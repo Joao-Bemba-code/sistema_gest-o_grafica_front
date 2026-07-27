@@ -1,0 +1,120 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --color-primary: #10b981;
+  --color-primary-container: #059669;
+  --color-on-primary: #002113;
+  --color-on-primary-container: #ecfdf5;
+  --color-primary-fixed: #34d399;
+  --color-primary-fixed-dim: #10b981;
+  --color-inverse-primary: #006c49;
+  --color-secondary: #38bdf8;
+  --color-secondary-container: #1e3a5f;
+  --color-on-secondary: #082f49;
+  --color-on-secondary-container: #38bdf8;
+  --color-secondary-fixed: #d3e4fe;
+  --color-secondary-fixed-dim: #b7c8e1;
+  --color-tertiary: #c8c6c5;
+  --color-tertiary-container: #a4a2a2;
+  --color-on-tertiary: #303030;
+  --color-on-tertiary-container: #393939;
+  --color-tertiary-fixed: #e5e2e1;
+  --color-tertiary-fixed-dim: #c8c6c5;
+  --color-error: #ff334b;
+  --color-error-container: #450a0a;
+  --color-on-error: #ffffff;
+  --color-on-error-container: #ffdad6;
+  --color-surface: #060912;
+  --color-surface-dim: #060912;
+  --color-surface-bright: #1e2638;
+  --color-surface-container-lowest: #030712;
+  --color-surface-container-low: #0b1326;
+  --color-surface-container: #0f172a;
+  --color-surface-container-high: #131b2e;
+  --color-surface-container-highest: #1e293b;
+  --color-surface-variant: #17223b;
+  --color-on-surface: #dae2fd;
+  --color-on-surface-variant: #94a3b8;
+  --color-outline: #4a5d52;
+  --color-outline-variant: #2d3449;
+  --color-background: #060912;
+  --color-on-background: #dae2fd;
+  --color-inverse-surface: #dae2fd;
+  --color-inverse-on-surface: #283044;
+  --color-accent-purple: #a855f7;
+  --color-accent-amber: #f59e0b;
+  --color-accent-cyan: #06b6d4;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist", ui-monospace, monospace;
+}
+
+:root:not(.dark) {
+  --color-primary: #059669;
+  --color-primary-container: #34d399;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #002113;
+  --color-primary-fixed: #34d399;
+  --color-primary-fixed-dim: #10b981;
+  --color-secondary: #0284c7;
+  --color-secondary-container: #bae6fd;
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-container: #0c4a6e;
+  --color-tertiary: #9e9a99;
+  --color-tertiary-container: #e5e2e1;
+  --color-on-tertiary: #ffffff;
+  --color-on-tertiary-container: #393939;
+  --color-error: #dc2626;
+  --color-error-container: #ffdad6;
+  --color-on-error: #ffffff;
+  --color-on-error-container: #410002;
+  --color-surface: #faf8ff;
+  --color-surface-dim: #d9d9e5;
+  --color-surface-bright: #faf8ff;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f3f3fe;
+  --color-surface-container: #ededf9;
+  --color-surface-container-high: #e7e7f3;
+  --color-surface-container-highest: #e1e2ed;
+  --color-surface-variant: #e1e2ed;
+  --color-on-surface: #18181b;
+  --color-on-surface-variant: #52525b;
+  --color-outline: #737686;
+  --color-outline-variant: #c3c6d7;
+  --color-background: #faf8ff;
+  --color-on-background: #18181b;
+  --color-inverse-surface: #2e3039;
+  --color-inverse-on-surface: #f0f0fb;
+}
+
+body {
+  font-family: var(--font-sans);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.glass-card {
+  background: linear-gradient(135deg, rgba(23, 31, 51, 0.7) 0%, rgba(11, 19, 38, 0.8) 100%);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.2);
+}
+
+:root:not(.dark) .glass-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.7) 0%, rgba(243, 243, 254, 0.8) 100%);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #1a2a22; border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #10b981; }
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
