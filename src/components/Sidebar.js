@@ -8,13 +8,13 @@ import Icon from "./Icon";
 
 const rotas = [
   { icone: "dashboard", nome: "Painel", para: "/" },
-  { icone: "receipt_long", nome: "Pedidos", para: "/orcamentos" },
+  { icone: "request_quote", nome: "Orçamentos", para: "/orcamentos" },
   { icone: "precision_manufacturing", nome: "Ordens de Produção", para: "/producao/ordens" },
-  { icone: "settings_suggest", nome: "Produção", para: "/producao" },
+  { icone: "factory", nome: "Produção", para: "/producao" },
   { icone: "preview", nome: "Pré-Impressão", para: "/pre-impressao" },
   { icone: "print", nome: "Impressão", para: "/impressao" },
   { icone: "handyman", nome: "Acabamento", para: "/acabamento" },
-  { icone: "badge", nome: "Cadastros", para: "/clientes" },
+  { icone: "groups", nome: "Cadastros", para: "/clientes" },
   { icone: "inventory_2", nome: "Estoque", para: "/estoque" },
   { icone: "analytics", nome: "Relatórios", para: "/relatorios" },
   { icone: "verified", nome: "Controlo Qualidade", para: "/qualidade" },
@@ -58,11 +58,6 @@ export default function Sidebar() {
             </div>
           </div>
         </div>
-
-        <button className="mx-4 my-3 px-4 py-3 bg-primary-container text-on-primary-container font-bold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition-all border border-primary/30">
-          <Icon name="add" />
-          Novo Trabalho
-        </button>
 
         <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto custom-scrollbar">
           {rotas.map((rota) => {

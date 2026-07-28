@@ -1,289 +1,416 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import Sidebar from "@/components/Sidebar";
 import TopBar, { Breadcrumbs } from "@/components/TopBar";
 import Icon from "@/components/Icon";
 
-const inkChannels = [
-  { id: "C", label: "CIANO", level: 75, color: "#00e5ff", viscosity: "12.4 cP", temp: "24.1 °C", calib: "OK [V2]" },
-  { id: "M", label: "MAGENTA", level: 50, color: "#ff4081", viscosity: "11.8 cP", temp: "25.5 °C", calib: "OK [V2]" },
-  { id: "Y", label: "AMARELO", level: 92, color: "#ffd740", viscosity: "12.1 cP", temp: "23.9 °C", calib: "OK [V2]" },
-  { id: "K", label: "PRETO", level: 32, color: "#b0bec5", viscosity: "13.2 cP", temp: "26.8 °C", calib: "SINCRONIZAR" },
-];
-
-const logMessages = [
-  "[14:22:01] NODE_01 SINCRONIZADO COM SUCESSO",
-  "[14:22:05] AQUECEDOR_UV_P2 POTÊNCIA ESTÁVEL: 4.2kW",
-  "[14:22:12] PACOTE_RECEBIDO: SIG_7748_V",
-  "[14:23:44] CABEÇA_INK_JET_A: ALINHAMENTO OK",
-  "[14:24:01] VERIF_LIMITE_TEMP: PASSOU",
-  "[14:24:15] ALERTA: TENSÃO_ALIMENTADOR_LIM_INF",
-  "[14:24:20] CORREÇÃO_AUTOMÁTICA_ATIVADA",
-  "[14:24:22] TENSÃO_NOMINAL",
-  "[14:25:01] AJUSTE_TENSÃO_ROLERO: +0.2N",
-  "[14:25:14] DENSIDADE_UV_ESTÁVEL",
-  "[14:25:30] NÍVEL_BUFFER_PRONTO",
-  "[14:26:01] VENTILADOR_REFRIG_AUTOMÁTICO",
-  "[14:26:15] CALIBRAÇÃO_VELOCIDADE_BOMBA_OK",
-  "[14:26:30] PACOTE_DADOS_VERIFICADO",
-];
-
-const materialLines = [
-  { name: "PAPEL_BRILHO_80G", color: "#c3f5ff", data: [150, 120, 140, 80, 110, 60, 90] },
-  { name: "PAPEL_FOSCO_120G", color: "#b7c8e1", data: [170, 140, 160, 120, 140, 100, 130] },
-  { name: "REVESTIMENTO_ESPECIAL", color: "#ffb4ab", data: [190, 180, 195, 170, 185, 160, 155] },
-];
-
 const kpis = [
-  { icon: "request_quote", label: "Orçamentos Hoje", value: "23", badge: "+8%", barColor: "bg-primary", barWidth: "76%" },
-  { icon: "precision_manufacturing", label: "Em Produção", value: "47", unit: "ativos", badge: "Alta", barColor: "bg-primary", barWidth: "70%" },
-  { icon: "task_alt", label: "Concluídos", value: "156", unit: "mês", badge: "+12%", barColor: "bg-primary", barWidth: "85%" },
-  { icon: "paid", label: "Faturação", value: "Kz 285k", badge: "+5.2%", barColor: "bg-primary", barWidth: "72%" },
+  {
+    icon: "request_quote",
+    label: "Orçamento do Dia",
+    value: "Kz 12.850",
+    badge: "+8%",
+    barColor: "bg-primary",
+    barWidth: "64%",
+  },
+  {
+    icon: "check_circle",
+    label: "Orçamentos Aprovados",
+    value: "23",
+    unit: "hoje",
+    badge: "+5",
+    badgeColor: "text-primary dark:text-primary/80",
+    barColor: "bg-primary",
+    barWidth: "76%",
+  },
+  {
+    icon: "precision_manufacturing",
+    label: "Trabalhos em Produção",
+    value: "47",
+    unit: "ativos",
+    badge: "Alta Demanda",
+    badgeColor: "text-primary dark:text-primary/80",
+    barColor: "bg-primary",
+    barWidth: "70%",
+  },
+  {
+    icon: "task_alt",
+    label: "Trabalhos Concluídos",
+    value: "156",
+    unit: "este mês",
+    badge: "+12%",
+    badgeColor: "text-primary dark:text-primary/80",
+    barColor: "bg-primary",
+    barWidth: "85%",
+  },
+  {
+    icon: "paid",
+    label: "Faturação Mensal",
+    value: "Kz 285.400",
+    badge: "+5.2%",
+    badgeColor: "text-primary dark:text-primary/80",
+    barColor: "bg-primary",
+    barWidth: "72%",
+  },
+  {
+    icon: "groups",
+    label: "Clientes Ativos",
+    value: "342",
+    badge: "+18",
+    badgeColor: "text-primary dark:text-primary/80",
+    barColor: "bg-primary",
+    barWidth: "68%",
+  },
+  {
+    icon: "warning",
+    label: "Trabalhos em Atraso",
+    value: "8",
+    unit: "pendentes",
+    badge: "Atenção",
+    badgeColor: "text-red-600 dark:text-red-400",
+    barColor: "bg-red-500",
+    barWidth: "16%",
+  },
 ];
 
-function CircularGauge({ level, color, size = 128 }) {
-  const r = 42;
-  const circumference = 2 * Math.PI * r;
-  const offset = circumference - (level / 100) * circumference;
-  return (
-    <div className="relative" style={{ width: size, height: size }}>
-      <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-        <circle cx="50" cy="50" fill="transparent" r={r} stroke="currentColor" strokeWidth="8" className="text-surface-container-highest" />
-        <circle cx="50" cy="50" fill="transparent" r={r} stroke={color} strokeWidth="8" strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="butt" style={{ transition: "stroke-dashoffset 1s ease" }} />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-data-lg text-data-lg text-on-surface">{level}%</span>
-        <span className="text-[9px] text-on-surface-variant uppercase font-bold tracking-wider">NÍVEL</span>
-      </div>
-    </div>
-  );
-}
+const activities = [
+  {
+    name: "Ana Costa",
+    action: "cadastrou novo pedido de impressão",
+    tag: "Venda",
+    description: "Pedido #8492 — Catálogos Institucionais, 1.000 unidades, 48 páginas.",
+    time: "2 minutos atrás",
+    borderColor: "border-primary",
+    imgSrc:
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuDtzEYNW6OYtKqZzk5DwikYshvA0YesUmrfMJvhVKrTp2DgUC51L19EeUqWKdhPCSPu11ZPVbErIUBJOvHqmSjmfMqk1rgYM9WZ6n0E3EZGR3NJbrAwtbHamHjx2Vr45-xJGemd1LIkTAQ7nLMIgNpKiHSw0gSLihgtMkJyTkKyKPr4WCnN_HXFbYYR178U6trY2NuWEJ1RpHo_H7EO3Hz2KpzwG4u4BS61OhFYn-AxPfyDz0NCHv52pdh5_Ruibo_VESLn6Cy5QSh_",
+  },
+  {
+    name: "Ricardo Silva",
+    action: "finalizou ajuste de calibragem",
+    tag: "Manutenção",
+    description: "Máquina Offset 1 — ajuste de densidade e registro concluído.",
+    time: "18 minutos atrás",
+    borderColor: "border-primary",
+    imgSrc:
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuAqQvkib2qJHeFx6Xm1jbYpQQlLlRzk5zYkUOgMgXcVS2Q7JfKc202gNLlFdWS3hdwA6Hu9xhoo0RQnHP7xpGkqVvbictVBeJ4CDD30rdFUAxFkEd7nh5OFhAClGewE_oiVhCrFIVh6OqojsYpd4V2yLVHmF91GmTnedFMMtzyf4JzlA5ph8ZI8QRPt_y0lG655lCDL-92hSB0jsagJRAvBGZG7k0Q9Fgt14IcRT3CTsjwwhyPT7oaamYqEMFCI9860DvF_RtdZnurF",
+  },
+  {
+    name: "Departamento Técnico",
+    action: "aprovou layout de embalagem",
+    tag: "Aprovação",
+    description: "Embalagem Kraft Personalizada — arte-final verificada e liberada.",
+    time: "1 hora atrás",
+    borderColor: "border-primary",
+    imgSrc: null,
+  },
+];
 
-function ThermalChart() {
-  const [bars, setBars] = useState([]);
+const calendarDays = [
+  { day: 28, dim: true },
+  { day: 29, dim: true },
+  { day: 30, dim: true },
+  { day: 1 },
+  { day: 2 },
+  { day: 3 },
+  { day: 4 },
+  { day: 5, active: true },
+  { day: 6, dot: "bg-primary" },
+  { day: 7 },
+  { day: 8 },
+  { day: 9, dot: "bg-primary" },
+  { day: 10 },
+  { day: 11 },
+];
 
-  useEffect(() => {
-    const generated = Array.from({ length: 48 }, () => ({
-      height: Math.floor(Math.random() * 60 + 40),
-      isHigh: Math.random() > 0.8,
-      opacity: Math.random() * 0.8 + 0.2,
-    }));
-    setBars(generated);
-  }, []);
+const scheduleItems = [
+  {
+    month: "Mai",
+    day: "06",
+    title: "Entrega Pedido #742",
+    subtitle: "Campanha Marketing Regional",
+    borderColor: "border-primary",
+  },
+  {
+    month: "Mai",
+    day: "09",
+    title: "Manutenção Preventiva",
+    subtitle: "Impressora Digital HP Indigo",
+    borderColor: "border-primary",
+  },
+];
 
-  return (
-    <div className="flex-1 grid grid-cols-1 sm:grid-cols-12 lg:grid-cols-24 h-32 gap-[2px] items-end">
-      {bars.map((bar, i) => (
-        <div
-          key={i}
-          className={`rounded-t-[1px] transition-all duration-1000 hover:scale-y-110 ${bar.isHigh ? "bg-primary" : "bg-secondary-container"}`}
-          style={{ height: `${bar.height}%`, opacity: bar.opacity }}
-        />
-      ))}
-    </div>
-  );
-}
-
-function TerminalLog() {
-  const [logs, setLogs] = useState(logMessages);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const time = new Date().toLocaleTimeString("pt-PT", { hour12: false });
-      const msgs = [
-        "PACOTE_DADOS_VERIFICADO",
-        "AJUSTE_TENSÃO_ROLERO: +0.2N",
-        "DENSIDADE_UV_ESTÁVEL",
-        "NÍVEL_BUFFER_PRONTO",
-        "VENTILADOR_REFRIG_AUTOMÁTICO",
-        "CALIBRAÇÃO_VELOCIDADE_BOMBA_OK",
-      ];
-      const newLog = `[${time}] ${msgs[Math.floor(Math.random() * msgs.length)]}`;
-      setLogs((prev) => [...prev.slice(-14), newLog]);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
-  }, [logs]);
-
-  return (
-    <div ref={ref} className="h-48 overflow-y-auto space-y-1 font-data-md text-data-md text-primary/70 pr-2">
-      {logs.map((log, i) => {
-        const isWarn = log.includes("ALERTA");
-        return (
-          <p key={i} className={`leading-tight ${isWarn ? "text-error/80" : ""}`}>
-            <span className="text-on-surface-variant">{log.match(/\[.*?\]/)?.[0]}</span>{" "}
-            {log.replace(/\[.*?\]\s*/, "")}
-          </p>
-        );
-      })}
-    </div>
-  );
-}
-
-function MaterialChart() {
-  const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul"];
-  const viewW = 1000;
-  const viewH = 200;
-
-  function buildPath(data) {
-    const max = 200;
-    const step = viewW / (data.length - 1);
-    return data
-      .map((v, i) => {
-        const x = i * step;
-        const y = viewH - (v / max) * viewH;
-        return i === 0 ? `M${x} ${y}` : `L${x} ${y}`;
-      })
-      .join(" ");
-  }
-
-  return (
-    <div className="w-full h-64 relative bg-surface-container-highest/20 border border-outline-variant/30 rounded-sm overflow-hidden">
-      <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: "radial-gradient(circle, #3b494c 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
-      <svg className="w-full h-full" preserveAspectRatio="none" viewBox={`0 0 ${viewW} ${viewH}`}>
-        {[50, 100, 150].map((y) => (
-          <line key={y} x1="0" x2={viewW} y1={y} y2={y} stroke="#3b494c" strokeWidth="0.5" />
-        ))}
-        {materialLines.map((line) => (
-          <path key={line.name} d={buildPath(line.data)} fill="none" stroke={line.color} strokeWidth="2" />
-        ))}
-      </svg>
-      <div className="absolute left-2 top-0 bottom-0 flex flex-col justify-between text-[9px] text-on-surface-variant/60 py-2">
-        <span>100%</span>
-        <span>75%</span>
-        <span>50%</span>
-        <span>25%</span>
-        <span>0%</span>
-      </div>
-    </div>
-  );
-}
+const consumptionItems = [
+  { label: "Vinil Adesivo Brilho", time: "2m atrás", dotColor: "bg-primary" },
+  { label: "Lona Front Light", time: "15m atrás", dotColor: "bg-primary" },
+];
 
 export default function DashboardPage() {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
+
       <main className="flex-1 md:ml-64 min-h-screen flex flex-col">
         <TopBar />
-        <div className="p-4 sm:p-6 md:p-8 space-y-6 flex-1">
+
+        <div className="p-6 md:p-8 space-y-6">
           <Breadcrumbs />
 
-          {/* KPIs */}
-          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             {kpis.map((kpi) => (
-              <div key={kpi.label} className="bg-surface-container p-5 rounded-xl border border-outline-variant flex flex-col gap-2 relative overflow-hidden group hover:border-primary/30 transition-all">
-                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+              <div
+                key={kpi.label}
+                className="bg-white dark:bg-zinc-900 p-5 md:p-6 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:shadow-md hover:border-primary/30 dark:hover:border-primary/20 transition-all duration-200 flex flex-col gap-2 relative overflow-hidden group"
+              >
+                <div className="absolute top-0 right-0 p-5 opacity-5 group-hover:opacity-10 transition-opacity">
                   <Icon name={kpi.icon} className="text-4xl" />
                 </div>
-                <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">{kpi.label}</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">{kpi.label}</p>
                 <div className="flex items-end gap-2">
-                  <h3 className="text-2xl font-bold text-on-surface">{kpi.value}</h3>
-                  {kpi.unit && <span className="text-sm text-on-surface-variant mb-1">{kpi.unit}</span>}
-                  <span className="text-xs font-bold text-primary mb-1 flex items-center gap-0.5">{kpi.badge} <Icon name="trending_up" className="text-[12px]" /></span>
+                  <h3 className="text-2xl font-bold text-zinc-800 dark:text-zinc-100">
+                    {kpi.value}{" "}
+                    {kpi.unit && (
+                      <span className="text-sm font-normal text-zinc-500 dark:text-zinc-400">{kpi.unit}</span>
+                    )}
+                  </h3>
+                  <span
+                    className={`font-semibold text-xs mb-1 flex items-center ${kpi.badgeColor || "text-primary"}`}
+                  >
+                    {kpi.badge}
+                    {kpi.badge === "+8%" || kpi.badge === "+12%" || kpi.badge === "+5.2%" || kpi.badge === "+5" || kpi.badge === "+18" ? (
+                      <Icon name="trending_up" className="text-[14px]" />
+                    ) : null}
+                  </span>
                 </div>
-                <div className="w-full h-1.5 bg-surface-container-highest rounded-full mt-1 overflow-hidden">
-                  <div className={`h-full ${kpi.barColor} rounded-full`} style={{ width: kpi.barWidth }} />
+                <div className="w-full h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full mt-1 overflow-hidden">
+                  <div
+                    className={`h-full ${kpi.barColor} rounded-full transition-all duration-700`}
+                    style={{ width: kpi.barWidth }}
+                  />
                 </div>
               </div>
             ))}
           </section>
 
-          {/* Live Ink Matrix */}
-          <section className="bg-surface-container-low border border-outline-variant rounded-xl p-4 sm:p-6 overflow-hidden relative">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-2">
-                <Icon name="format_color_fill" className="text-primary text-lg" />
-                <h2 className="text-base sm:text-lg font-bold text-on-surface uppercase tracking-tight">Matriz de Tinta ao Vivo</h2>
-              </div>
-              <span className="flex items-center gap-2 text-[10px] font-bold text-primary uppercase tracking-widest">
-                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" /> NOMINAL
-              </span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {inkChannels.map((ch) => (
-                <div key={ch.id} className="bg-surface-container-high border border-outline-variant p-4 flex flex-col items-center rounded-xl">
-                  <div className="w-full flex justify-between items-start mb-4">
-                    <span className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest">CANAL_0{inkChannels.indexOf(ch) + 1} [{ch.label}]</span>
-                    <Icon name="info" className="text-on-surface-variant/40 text-[16px]" />
-                  </div>
-                  <CircularGauge level={ch.level} color={ch.color} />
-                  <div className="w-full space-y-1.5 border-t border-outline-variant/30 pt-3 mt-4 text-xs">
-                    <div className="flex justify-between font-data-md"><span className="text-on-surface-variant">VISCOSIDADE</span><span className="text-on-surface">{ch.viscosity}</span></div>
-                    <div className="flex justify-between font-data-md"><span className="text-on-surface-variant">TEMP</span><span className="text-on-surface">{ch.temp}</span></div>
-                    <div className="flex justify-between font-data-md"><span className="text-on-surface-variant">CALIBRAÇÃO</span><span className={ch.calib.includes("SINCRONIZAR") ? "text-tertiary" : "text-primary"}>{ch.calib}</span></div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Thermal Production Flow */}
-            <section className="lg:col-span-2 bg-surface-container-low border border-outline-variant rounded-xl p-4 sm:p-6 flex flex-col">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Icon name="thermostat" className="text-primary text-lg" />
-                  <h2 className="text-[10px] font-bold text-on-surface uppercase tracking-widest">Fluxo de Produção Térmico</h2>
+            <section className="lg:col-span-2 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <div>
+                  <h2 className="text-base font-semibold text-zinc-800 dark:text-zinc-200">
+                    Volume de Impressão Mensal
+                  </h2>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    Produção vs. Prazo de Entrega (Acumulado)
+                  </p>
                 </div>
-                <div className="flex gap-3">
-                  <span className="flex items-center gap-1.5 text-[10px] font-bold text-on-surface-variant">
-                    <span className="w-2.5 h-2.5 bg-primary" /> ALTA
-                  </span>
-                  <span className="flex items-center gap-1.5 text-[10px] font-bold text-on-surface-variant">
-                    <span className="w-2.5 h-2.5 bg-secondary-container" /> NORMAL
-                  </span>
+                <div className="flex gap-1">
+                  <button className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
+                    Semanal
+                  </button>
+                  <button className="px-3 py-1 rounded-full bg-primary text-white text-xs font-medium shadow-sm hover:bg-primary/90 transition-colors">
+                    Mensal
+                  </button>
+                  <button className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
+                    Anual
+                  </button>
                 </div>
               </div>
-              <ThermalChart />
-              <div className="mt-3 flex justify-between text-[10px] text-on-surface-variant font-bold uppercase tracking-widest border-t border-outline-variant/30 pt-2">
-                <span>00:00</span><span>04:00</span><span>08:00</span><span>12:00</span><span>16:00</span><span>20:00</span><span>00:00</span>
+
+              <div className="w-full h-64 relative flex items-end gap-2 px-2">
+                <div className="absolute inset-0 border-b border-l border-zinc-200 dark:border-zinc-700 flex flex-col justify-between">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="border-t border-zinc-100 dark:border-zinc-800 w-full" />
+                  ))}
+                </div>
+                <svg className="w-full h-full absolute inset-0" preserveAspectRatio="none" viewBox="0 0 100 100">
+                  <path d="M0 80 Q 20 60, 40 70 T 80 30 T 100 15" fill="none" stroke="#4edea3" strokeWidth="2" />
+                  <path d="M0 80 Q 20 60, 40 70 T 80 30 T 100 15 V 100 H 0 Z" fill="url(#grad1)" opacity="0.08" />
+                  <path d="M0 85 Q 25 80, 50 75 T 75 60 T 100 55" fill="none" stroke="#4edea3" strokeWidth="2" />
+                  <defs>
+                    <linearGradient id="grad1" x1="0%" x2="0%" y1="0%" y2="100%">
+                      <stop offset="0%" stopColor="#4edea3" stopOpacity="1" />
+                      <stop offset="100%" stopColor="#4edea3" stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
+              <div className="flex justify-between mt-3 px-2 text-[10px] text-zinc-400 dark:text-zinc-500 font-semibold uppercase tracking-wider">
+                <span>Jan</span>
+                <span>Fev</span>
+                <span>Mar</span>
+                <span>Abr</span>
+                <span>Mai</span>
+                <span>Jun</span>
               </div>
             </section>
 
-            {/* Active Machine Nodes */}
-            <section className="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 relative overflow-hidden min-h-[320px]">
-              <div className="flex items-center gap-2 mb-4">
-                <Icon name="terminal" className="text-primary text-[16px]" />
-                <h2 className="text-[10px] font-bold text-on-surface uppercase tracking-widest">Nós de Máquinas Ativos</h2>
+            <section className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 flex flex-col p-6">
+              <h2 className="text-base font-semibold mb-4 text-zinc-800 dark:text-zinc-200">
+                Status de Maquinário e Insumos
+              </h2>
+              <div className="flex-1 grid grid-cols-1 gap-4">
+                <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30 p-4 rounded-lg flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-600 dark:text-red-400">
+                      <Icon name="inventory_2" className="text-lg" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+                        Estoque Baixo: Papel Couché 150g
+                      </p>
+                      <p className="text-[10px] text-red-600 dark:text-red-400 font-medium">
+                        Apenas 5 resmas disponíveis
+                      </p>
+                    </div>
+                  </div>
+                  <button className="text-red-600 dark:text-red-400 font-semibold text-sm hover:underline">
+                    Repor
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 flex-1">
+                  <div className="bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded-lg flex flex-col justify-center border border-zinc-200 dark:border-zinc-700">
+                    <Icon name="imagesearch_roller" className="text-primary mb-1" />
+                    <p className="text-[10px] uppercase font-semibold text-zinc-500 dark:text-zinc-400">
+                      Tinta CMYK
+                    </p>
+                    <p className="text-lg font-bold text-zinc-800 dark:text-zinc-100">78%</p>
+                  </div>
+                  <div className="bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded-lg flex flex-col justify-center border border-zinc-200 dark:border-zinc-700">
+                    <Icon name="settings_input_component" className="text-primary mb-1" />
+                    <p className="text-[10px] uppercase font-semibold text-zinc-500 dark:text-zinc-400">
+                      Offset 1
+                    </p>
+                    <p className="text-lg font-bold text-primary dark:text-primary/80">Ativa</p>
+                  </div>
+                </div>
+
+                <div className="mt-auto pt-4 border-t border-zinc-200 dark:border-zinc-800">
+                  <p className="text-sm font-semibold mb-2 text-zinc-800 dark:text-zinc-200">Consumo Recente</p>
+                  <div className="space-y-2">
+                    {consumptionItems.map((item) => (
+                      <div key={item.label} className="flex items-center justify-between text-sm">
+                        <span className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
+                          <span className={`w-2 h-2 rounded-full ${item.dotColor}`} />
+                          {item.label}
+                        </span>
+                        <span className="text-zinc-400 dark:text-zinc-500 text-xs">{item.time}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
-              {/* Waveform */}
-              <div className="h-12 mb-4 border-b border-outline-variant/30 overflow-hidden" style={{ maskImage: "linear-gradient(to right, transparent, black 15%, black 85%, transparent)" }}>
-                <svg className="w-full h-full text-primary" viewBox="0 0 400 60">
-                  <path d="M0 30 L50 30 L60 10 L70 50 L80 30 L150 30 L160 5 L170 55 L180 30 L250 30 L260 15 L270 45 L280 30 L350 30 L360 0 L370 60 L380 30 L400 30" fill="none" stroke="currentColor" strokeDasharray="1000" strokeDashoffset="1000" strokeWidth="1.5">
-                    <animate attributeName="stroke-dashoffset" dur="4s" from="1000" repeatCount="indefinite" to="0" />
-                  </path>
-                </svg>
-              </div>
-              <TerminalLog />
             </section>
           </div>
 
-          {/* Material Consumption */}
-          <section className="bg-surface-container-low border border-outline-variant rounded-xl p-4 sm:p-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-              <div className="flex items-center gap-2">
-                <Icon name="show_chart" className="text-primary text-lg" />
-                <h2 className="text-base sm:text-lg font-bold text-on-surface uppercase tracking-tight">Consumo de Materiais</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            <section className="xl:col-span-2 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-6 overflow-hidden">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-base font-semibold text-zinc-800 dark:text-zinc-200">
+                  Atividades da Produção
+                </h2>
+                <button className="text-primary dark:text-primary/80 font-medium text-sm flex items-center gap-1 hover:gap-2 transition-all">
+                  Ver Histórico Completo
+                  <Icon name="arrow_forward" className="text-[18px]" />
+                </button>
               </div>
-              <div className="flex gap-3 flex-wrap">
-                {materialLines.map((l) => (
-                  <span key={l.name} className="flex items-center gap-1.5 text-[10px] font-bold text-on-surface-variant border border-outline-variant px-2.5 py-1 rounded-sm uppercase tracking-widest">
-                    <span className="w-3 h-[2px] rounded-sm" style={{ backgroundColor: l.color }} /> {l.name}
-                  </span>
+
+              <div className="space-y-4">
+                {activities.map((activity, idx) => (
+                  <div key={idx} className="flex gap-4 group">
+                    <div className="flex flex-col items-center">
+                      <div className={`w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden border-2 ${activity.borderColor}`}>
+                        {activity.imgSrc ? (
+                          <Image className="object-cover" alt={activity.name} src={activity.imgSrc} width={40} height={40} unoptimized />
+                        ) : (
+                          <div className="w-full h-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-zinc-500 dark:text-zinc-400">
+                            <Icon name="description" className="text-lg" />
+                          </div>
+                        )}
+                      </div>
+                      {idx < activities.length - 1 && (
+                        <div className="w-px h-full bg-zinc-200 dark:bg-zinc-800 mt-2" />
+                      )}
+                    </div>
+                    <div className={`flex-1 ${idx < activities.length - 1 ? "pb-4" : ""}`}>
+                      <div className="flex justify-between items-start gap-2">
+                        <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+                          {activity.name}{" "}
+                          <span className="font-normal text-zinc-500 dark:text-zinc-400">
+                            {activity.action}
+                          </span>
+                        </p>
+                        <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded uppercase shrink-0">
+                          {activity.tag}
+                        </span>
+                      </div>
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+                        {activity.description}
+                      </p>
+                      <p className="text-[11px] text-primary dark:text-primary/80 font-medium mt-2">
+                        {activity.time}
+                      </p>
+                    </div>
+                  </div>
                 ))}
               </div>
-            </div>
-            <MaterialChart />
-          </section>
+            </section>
+
+            <section className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-6 flex flex-col">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-base font-semibold text-zinc-800 dark:text-zinc-200">Agenda</h2>
+                <span className="text-sm font-medium text-primary dark:text-primary/80">
+                  Maio 2024
+                </span>
+              </div>
+
+              <div className="grid grid-cols-7 gap-1 text-center mb-4">
+                {["D", "S", "T", "Q", "Q", "S", "S"].map((d, i) => (
+                  <span key={i} className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500">
+                    {d}
+                  </span>
+                ))}
+                {calendarDays.map((item, i) => (
+                  <div key={i} className="relative">
+                    <span className={`inline-flex items-center justify-center w-8 h-8 text-xs rounded-lg cursor-pointer
+                      ${item.dim ? "opacity-30" : "hover:bg-primary/10 dark:hover:bg-primary/20 text-zinc-700 dark:text-zinc-300"}
+                      ${item.active ? "bg-primary text-white font-bold hover:bg-primary/90" : ""}
+                    `}>
+                      {item.day}
+                    </span>
+                    {item.dot && (
+                      <div className={`absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${item.dot}`} />
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-auto space-y-2">
+                {scheduleItems.map((item) => (
+                  <div key={item.day} className={`p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg border-l-4 ${item.borderColor} flex gap-4 items-center`}>
+                    <div className="text-center leading-tight">
+                      <p className="text-[10px] font-semibold uppercase text-zinc-500 dark:text-zinc-400">
+                        {item.month}
+                      </p>
+                      <p className="text-xl font-bold text-zinc-800 dark:text-zinc-200">
+                        {item.day}
+                      </p>
+                    </div>
+                    <div className="flex-1 overflow-hidden">
+                      <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 truncate">{item.title}</p>
+                      <p className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">{item.subtitle}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
         </div>
 
-        <footer className="mt-auto p-6 text-center border-t border-outline-variant bg-surface-container">
-          <p className="text-sm text-on-surface-variant">SIGRAF — Sistema de Gestão para Indústria Gráfica</p>
+        <footer className="mt-auto p-6 text-center border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
+          <p className="text-sm text-zinc-400 dark:text-zinc-500">
+            SIGRAF — Sistema de Gestão para Indústria Gráfica
+          </p>
         </footer>
       </main>
     </div>
