@@ -6,7 +6,7 @@ import Icon from "./Icon";
 
 const breadcrumbs = {
   "/": ["Painel"],
-  "/orcamentos": ["Pedidos", "Todos"],
+  "/orcamentos": ["Orçamentos", "Todos"],
   "/producao/ordens": ["Produção", "Ordens"],
   "/producao": ["Produção"],
   "/pre-impressao": ["Pré-Impressão"],
@@ -40,7 +40,7 @@ export default function TopBar() {
         </div>
       </div>
       <div className="flex items-center gap-2 sm:gap-5">        <nav className="hidden md:flex gap-5">
-          <a className="text-primary font-bold border-b-2 border-primary pb-1 text-xs uppercase tracking-widest transition-all">Pedidos</a>
+          <a className="text-primary font-bold border-b-2 border-primary pb-1 text-xs uppercase tracking-widest transition-all">Orçamentos</a>
           <a className="text-on-surface-variant hover:text-primary transition-all text-xs font-bold uppercase tracking-widest">Produção</a>
         </nav>
         <div className="flex items-center gap-3">
