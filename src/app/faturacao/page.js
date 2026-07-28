@@ -95,7 +95,7 @@ export default function FaturacaoPage() {
 
               <section className="bg-surface-container dark:bg-surface-container rounded-xl border border-outline-variant overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-sm hidden md:table">
                     <thead>
                       <tr className="border-b border-outline-variant bg-surface-container-highest">
                         {["Factura", "Data", "Cliente", "OP", "Valor", "Método", "Referência", "Estado"].map((h) => (
@@ -122,6 +122,29 @@ export default function FaturacaoPage() {
                       })}
                     </tbody>
                   </table>
+                  <div className="md:hidden space-y-3 p-3">
+                    {filtered.map((p) => {
+                      const ec = estadoConfig[p.estado];
+                      const mc = metodos[p.metodo];
+                      return (
+                        <div key={p.id} className="bg-surface-container-high rounded-xl p-4 border border-outline-variant/50 space-y-2">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="text-xs font-bold text-on-surface">{p.id}</p>
+                              <p className="text-[10px] text-on-surface-variant">{p.cliente} · {p.op}</p>
+                            </div>
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${ec.color}`}><span className={`w-1.5 h-1.5 rounded-full ${ec.dot}`} />{ec.label}</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-[10px]">
+                            <div><span className="text-on-surface-variant">Data:</span> <span className="font-medium text-on-surface">{new Date(p.data).toLocaleDateString("pt-AO")}</span></div>
+                            <div><span className="text-on-surface-variant">Valor:</span> <span className="font-bold text-on-surface">Kz {p.valor.toLocaleString("pt-AO")}</span></div>
+                            <div className="flex items-center gap-1"><span className="text-on-surface-variant">Método:</span> <span className={`flex items-center gap-1 ${mc.color}`}><Icon name={mc.icon} className="text-[12px]" />{mc.label}</span></div>
+                            <div><span className="text-on-surface-variant">Ref:</span> <span className="font-mono text-on-surface-variant">{p.referencia || "—"}</span></div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </section>
             </>

@@ -109,7 +109,7 @@ export default function RelatoriosPage() {
               <section className="bg-surface-container dark:bg-surface-container rounded-xl border border-outline-variant p-6">
                 <h2 className="text-base font-semibold text-on-surface mb-4">Vendas por Período</h2>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-sm hidden md:table">
                     <thead>
                       <tr className="border-b border-outline-variant bg-surface-container-high/50">
                         {["Mês", "Valor", "Custos", "Lucro", "Margem", "Trabalhos"].map((h) => (
@@ -134,10 +134,30 @@ export default function RelatoriosPage() {
                       })}
                     </tbody>
                   </table>
+                  <div className="md:hidden space-y-3 p-3">
+                    {vendasPorMes.filter(m => m.valor > 0).map((m) => {
+                      const lucro = m.valor - m.custos;
+                      const margem = ((lucro / m.valor) * 100).toFixed(1);
+                      return (
+                        <div key={m.mes} className="bg-surface-container-high rounded-xl p-4 border border-outline-variant/50 space-y-2">
+                          <div className="flex justify-between items-center">
+                            <p className="text-sm font-bold text-on-surface">{m.mes}</p>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary">{margem}%</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-[10px]">
+                            <div><span className="text-on-surface-variant">Vendas:</span> <span className="font-bold text-on-surface">Kz {m.valor.toLocaleString("pt-AO")}</span></div>
+                            <div><span className="text-on-surface-variant">Custos:</span> <span className="text-on-surface-variant">Kz {m.custos.toLocaleString("pt-AO")}</span></div>
+                            <div><span className="text-on-surface-variant">Lucro:</span> <span className="font-bold text-primary">Kz {lucro.toLocaleString("pt-AO")}</span></div>
+                            <div><span className="text-on-surface-variant">Trabalhos:</span> <span className="text-on-surface">{m.jobs}</span></div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </section>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="bg-surface-container dark:bg-surface-container rounded-xl border border-outline-variant p-5 text-center">
                   <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Total Período</p>
                   <p className="text-2xl font-bold text-on-surface mt-2">Kz 465.500</p>
@@ -158,7 +178,7 @@ export default function RelatoriosPage() {
             <section className="bg-surface-container dark:bg-surface-container rounded-xl border border-outline-variant p-6">
               <h2 className="text-base font-semibold text-on-surface mb-4">Clientes Mais Ativos</h2>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm hidden md:table">
                   <thead>
                     <tr className="border-b border-outline-variant bg-surface-container-high/50">
                       {["#", "Cliente", "Total Gasto", "Pedidos", "Ticket Médio", "Último Pedido"].map((h) => (
@@ -179,6 +199,18 @@ export default function RelatoriosPage() {
                     ))}
                   </tbody>
                 </table>
+                <div className="md:hidden space-y-3 p-3">
+                  {topClientes.map((c, i) => (
+                    <div key={c.nome} className="bg-surface-container-high rounded-xl p-4 border border-outline-variant/50 flex items-center gap-3">
+                      <span className="w-8 h-8 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-on-surface truncate">{c.nome}</p>
+                        <p className="text-[10px] text-on-surface-variant">{c.pedidos} pedidos · Ticket: Kz {(c.total / c.pedidos).toLocaleString("pt-AO")}</p>
+                      </div>
+                      <p className="text-xs font-bold text-primary flex-shrink-0">Kz {c.total.toLocaleString("pt-AO")}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </section>
           )}
@@ -187,7 +219,7 @@ export default function RelatoriosPage() {
             <section className="bg-surface-container dark:bg-surface-container rounded-xl border border-outline-variant p-6">
               <h2 className="text-base font-semibold text-on-surface mb-4">Produtos Mais Vendidos</h2>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm hidden md:table">
                   <thead>
                     <tr className="border-b border-outline-variant bg-surface-container-high/50">
                       {["#", "Produto", "Vendas", "Quantidade", "Margem"].map((h) => (
@@ -207,6 +239,18 @@ export default function RelatoriosPage() {
                     ))}
                   </tbody>
                 </table>
+                <div className="md:hidden space-y-3 p-3">
+                  {topProdutos.map((p, i) => (
+                    <div key={p.nome} className="bg-surface-container-high rounded-xl p-4 border border-outline-variant/50 flex items-center gap-3">
+                      <span className="w-8 h-8 rounded-full bg-secondary-container/30 text-secondary text-xs font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-on-surface truncate">{p.nome}</p>
+                        <p className="text-[10px] text-on-surface-variant">{p.un} · Margem: {p.margem}</p>
+                      </div>
+                      <p className="text-xs font-bold text-primary flex-shrink-0">Kz {p.vendas.toLocaleString("pt-AO")}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </section>
           )}
@@ -215,7 +259,7 @@ export default function RelatoriosPage() {
             <section className="bg-surface-container dark:bg-surface-container rounded-xl border border-outline-variant p-6">
               <h2 className="text-base font-semibold text-on-surface mb-4">Consumo de Matérias-Primas</h2>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm hidden md:table">
                   <thead>
                     <tr className="border-b border-outline-variant bg-surface-container-high/50">
                       {["Material", "Consumo", "Custo", "Estado no Stock"].map((h) => (
@@ -236,6 +280,20 @@ export default function RelatoriosPage() {
                     ))}
                   </tbody>
                 </table>
+                <div className="md:hidden space-y-3 p-3">
+                  {consumoMateriais.map((m) => (
+                    <div key={m.nome} className="bg-surface-container-high rounded-xl p-4 border border-outline-variant/50 flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-on-surface truncate">{m.nome}</p>
+                        <p className="text-[10px] text-on-surface-variant">{m.consumo}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-xs font-bold text-tertiary">{m.custo}</p>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${m.estoque === "Baixo" ? "bg-error-container/10 text-error" : "bg-primary/10 text-primary"}`}>{m.estoque}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </section>
           )}
@@ -244,7 +302,7 @@ export default function RelatoriosPage() {
             <section className="bg-surface-container dark:bg-surface-container rounded-xl border border-outline-variant p-6">
               <h2 className="text-base font-semibold text-on-surface mb-4">Lucro por Trabalho</h2>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm hidden md:table">
                   <thead>
                     <tr className="border-b border-outline-variant bg-surface-container-high/50">
                       {["OP", "Produto", "Receita", "Custo", "Lucro", "Margem"].map((h) => (
@@ -265,8 +323,26 @@ export default function RelatoriosPage() {
                     ))}
                   </tbody>
                 </table>
+                <div className="md:hidden space-y-3 p-3">
+                  {lucroTrabalhos.map((t) => (
+                    <div key={t.op} className="bg-surface-container-high rounded-xl p-4 border border-outline-variant/50 space-y-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="bg-primary/10 text-primary font-semibold px-2 py-0.5 rounded text-[10px]">{t.op}</span>
+                          <p className="text-xs font-bold text-on-surface mt-1">{t.produto}</p>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary">{t.margem}</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-[10px]">
+                        <div><span className="text-on-surface-variant">Receita:</span><br /><span className="font-bold text-on-surface">Kz {t.receita.toLocaleString("pt-AO")}</span></div>
+                        <div><span className="text-on-surface-variant">Custo:</span><br /><span className="text-on-surface-variant">Kz {t.custo.toLocaleString("pt-AO")}</span></div>
+                        <div><span className="text-on-surface-variant">Lucro:</span><br /><span className="font-bold text-primary">Kz {t.lucro.toLocaleString("pt-AO")}</span></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="grid grid-cols-3 gap-4 mt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
                 {[
                   { label: "Receita Total", value: "Kz 91.900", color: "text-primary" },
                   { label: "Lucro Total", value: "Kz 27.550", color: "text-primary" },
@@ -285,7 +361,7 @@ export default function RelatoriosPage() {
             <section className="bg-surface-container dark:bg-surface-container rounded-xl border border-outline-variant p-6">
               <h2 className="text-base font-semibold text-on-surface mb-4">Desperdício de Produção</h2>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm hidden md:table">
                   <thead>
                     <tr className="border-b border-outline-variant bg-surface-container-high/50">
                       {["Mês", "Taxa", "Material", "Causa"].map((h) => (
@@ -304,8 +380,21 @@ export default function RelatoriosPage() {
                     ))}
                   </tbody>
                 </table>
+                <div className="md:hidden space-y-3 p-3">
+                  {desperdicio.map((d) => (
+                    <div key={d.mes} className="bg-surface-container-high rounded-xl p-4 border border-outline-variant/50 flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-bold text-on-surface">{d.mes}</p>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-error-container/10 text-error">{d.taxa}</span>
+                        </div>
+                        <p className="text-[10px] text-on-surface-variant">{d.material} · {d.causa}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="grid grid-cols-3 gap-4 mt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
                 {[
                   { label: "Taxa Média", value: "2.8%", color: "text-error" },
                   { label: "Total Perdido (Est.)", value: "Kz 4.580", color: "text-tertiary" },
@@ -324,7 +413,7 @@ export default function RelatoriosPage() {
             <section className="bg-surface-container dark:bg-surface-container rounded-xl border border-outline-variant p-6">
               <h2 className="text-base font-semibold text-on-surface mb-4">Produtividade dos Operadores</h2>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm hidden md:table">
                   <thead>
                     <tr className="border-b border-outline-variant bg-surface-container-high/50">
                       {["Operador", "Função", "Trabalhos", "Horas", "Produtividade", "Eficiência"].map((h) => (
@@ -345,8 +434,28 @@ export default function RelatoriosPage() {
                     ))}
                   </tbody>
                 </table>
+                <div className="md:hidden space-y-3 p-3">
+                  {produtividade.map((p) => (
+                    <div key={p.operador} className="bg-surface-container-high rounded-xl p-4 border border-outline-variant/50 space-y-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="text-xs font-bold text-on-surface">{p.operador}</p>
+                          <p className="text-[10px] text-on-surface-variant">{p.funcao}</p>
+                        </div>
+                        <div className="flex gap-1.5">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${Number(p.produtividade.replace("%", "")) >= 95 ? "bg-primary/10 text-primary" : "bg-tertiary-container/10 text-tertiary"}`}>{p.produtividade}</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary">{p.eficiencia}</span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-[10px]">
+                        <div><span className="text-on-surface-variant">Trabalhos:</span> <span className="font-medium text-on-surface">{p.jobs}</span></div>
+                        <div><span className="text-on-surface-variant">Horas:</span> <span className="font-medium text-on-surface">{p.horas}h</span></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="grid grid-cols-3 gap-4 mt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
                 {[
                   { label: "Produtividade Média", value: "93.4%", color: "text-primary" },
                   { label: "Eficiência Média", value: "95.4%", color: "text-primary" },

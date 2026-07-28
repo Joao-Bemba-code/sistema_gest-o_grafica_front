@@ -118,7 +118,7 @@ export default function QualidadePage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="w-full text-xs hidden md:table">
               <thead>
                 <tr className="bg-surface-container-highest text-on-surface-variant">
                   <th className="text-left px-3 py-3 font-semibold">ID</th>
@@ -176,6 +176,45 @@ export default function QualidadePage() {
                 })}
               </tbody>
             </table>
+            <div className="md:hidden space-y-3 p-3">
+              {filtered.map((insp) => {
+                const resultado = calcularResultado(insp);
+                const resConfig = resultado === "aprovado" ? { color: "text-primary", bg: "bg-primary/10", icon: "check_circle" } : resultado === "reprovado" ? { color: "text-error", bg: "bg-error-container/10", icon: "cancel" } : { color: "text-tertiary", bg: "bg-tertiary-container/10", icon: "pending" };
+                return (
+                  <div key={insp.id} className="bg-surface-container-high rounded-xl p-4 border border-outline-variant/50 space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="text-xs font-bold text-on-surface">{insp.id} — {insp.produto}</p>
+                        <p className="text-[10px] text-on-surface-variant">{insp.cliente} · {insp.responsavel}</p>
+                        <p className="text-[10px] text-on-surface-variant">{new Date(insp.data).toLocaleDateString("pt-PT")}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${resConfig.bg} ${resConfig.color}`}>
+                          <Icon name={resConfig.icon} className="text-xs" />
+                          {resultado === "aprovado" ? "OK" : resultado === "reprovado" ? "NOK" : "Pendente"}
+                        </span>
+                        <button onClick={() => abrirEdicao(insp)} className="text-primary">
+                          <Icon name="edit" className="text-base" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {campos.map(c => {
+                        const val = insp[c.key];
+                        return (
+                          <button key={c.key} onClick={() => alterarCampo(insp.id, c.key, val === "aprovado" ? "reprovado" : val === "reprovado" ? "pendente" : "aprovado")}
+                            className={`flex flex-col items-center gap-0.5 p-1.5 rounded-lg border text-center cursor-pointer transition-all ${statusClasses[val]}`}>
+                            <Icon name={c.icon} className="text-xs" />
+                            <span className="text-[8px] font-bold leading-tight">{c.label}</span>
+                            <span className="text-[8px] font-bold">{val === "aprovado" ? "OK" : val === "reprovado" ? "NOK" : "—"}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {filtered.length === 0 && (

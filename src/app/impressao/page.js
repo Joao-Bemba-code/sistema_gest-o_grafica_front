@@ -63,7 +63,7 @@ export default function ImpressaoPage() {
             </button>
           </div>
 
-          <section className="grid grid-cols-3 gap-4">
+          <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[
               { label: "Total Produzido", value: totalProduzido.toLocaleString(), icon: "checklist", color: "text-green-600", sub: "unidades" },
               { label: "Total Rejeitado", value: totalRejeitado.toLocaleString(), icon: "block", color: "text-red-500", sub: "unidades" },
@@ -82,7 +82,7 @@ export default function ImpressaoPage() {
               <h2 className="text-sm font-bold text-on-surface">Registos de Produção</h2>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-xs">
+              <table className="w-full text-xs hidden md:table">
                 <thead>
                   <tr className="bg-surface-container-high text-on-surface-variant">
                     <th className="text-left px-4 py-3 font-semibold">Máquina</th>
@@ -131,6 +131,49 @@ export default function ImpressaoPage() {
                   })}
                 </tbody>
               </table>
+              <div className="md:hidden space-y-3 p-3">
+                {registros.map((r) => {
+                  const pct = r.produzido > 0 ? ((r.rejeitado / r.produzido) * 100).toFixed(1) : "0.0";
+                  const editando = observacaoEdit.id === r.id;
+                  return (
+                    <div key={r.id} className="bg-surface-container-high rounded-xl p-4 border border-outline-variant/50 space-y-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="text-xs font-bold text-on-surface">{r.maquina}</p>
+                          <p className="text-[10px] text-on-surface-variant">{r.operador}</p>
+                        </div>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${Number(pct) > 3 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'}`}>
+                          {pct}% rej.
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-[10px]">
+                        <div><span className="text-on-surface-variant">Início:</span> <span className="font-medium text-on-surface">{new Date(r.inicio).toLocaleString("pt-PT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span></div>
+                        <div><span className="text-on-surface-variant">Fim:</span> <span className="font-medium text-on-surface">{new Date(r.fim).toLocaleString("pt-PT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span></div>
+                        <div><span className="text-on-surface-variant">Produzido:</span> <span className="font-bold text-green-600">{r.produzido}</span></div>
+                        <div><span className="text-on-surface-variant">Rejeitado:</span> <span className="font-bold text-red-500">{r.rejeitado}</span></div>
+                      </div>
+                      <div className="pt-1 border-t border-outline-variant/30">
+                        {editando ? (
+                          <div className="flex flex-col gap-1">
+                            <textarea value={observacaoEdit.texto} onChange={(e) => setObservacaoEdit({ ...observacaoEdit, texto: e.target.value })} className="w-full px-2 py-1 bg-surface-container border border-outline-variant rounded text-[10px] outline-none focus:ring-2 focus:ring-primary/30 resize-none" rows={2} />
+                            <div className="flex gap-2 justify-end">
+                              <button onClick={() => setObservacaoEdit({ id: null, texto: "" })} className="px-2 py-1 text-[10px] text-on-surface-variant hover:text-on-surface">Cancelar</button>
+                              <button onClick={() => salvarObservacao(r.id)} className="px-2 py-1 text-[10px] bg-primary text-on-primary rounded">Guardar</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="text-on-surface-variant text-[10px] truncate">{r.observacoes || "Sem observações"}</span>
+                            <button onClick={() => setObservacaoEdit({ id: r.id, texto: r.observacoes || "" })} className="text-primary flex-shrink-0">
+                              <Icon name="edit_note" className="text-sm" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </section>
         </div>

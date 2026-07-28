@@ -16,22 +16,24 @@ const categoriaIcones = {
   Chapas: "view_column",
 };
 
+const fornecedores = ["Papelaria Angola", "Tintas Premium Lda", "Lonas & Vinis SA", "Colas Industriais", "Distribuidora Gráfica"];
+
 const sampleItems = [
-  { id: 1, nome: "Papel Couché 150g", categoria: "Papel", unidade: "resmas", saldo: 5, estoqueMinimo: 20 },
-  { id: 2, nome: "Papel Offset 90g", categoria: "Papel", unidade: "resmas", saldo: 42, estoqueMinimo: 15 },
-  { id: 12, nome: "Papel Couché 115g", categoria: "Papel", unidade: "resmas", saldo: 35, estoqueMinimo: 15 },
-  { id: 3, nome: "Tinta Cyan", categoria: "Tintas", unidade: "kg", saldo: 8, estoqueMinimo: 5 },
-  { id: 4, nome: "Tinta Magenta", categoria: "Tintas", unidade: "kg", saldo: 7, estoqueMinimo: 5 },
-  { id: 5, nome: "Tinta Yellow", categoria: "Tintas", unidade: "kg", saldo: 9, estoqueMinimo: 5 },
-  { id: 6, nome: "Tinta Black", categoria: "Tintas", unidade: "kg", saldo: 6, estoqueMinimo: 5 },
-  { id: 7, nome: "Lona Front Light 440g", categoria: "Lonas", unidade: "rolos", saldo: 12, estoqueMinimo: 5 },
-  { id: 8, nome: "Vinil Adesivo Brilho", categoria: "Vinil", unidade: "rolos", saldo: 3, estoqueMinimo: 4 },
-  { id: 9, nome: "Vinil Adesivo Fosco", categoria: "Vinil", unidade: "rolos", saldo: 6, estoqueMinimo: 4 },
-  { id: 10, nome: "Cola para Encadernação", categoria: "Cola", unidade: "litros", saldo: 2, estoqueMinimo: 3 },
-  { id: 11, nome: "Chapas Offset", categoria: "Chapas", unidade: "un", saldo: 150, estoqueMinimo: 50 },
+  { id: 1, codigo: "MAT-001", nome: "Papel Couché 150g", nomeTecnico: "C150-BO", categoria: "Papel", fornecedor: "Papelaria Angola", descricaoDetalhada: "Papel couché brilho 150g, formato A3, ideal para impressões de alta qualidade", especificidade: "Superfície brilhante, gramatura 150g/m²", condicaoArmazenagem: "Local seco e ventilado, temperatura ambiente", unidade: "resmas", saldo: 5, estoqueMinimo: 20, precoCompra: 4500, precoVenda: 6500, custo: 4500, margem: 44 },
+  { id: 2, codigo: "MAT-002", nome: "Papel Offset 90g", nomeTecnico: "OFF90-BO", categoria: "Papel", fornecedor: "Papelaria Angola", descricaoDetalhada: "Papel offset branco 90g, formato A4, para impressão convencional", especificidade: "Gramatura 90g/m², opaco", condicaoArmazenagem: "Evitar humidade, armazenar em paletes", unidade: "resmas", saldo: 42, estoqueMinimo: 15, precoCompra: 2800, precoVenda: 4200, custo: 2800, margem: 50 },
+  { id: 12, codigo: "MAT-003", nome: "Papel Couché 115g", nomeTecnico: "C115-BO", categoria: "Papel", fornecedor: "Papelaria Angola", descricaoDetalhada: "Papel couché fosco 115g, formato A3", especificidade: "Superície fosca, gramatura 115g/m²", condicaoArmazenagem: "Local seco, evitar exposição solar", unidade: "resmas", saldo: 35, estoqueMinimo: 15, precoCompra: 3800, precoVenda: 5500, custo: 3800, margem: 45 },
+  { id: 3, codigo: "MAT-004", nome: "Tinta Cyan", nomeTecnico: "INK-CY-1K", categoria: "Tintas", fornecedor: "Tintas Premium Lda", descricaoDetalhada: "Tinta cyan para impressão offset, frasco de 1kg", especificidade: "Compatível com máquinas offset, secagem rápida", condicaoArmazenagem: "Armazenar em local fresco, longe de fontes de calor", unidade: "kg", saldo: 8, estoqueMinimo: 5, precoCompra: 12000, precoVenda: 18000, custo: 12000, margem: 50 },
+  { id: 4, codigo: "MAT-005", nome: "Tinta Magenta", nomeTecnico: "INK-MG-1K", categoria: "Tintas", fornecedor: "Tintas Premium Lda", descricaoDetalhada: "Tinta magenta para impressão offset, frasco de 1kg", especificidade: "Compatível com máquinas offset, secagem rápida", condicaoArmazenagem: "Armazenar em local fresco, longe de fontes de calor", unidade: "kg", saldo: 7, estoqueMinimo: 5, precoCompra: 12000, precoVenda: 18000, custo: 12000, margem: 50 },
+  { id: 5, codigo: "MAT-006", nome: "Tinta Yellow", nomeTecnico: "INK-YL-1K", categoria: "Tintas", fornecedor: "Tintas Premium Lda", descricaoDetalhada: "Tinta amarela para impressão offset, frasco de 1kg", especificidade: "Compatível com máquinas offset, secagem rápida", condicaoArmazenagem: "Armazenar em local fresco, longe de fontes de calor", unidade: "kg", saldo: 9, estoqueMinimo: 5, precoCompra: 12000, precoVenda: 18000, custo: 12000, margem: 50 },
+  { id: 6, codigo: "MAT-007", nome: "Tinta Black", nomeTecnico: "INK-BK-1K", categoria: "Tintas", fornecedor: "Tintas Premium Lda", descricaoDetalhada: "Tinta preta para impressão offset, frasco de 1kg", especificidade: "Compatível com máquinas offset, secagem rápida", condicaoArmazenagem: "Armazenar em local fresco, longe de fontes de calor", unidade: "kg", saldo: 6, estoqueMinimo: 5, precoCompra: 12000, precoVenda: 18000, custo: 12000, margem: 50 },
+  { id: 7, codigo: "MAT-008", nome: "Lona Front Light 440g", nomeTecnico: "LFL-440-R", categoria: "Lonas", fornecedor: "Lonas & Vinis SA", descricaoDetalhada: "Lona front light 440g para banners e outdoors, rolo de 50m", especificidade: "Resistente a UV e intempéries, impressão digital", condicaoArmazenagem: "Armazenar em local seco, evitar amassamentos", unidade: "rolos", saldo: 12, estoqueMinimo: 5, precoCompra: 35000, precoVenda: 52000, custo: 35000, margem: 49 },
+  { id: 8, codigo: "MAT-009", nome: "Vinil Adesivo Brilho", nomeTecnico: "VA-BR-R", categoria: "Vinil", fornecedor: "Lonas & Vinis SA", descricaoDetalhada: "Vinil adesivo brilho para adesivos e displays", especificidade: "Acabamento brilho, face adesiva acrílica", condicaoArmazenagem: "Armazenar na horizontal, temperatura 15-25°C", unidade: "rolos", saldo: 3, estoqueMinimo: 4, precoCompra: 18000, precoVenda: 27000, custo: 18000, margem: 50 },
+  { id: 9, codigo: "MAT-010", nome: "Vinil Adesivo Fosco", nomeTecnico: "VA-FC-R", categoria: "Vinil", fornecedor: "Lonas & Vinis SA", descricaoDetalhada: "Vinil adesivo fosco para adesivos e displays", especificidade: "Acabamento fosco, face adesiva acrílica", condicaoArmazenagem: "Armazenar na horizontal, temperatura 15-25°C", unidade: "rolos", saldo: 6, estoqueMinimo: 4, precoCompra: 18000, precoVenda: 27000, custo: 18000, margem: 50 },
+  { id: 10, codigo: "MAT-011", nome: "Cola para Encadernação", nomeTecnico: "COL-ENC-L", categoria: "Cola", fornecedor: "Colas Industriais", descricaoDetalhada: "Cola para encadernação de alta adesão, frasco de 5L", especificidade: "Secagem rápida, resistente a flexão", condicaoArmazenagem: "Armazenar em local ventilado, evitar congelamento", unidade: "litros", saldo: 2, estoqueMinimo: 3, precoCompra: 8000, precoVenda: 12000, custo: 8000, margem: 50 },
+  { id: 11, codigo: "MAT-012", nome: "Chapas Offset", nomeTecnico: "CHP-OF-U", categoria: "Chapas", fornecedor: "Distribuidora Gráfica", descricaoDetalhada: "Chapas offset para impressão, formato standard", especificidade: "Liga de alumínio, sensível à luz", condicaoArmazenagem: "Armazenar em local escuro e seco", unidade: "un", saldo: 150, estoqueMinimo: 50, precoCompra: 3500, precoVenda: 5500, custo: 3500, margem: 57 },
 ];
 
-const initialItem = { nome: "", categoria: "Papel", unidade: "", estoqueMinimo: "" };
+const initialItem = { codigo: "", categoria: "Papel", fornecedor: "", nomeComercial: "", nomeTecnico: "", descricaoDetalhada: "", especificidade: "", condicaoArmazenagem: "", unidade: "", estoqueMinimo: "", precoCompra: "", precoVenda: "", custo: "", margem: "" };
 
 export default function EstoquePage() {
   const [items, setItems] = useState(sampleItems);
@@ -57,7 +59,7 @@ export default function EstoquePage() {
   const handleNewItem = (e) => {
     e.preventDefault();
     const id = Math.max(...items.map(i => i.id)) + 1;
-    setItems([{ id, ...form, saldo: 0, estoqueMinimo: Number(form.estoqueMinimo) }, ...items]);
+    setItems([{ id, nome: form.nomeComercial, ...form, saldo: 0, estoqueMinimo: Number(form.estoqueMinimo) }, ...items]);
     setForm(initialItem);
     setItemModal(false);
   };
@@ -131,7 +133,8 @@ export default function EstoquePage() {
                       <div key={item.id} className="px-5 py-3 flex flex-col sm:flex-row sm:items-center gap-3 hover:bg-surface-container-high/30 transition-colors">
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-on-surface truncate">{item.nome}</p>
-                          <p className="text-[10px] text-on-surface-variant">{item.unidade}</p>
+                          <p className="text-[10px] text-on-surface-variant">{item.codigo} — {item.nomeTecnico}</p>
+                          <p className="text-[10px] text-on-surface-variant">{item.fornecedor} • {item.unidade}</p>
                         </div>
 
                         <div className="flex items-center gap-4 sm:gap-6">
@@ -143,6 +146,16 @@ export default function EstoquePage() {
                           <div className="text-center min-w-[60px]">
                             <p className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider">Mínimo</p>
                             <p className="text-base font-bold text-on-surface-variant">{item.estoqueMinimo}</p>
+                          </div>
+
+                          <div className="text-center min-w-[80px] hidden sm:block">
+                            <p className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider">Preço Venda</p>
+                            <p className="text-sm font-bold text-primary">Kz {item.precoVenda?.toLocaleString("pt-AO")}</p>
+                          </div>
+
+                          <div className="text-center min-w-[50px] hidden sm:block">
+                            <p className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider">Margem</p>
+                            <p className="text-sm font-bold text-tertiary">{item.margem}%</p>
                           </div>
 
                           <div className="hidden sm:block w-20">
@@ -199,12 +212,12 @@ export default function EstoquePage() {
           </div>
         </Modal>
 
-        <Modal open={itemModal} onClose={() => setItemModal(false)} title="Novo Material" icon="add_box" size="md">
+        <Modal open={itemModal} onClose={() => setItemModal(false)} title="Novo Material" icon="add_box" size="lg">
           <form onSubmit={handleNewItem} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1 sm:col-span-2">
-                <label className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Nome do Material *</label>
-                <input required name="nome" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} className="px-3 py-2 bg-surface-container-high border border-outline-variant rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="Ex: Papel Couché 150g" />
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Código *</label>
+                <input required name="codigo" value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })} className="px-3 py-2 bg-surface-container-high border border-outline-variant rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="Ex: MAT-013" />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Categoria *</label>
@@ -213,12 +226,55 @@ export default function EstoquePage() {
                 </select>
               </div>
               <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Fornecedor *</label>
+                <select required name="fornecedor" value={form.fornecedor} onChange={(e) => setForm({ ...form, fornecedor: e.target.value })} className="px-3 py-2 bg-surface-container-high border border-outline-variant rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30">
+                  <option value="" disabled>Selecionar fornecedor</option>
+                  {fornecedores.map((f) => <option key={f}>{f}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Nome Comercial *</label>
+                <input required name="nomeComercial" value={form.nomeComercial} onChange={(e) => setForm({ ...form, nomeComercial: e.target.value })} className="px-3 py-2 bg-surface-container-high border border-outline-variant rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="Ex: Papel Couché 150g" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Nome Técnico *</label>
+                <input required name="nomeTecnico" value={form.nomeTecnico} onChange={(e) => setForm({ ...form, nomeTecnico: e.target.value })} className="px-3 py-2 bg-surface-container-high border border-outline-variant rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="Ex: C150-BO" />
+              </div>
+              <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Unidade *</label>
                 <input required name="unidade" value={form.unidade} onChange={(e) => setForm({ ...form, unidade: e.target.value })} className="px-3 py-2 bg-surface-container-high border border-outline-variant rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="Ex: resmas, kg" />
+              </div>
+              <div className="flex flex-col gap-1 sm:col-span-2">
+                <label className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Descrição Detalhada *</label>
+                <textarea required name="descricaoDetalhada" value={form.descricaoDetalhada} onChange={(e) => setForm({ ...form, descricaoDetalhada: e.target.value })} rows={2} className="px-3 py-2 bg-surface-container-high border border-outline-variant rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30 resize-none" placeholder="Descrição completa do material..." />
+              </div>
+              <div className="flex flex-col gap-1 sm:col-span-2">
+                <label className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Especificidade *</label>
+                <textarea required name="especificidade" value={form.especificidade} onChange={(e) => setForm({ ...form, especificidade: e.target.value })} rows={2} className="px-3 py-2 bg-surface-container-high border border-outline-variant rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30 resize-none" placeholder="Características técnicas específicas..." />
+              </div>
+              <div className="flex flex-col gap-1 sm:col-span-2">
+                <label className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Condição de Armazenagem *</label>
+                <textarea required name="condicaoArmazenagem" value={form.condicaoArmazenagem} onChange={(e) => setForm({ ...form, condicaoArmazenagem: e.target.value })} rows={2} className="px-3 py-2 bg-surface-container-high border border-outline-variant rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30 resize-none" placeholder="Condições necessárias para armazenamento..." />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Estoque Mínimo *</label>
                 <input required type="number" name="estoqueMinimo" value={form.estoqueMinimo} onChange={(e) => setForm({ ...form, estoqueMinimo: e.target.value })} className="px-3 py-2 bg-surface-container-high border border-outline-variant rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="Ex: 10" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Preço de Compra (Kz) *</label>
+                <input required type="number" name="precoCompra" value={form.precoCompra} onChange={(e) => setForm({ ...form, precoCompra: e.target.value })} className="px-3 py-2 bg-surface-container-high border border-outline-variant rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="Ex: 4500" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Preço de Venda (Kz) *</label>
+                <input required type="number" name="precoVenda" value={form.precoVenda} onChange={(e) => setForm({ ...form, precoVenda: e.target.value })} className="px-3 py-2 bg-surface-container-high border border-outline-variant rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="Ex: 6500" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Custo (Kz) *</label>
+                <input required type="number" name="custo" value={form.custo} onChange={(e) => setForm({ ...form, custo: e.target.value })} className="px-3 py-2 bg-surface-container-high border border-outline-variant rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="Ex: 4500" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Margem (%) *</label>
+                <input required type="number" name="margem" value={form.margem} onChange={(e) => setForm({ ...form, margem: e.target.value })} className="px-3 py-2 bg-surface-container-high border border-outline-variant rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="Ex: 44" />
               </div>
             </div>
             <div className="flex justify-end gap-3 pt-2">

@@ -125,7 +125,7 @@ export default function PreImpressaoPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="w-full text-xs hidden md:table">
               <thead>
                 <tr className="bg-surface-container-high text-on-surface-variant">
                   <th className="text-left px-2 py-3 font-semibold">ID</th>
@@ -179,6 +179,44 @@ export default function PreImpressaoPage() {
                 })}
               </tbody>
             </table>
+            <div className="md:hidden space-y-3 p-3">
+              {filtered.map((job) => {
+                const resultado = calcularPreResultado(job);
+                const resCfg = resultado === "aprovado" ? { color: "text-primary", bg: "bg-primary/10 dark:bg-green-900/20", icon: "check_circle" } : resultado === "reprovado" ? { color: "text-error", bg: "bg-error-container/10 dark:bg-red-900/20", icon: "cancel" } : { color: "text-tertiary", bg: "bg-tertiary-container/10 dark:bg-amber-900/20", icon: "pending" };
+                return (
+                  <div key={job.id} className="bg-surface-container-high rounded-xl p-4 border border-outline-variant/50 space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="text-xs font-bold text-on-surface">{job.id} — {job.job}</p>
+                        <p className="text-[10px] text-on-surface-variant">{job.produto} · {job.cliente}</p>
+                        <p className="text-[10px] text-on-surface-variant">Resp: {job.responsavel}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${resCfg.bg} ${resCfg.color}`}>
+                          <Icon name={resCfg.icon} className="text-xs" />
+                          {resultado === "aprovado" ? "OK" : resultado === "reprovado" ? "NOK" : "Pendente"}
+                        </span>
+                        <button onClick={() => abrirEdicao(job)} className="text-primary">
+                          <Icon name="edit" className="text-base" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {checklistItems.map(c => {
+                        const val = job[c.key];
+                        return (
+                          <button key={c.key} onClick={() => alterarItem(job.id, c.key, proximoStatus(val))}
+                            className={`flex flex-col items-center gap-0.5 p-1.5 rounded-lg border text-center cursor-pointer transition-all ${statusClasses[val]}`}>
+                            <Icon name={c.icon} className="text-xs" />
+                            <span className="text-[8px] font-bold leading-tight">{c.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {filtered.length === 0 && (
