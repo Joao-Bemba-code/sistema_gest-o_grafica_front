@@ -3,19 +3,29 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
+import { login } from "@/services/auth";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState(false);
+  const { setUsuario } = useAuth();
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    if (username === "admin" && password === "admin") {
+    setError("");
+    setLoading(true);
+    try {
+      const data = await login(email, senha);
+      setUsuario(data.usuario);
       router.push("/");
-    } else {
-      setError(true);
+    } catch (err) {
+      setError(err.response?.data?.erro || "Erro ao fazer login");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -32,15 +42,15 @@ export default function LoginPage() {
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Utilizador</label>
+            <label className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Email</label>
             <div className="relative">
               <Icon name="person" className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-base" />
               <input
-                type="text"
-                value={username}
-                onChange={(e) => { setUsername(e.target.value); setError(false); }}
+                type="email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(""); }}
                 className="w-full pl-9 pr-3 py-2.5 bg-surface-container-high border border-outline-variant rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all placeholder:text-on-surface-variant"
-                placeholder="Digite o utilizador"
+                placeholder="Digite o email"
                 autoFocus
               />
             </div>
@@ -52,8 +62,8 @@ export default function LoginPage() {
               <Icon name="settings" className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-base" />
               <input
                 type="password"
-                value={password}
-                onChange={(e) => { setPassword(e.target.value); setError(false); }}
+                value={senha}
+                onChange={(e) => { setSenha(e.target.value); setError(""); }}
                 className="w-full pl-9 pr-3 py-2.5 bg-surface-container-high border border-outline-variant rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all placeholder:text-on-surface-variant"
                 placeholder="Digite a palavra-passe"
               />
@@ -63,18 +73,18 @@ export default function LoginPage() {
           {error && (
             <div className="bg-error-container/10 border border-error/30 rounded-lg px-4 py-2.5 flex items-center gap-2">
               <Icon name="warning" className="text-error text-sm" />
-              <p className="text-xs text-error font-medium">Utilizador ou palavra-passe inválidos</p>
+              <p className="text-xs text-error font-medium">{error}</p>
             </div>
           )}
 
-          <button type="submit" className="w-full py-2.5 bg-primary hover:bg-primary-container text-on-primary text-xs font-bold rounded-lg transition-all shadow-sm flex items-center justify-center gap-2">
+          <button type="submit" disabled={loading} className="w-full py-2.5 bg-primary hover:bg-primary-container disabled:opacity-50 text-on-primary text-xs font-bold rounded-lg transition-all shadow-sm flex items-center justify-center gap-2">
             <Icon name="logout" className="text-sm rotate-180" />
-            Entrar
+            {loading ? "A entrar..." : "Entrar"}
           </button>
         </form>
 
         <p className="text-[10px] text-on-surface-variant text-center mt-6">
-          admin / admin
+          Use o email e senha da sua conta
         </p>
       </div>
     </div>

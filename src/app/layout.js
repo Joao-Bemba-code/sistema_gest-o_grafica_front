@@ -1,11 +1,6 @@
-import { Inter } from "next/font/google";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { AuthProvider } from "@/contexts/AuthContext";
 import "./globals.css";
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-});
 
 export const metadata = {
   title: "SIGRAF - Gestão de Gráfica",
@@ -14,7 +9,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="pt-br" className={`${inter.variable} antialiased`} suppressHydrationWarning>
+    <html lang="pt-br" className="antialiased" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -30,7 +25,9 @@ export default function RootLayout({ children }) {
         />
       </head>
       <body className="bg-zinc-100 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 min-h-screen">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
