@@ -8,7 +8,7 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
-    const token = localStorage.getItem("sigraf_token");
+    const token = window.sessionStorage.getItem("sigraf_token");
     if (token) config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
@@ -18,8 +18,8 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401 && typeof window !== "undefined") {
-      localStorage.removeItem("sigraf_token");
-      localStorage.removeItem("sigraf_usuario");
+      window.sessionStorage.removeItem("sigraf_token");
+      window.sessionStorage.removeItem("sigraf_usuario");
       if (window.location.pathname !== "/login") {
         window.location.href = "/login";
       }

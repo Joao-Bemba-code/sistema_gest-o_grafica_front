@@ -4,12 +4,18 @@ import { useEffect, useState } from "react";
 import Modal from "@/components/Modal";
 import Icon from "@/components/Icon";
 import { Card, CardContent } from "@/components/ui/Card";
+import KpiCard from "@/components/ui/KpiCard";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
-import { listarOrdens, criarOrdem } from "@/services/producao";
+import { inputCls } from "@/lib/estoque";
+import { listarOrdens, criarOrdem, libertarMateriais } from "@/services/producao";
+import { getUsuario } from "@/services/auth";
+import SaidaMateriaisModal from "@/components/producao/SaidaMateriaisModal";
 import { listar as listarClientes } from "@/services/clientes";
+import { listar as listarOrcamentos } from "@/services/orcamentos";
+import { listar as listarMateriais } from "@/services/materiais";
 
 const statusConfig = {
   aguardando: { label: "Aguardando", variant: "warning" },
@@ -20,7 +26,41 @@ const statusConfig = {
 
 const etapaLabels = { pre_impressao: "Pré-Impressão", impressao: "Impressão", acabamento: "Acabamento", qualidade: "Qualidade", entrega: "Entrega" };
 
+function formatData(v) {
+  if (!v) return "—";
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("pt-BR");
+}
+
 const initialForm = { cliente: "", empresa: "", produto: "", quantidade: "", dataEntrega: "", orcamento: "" };
+
+const reservaEstado = {
+  ativa: { label: "Ativa", variant: "warning" },
+  parcial: { label: "Parcial", variant: "info" },
+  consumida: { label: "Consumida", variant: "success" },
+  cancelada: { label: "Cancelada", variant: "secondary" },
+};
+
+function derivarEtapa(op) {
+  if (op.estado === "entregue" || op.entrega_ok) return "entrega";
+  if (op.qualidade_ok) return "qualidade";
+  if (op.acabamento_ok) return "acabamento";
+  if (op.impressao_ok) return "impressao";
+  if (op.pre_impressao_ok) return "pre_impressao";
+  return "pre_impressao";
+}
+
+function normalizar(op) {
+  return {
+    ...op,
+    status: op.estado || op.status || "aguardando",
+    cliente: op.cliente?.nome || op.cliente || "—",
+    orcamento: op.orcamento?.numero || op.orcamento || "—",
+    dataEntrada: op.data_entrada || op.dataEntrada || "",
+    dataEntrega: op.data_entrega || op.dataEntrega || "",
+    etapaAtual: op.etapa_atual || op.etapaAtual || derivarEtapa(op),
+  };
+}
 
 export default function OrdensProducaoPage() {
   const [ops, setOps] = useState([]);
@@ -30,14 +70,40 @@ export default function OrdensProducaoPage() {
   const [form, setForm] = useState(initialForm);
   const [loading, setLoading] = useState(true);
   const [clientes, setClientes] = useState([]);
+  const [orcamentos, setOrcamentos] = useState([]);
+  const [materiais, setMateriais] = useState([]);
+  const [itens, setItens] = useState([]);
+  const [materialSel, setMaterialSel] = useState("");
+  const [qtdSel, setQtdSel] = useState("");
+  const [loteSel, setLoteSel] = useState("");
+  const [libertarOp, setLibertarOp] = useState(null);
+  const [libertando, setLibertando] = useState(false);
   const { addToast } = useToast();
 
   useEffect(() => {
-    Promise.all([listarOrdens(), listarClientes()]).then(([ordensData, clientesData]) => {
-      setOps(Array.isArray(ordensData) ? ordensData : ordensData?.ordens || []);
+    Promise.all([listarOrdens(), listarClientes({ tipo: "cliente" }), listarOrcamentos(), listarMateriais()]).then(([ordensData, clientesData, orcamentosData, materiaisData]) => {
+      setOps((Array.isArray(ordensData) ? ordensData : ordensData?.ordens || []).map(normalizar));
       setClientes(Array.isArray(clientesData) ? clientesData : clientesData?.clientes || []);
+      setOrcamentos(Array.isArray(orcamentosData) ? orcamentosData : orcamentosData?.orcamentos || []);
+      setMateriais(Array.isArray(materiaisData) ? materiaisData : materiaisData?.materiais || []);
     }).finally(() => setLoading(false));
   }, []);
+
+  const matPorId = Object.fromEntries(materiais.map((m) => [m.id, m]));
+
+  const adicionarItem = () => {
+    const qtd = Number(qtdSel);
+    if (!materialSel || !qtd || qtd <= 0) return;
+    const jahExiste = itens.some((i) => i.material_id === Number(materialSel));
+    if (jahExiste) {
+      addToast("Material já adicionado — edite a quantidade se necessário", "error");
+      return;
+    }
+    setItens([...itens, { material_id: Number(materialSel), quantidade: qtd, lote: loteSel.trim() || null }]);
+    setMaterialSel(""); setQtdSel(""); setLoteSel("");
+  };
+
+  const removerItem = (idx) => setItens(itens.filter((_, i) => i !== idx));
 
   const filtered = filter === "todos" ? ops : ops.filter((o) => o.status === filter);
 
@@ -47,39 +113,61 @@ export default function OrdensProducaoPage() {
     e.preventDefault();
     try {
       const nova = await criarOrdem({
-        ...form, quantidade: form.quantidade + " un",
+        cliente_id: Number(form.cliente) || null,
+        orcamento_id: Number(form.orcamento) || null,
+        produto: form.produto,
+        quantidade: Number(form.quantidade),
+        dataEntrega: form.dataEntrega,
         dataEntrada: new Date().toISOString().split("T")[0],
-        status: "aguardando", etapaAtual: "pre_impressao",
+        status: "aguardando",
+        itens_materiais: itens,
       });
-      setOps([nova, ...ops]);
-      setForm(initialForm); setModalOpen(false);
+      setOps([normalizar(nova), ...ops]);
+      setForm(initialForm); setItens([]); setModalOpen(false);
       addToast("Operação realizada com sucesso", "success");
     } catch (err) {
       addToast(err.response?.data?.erro || "Erro na operação", "error");
     }
   };
 
+  const handleLibertar = async (dados = {}) => {
+    if (!libertarOp) return false;
+    setLibertando(true);
+    try {
+      const atualizada = await libertarMateriais(libertarOp.id, dados);
+      setOps((prev) => prev.map((o) => (o.id === libertarOp.id ? normalizar(atualizada) : o)));
+      addToast(`Materiais da OP ${libertarOp.id} libertados — saída de stock registada`, "success");
+      return true;
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao libertar materiais", "error");
+      return false;
+    } finally {
+      setLibertando(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="obsidian-glass rounded-lg p-5 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-l-4 border-l-primary">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Ordens de Produção</h1>
-          <p className="text-xs text-muted-foreground mt-1">{ops.length} OPs registadas</p>
+          <h1 className="font-sans text-3xl font-bold text-foreground tracking-tight">Ordens de Produção</h1>
+          <p className="text-primary mt-1 font-mono text-xs uppercase tracking-widest">{ops.length} OPs registadas // ORD</p>
         </div>
-        <Button onClick={() => setModalOpen(true)}><Icon name="add" className="text-lg" /> Nova OP</Button>
+        <div className="flex flex-wrap gap-3">
+          <button onClick={() => setModalOpen(true)} className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold shadow-[0_0_15px_rgba(128,213,203,0.2)] hover:shadow-[0_0_25px_rgba(128,213,203,0.4)]">
+            <Icon name="add" className="text-[16px]" /> Nova OP
+          </button>
+        </div>
       </div>
 
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-5">
-        {Object.entries(statusConfig).map(([key, cfg]) => (
-          <Card key={key} className="hover-lift">
-            <CardContent className="p-5">
-              <div className="flex items-center gap-2.5 mb-3">
-                <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${cfg.variant === "info" ? "bg-primary" : cfg.variant === "warning" ? "bg-amber-500" : cfg.variant === "success" ? "bg-green-500" : "bg-purple-500"}`} />
-                <span className="text-xs font-medium text-muted-foreground">{cfg.label}</span>
-              </div>
-              <p className="text-3xl font-extrabold text-foreground tracking-tight">{ops.filter((o) => o.status === key).length}</p>
-            </CardContent>
-          </Card>
+        {[
+          ["aguardando", "schedule", "warning"],
+          ["em_producao", "construction", "info"],
+          ["finalizado", "check_circle", "success"],
+          ["entregue", "local_shipping", "secondary"],
+        ].map(([key, icon, iconVariant]) => (
+          <KpiCard key={key} icon={icon} iconVariant={iconVariant} label={statusConfig[key].label} value={ops.filter((o) => o.status === key).length} />
         ))}
       </section>
 
@@ -98,7 +186,7 @@ export default function OrdensProducaoPage() {
             const etapas = Object.keys(etapaLabels);
             const etapaIdx = etapas.indexOf(op.etapaAtual);
             return (
-              <Card key={op.id} className="cursor-pointer hover-lift hover:border-primary transition-colors" onClick={() => setSelected(selected === op.id ? null : op.id)}>
+              <Card key={op.id} className="cursor-pointer hover-lift" onClick={() => setSelected(selected === op.id ? null : op.id)}>
                 <CardContent className="p-5">
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                     <div className="flex items-center gap-4">
@@ -106,16 +194,19 @@ export default function OrdensProducaoPage() {
                         <Icon name="construction" className="text-primary text-[20px]" />
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-bold text-sm text-foreground">{op.id}</span>
                           <Badge variant={sc.variant || "info"} className="text-[10px]">{sc.label}</Badge>
+                          {op.requisicao_estado === "pendente" && Array.isArray(op.reserva_estoques) && op.reserva_estoques.length > 0 && (
+                            <Badge variant="destructive" className="text-[10px]">Aguardando saída de materiais</Badge>
+                          )}
                         </div>
                         <p className="text-xs text-muted-foreground">{op.cliente} — {op.produto} ({op.quantidade})</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <span>Entrada: {new Date(op.dataEntrada).toLocaleDateString("pt-BR")}</span>
-                      <span>Entrega: {new Date(op.dataEntrega).toLocaleDateString("pt-BR")}</span>
+                      <span>Entrada: {formatData(op.dataEntrada)}</span>
+                      <span>Entrega: {formatData(op.dataEntrega)}</span>
                     </div>
                   </div>
 
@@ -133,6 +224,7 @@ export default function OrdensProducaoPage() {
                   </div>
 
                   {selected === op.id && (
+                    <>
                     <div className="mt-4 pt-4 border-t grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       {[
                         { label: "OP", value: op.id },
@@ -140,8 +232,8 @@ export default function OrdensProducaoPage() {
                         { label: "Produto", value: op.produto },
                         { label: "Quantidade", value: op.quantidade },
                         { label: "Orçamento", value: op.orcamento, highlight: "text-primary" },
-                        { label: "Data Entrada", value: new Date(op.dataEntrada).toLocaleDateString("pt-BR") },
-                        { label: "Data Entrega", value: new Date(op.dataEntrega).toLocaleDateString("pt-BR") },
+                        { label: "Data Entrada", value: formatData(op.dataEntrada) },
+                        { label: "Data Entrega", value: formatData(op.dataEntrega) },
                         { label: "Empresa", value: op.empresa },
                       ].map((f) => (
                         <div key={f.label}>
@@ -150,6 +242,47 @@ export default function OrdensProducaoPage() {
                         </div>
                       ))}
                     </div>
+                    {Array.isArray(op.reserva_estoques) && op.reserva_estoques.length > 0 && (
+                      <div className="mt-4 pt-4 border-t">
+                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Materiais Reservados</p>
+                        <div className="space-y-1.5">
+                          {op.reserva_estoques.map((r) => {
+                            const rc = reservaEstado[r.estado] || { label: r.estado, variant: "secondary" };
+                            return (
+                              <div key={r.id} className="flex items-center justify-between gap-2 bg-muted/40 rounded-lg px-3 py-2 text-xs">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="font-medium text-foreground truncate">{matPorId[r.material_id]?.nome || `Material #${r.material_id}`}</span>
+                                  <span className="text-muted-foreground shrink-0">{r.lote ? `Lote ${r.lote}` : ""}</span>
+                                </div>
+                                <div className="flex items-center gap-3 shrink-0">
+                                  <span className="text-muted-foreground">{r.quantidade_reservada} reservado{r.quantidade_consumida > 0 ? ` · ${r.quantidade_consumida} consumido` : ""}</span>
+                                  <Badge variant={rc.variant || "secondary"} className="text-[9px]">{rc.label}</Badge>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {op.requisicao_estado === "pendente" && op.status === "aguardando" && (
+                          <div className="mt-3 flex items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3">
+                            <p className="text-xs text-amber-700 dark:text-amber-400">
+                              Saída de materiais pendente — só depois de libertada a OP pode avançar para produção.
+                            </p>
+                            <Button size="sm" onClick={() => setLibertarOp(op)} disabled={libertando}>
+                              <Icon name="inventory" className="text-lg" /> Dar saída de materiais
+                            </Button>
+                          </div>
+                        )}
+                        {op.requisicao_estado === "libertada" && (
+                          <div className="mt-3 flex items-center justify-between gap-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 py-3">
+                            <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                              Materiais libertados — saída de stock registada. A OP pode avançar para produção.
+                            </p>
+                            <Badge variant="success" className="text-[10px]">Libertada</Badge>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    </>
                   )}
                 </CardContent>
               </Card>
@@ -164,37 +297,81 @@ export default function OrdensProducaoPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Cliente *</label>
-              <select required name="cliente" value={form.cliente} onChange={handleChange} className="w-full px-3 py-2.5 bg-background border border-input rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/30 transition-all">
+              <select required name="cliente" value={form.cliente} onChange={handleChange} className={inputCls}>
                 <option value="">Seleccionar...</option>
-                {clientes.map((c) => (<option key={c.id || c.nome} value={c.nome}>{c.nome}</option>))}
+                {clientes.map((c) => (<option key={c.id} value={c.id}>{c.nome}</option>))}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Empresa</label>
-              <input name="empresa" value={form.empresa} onChange={handleChange} className="w-full px-3 py-2.5 bg-background border border-input rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/30 transition-all" placeholder="Ex: Gráfica Expresso" />
+              <input name="empresa" value={form.empresa} onChange={handleChange} className={inputCls} placeholder="Ex: Gráfica Expresso" />
             </div>
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Produto *</label>
-              <input required name="produto" value={form.produto} onChange={handleChange} className="w-full px-3 py-2.5 bg-background border border-input rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/30 transition-all" placeholder="Ex: Catálogos Institucionais" />
+              <input required name="produto" value={form.produto} onChange={handleChange} className={inputCls} placeholder="Ex: Catálogos Institucionais" />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Quantidade *</label>
-              <input required name="quantidade" value={form.quantidade} onChange={handleChange} className="w-full px-3 py-2.5 bg-background border border-input rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/30 transition-all" placeholder="Ex: 500" />
+              <input required name="quantidade" value={form.quantidade} onChange={handleChange} className={inputCls} placeholder="Ex: 500" />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Data de Entrega *</label>
-              <input required type="date" name="dataEntrega" value={form.dataEntrega} onChange={handleChange} className="w-full px-3 py-2.5 bg-background border border-input rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/30 transition-all" />
+              <input required type="date" name="dataEntrega" value={form.dataEntrega} onChange={handleChange} className={inputCls} />
+            </div>
+            <div className="flex flex-col gap-1.5 sm:col-span-2">
+              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Materiais (Reserva Automática)</label>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <select name="materialSel" value={materialSel} onChange={(e) => setMaterialSel(e.target.value)} className={`${inputCls} flex-1`}>
+                  <option value="">Seleccionar material...</option>
+                  {materiais.map((m) => (
+                    <option key={m.id} value={m.id} disabled={m.estoque_disponivel <= 0}>
+                      {m.nome} — {m.estoque_disponivel} {m.unidade || "un"} disponível
+                    </option>
+                  ))}
+                </select>
+                <input name="qtdSel" type="number" min="1" value={qtdSel} onChange={(e) => setQtdSel(e.target.value)} className={`${inputCls} sm:w-32`} placeholder="Qtd." />
+                <input name="loteSel" value={loteSel} onChange={(e) => setLoteSel(e.target.value)} className={`${inputCls} sm:w-40`} placeholder="Lote (opcional)" />
+                <Button type="button" size="sm" onClick={adicionarItem}><Icon name="add" className="text-lg" /> Adicionar</Button>
+              </div>
+              {materialSel && matPorId[Number(materialSel)]?.percentual_quebra > 0 && (
+                <p className="text-[10px] text-amber-600">
+                  Quebra técnica de {matPorId[Number(materialSel)].percentual_quebra}% será adicionada à quantidade reservada.
+                </p>
+              )}
+              {itens.length > 0 && (
+                <div className="mt-2 space-y-1.5">
+                  {itens.map((item, i) => {
+                    const m = matPorId[item.material_id];
+                    return (
+                      <div key={i} className="flex items-center justify-between gap-2 bg-muted/40 rounded-lg px-3 py-2 text-xs">
+                        <span className="font-medium text-foreground truncate">{m?.nome || `Material #${item.material_id}`}</span>
+                        <span className="text-muted-foreground shrink-0">{item.quantidade} {m?.unidade || "un"}{m?.percentual_quebra > 0 ? ` (+${m.percentual_quebra}% quebra)` : ""}{item.lote ? ` · Lote ${item.lote}` : ""}</span>
+                        <button type="button" onClick={() => removerItem(i)} className="shrink-0 text-red-500 hover:text-red-700 transition-colors" title="Remover"><Icon name="delete" /></button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Orçamento de Referência</label>
-              <select name="orcamento" value={form.orcamento} onChange={handleChange} className="w-full px-3 py-2.5 bg-background border border-input rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/30 transition-all">
+              <select name="orcamento" value={form.orcamento} onChange={handleChange} className={inputCls}>
                 <option value="">Nenhum</option>
-                {[1,2,3,4,5].map((n) => <option key={n} value={`ORC-2024-00${n}`}>ORC-2024-00{n}</option>)}
+                {orcamentos.map((o) => <option key={o.id} value={o.id}>{o.numero}{o.cliente?.nome ? ` — ${o.cliente.nome}` : ""}</option>)}
               </select>
             </div>
           </div>
         </form>
       </Modal>
+
+      <SaidaMateriaisModal
+        open={!!libertarOp}
+        op={libertarOp}
+        matPorId={matPorId}
+        onClose={() => setLibertarOp(null)}
+        onConfirm={handleLibertar}
+        nomeUsuario={getUsuario()?.nome || ""}
+      />
 
       <footer className="p-6 text-center border-t bg-muted/30 rounded-2xl">
         <p className="text-sm text-muted-foreground">SIGRAF — Sistema de Gestão para Indústria Gráfica</p>

@@ -11,7 +11,7 @@ function FormField({ label, required, error, hint, children, className }) {
       )}
       {children}
       {hint && <p className="text-[10px] text-muted-foreground/60">{hint}</p>}
-      {error && <p className="text-[10px] text-destructive font-medium">{error}</p>}
+      {error && <p className="text-[10px] text-destructive font-medium flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-destructive" />{error}</p>}
     </div>
   );
 }

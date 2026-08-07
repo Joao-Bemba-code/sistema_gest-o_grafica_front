@@ -3,27 +3,30 @@ import { cn } from "@/lib/utils";
 import { cva } from "class-variance-authority";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.97] cursor-pointer",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 active:scale-[0.97] cursor-pointer",
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-white shadow-sm shadow-primary/20 hover:bg-primary/90 hover:shadow-md hover:-translate-y-0.5",
+          "bg-primary text-on-primary shadow-[0_0_15px_rgba(128,213,203,0.25)] hover:bg-primary-fixed hover:shadow-[0_0_20px_rgba(128,213,203,0.4)] hover:-translate-y-0.5",
+        gradient:
+          "bg-gradient-to-br from-primary via-primary to-secondary text-on-primary shadow-[0_0_20px_rgba(128,213,203,0.3)] hover:shadow-[0_0_28px_rgba(128,213,203,0.5)] hover:-translate-y-0.5 hover:brightness-110",
         destructive:
-          "bg-error text-white shadow-sm hover:bg-error/90",
+          "bg-error/15 text-error border border-error/30 hover:bg-error hover:text-on-error",
         outline:
-          "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
+          "border border-outline-variant bg-surface-variant/40 text-on-surface hover:border-primary hover:text-primary",
         secondary:
-          "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
+          "bg-secondary text-on-secondary shadow-sm hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         success:
           "bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 hover:shadow-md hover:-translate-y-0.5",
+        link: "text-primary underline-offset-4 hover:underline p-0 shadow-none hover:translate-y-0",
       },
       size: {
-        default: "h-10 px-5 py-2",
+        default: "h-11 px-5 py-2",
         sm: "h-9 rounded-lg px-3 text-xs",
         lg: "h-12 rounded-xl px-8 text-base",
-        icon: "h-10 w-10 rounded-xl",
+        icon: "h-11 w-11 rounded-xl",
       },
     },
     defaultVariants: {
@@ -34,15 +37,26 @@ const buttonVariants = cva(
 );
 
 const Button = forwardRef(function Button(
-  { className, variant, size, ...props },
+  { className, variant, size, loading, disabled, children, ...props },
   ref
 ) {
   return (
     <button
-      className={cn(buttonVariants({ variant, size, className }))}
+      className={cn(
+        buttonVariants({ variant, size, className }),
+        loading && "cursor-wait"
+      )}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
       ref={ref}
       {...props}
-    />
+    >
+      {loading ? (
+        <span className="spinner" aria-hidden="true" />
+      ) : (
+        children
+      )}
+    </button>
   );
 });
 

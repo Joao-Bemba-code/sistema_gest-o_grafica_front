@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useToast } from "@/components/Toast";
@@ -11,6 +12,7 @@ import { Input } from "@/components/ui/Input";
 import { FormField } from "@/components/ui/FormField";
 import { CardSkeleton } from "@/components/Skeleton";
 import Icon from "@/components/Icon";
+import { getImageUrl } from "@/lib/utils";
 import {
   buscarOrganizacao, guardarOrganizacao,
   buscarSistema, guardarSistema,
@@ -19,109 +21,7 @@ import {
   alterarEmail, alterarSenha,
 } from "@/services/configuracoes";
 
-const CONTRATO_TEMPLATE = `CONTRATO DE TRABALHO
-
-ENTRE
-(nome completo), (estado civil), natural de Kuito, província Bié, com domicílio profissional em Luanda, rua 22 de Janeiro, Nova Urbanização, Junto ao Siac, Cacuaco, que outorga na qualidade de sócio-gerente em representação da sociedade comercial quotas com a firma {NOME_ORGANIZACAO}, {NIF_ORGANIZACAO}, com sede na {MORADA_ORGANIZACAO}, com o capital social de 100.000,00 cem kwanzas mil, matriculada na Conservatória de Registo Comercial de Luanda Sob o número 38.211-22/2120816 adiante designada por PRIMEIRA CONTRAENTE ou ENTIDADE EMPREGADORA
-
-E
-{NOME_COLABORADOR}, {ESTADO_CIVIL}, NIF {NIF_COLABORADOR}, natural de {NATURAL_DE}, residente em {RESIDENCIA}, portador do Bilhete de Identidade, número {BI_COLABORADOR}, emitido por ............. em .........., adiante designado por SEGUNDO CONTRAENTE ou TRABALHADOR
-
-É celebrado o presente contrato de trabalho que se rege pelas disposições da Lei Geral do Trabalho (L.G.T) e respectiva legislação complementar, pelos regulamentos internos e ainda pelas seguintes cláusulas:
-
-CLÁUSULA PRIMEIRA
-Categoria Profissional
-
-A Entidade Empregadora admite ao seu serviço para a satisfação de necessidades temporárias de trabalho, o trabalhador com a categoria profissional de {CATEGORIA_PROFISSIONAL}, ficando este, no que diz respeito ao desempenho das tarefas que lhe forem confiadas, sob autoridade e direcção da primeira contraente.
-
-CLÁUSULA SEGUNDA
-Duração
-
-O presente contrato tem início em {DATA_INICIO} e vigorará pelo tempo necessário à satisfação das necessidades temporárias da empresa, caducando, para todos os efeitos quando as mesmas deixarem de se verificar.
-
-CLÁUSULA TERCEIRA
-Motivo Justificativo
-
-O motivo justificativo da celebração do presente contrato a termo incerto, e que é do conhecimento do trabalhador, tem por base a satisfação de necessidades temporárias da empresa, a saber na descrição de cargos conforme o anexo I.
-
-CLÁUSULA QUARTA
-Local de Trabalho
-
-O local de prestação de trabalho será no estabelecimento da Entidade Empregadora, sito na {LOCAL_TRABALHO} ou noutro que venha possuir, arrendar ou explorar, sempre que tal se mostre necessário para o bom e efectivo exercício das funções que constituem o objecto do presente contrato.
-
-CLÁUSULA QUINTA
-Horário de Trabalho
-
-O trabalhador obriga-se a prestar {HORARIO_TRABALHO} horas semanais distribuídas por (__ ) dias por semana com intervalo para refeição, de acordo com o horário em vigor no seio da Entidade Empregadora.
-
-CLÁUSULA SEXTA
-Retribuição
-
-1. Como contrapartida do trabalho prestado a Entidade Empregadora compromete-se a pagar ao trabalhador a retribuição mensal de {SALARIO_BASE}, sujeita aos descontos legais e paga 12 meses por ano, acrescida de duodécimos de subsídio de natal e de férias calculados nos termos da lei.
-
-2. O trabalhador terá ainda o direito ao valor de {SUBSIDIO_ALIMENTACAO}, referente ao subsídio de alimentação por cada dia de trabalho efectivo, não sendo este valor considerado para efeitos de cálculo dos duodécimos previstos no número anterior.
-
-3. As remunerações previstas nos números anteriores serão pagas até ao quinto dia útil do mês posterior a que respeitam através de transferência bancária.
-
-CLÁUSULA SÉTIMA
-Deveres do Trabalhador
-
-1. O trabalhador, aceitando ser admitido ao serviço da Entidade Empregadora, obriga-se ao cumprimento dos regulamentos e determinações escritas ou resultantes das práticas internas e usuais desta, bem como do preceituado na contratação colectiva e demais legislação aplicável e ainda mais especificamente:
-
-a) Comparecer ao serviço com assiduidade e realizar o trabalho com zelo e diligência, visando a melhoria da produtividade da empresa;
-
-b) Executar todos os trabalhos com zelo e dedicação, ao serviço e no interesse da Entidade Empregadora, cumprindo estritamente as ordens e instruções dos seus superiores hierárquicos;
-
-c) Cumprir pontualmente o seu horário de trabalho, só prestando trabalho suplementar quando tal for determinado pelos seus superiores hierárquicos competentes para o efeito e dentro dos pressupostos definidos na lei;
-
-d) Guardar sigilo absoluto em todos os assuntos relacionados com a actividade da Entidade Empregadora e não guardar para si ou para terceiros cópias, duplicatos ou documentos daquela;
-
-e) Não exercer fora da actividade prestada à Entidade Empregadora qualquer actividade remunerada sem que para tanto tenha autorização escrita daquela;
-
-f) Deslocar-se ao serviço e a expensas da Entidade Empregadora, a qualquer localidade do país ou estrangeiro, sempre que tais deslocações sejam necessárias ao exercício da actividade da primeira outorgante;
-
-g) Guardar lealdade à Entidade Empregadora e cumprir as demais obrigações decorrentes do contrato e das normas que o regem;
-
-h) Responsabilizar-se pela guarda e adequada utilização e conservação de todos os bens e valores que no âmbito do presente contrato, sejam por ele recebido e manuseado ou por qualquer outra forma se encontrem à sua guarda, responsabilizar-se nos termos gerais pelo ressarcimento de quaisquer prejuízos que venha a causar directa ou indirectamente por um negligente desempenho das suas funções, nomeadamente extravio de bens e valores ou sua danificação, sem prejuízo de um eventual procedimento disciplinar ou criminal;
-
-i) Abster-se de ter conduta que possa prejudicar o bom nome e a imagem da Entidade Empregadora e seus representantes.
-
-CLÁUSULA OITAVA
-Confidencialidade
-
-1. As partes acordam atribuir confidencialidade a toda e qualquer informação decorrente do presente contrato.
-
-2. Considera-se existir informação confidencial da Entidade Empregadora, designadamente, a que disser respeito aos segredos comerciais, aos seus métodos de produção e comercialização e demais operativas, toda a sua estratégia de marketing, a sua técnica de formação de pessoal, estudos de mercado, planos de expansão e respectivos timings, identificação de potencial clientela, técnicas de penetração no mercado e todos os demais segredos e usos comerciais e industriais que mereçam a tutela do direito a nível de concorrência ou outro.
-
-3. Durante a execução do presente contrato e nos anos subsequentes à cessação do mesmo, o trabalhador obriga-se a não desenvolver, directa ou indirectamente por conta própria ou de outrem qualquer actividade que possa conflituar ou concorrer com a actividade da Entidade Empregadora.
-
-CLÁUSULA NONA
-Poderes da Entidade Empregadora
-
-Compete à Entidade Empregadora:
-1. Definir as funções e tarefas do trabalhador, de acordo com as aptidões e competências deste.
-2. Regulamentar o modo de prestação de trabalho do trabalhador.
-
-CLÁUSULA DÉCIMA
-Dúvidas e Omissões
-
-Na integração de lacunas e resolução de dúvidas eventualmente emergentes do clausulado do presente contrato, aplicar-se-ão as disposições vigentes na L.G.T.
-
-CLÁUSULA DÉCIMA PRIMEIRA
-Direito à Informação
-
-Foram prestados todos os esclarecimentos e informações relativas aos aspectos mais relevantes do contrato, de forma escrita conforme consta do anexo I, que dele faz parte integrante, a que se referem os artigos do citado diploma legal, tendo o trabalhador ficado ciente de todos os direitos e obrigações decorrentes do presente contrato de trabalho.
-
-CLÁUSULA DÉCIMA SEGUNDA
-Disposições Finais
-
-1. Ambas as partes se obrigam ao integral cumprimento do acordado no presente contrato, envolvendo a sua violação a imediata possibilidade de denúncia e consequente invocação de justa causa, independentemente de outras vias legalmente adequadas ao cabal ressarcimento dos direitos ou indemnizações emergentes.
-
-2. Para resolução de quaisquer litígios emergentes do presente contrato, as partes convencionam o foro da comarca de Cacuaco com expressa renúncia a qualquer outro.
-
-O presente contrato é feito em duplicado, ambos com valor de original, os quais vão ser assinados pelos contraentes, ficando um exemplar em poder de cada uma das partes.
-
-Cacuaco, {DATA_ASSINATURA}`;
+const CONTRATO_TEMPLATE = ``;
 
 const SECTIONS = {
   organizacao: { icon: "business", title: "Organização", desc: "Dados da Organização" },
@@ -294,10 +194,12 @@ export default function ConfiguracoesPage() {
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-col gap-1">
-        <h1 className="text-2xl font-extrabold text-foreground tracking-tight">Configurações</h1>
-        <p className="text-sm text-muted-foreground">Gerencie a organização, sistema e segurança</p>
-      </section>
+      <div className="obsidian-glass rounded-lg p-5 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-l-4 border-l-primary">
+        <div>
+          <h1 className="font-sans text-3xl font-bold text-foreground tracking-tight">Configurações</h1>
+          <p className="text-primary mt-1 font-mono text-xs uppercase tracking-widest">Parâmetros e definições do sistema // CFG</p>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
@@ -351,8 +253,8 @@ export default function ConfiguracoesPage() {
               <div className="flex items-center justify-between gap-6 rounded-xl border bg-muted/30 p-5">
                 <div className="flex items-center gap-4 min-w-0">
                   <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5 overflow-hidden">
-                    {org.logo_url ? (
-                      <img src={org.logo_url} alt="Logo" className="h-full w-full object-contain" />
+                     {org.logo_url ? (
+                      <Image src={getImageUrl(org.logo_url)} alt="Logo" className="h-full w-full object-contain" width={64} height={64} />
                     ) : (
                       <Icon name="image" className="text-2xl text-primary/50" />
                     )}

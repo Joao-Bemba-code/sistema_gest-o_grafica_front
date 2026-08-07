@@ -7,8 +7,10 @@ import Modal from "@/components/Modal";
 import Icon from "@/components/Icon";
 import { Card, CardContent } from "@/components/ui/Card";
 import KpiCard from "@/components/ui/KpiCard";
+import { inputCls } from "@/lib/estoque";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { listar, criar, atualizar, remover } from "@/services/clientes";
 
 const initialForm = {
@@ -25,6 +27,9 @@ export default function CadastrosPage() {
   const [filtroTipo, setFiltroTipo] = useState("todos");
   const [carregando, setCarregando] = useState(false);
   const [editando, setEditando] = useState(null);
+  const [detalhes, setDetalhes] = useState(null);
+  const [eliminarItem, setEliminarItem] = useState(null);
+  const [deletando, setDeletando] = useState(false);
   const { addToast } = useToast();
 
   const carregar = useCallback(async (params = {}) => {
@@ -38,12 +43,18 @@ export default function CadastrosPage() {
     } finally { setCarregando(false); }
   }, [addToast]);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    carregar({});
+  }, [carregar]);
+
   useEffect(() => {
     const params = {};
     if (filtroTipo !== "todos") params.tipo = filtroTipo;
     if (searchTerm) params.busca = searchTerm;
     carregar(params);
   }, [searchTerm, filtroTipo, carregar]);
+/* eslint-enable react-hooks/set-state-in-effect */
 
   const totalClientes = clientes.filter((c) => c.tipo === "cliente").length;
   const totalFornecedores = clientes.filter((c) => c.tipo === "fornecedor").length;
@@ -70,16 +81,21 @@ export default function CadastrosPage() {
     }
   };
 
-  const handleDelete = async (codigo) => {
+  const confirmarEliminacao = async () => {
+    if (!eliminarItem) return;
+    setDeletando(true);
     try {
-      await remover(codigo);
-      addToast("Cliente removido com sucesso", "success");
+      await remover(eliminarItem.id ?? eliminarItem.codigo);
+      addToast("Cadastro removido com sucesso", "success");
       const params = {};
       if (filtroTipo !== "todos") params.tipo = filtroTipo;
       if (searchTerm) params.busca = searchTerm;
       await carregar(params);
+      setEliminarItem(null);
     } catch (err) {
       addToast(err.response?.data?.erro || "Erro na operação", "error");
+    } finally {
+      setDeletando(false);
     }
   };
 
@@ -96,25 +112,25 @@ export default function CadastrosPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+      <div className="obsidian-glass rounded-lg p-5 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-l-4 border-l-primary">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Cadastros</h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            {clientes.length} registos ({totalClientes} clientes, {totalFornecedores} fornecedores)
-          </p>
+          <h1 className="font-sans text-3xl font-bold text-foreground tracking-tight">Cadastros</h1>
+          <p className="text-primary mt-1 font-mono text-xs uppercase tracking-widest">Gestão de clientes // CLT · {clientes.length} registos ({totalClientes} clientes, {totalFornecedores} fornecedores)</p>
         </div>
-        <Button onClick={() => { setEditando(null); setForm(initialForm); setShowForm(true); }}>
-          <Icon name="add" className="text-lg" /> Novo Cadastro
-        </Button>
+        <div className="flex flex-wrap gap-3">
+          <button onClick={() => { setEditando(null); setForm(initialForm); setShowForm(true); }} className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold shadow-[0_0_15px_rgba(128,213,203,0.2)] hover:shadow-[0_0_25px_rgba(128,213,203,0.4)]">
+            <Icon name="add" className="text-[16px]" /> Novo Cadastro
+          </button>
+        </div>
       </div>
 
       <section className="grid grid-cols-2 sm:grid-cols-3 gap-5">
         {[
-          { label: "Total Cadastros", value: clientes.length, icon: "badge" },
-          { label: "Clientes", value: totalClientes, icon: "person" },
-          { label: "Fornecedores", value: totalFornecedores, icon: "local_shipping" },
+          { label: "Total Cadastros", value: clientes.length, icon: "badge", iconVariant: "primary" },
+          { label: "Clientes", value: totalClientes, icon: "person", iconVariant: "secondary" },
+          { label: "Fornecedores", value: totalFornecedores, icon: "local_shipping", iconVariant: "info" },
         ].map((kpi) => (
-          <KpiCard key={kpi.label} icon={kpi.icon} label={kpi.label} value={kpi.value} />
+          <KpiCard key={kpi.label} icon={kpi.icon} label={kpi.label} value={kpi.value} iconVariant={kpi.iconVariant} />
         ))}
       </section>
 
@@ -149,24 +165,71 @@ export default function CadastrosPage() {
               <div key={f.name} className={f.name === "endereco" || f.name === "email" ? "sm:col-span-2 flex flex-col gap-1.5" : "flex flex-col gap-1.5"}>
                 <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{f.label}</label>
                 <input required={f.required} name={f.name} type={f.type || "text"} value={form[f.name]} onChange={handleChange}
-                  className="w-full px-3 py-2.5 bg-background border border-input rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                  className={inputCls}
                   placeholder={f.placeholder} />
               </div>
             ))}
             <div className="sm:col-span-2 flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Endereço</label>
               <input name="endereco" value={form.endereco} onChange={handleChange}
-                className="w-full px-3 py-2.5 bg-background border border-input rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                className={inputCls}
                 placeholder="Ex: Rua Major Kanhangulo, 145 - Luanda" />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Data de Cadastro</label>
               <input name="dataCadastro" type="date" value={form.dataCadastro} onChange={handleChange}
-                className="w-full px-3 py-2.5 bg-background border border-input rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/30 transition-all" />
+                className={inputCls} />
             </div>
           </div>
         </form>
       </Modal>
+
+      <Modal open={Boolean(detalhes)} onClose={() => setDetalhes(null)} title="Detalhes do cadastro" icon={detalhes?.tipo === "fornecedor" ? "local_shipping" : "person"} size="sm">
+        {detalhes && (
+          <dl className="divide-y divide-border/50">
+            {[
+              { label: "Código", value: detalhes.codigo },
+              { label: "Tipo", value: detalhes.tipo === "fornecedor" ? "Fornecedor" : "Cliente", badge: true },
+              { label: "Nome", value: detalhes.nome },
+              { label: "Empresa", value: detalhes.empresa || "—" },
+              { label: "NIF", value: detalhes.nif || "—" },
+              { label: "Telefone", value: detalhes.telefone || "—" },
+              { label: "WhatsApp", value: detalhes.whatsapp || "—" },
+              { label: "Email", value: detalhes.email || "—" },
+              { label: "Endereço", value: detalhes.endereco || "—" },
+              { label: "Data de cadastro", value: detalhes.dataCadastro ? new Date(detalhes.dataCadastro).toLocaleDateString("pt-BR") : "—" },
+            ].map((linha) => (
+              <div key={linha.label} className="flex items-center justify-between gap-4 py-2.5">
+                <dt className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  {linha.label}
+                </dt>
+                <dd className="min-w-0 truncate text-right font-medium text-foreground">
+                  {linha.badge ? (
+                    <Badge variant={detalhes.tipo === "fornecedor" ? "secondary" : "info"} className="text-[10px]">
+                      {linha.value}
+                    </Badge>
+                  ) : (
+                    linha.value
+                  )}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        )}
+      </Modal>
+
+      <ConfirmDialog
+        open={Boolean(eliminarItem)}
+        onClose={() => setEliminarItem(null)}
+        onConfirm={confirmarEliminacao}
+        loading={deletando}
+        title="Eliminar cadastro"
+        description={
+          eliminarItem
+            ? `Tem a certeza que deseja eliminar "${eliminarItem.nome}"? Esta ação não pode ser desfeita e removerá o cadastro de forma definitiva.`
+            : ""
+        }
+      />
 
       {carregando ? <ListSkeleton count={5} /> : (
         <Card>
@@ -197,8 +260,8 @@ export default function CadastrosPage() {
                 </tr>
               </thead>
               <tbody>
-                {clientes.map((item) => (
-                  <tr key={item.codigo} className="border-b border-border/10 hover:bg-muted/30 transition-colors">
+                {clientes.map((item, index) => (
+                  <tr key={item.id ?? index} className="border-b border-border/10 hover:bg-muted/30 transition-colors">
                     <td className="px-5 py-3"><span className="bg-primary/10 text-primary font-semibold px-2 py-1 rounded text-[10px]">{item.codigo}</span></td>
                     <td className="px-5 py-3">
                       <Badge variant={item.tipo === "cliente" ? "info" : "secondary"} className="text-[10px]">
@@ -214,9 +277,9 @@ export default function CadastrosPage() {
                     <td className="px-5 py-3 text-muted-foreground text-xs whitespace-nowrap">{new Date(item.dataCadastro).toLocaleDateString("pt-BR")}</td>
                     <td className="px-5 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" title="Ver detalhes"><Icon name="visibility" className="text-[16px]" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => setDetalhes(item)} title="Ver detalhes"><Icon name="visibility" className="text-[16px]" /></Button>
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(item)} title="Editar"><Icon name="edit" className="text-[16px]" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(item.codigo)} title="Eliminar" className="text-error hover:text-error"><Icon name="delete" className="text-[16px]" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => setEliminarItem(item)} title="Eliminar" className="text-error hover:text-error"><Icon name="delete" className="text-[16px]" /></Button>
                       </div>
                     </td>
                   </tr>
@@ -233,8 +296,8 @@ export default function CadastrosPage() {
           </div>
 
           <div className="lg:hidden divide-y divide-border/20">
-            {clientes.map((item) => (
-              <div key={item.codigo} className="p-4 hover:bg-muted/30 transition-colors">
+            {clientes.map((item, index) => (
+              <div key={item.id ?? index} className="p-4 hover:bg-muted/30 transition-colors">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
@@ -254,7 +317,7 @@ export default function CadastrosPage() {
                   </div>
                   <div className="flex flex-col gap-1 shrink-0">
                     <Button variant="ghost" size="icon" onClick={() => handleEdit(item)} title="Editar"><Icon name="edit" className="text-[14px]" /></Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(item.codigo)} title="Eliminar" className="text-error"><Icon name="delete" className="text-[14px]" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => setEliminarItem(item)} title="Eliminar" className="text-error"><Icon name="delete" className="text-[14px]" /></Button>
                   </div>
                 </div>
               </div>

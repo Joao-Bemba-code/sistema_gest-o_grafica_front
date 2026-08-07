@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
-import { listarOrdens } from "@/services/producao";
+import { inputCls } from "@/lib/estoque";
+import { listarOrdens, salvarAcabamento } from "@/services/producao";
 
 const servicos = [
   { id: "corte", label: "Corte", icon: "content_cut" },
@@ -39,11 +40,14 @@ export default function AcabamentoPage() {
   useEffect(() => {
     listarOrdens().then(data => {
       const arr = Array.isArray(data) ? data : data?.ordens || [];
-      setOrdens(arr.map(o => ({
-        id: o.id, cliente: o.cliente || "—", produto: o.produto || "—",
-        prazo: o.data_entrega || o.prazo || "—", responsavel: o.responsavel_acabamento || "",
-        servicos: servicos.reduce((acc, s) => ({ ...acc, [s.id]: o.acabamento?.[s.id] || "pendente" }), {}),
-      })));
+      setOrdens(arr.map(o => {
+        const acMap = (Array.isArray(o.acabamentos) ? o.acabamentos : []).reduce((acc, r) => ({ ...acc, [r.servico]: r.estado }), {});
+        return {
+          id: o.id, cliente: o.cliente?.nome || o.cliente || "—", produto: o.produto || "—",
+          prazo: o.data_entrega || o.prazo || "—", responsavel: o.responsavel_acabamento || "",
+          servicos: servicos.reduce((acc, s) => ({ ...acc, [s.id]: acMap[s.id] || "pendente" }), {}),
+        };
+      }));
     }).catch(err => setError(err.message)).finally(() => setLoading(false));
   }, []);
 
@@ -57,8 +61,15 @@ export default function AcabamentoPage() {
     }));
   };
 
-  const handleSave = (opId) => {
-    addToast("Acabamento actualizado com sucesso", "success");
+  const handleSave = async (opId) => {
+    const op = ordens.find(o => o.id === opId);
+    if (!op) return;
+    try {
+      await salvarAcabamento(opId, op.servicos);
+      addToast("Acabamento actualizado com sucesso", "success");
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao guardar acabamento", "error");
+    }
   };
 
   const handleEdit = (op) => {
@@ -68,11 +79,16 @@ export default function AcabamentoPage() {
     setModalOpen(true);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setOrdens(prev => prev.map(o => o.id === form.op ? { ...o, servicos: { ...servicosForm }, responsavel: form.responsavel } : o));
-    setModalOpen(false);
-    addToast("Acabamento actualizado com sucesso", "success");
+    try {
+      await salvarAcabamento(form.op, servicosForm);
+      setOrdens(prev => prev.map(o => o.id === form.op ? { ...o, servicos: { ...servicosForm }, responsavel: form.responsavel } : o));
+      setModalOpen(false);
+      addToast("Acabamento actualizado com sucesso", "success");
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao guardar acabamento", "error");
+    }
   };
 
   if (loading) return <CardSkeleton lines={6} />;
@@ -80,9 +96,11 @@ export default function AcabamentoPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-bold text-foreground">Acabamento</h1>
-        <p className="text-xs text-muted-foreground mt-1">Acompanhamento dos serviços de acabamento</p>
+      <div className="obsidian-glass rounded-lg p-5 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-l-4 border-l-primary">
+        <div>
+          <h1 className="font-sans text-3xl font-bold text-foreground tracking-tight">Acabamento</h1>
+          <p className="text-primary mt-1 font-mono text-xs uppercase tracking-widest">Acompanhamento dos serviços de acabamento // ACB</p>
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -91,8 +109,8 @@ export default function AcabamentoPage() {
           const algumExec = servicos.some(s => op.servicos[s.id] === "em_execucao");
           return (
             <Card key={op.id} className="hover-lift cursor-pointer" onClick={() => setSelected(selected === op.id ? null : op.id)}>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between gap-3">
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                       <Icon name="handyman" className="text-primary text-[20px]" />
@@ -157,7 +175,7 @@ export default function AcabamentoPage() {
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Responsável</label>
-              <input value={form.responsavel} onChange={(e) => setForm({ ...form, responsavel: e.target.value })} className="w-full px-3 py-2.5 bg-background border border-input rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/30 transition-all" placeholder="Nome do responsável" />
+              <input value={form.responsavel} onChange={(e) => setForm({ ...form, responsavel: e.target.value })} className={inputCls} placeholder="Nome do responsável" />
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">

@@ -24,3 +24,8 @@ export async function remover(id) {
   const { data } = await api.delete(`/orcamentos/${id}`);
   return data;
 }
+
+export async function mudarEstado(id, estado) {
+  const { data } = await api.put(`/orcamentos/${id}`, { estado });
+  return data;
+}

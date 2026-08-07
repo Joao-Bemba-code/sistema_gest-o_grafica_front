@@ -16,7 +16,7 @@ const Input = forwardRef(function Input(
       <input
         type={type}
         className={cn(
-          "flex h-10 w-full rounded-xl border border-input bg-background px-3.5 py-2 text-xs ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all disabled:cursor-not-allowed disabled:opacity-50",
+          "flex h-10 w-full rounded-xl border border-outline-variant/40 bg-background/60 px-3.5 py-2 text-xs placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 focus-visible:border-primary transition-all disabled:cursor-not-allowed disabled:opacity-50",
           icon && "pl-10",
           className
         )}
@@ -27,4 +27,22 @@ const Input = forwardRef(function Input(
   );
 });
 
-export { Input };
+const Select = forwardRef(function Select(
+  { className, children, ...props },
+  ref
+) {
+  return (
+    <select
+      className={cn(
+        "flex h-10 w-full rounded-xl border border-outline-variant/40 bg-background/60 px-3.5 py-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 focus-visible:border-primary transition-all disabled:cursor-not-allowed disabled:opacity-50",
+        className
+      )}
+      ref={ref}
+      {...props}
+    >
+      {children}
+    </select>
+  );
+});
+
+export { Input, Select };

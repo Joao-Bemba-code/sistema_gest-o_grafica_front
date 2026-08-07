@@ -3,10 +3,7 @@ import { cn } from "@/lib/utils";
 function Card({ className, ...props }) {
   return (
     <div
-      className={cn(
-        "rounded-2xl border bg-card text-card-foreground shadow-[0_1px_3px_0_rgba(0,0,0,0.04)] transition-all duration-200",
-        className
-      )}
+      className={cn("rounded-xl border border-outline-variant/30 bg-card text-card-foreground shadow-sm transition-shadow duration-200 hover:border-outline-variant/50", className)}
       {...props}
     />
   );
@@ -24,10 +21,7 @@ function CardHeader({ className, ...props }) {
 function CardTitle({ className, ...props }) {
   return (
     <h3
-      className={cn(
-        "text-base sm:text-lg font-semibold leading-none tracking-tight",
-        className
-      )}
+      className={cn("text-sm sm:text-base font-semibold leading-none tracking-tight text-foreground", className)}
       {...props}
     />
   );
@@ -36,7 +30,7 @@ function CardTitle({ className, ...props }) {
 function CardDescription({ className, ...props }) {
   return (
     <p
-      className={cn("text-sm text-muted-foreground", className)}
+      className={cn("text-xs text-muted-foreground", className)}
       {...props}
     />
   );

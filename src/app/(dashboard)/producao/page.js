@@ -23,6 +23,56 @@ const etapaStatusOptions = ["pendente", "em_execucao", "concluido"];
 const etapaStatusLabels = { pendente: "Pendente", em_execucao: "Em Execução", concluido: "Concluído" };
 const etapaStatusVariants = { pendente: "outline", em_execucao: "warning", concluido: "success" };
 
+function derivarEtapa(j) {
+  if (j.estado === "entregue" || j.entrega_ok) return "entrega";
+  if (j.qualidade_ok) return "qualidade";
+  if (j.acabamento_ok) return "acabamento";
+  if (j.impressao_ok) return "impressao";
+  if (j.pre_impressao_ok) return "pre_impressao";
+  return "pre_impressao";
+}
+
+const etapaLabels = Object.fromEntries(etapas.map((e) => [e.id, e.label]));
+
+function normalizar(j) {
+  const preRow = Array.isArray(j.pre_impressaos) ? j.pre_impressaos[0] : j.preImpressao;
+  const impRow = Array.isArray(j.impressaos) ? j.impressaos[0] : j.impressao;
+  const qualRow = Array.isArray(j.qualidades) ? j.qualidades[0] : j.qualidade;
+  const pre = preRow ? {
+    arquivoRecebido: !!preRow.arquivo,
+    tamanhoCorreto: !!preRow.tamanho,
+    CMYK: !!preRow.cmyk,
+    fontesConvertidas: !!preRow.fontes,
+    imagem300DPI: !!preRow.imagens,
+    revisaoOrtografica: !!preRow.revisao,
+    aprovacaoCliente: !!preRow.aprovacao,
+    responsavel: preRow.responsavel || "",
+  } : {};
+  const imp = impRow ? {
+    maquina: impRow.maquina || "",
+    operador: impRow.operador || "",
+    horaInicio: impRow.data_inicio || "",
+    horaFim: impRow.data_fim || "",
+    quantidadeProduzida: impRow.quantidade_produzida ?? "",
+    quantidadeRejeitada: impRow.quantidade_rejeitada ?? "",
+    observacoes: impRow.observacoes || "",
+  } : {};
+  const ac = (Array.isArray(j.acabamentos) ? j.acabamentos : []).reduce((acc, r) => {
+    acc[r.servico === "hot_stamping" ? "hotStamping" : r.servico] = r.estado;
+    return acc;
+  }, {});
+  return {
+    ...j,
+    status: j.estado || j.status || "aguardando",
+    etapaAtual: derivarEtapa(j),
+    cliente: j.cliente?.nome || j.cliente || "—",
+    preImpressao: pre,
+    impressao: imp,
+    acabamento: ac,
+    qualidade: qualRow || {},
+  };
+}
+
 export default function ProducaoPage() {
   const [jobs, setJobs] = useState([]);
   const [activeTab, setActiveTab] = useState("pre_impressao");
@@ -32,9 +82,11 @@ export default function ProducaoPage() {
 
   useEffect(() => {
     listarOrdens().then((data) => {
-      setJobs(Array.isArray(data) ? data : data?.ordens || []);
-    }).finally(() => setLoading(false));
-  }, []);
+      const arr = (Array.isArray(data) ? data : data?.ordens || []).map(normalizar);
+      setJobs(arr);
+      setSelectedJob((prev) => prev ?? arr[0]?.id ?? null);
+    }).catch(() => addToast("Erro ao carregar ordens", "error")).finally(() => setLoading(false));
+  }, [addToast]);
 
   const updateJob = (jobId, section, key, value) => {
     setJobs(jobs.map(j => j.id === jobId ? { ...j, [section]: { ...j[section], [key]: value } } : j));
@@ -60,6 +112,10 @@ export default function ProducaoPage() {
   const handleSave = async (jobId) => {
     const job = jobs.find(j => j.id === jobId);
     if (!job) return;
+    if (job.requisicao_estado === "pendente" && job.status === "aguardando" && activeTab !== "entrega") {
+      addToast("Primeiro liberte os materiais da OP (saída de stock) para avançar", "error");
+      return;
+    }
     try {
       if (activeTab === "pre_impressao") await salvarPreImpressao(jobId, job.preImpressao);
       else if (activeTab === "impressao") await salvarImpressao(jobId, job.impressao);
@@ -76,16 +132,16 @@ export default function ProducaoPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="obsidian-glass rounded-lg p-5 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-l-4 border-l-primary">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Controlo de Produção</h1>
-          <p className="text-xs text-muted-foreground mt-1">Acompanhamento das etapas de produção</p>
+          <h1 className="font-sans text-3xl font-bold text-foreground tracking-tight">Controlo de Produção</h1>
+          <p className="text-primary mt-1 font-mono text-xs uppercase tracking-widest">Acompanhamento das etapas de produção // PROD</p>
         </div>
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-2">
         {etapas.map((e) => (
-          <Button key={e.id} variant={activeTab === e.id ? "default" : "outline"} size="sm" onClick={() => setActiveTab(e.id)}>
+          <Button key={e.id} variant={activeTab === e.id ? "default" : "outline"} size="sm" onClick={() => { setActiveTab(e.id); if (selectedJob == null && jobs.length) setSelectedJob(jobs[0].id); }}>
             <Icon name={e.icon} className="text-[16px]" />
             {e.label}
           </Button>
@@ -95,7 +151,7 @@ export default function ProducaoPage() {
       <div className="space-y-3">
         {jobs.map((job) => (
           <Card key={job.id}>
-            <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setSelectedJob(selectedJob === job.id ? null : job.id)}>
+            <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setSelectedJob(selectedJob === job.id ? null : job.id)}>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
                   <Icon name="construction" className="text-primary text-[20px]" />
@@ -104,6 +160,10 @@ export default function ProducaoPage() {
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-sm text-foreground">{job.id}</span>
                     <Badge variant={statusColors[job.status] || "outline"} className="text-[10px]">{statusLabels[job.status] || job.status}</Badge>
+                    <Badge variant="outline" className="text-[10px]">{etapaLabels[job.etapaAtual]}</Badge>
+                    {job.requisicao_estado === "pendente" && (
+                      <Badge variant="destructive" className="text-[10px]">Aguardando saída de materiais</Badge>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground">{job.cliente} — {job.produto}</p>
                 </div>
@@ -113,12 +173,23 @@ export default function ProducaoPage() {
 
             {selectedJob === job.id && (
               <div className="border-t p-5 space-y-4">
+                {job.requisicao_estado === "pendente" && (
+                  <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                    <Icon name="inventory" className="text-[20px] text-amber-600 shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Aguardando libertação de materiais</p>
+                      <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-0.5">
+                        Esta OP ainda não teve a saída de materiais confirmada pelo armazém. Só depois da libertação é que pode avançar para produção. Vá a Ordens de Produção → "Dar saída de materiais".
+                      </p>
+                    </div>
+                  </div>
+                )}
                 {activeTab === "pre_impressao" && (
                   <div className="space-y-4">
                     <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Icon name="rule" className="text-[18px] text-primary" /> Checklist Pré-Impressão</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       {["arquivoRecebido", "tamanhoCorreto", "CMYK", "fontesConvertidas", "imagem300DPI", "revisaoOrtografica", "aprovacaoCliente"].map((key) => (
-                        <label key={key} className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 border cursor-pointer hover:bg-muted transition-colors">
+                        <label key={key} className="flex items-center gap-3 p-4 rounded-xl bg-muted/50 border cursor-pointer hover:bg-muted transition-colors">
                           <input type="checkbox" checked={!!job.preImpressao[key]} onChange={(e) => updateJob(job.id, "preImpressao", key, e.target.checked)} className="w-4 h-4 rounded accent-primary" />
                           <span className="text-sm text-foreground">{key.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase())}</span>
                         </label>
@@ -139,12 +210,12 @@ export default function ProducaoPage() {
                       {["maquina", "operador", "horaInicio", "horaFim", "quantidadeProduzida", "quantidadeRejeitada"].map((f) => (
                         <div key={f} className="flex flex-col gap-1">
                           <label className="text-[10px] font-bold text-muted-foreground uppercase">{f.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase())}</label>
-                          <input type={f.includes("hora") ? "time" : f.includes("quantidade") ? "number" : "text"} value={job.impressao[f] || ""} onChange={(e) => updateImpressao(job.id, f, f.includes("quantidade") ? Number(e.target.value) : e.target.value)} className="px-3 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder={f.replace(/([A-Z])/g, " $1")} />
+                          <input type={f.includes("hora") ? "time" : f.includes("quantidade") ? "number" : "text"} value={job.impressao[f] || ""} onChange={(e) => updateImpressao(job.id, f, f.includes("quantidade") ? Number(e.target.value) : e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder={f.replace(/([A-Z])/g, " $1")} />
                         </div>
                       ))}
                       <div className="flex flex-col gap-1 sm:col-span-2 lg:col-span-3">
                         <label className="text-[10px] font-bold text-muted-foreground uppercase">Observações</label>
-                        <textarea value={job.impressao.observacoes || ""} onChange={(e) => updateImpressao(job.id, "observacoes", e.target.value)} rows={2} className="px-3 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" placeholder="Notas sobre a impressão..." />
+                        <textarea value={job.impressao.observacoes || ""} onChange={(e) => updateImpressao(job.id, "observacoes", e.target.value)} rows={2} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" placeholder="Notas sobre a impressão..." />
                       </div>
                     </div>
                     <div className="flex justify-end"><Button size="sm" onClick={() => handleSave(job.id)}>Guardar</Button></div>
@@ -182,7 +253,7 @@ export default function ProducaoPage() {
                       {["cor", "corte", "quantidade", "acabamento", "embalagem"].map((campo) => (
                         <div key={campo} className="flex flex-col gap-1">
                           <label className="text-[10px] font-bold text-muted-foreground uppercase">{campo}</label>
-                          <select value={job.qualidade[campo] || ""} onChange={(e) => updateQualidade(job.id, campo, e.target.value)} className="px-3 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30">
+                          <select value={job.qualidade[campo] || ""} onChange={(e) => updateQualidade(job.id, campo, e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30">
                             <option value="">Seleccionar...</option>
                             <option value="aprovado">Aprovado</option>
                             <option value="reprovado">Reprovado</option>
@@ -191,7 +262,7 @@ export default function ProducaoPage() {
                       ))}
                       <div className="flex flex-col gap-1">
                         <label className="text-[10px] font-bold text-muted-foreground uppercase">Resultado Final</label>
-                        <select value={job.qualidade.resultado || ""} onChange={(e) => updateQualidade(job.id, "resultado", e.target.value)} className="px-3 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30 font-bold">
+                        <select value={job.qualidade.resultado || ""} onChange={(e) => updateQualidade(job.id, "resultado", e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30 font-bold">
                           <option value="">Seleccionar...</option>
                           <option value="aprovado">APROVADO</option>
                           <option value="reprovado">REPROVADO</option>
@@ -207,7 +278,7 @@ export default function ProducaoPage() {
                     <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Icon name="local_shipping" className="text-[18px] text-primary" /> Entrega</h3>
                     <div className="p-6 bg-muted/50 rounded-xl text-center">
                       <Icon name="local_shipping" className="text-4xl text-muted-foreground/30 block mb-2" />
-                      <p className="text-sm text-muted-foreground">Estado da entrega: <strong className="text-foreground">{etapaStatusLabels[job.acabamento?.entrega] || "Pendente"}</strong></p>
+                      <p className="text-sm text-muted-foreground">Estado da entrega: <strong className="text-foreground">{job.status === "entregue" ? "Concluído" : "Pendente"}</strong></p>
                     </div>
                   </div>
                 )}
@@ -216,6 +287,14 @@ export default function ProducaoPage() {
           </Card>
         ))}
       </div>
+
+      {jobs.length === 0 && !loading && (
+        <div className="text-center p-12 text-muted-foreground">
+          <Icon name="construction" className="text-4xl block mx-auto mb-2 opacity-30" />
+          <p className="font-medium">Nenhuma ordem de produção encontrada</p>
+          <p className="text-xs mt-1">Crie uma OP em {"Ordens de Produção"} para começar.</p>
+        </div>
+      )}
 
       <footer className="p-6 text-center border-t bg-muted/30 rounded-2xl">
         <p className="text-sm text-muted-foreground">SIGRAF — Sistema de Gestão para Indústria Gráfica</p>

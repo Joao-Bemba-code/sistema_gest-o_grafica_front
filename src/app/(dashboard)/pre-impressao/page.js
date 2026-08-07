@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
-import { listarOrdens } from "@/services/producao";
+import { inputCls } from "@/lib/estoque";
+import { listarOrdens, salvarPreImpressao } from "@/services/producao";
 
 const checklistItems = [
   { key: "arquivo", label: "Arquivo Recebido", icon: "file_present" },
@@ -48,11 +49,14 @@ export default function PreImpressaoPage() {
   useEffect(() => {
     listarOrdens().then(data => {
       const arr = Array.isArray(data) ? data : data?.ordens || [];
-      setJobs(arr.map(j => ({
-        id: j.id, cliente: j.cliente || j.cliente_nome || "—", produto: j.produto || "—",
-        responsavel: j.preImpressao?.responsavel || j.responsavel_pre_impressao || "",
-        ...checklistItems.reduce((acc, c) => ({ ...acc, [c.key]: j.preImpressao?.[c.key] || j[c.key] || "pendente" }), {}),
-      })));
+      setJobs(arr.map(j => {
+        const pre = Array.isArray(j.pre_impressaos) ? j.pre_impressaos[0] : j.preImpressao;
+        return {
+        id: j.id, cliente: j.cliente?.nome || j.cliente || "—", produto: j.produto || "—",
+        responsavel: pre?.responsavel || j.responsavel_pre_impressao || "",
+        ...checklistItems.reduce((acc, c) => ({ ...acc, [c.key]: pre?.[c.key] ? "ok" : "pendente" }), {}),
+      };
+      }));
     }).catch(err => setError(err.message)).finally(() => setLoading(false));
   }, []);
 
@@ -75,9 +79,23 @@ export default function PreImpressaoPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    addToast("Pré-impressão actualizada com sucesso", "success");
-    setJobs(prev => prev.map(j => j.id === editId ? { ...j, ...form, responsavel: form.responsavel } : j));
-    setModalOpen(false);
+    if (!editId) return;
+    try {
+      const dados = {
+        responsavel: form.responsavel || "",
+        ...checklistItems.reduce((acc, c) => ({ ...acc, [c.key]: form[c.key] === "ok" }), {}),
+      };
+      const salvo = await salvarPreImpressao(editId, dados);
+      setJobs(prev => prev.map(j => j.id === editId ? {
+        ...j,
+        responsavel: form.responsavel || "",
+        ...checklistItems.reduce((acc, c) => ({ ...acc, [c.key]: salvo[c.key] ? "ok" : "pendente" }), {}),
+      } : j));
+      setModalOpen(false);
+      addToast("Pré-impressão actualizada com sucesso", "success");
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao guardar pré-impressão", "error");
+    }
   };
 
   if (loading) return <CardSkeleton lines={6} />;
@@ -85,9 +103,11 @@ export default function PreImpressaoPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-bold text-foreground">Pré-Impressão</h1>
-        <p className="text-xs text-muted-foreground mt-1">Checklist de preparação de arquivos</p>
+      <div className="obsidian-glass rounded-lg p-5 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-l-4 border-l-primary">
+        <div>
+          <h1 className="font-sans text-3xl font-bold text-foreground tracking-tight">Pré-Impressão</h1>
+          <p className="text-primary mt-1 font-mono text-xs uppercase tracking-widest">Checklist de preparação de arquivos // PRE</p>
+        </div>
       </div>
 
       <div className="grid gap-3">
@@ -95,9 +115,9 @@ export default function PreImpressaoPage() {
           const resultado = calcularPreResultado(job);
           return (
             <Card key={job.id} className="hover-lift cursor-pointer" onClick={() => setSelected(selected === job.id ? null : job.id)}>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4 min-w-0">
                     <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                       <Icon name="rule" className="text-primary text-[20px]" />
                     </div>
@@ -149,7 +169,7 @@ export default function PreImpressaoPage() {
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Responsável</label>
-              <input value={form.responsavel} onChange={(e) => setField("responsavel", e.target.value)} className="w-full px-3 py-2.5 bg-background border border-input rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/30 transition-all" placeholder="Nome do responsável" />
+              <input value={form.responsavel} onChange={(e) => setField("responsavel", e.target.value)} className={inputCls} placeholder="Nome do responsável" />
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">

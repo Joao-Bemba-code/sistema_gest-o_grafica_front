@@ -5,7 +5,7 @@ import Icon from "./Icon";
 const ToastContext = createContext();
 
 const variants = {
-  success: { bg: "bg-primary text-white shadow-lg shadow-primary/30", icon: "check_circle" },
+  success: { bg: "bg-primary text-on-primary shadow-lg shadow-primary/30", icon: "check_circle" },
   error: { bg: "bg-destructive text-white shadow-lg shadow-destructive/30", icon: "warning" },
   warning: { bg: "bg-amber-500 text-white shadow-lg shadow-amber-500/30", icon: "warning" },
   info: { bg: "bg-secondary text-white shadow-lg shadow-secondary/30", icon: "info" },
@@ -25,13 +25,13 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={{ addToast }}>
       {children}
-      <div className="fixed bottom-5 right-5 z-[9999] flex flex-col gap-2.5 pointer-events-none" aria-live="polite">
+      <div className="fixed top-20 right-4 sm:right-6 z-[9999] flex flex-col gap-2.5 pointer-events-none items-end" aria-live="polite">
         {toasts.map((toast) => {
           const v = variants[toast.type] || variants.success;
           return (
             <div
               key={toast.id}
-              className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-semibold animate-slide-up border ${
+              className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-semibold animate-slide-down border ${
                 toast.type === "error" ? "border-destructive/20" : "border-white/10"
               } ${v.bg}`}
               role="alert"
@@ -48,12 +48,6 @@ export function ToastProvider({ children }) {
           );
         })}
       </div>
-      <style jsx global>{`
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(16px) scale(0.95); }
-          to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-      `}</style>
     </ToastContext.Provider>
   );
 }

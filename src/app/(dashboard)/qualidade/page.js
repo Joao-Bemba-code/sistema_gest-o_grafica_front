@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
-import { listarOrdens } from "@/services/producao";
+import { inputCls } from "@/lib/estoque";
+import { listarOrdens, salvarQualidade } from "@/services/producao";
 
 const campos = [
   { key: "cor", label: "Cor", icon: "palette" },
@@ -41,11 +42,14 @@ export default function QualidadePage() {
   useEffect(() => {
     listarOrdens().then(data => {
       const arr = Array.isArray(data) ? data : data?.ordens || [];
-      setInspecoes(arr.map(o => ({
-        id: o.id, op: o.id, cliente: o.cliente || "—", produto: o.produto || "—",
-        responsavel: o.qualidade?.responsavel || o.responsavel_qualidade || "",
-        ...campos.reduce((acc, c) => ({ ...acc, [c.key]: o.qualidade?.[c.key] || "pendente" }), {}),
-      })));
+      setInspecoes(arr.map(o => {
+        const qual = Array.isArray(o.qualidades) ? o.qualidades[0] : o.qualidade;
+        return {
+        id: o.id, op: o.id, cliente: o.cliente?.nome || o.cliente || "—", produto: o.produto || "—",
+        responsavel: qual?.responsavel || o.responsavel_qualidade || "",
+        ...campos.reduce((acc, c) => ({ ...acc, [c.key]: qual?.[c.key] || "pendente" }), {}),
+      };
+      }));
     }).catch(err => setError(err.message)).finally(() => setLoading(false));
   }, []);
 
@@ -65,11 +69,18 @@ export default function QualidadePage() {
     setModal(true);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setInspecoes(prev => prev.map(i => i.id === editandoId ? { ...i, ...form, responsavel: form.responsavel } : i));
-    setModal(false);
-    addToast("Inspeção actualizada com sucesso", "success");
+    if (!editandoId) return;
+    try {
+      const dados = campos.reduce((acc, c) => ({ ...acc, [c.key]: form[c.key] || "pendente" }), {});
+      await salvarQualidade(editandoId, dados);
+      setInspecoes(prev => prev.map(i => i.id === editandoId ? { ...i, ...dados, responsavel: form.responsavel } : i));
+      setModal(false);
+      addToast("Inspeção actualizada com sucesso", "success");
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao guardar inspeção", "error");
+    }
   };
 
   if (loading) return <CardSkeleton lines={6} />;
@@ -77,9 +88,11 @@ export default function QualidadePage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-bold text-foreground">Controlo de Qualidade</h1>
-        <p className="text-xs text-muted-foreground mt-1">{inspecoes.length} inspeções registadas</p>
+      <div className="obsidian-glass rounded-lg p-5 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-l-4 border-l-primary">
+        <div>
+          <h1 className="font-sans text-3xl font-bold text-foreground tracking-tight">Controlo de Qualidade</h1>
+          <p className="text-primary mt-1 font-mono text-xs uppercase tracking-widest">{inspecoes.length} inspeções registadas // QLT</p>
+        </div>
       </div>
 
       <div className="flex gap-2 flex-wrap">
@@ -95,8 +108,8 @@ export default function QualidadePage() {
           const resultado = calcularResultado(insp);
           return (
             <Card key={insp.id} className="hover-lift">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between gap-3 mb-3">
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between gap-4 mb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                       <Icon name="verified" className="text-primary text-[20px]" />
@@ -149,7 +162,7 @@ export default function QualidadePage() {
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Responsável</label>
-              <input value={form.responsavel} onChange={(e) => setForm({ ...form, responsavel: e.target.value })} className="w-full px-3 py-2.5 bg-background border border-input rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/30 transition-all" placeholder="Nome do inspector" />
+              <input value={form.responsavel} onChange={(e) => setForm({ ...form, responsavel: e.target.value })} className={inputCls} placeholder="Nome do inspector" />
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
