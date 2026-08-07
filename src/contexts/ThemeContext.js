@@ -10,7 +10,7 @@ export function ThemeProvider({ children }) {
     const stored = localStorage.getItem("sigraf-theme");
     if (stored === "dark") return true;
     if (stored === "light") return false;
-    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+    return true;
   });
 
   useEffect(() => {
