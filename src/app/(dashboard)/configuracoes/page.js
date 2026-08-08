@@ -133,7 +133,7 @@ export default function ConfiguracoesPage() {
       const res = await uploadLogo(file);
       setOrg((prev) => ({ ...prev, logo_url: res.logo_url }));
       notificar("Logo atualizado com sucesso");
-    } catch { notificar("Erro ao fazer upload do logo", "error"); }
+    } catch (e) { notificar(e?.response?.data?.erro || "Erro ao fazer upload do logo", "error"); }
   };
 
   const handleAlterarEmail = async () => {
