@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
 import { applyPlugin } from "jspdf-autotable";
-import { formatKz } from "./estoque";
+import { formatKz, grupos, normalizarGrupo } from "./estoque";
 
 applyPlugin(jsPDF);
 
@@ -176,14 +176,18 @@ export async function gerarFichaMaterialPDF(mat, org = {}) {
     ["Nome", mat.nome || "—"],
     ["Nome Técnico", mat.nome_tecnico || "—"],
     ["Categoria", categoria],
-    ["Grupo", mat.categoria?.grupo || mat.grupo || "—"],
+    ["Grupo", grupos[normalizarGrupo(mat.categoria?.grupo || mat.grupo)]?.label || "—"],
     ["Fornecedor", mat.fornecedor || "—"],
     ["Unidade", mat.unidade || "—"],
+    ...Object.entries(mat.especificacoes || {})
+      .filter(([, v]) => String(v || "").trim() !== "")
+      .map(([k, v]) => [k, String(v)]),
     ["Formato", mat.formato || "—"],
     ["Gramagem", mat.gramagem ? `${mat.gramagem} g/m²` : "—"],
     ["Dimensões", mat.largura || mat.altura ? `${mat.largura || "—"} x ${mat.altura || "—"} cm` : "—"],
     ["Quebra técnica", mat.percentual_quebra ? `${mat.percentual_quebra}%` : "—"],
     ["Rastreabilidade por lote", mat.controla_lote ? "Sim" : "Não"],
+    ["Localização na prateleira", mat.localizacao || "—"],
     ["Estoque mínimo", mat.estoque_min != null ? String(mat.estoque_min) : "—"],
     ["Estoque máximo", mat.estoque_max != null ? String(mat.estoque_max) : "—"],
     ["Ponto de pedido", mat.ponto_ressuprimento != null ? String(mat.ponto_ressuprimento) : "—"],

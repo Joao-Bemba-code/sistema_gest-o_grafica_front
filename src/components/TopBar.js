@@ -37,7 +37,7 @@ const COR_NIVEL = {
 export default function TopBar() {
   const { usuario } = useAuth();
   const [notifAberto, setNotifAberto] = useState(false);
-  const { notificacoes, carregando, naoLidas, marcarTodasLidas } = useNotificacoes();
+  const { notificacoes, carregando, naoLidas, marcarLida, marcarTodasLidas } = useNotificacoes();
   const naoLidasIds = new Set(naoLidas.map((n) => n.id));
   const bellRef = useRef(null);
 
@@ -102,25 +102,28 @@ export default function TopBar() {
                 </div>
               ) : (
                 <div className="space-y-1">
-                  {notificacoes.map((n) => (
-                    <Link
-                      key={n.id}
-                      href={n.link}
-                      onClick={() => setNotifAberto(false)}
-                      className="w-full flex items-start gap-3 p-3.5 hover:bg-accent transition-all text-left border-b last:border-0 group"
-                    >
-                      <span className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                        <Icon name={n.icon} className={`${COR_NIVEL[n.nivel] || "text-primary"} text-base`} />
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs font-bold text-foreground truncate">{n.titulo}</p>
-                          {naoLidasIds.has(n.id) && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" aria-label="Não lida" />}
+                  {notificacoes.map((n) => {
+                    const unread = naoLidasIds.has(n.id);
+                    return (
+                      <Link
+                        key={n.id}
+                        href={n.link}
+                        onClick={() => { marcarLida(n.id); setNotifAberto(false); }}
+                        className={`w-full flex items-start gap-3 p-3.5 transition-all text-left border-b last:border-0 group ${unread ? "hover:bg-accent" : "opacity-55 hover:opacity-100 hover:bg-accent"}`}
+                      >
+                        <span className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                          <Icon name={n.icon} className={`${COR_NIVEL[n.nivel] || "text-primary"} text-base`} />
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className={`text-xs font-bold truncate ${unread ? "text-foreground" : "text-muted-foreground"}`}>{n.titulo}</p>
+                            {unread && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" aria-label="Não lida" />}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground truncate">{n.desc}</p>
                         </div>
-                        <p className="text-[10px] text-muted-foreground truncate">{n.desc}</p>
-                      </div>
-                    </Link>
-                  ))}
+                      </Link>
+                    );
+                  })}
                   <p className="text-[10px] text-center text-muted-foreground pt-3">
                     Alerta em tempo real a partir dos dados
                   </p>

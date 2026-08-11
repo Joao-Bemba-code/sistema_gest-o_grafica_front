@@ -125,9 +125,31 @@ export default function useNotificacoes() {
 
   useEffect(() => {
     carregar();
+    const intervalo = setInterval(carregar, 30000);
+    const aoVoltar = () => {
+      if (document.visibilityState === "visible") carregar();
+    };
+    window.addEventListener("focus", aoVoltar);
+    document.addEventListener("visibilitychange", aoVoltar);
+    return () => {
+      clearInterval(intervalo);
+      window.removeEventListener("focus", aoVoltar);
+      document.removeEventListener("visibilitychange", aoVoltar);
+    };
   }, [carregar]);
 
   const naoLidas = useMemo(() => itens.filter((n) => !lidas[n.id]), [itens, lidas]);
+
+  const marcarLida = useCallback((id) => {
+    setLidas((prev) => {
+      if (prev[id]) return prev;
+      const proximo = { ...prev, [id]: true };
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(chaveLidas(), JSON.stringify(proximo));
+      }
+      return proximo;
+    });
+  }, []);
 
   const marcarTodasLidas = useCallback(() => {
     setLidas((prev) => {
@@ -142,5 +164,5 @@ export default function useNotificacoes() {
     });
   }, [itens]);
 
-  return { notificacoes: itens, carregando, naoLidas, marcarTodasLidas };
+  return { notificacoes: itens, carregando, naoLidas, marcarLida, marcarTodasLidas };
 }

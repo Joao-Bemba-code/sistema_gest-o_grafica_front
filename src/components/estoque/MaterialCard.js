@@ -3,7 +3,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Icon from "@/components/Icon";
-import { formatKz, grupos, statusCfg, toNum } from "@/lib/estoque";
+import { formatKz, grupos, normalizarGrupo, statusCfg, toNum } from "@/lib/estoque";
 
 const textoStatus = {
   ok: { label: "Saudável", cor: "text-primary" },
@@ -64,7 +64,7 @@ function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEdita
   const btnRef = useRef(null);
   const menuRef = useRef(null);
   const st = statusCfg[item.status] || statusCfg.ok;
-  const grupo = grupos[item.categoria?.grupo || "outros"] || grupos.outros;
+  const grupo = grupos[normalizarGrupo(item.categoria?.grupo)];
   const pct = toNum(item.estoque_max) > 0 ? (toNum(item.estoque_disponivel) / toNum(item.estoque_max)) * 100 : 100;
   const critico = item.status === "repor" || item.status === "esgotado";
   const stText = textoStatus[item.status] || textoStatus.ok;
@@ -121,6 +121,8 @@ function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEdita
             </div>
             <div className="flex items-center gap-3 text-[11px] font-mono text-on-surface-variant">
               <span>SKU: <span className={critico ? "text-error/80" : "text-primary/80"}>{item.codigo || "—"}</span></span>
+              <span className="w-1 h-1 rounded-full bg-outline-variant" />
+              {item.localizacao ? <span>LOC: <span className={critico ? "text-error/80" : "text-primary/80"}>{item.localizacao}</span></span> : null}
               <span className="w-1 h-1 rounded-full bg-outline-variant" />
               <span>FRN: {item.fornecedor || "—"}</span>
             </div>

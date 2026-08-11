@@ -6,7 +6,7 @@ import Icon from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
 import MaterialForm from "@/components/estoque/MaterialForm";
 import useEstoque from "@/hooks/useEstoque";
-import { blankItem, formatKz, toNum, tiposEstoque } from "@/lib/estoque";
+import { blankItem, entradasEspecificacao, formatKz, toNum, tiposEstoque } from "@/lib/estoque";
 
 function PreviewLinha({ label, valor, acento }) {
   return (
@@ -106,10 +106,19 @@ export default function NovoMaterialPage() {
           <div>
             <PreviewLinha label="Categoria" valor={categoria?.nome} />
             <PreviewLinha label="Unidade" valor={form.unidade} />
-            <PreviewLinha label="Formato" valor={form.formato} />
-            <PreviewLinha label="Gramagem" valor={form.gramagem ? `${form.gramagem} g/m²` : ""} />
+            {entradasEspecificacao(form.especificacoes).length > 0 ? (
+              entradasEspecificacao(form.especificacoes).map((e) => (
+                <PreviewLinha key={e.rotulo} label={e.rotulo} valor={e.valor} />
+              ))
+            ) : (
+              <>
+                <PreviewLinha label="Formato" valor={form.formato} />
+                <PreviewLinha label="Gramagem" valor={form.gramagem ? `${form.gramagem} g/m²` : ""} />
+              </>
+            )}
             <PreviewLinha label="Tipo de Estoque" valor={tiposEstoque.find((t) => t === form.tipo_estoque)} />
             <PreviewLinha label="Custo Unitário" valor={formatKz(form.custo_unit)} />
+            <PreviewLinha label="Localização" valor={form.localizacao} />
             <PreviewLinha label="Valor Máx. Stock" valor={formatKz(custoTotal)} acento="text-primary" />
           </div>
 

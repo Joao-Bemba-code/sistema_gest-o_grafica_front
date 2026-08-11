@@ -14,7 +14,7 @@ import ConversorModal from "@/components/estoque/ConversorModal";
 import ReservasModal from "@/components/estoque/ReservasModal";
 import EditMaterialModal from "@/components/estoque/EditMaterialModal";
 import EmptyState from "@/components/estoque/EmptyState";
-import { grupos } from "@/lib/estoque";
+import { grupos, normalizarGrupo } from "@/lib/estoque";
 import { gerarFichaMaterialPDF } from "@/lib/estoquePdf";
 
 export default function EstoquePage() {
@@ -36,14 +36,14 @@ export default function EstoquePage() {
   const [res, setRes] = useState({ open: false, item: null, reservas: [], carregando: false });
 
   const filtrados = useMemo(
-    () => (filtro === "todos" ? materiais : materiais.filter((i) => (i.categoria?.grupo || "outros") === filtro)),
+    () => (filtro === "todos" ? materiais : materiais.filter((i) => normalizarGrupo(i.categoria?.grupo) === filtro)),
     [materiais, filtro]
   );
 
   const porGrupo = useMemo(() => {
     const mapa = {};
     Object.keys(grupos).forEach((g) => {
-      mapa[g] = filtrados.filter((i) => (i.categoria?.grupo || "outros") === g);
+      mapa[g] = filtrados.filter((i) => normalizarGrupo(i.categoria?.grupo) === g);
     });
     return mapa;
   }, [filtrados]);

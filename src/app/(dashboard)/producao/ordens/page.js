@@ -134,7 +134,12 @@ export default function OrdensProducaoPage() {
     if (!libertarOp) return false;
     setLibertando(true);
     try {
-      const atualizada = await libertarMateriais(libertarOp.id, dados);
+      const atualizada = await libertarMateriais(libertarOp.id, {
+        solicitado_por: dados.solicitado_por,
+        permitido_por: dados.permitido_por,
+        observacoes: dados.observacoes,
+        itens_materiais: dados.itens_materiais,
+      });
       setOps((prev) => prev.map((o) => (o.id === libertarOp.id ? normalizar(atualizada) : o)));
       addToast(`Materiais da OP ${libertarOp.id} libertados — saída de stock registada`, "success");
       return true;
@@ -197,7 +202,7 @@ export default function OrdensProducaoPage() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-bold text-sm text-foreground">{op.id}</span>
                           <Badge variant={sc.variant || "info"} className="text-[10px]">{sc.label}</Badge>
-                          {op.requisicao_estado === "pendente" && Array.isArray(op.reserva_estoques) && op.reserva_estoques.length > 0 && (
+                          {op.requisicao_estado === "pendente" && (
                             <Badge variant="destructive" className="text-[10px]">Aguardando saída de materiais</Badge>
                           )}
                         </div>
@@ -262,24 +267,33 @@ export default function OrdensProducaoPage() {
                             );
                           })}
                         </div>
-                        {op.requisicao_estado === "pendente" && op.status === "aguardando" && (
-                          <div className="mt-3 flex items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3">
-                            <p className="text-xs text-amber-700 dark:text-amber-400">
-                              Saída de materiais pendente — só depois de libertada a OP pode avançar para produção.
-                            </p>
-                            <Button size="sm" onClick={() => setLibertarOp(op)} disabled={libertando}>
-                              <Icon name="inventory" className="text-lg" /> Dar saída de materiais
-                            </Button>
-                          </div>
+                      </div>
+                    )}
+                    {op.requisicao_estado === "pendente" && op.status === "aguardando" && (
+                      <div className="mt-4 pt-4 border-t">
+                        {(!Array.isArray(op.reserva_estoques) || op.reserva_estoques.length === 0) && (
+                          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                            Nenhum material reservado — adicione os materiais na saída
+                          </p>
                         )}
-                        {op.requisicao_estado === "libertada" && (
-                          <div className="mt-3 flex items-center justify-between gap-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 py-3">
-                            <p className="text-xs text-emerald-700 dark:text-emerald-400">
-                              Materiais libertados — saída de stock registada. A OP pode avançar para produção.
-                            </p>
-                            <Badge variant="success" className="text-[10px]">Libertada</Badge>
-                          </div>
-                        )}
+                        <div className="flex items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3">
+                          <p className="text-xs text-amber-700 dark:text-amber-400">
+                            Saída de materiais pendente — só depois de libertada a OP pode avançar para produção.
+                          </p>
+                          <Button size="sm" onClick={() => setLibertarOp(op)} disabled={libertando}>
+                            <Icon name="inventory" className="text-lg" /> Dar saída de materiais
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    {op.requisicao_estado === "libertada" && (
+                      <div className="mt-4 pt-4 border-t">
+                        <div className="flex items-center justify-between gap-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 py-3">
+                          <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                            Materiais libertados — saída de stock registada. A OP pode avançar para produção.
+                          </p>
+                          <Badge variant="success" className="text-[10px]">Libertada</Badge>
+                        </div>
                       </div>
                     )}
                     </>
@@ -365,9 +379,11 @@ export default function OrdensProducaoPage() {
       </Modal>
 
       <SaidaMateriaisModal
+        key={libertarOp?.id ?? "nenhum"}
         open={!!libertarOp}
         op={libertarOp}
         matPorId={matPorId}
+        materiais={materiais}
         onClose={() => setLibertarOp(null)}
         onConfirm={handleLibertar}
         nomeUsuario={getUsuario()?.nome || ""}

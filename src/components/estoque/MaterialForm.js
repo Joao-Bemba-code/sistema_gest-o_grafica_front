@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Icon from "@/components/Icon";
 import FornecedorSelect from "./FornecedorSelect";
-import { inputCls, tiposEstoque, unidades } from "@/lib/estoque";
+import { inputCls, tiposEstoque, unidades, camposDeCategoria } from "@/lib/estoque";
 
 const tabs = [
   { key: "basicos", label: "Dados Básicos", icon: "badge" },
@@ -22,9 +22,54 @@ function Campo({ label, children, obrigatorio, full }) {
   );
 }
 
-export default function MaterialForm({ formId = "form-material", form, onChange, onSubmit, categorias, fornecedores, formatos }) {
+function CampoEspecificacao({ campo, valor, onChange }) {
+  const { chave, rotulo, tipo, unidade, opcoes, obrigatorio } = campo;
+  const sufixo = unidade ? <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap">{unidade}</span> : null;
+  if (tipo === "numero") {
+    return (
+      <Campo label={rotulo} obrigatorio={obrigatorio}>
+        <div className="flex items-center gap-2">
+          <input type="number" min="0" step="any" value={valor || ""} onChange={(e) => onChange(chave, e.target.value)} className={inputCls} placeholder="0" />
+          {sufixo}
+        </div>
+      </Campo>
+    );
+  }
+  if (tipo === "selecao") {
+    return (
+      <Campo label={rotulo} obrigatorio={obrigatorio}>
+        <select value={valor || ""} onChange={(e) => onChange(chave, e.target.value)} className={inputCls}>
+          <option value="">Selecionar...</option>
+          {(opcoes || []).map((o) => <option key={o} value={o}>{o}</option>)}
+        </select>
+      </Campo>
+    );
+  }
+  if (tipo === "area") {
+    return (
+      <Campo label={rotulo} obrigatorio={obrigatorio} full>
+        <textarea rows={2} value={valor || ""} onChange={(e) => onChange(chave, e.target.value)} className={`${inputCls} resize-none`} placeholder={rotulo} />
+      </Campo>
+    );
+  }
+  return (
+    <Campo label={rotulo} obrigatorio={obrigatorio}>
+      <input value={valor || ""} onChange={(e) => onChange(chave, e.target.value)} className={inputCls} placeholder={rotulo} />
+    </Campo>
+  );
+}
+
+export default function MaterialForm({ formId = "form-material", form, onChange, onSubmit, categorias, fornecedores }) {
   const [tab, setTab] = useState("basicos");
   const id = (sufixo) => `${formId}-${sufixo}`;
+  const categoria = categorias.find((c) => String(c.id) === String(form.categoria_id));
+  const camposEspec = camposDeCategoria(categoria);
+
+  const aoMudarEspec = (chave, valor) => {
+    const especificacoes = { ...(form.especificacoes || {}) };
+    especificacoes[chave] = valor;
+    onChange("especificacoes", especificacoes);
+  };
 
   return (
     <form id={formId} onSubmit={onSubmit} className="space-y-5">
@@ -80,6 +125,9 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
             <Campo label="Descrição" full>
               <textarea rows={2} value={form.descricao} onChange={(e) => onChange("descricao", e.target.value)} className={`${inputCls} resize-none`} placeholder="Descrição completa do material..." />
             </Campo>
+            <Campo label="Localização na Prateleira" full>
+              <input value={form.localizacao} onChange={(e) => onChange("localizacao", e.target.value)} className={inputCls} placeholder="Ex: Prateleira A3, seção 2" />
+            </Campo>
           </div>
         )}
 
@@ -90,19 +138,22 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
                 {tiposEstoque.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </Campo>
-            <Campo label="Formato (papel)">
-              <input value={form.formato} onChange={(e) => onChange("formato", e.target.value)} list={`${formId}-formatos-list`} className={inputCls} placeholder="Ex: A3, 66x96" />
-              <datalist id={`${formId}-formatos-list`}>{formatos.map((f) => <option key={f.nome} value={f.nome} />)}</datalist>
-            </Campo>
-            <Campo label="Gramagem (g/m²)">
-              <input type="number" min="0" value={form.gramagem} onChange={(e) => onChange("gramagem", e.target.value)} className={inputCls} placeholder="Ex: 150" />
-            </Campo>
-            <Campo label="Largura (cm)">
-              <input type="number" min="0" value={form.largura} onChange={(e) => onChange("largura", e.target.value)} className={inputCls} placeholder="Ex: 66" />
-            </Campo>
-            <Campo label="Altura (cm)">
-              <input type="number" min="0" value={form.altura} onChange={(e) => onChange("altura", e.target.value)} className={inputCls} placeholder="Ex: 96" />
-            </Campo>
+
+            {!categoria && (
+              <div className="sm:col-span-2 rounded-xl border border-dashed border-outline-variant p-4 text-xs text-muted-foreground">
+                Selecione uma categoria para definir as especificações técnicas deste material.
+              </div>
+            )}
+
+            {camposEspec.map((campo) => (
+              <CampoEspecificacao
+                key={campo.chave}
+                campo={campo}
+                valor={form.especificacoes?.[campo.chave]}
+                onChange={aoMudarEspec}
+              />
+            ))}
+
             <Campo label="Quebra técnica (%)">
               <input type="number" min="0" max="100" value={form.percentual_quebra} onChange={(e) => onChange("percentual_quebra", e.target.value)} className={inputCls} placeholder="Ex: 5" />
             </Campo>

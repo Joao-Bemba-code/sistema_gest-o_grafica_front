@@ -147,7 +147,7 @@ const SERVICOS = [
     price: "AOA 2 500",
     cta: "Orçar",
     gradient: 0,
-    thumb: "https://picsum.photos/seed/impressao/800/500",
+    thumb: "/placeholder.svg",
   },
   {
     title: "Offset",
@@ -176,7 +176,7 @@ const SERVICOS = [
     price: "AOA 4 200",
     cta: "Pedir proposta",
     gradient: 3,
-    thumb: "https://picsum.photos/seed/design/800/500",
+    thumb: "/placeholder.svg",
   },
   {
     title: "Acabamento Premium",

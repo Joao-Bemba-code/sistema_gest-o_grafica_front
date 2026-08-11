@@ -61,6 +61,18 @@ export default function useEstoque() {
     carregar();
   }, [carregar]);
 
+  useEffect(() => {
+    const aoVoltar = () => {
+      if (document.visibilityState === "visible") carregar();
+    };
+    window.addEventListener("focus", aoVoltar);
+    document.addEventListener("visibilitychange", aoVoltar);
+    return () => {
+      window.removeEventListener("focus", aoVoltar);
+      document.removeEventListener("visibilitychange", aoVoltar);
+    };
+  }, [carregar]);
+
   const salvarMaterial = useCallback(async (dados, id) => {
     setCarregando(true);
     try {

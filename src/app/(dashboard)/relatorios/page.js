@@ -12,8 +12,32 @@ import { listarOrdens } from "@/services/producao";
 import { listar } from "@/services/clientes";
 import { listar as listarFaturas } from "@/services/faturacao";
 
-const meses = ["jan", "fev", "mar", "abr", "mai", "jun"];
-const labelsMes = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun"];
+const nomesMeses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+function getUltimos6Meses() {
+  const hoje = new Date();
+  const result = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+    result.push({
+      mes: d.getMonth(),
+      label: nomesMeses[d.getMonth()],
+      labelCurto: nomesMeses[d.getMonth()].slice(0, 3).toLowerCase(),
+    });
+  }
+  return result;
+}
+
+function fmtKz(v) {
+  return "Kz " + Math.round(Number(v) || 0).toLocaleString("pt-PT");
+}
+
+function compactKz(v) {
+  const n = Number(v) || 0;
+  if (n >= 1000000) return (n / 1000000).toLocaleString("pt-PT", { maximumFractionDigits: 1 }) + "M";
+  if (n >= 1000) return Math.round(n / 1000) + "k";
+  return String(Math.round(n));
+}
 
 export default function RelatoriosPage() {
   const [loading, setLoading] = useState(true);
@@ -21,7 +45,7 @@ export default function RelatoriosPage() {
   const [ordens, setOrdens] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [faturas, setFaturas] = useState([]);
-  const [periodo, setPeriodo] = useState("mai");
+  const [periodo, setPeriodo] = useState(getUltimos6Meses()[5].labelCurto);
   const [aba, setAba] = useState("vendas");
   const { addToast } = useToast();
 
@@ -42,35 +66,41 @@ export default function RelatoriosPage() {
   useEffect(() => { carregarDados(); }, [carregarDados]);
 /* eslint-enable react-hooks/set-state-in-effect */
 
+  const ultimosMeses = useMemo(() => getUltimos6Meses(), []);
+
   const vendasPorMes = useMemo(() => {
     const hoje = new Date();
-    const counts = meses.map((mes, i) => ({ mes, label: labelsMes[i], valor: 0, quantidade: 0 }));
+    const mesesIndices = ultimosMeses.map((m) => m.mes);
+    const counts = ultimosMeses.map((m) => ({ mes: m.mes, label: m.label, valor: 0, quantidade: 0 }));
     faturas.forEach((f) => {
       const d = f.data_emissao ? new Date(f.data_emissao) : null;
-      if (d && !isNaN(d.getTime()) && d.getFullYear() === hoje.getFullYear() && d.getMonth() >= 0 && d.getMonth() < 6) {
-        counts[d.getMonth()].valor += Number(f.valor) || 0;
-        counts[d.getMonth()].quantidade += 1;
+      if (d && !isNaN(d.getTime()) && d.getFullYear() === hoje.getFullYear() && mesesIndices.includes(d.getMonth())) {
+        const idx = ultimosMeses.findIndex((m) => m.mes === d.getMonth());
+        counts[idx].valor += Number(f.total || f.valor) || 0;
+        counts[idx].quantidade += 1;
       }
     });
     return counts;
-  }, [faturas]);
+  }, [faturas, ultimosMeses]);
 
   const maxValor = useMemo(() => Math.max(...vendasPorMes.map(v => v.valor), 1), [vendasPorMes]);
 
   const recebidoPorMes = useMemo(() => {
     const hoje = new Date();
-    const counts = meses.map((mes, i) => ({ mes, label: labelsMes[i], valor: 0, quantidade: 0 }));
+    const mesesIndices = ultimosMeses.map((m) => m.mes);
+    const counts = ultimosMeses.map((m) => ({ mes: m.mes, label: m.label, valor: 0, quantidade: 0 }));
     faturas.forEach((f) => {
       if (f.estado !== "paga") return;
       const d = f.data_pagamento || f.data_emissao;
       const dt = d ? new Date(d) : null;
-      if (dt && !isNaN(dt.getTime()) && dt.getFullYear() === hoje.getFullYear() && dt.getMonth() >= 0 && dt.getMonth() < 6) {
-        counts[dt.getMonth()].valor += Number(f.valor_pago || f.total || f.valor) || 0;
-        counts[dt.getMonth()].quantidade += 1;
+      if (dt && !isNaN(dt.getTime()) && dt.getFullYear() === hoje.getFullYear() && mesesIndices.includes(dt.getMonth())) {
+        const idx = ultimosMeses.findIndex((m) => m.mes === dt.getMonth());
+        counts[idx].valor += Number(f.valor_pago || f.total || f.valor) || 0;
+        counts[idx].quantidade += 1;
       }
     });
     return counts;
-  }, [faturas]);
+  }, [faturas, ultimosMeses]);
 
   const maxRecebido = useMemo(() => Math.max(...recebidoPorMes.map(v => v.valor), 1), [recebidoPorMes]);
 
@@ -96,7 +126,7 @@ export default function RelatoriosPage() {
     const map = {};
     faturas.forEach((f) => {
       const nome = f.cliente?.nome || f.cliente || "Cliente";
-      map[nome] = (map[nome] || 0) + (Number(f.valor) || 0);
+      map[nome] = (map[nome] || 0) + (Number(f.total || f.valor) || 0);
     });
     return Object.entries(map)
       .sort((a, b) => b[1] - a[1])
@@ -112,16 +142,19 @@ export default function RelatoriosPage() {
 
   const producaoPorMes = useMemo(() => {
     const hoje = new Date();
-    return Array.from({ length: 6 }, (_, i) => {
+    const mesesIndices = ultimosMeses.map((m) => m.mes);
+    const result = {};
+    mesesIndices.forEach((mesIdx) => {
       const ordensMes = ordens.filter((o) => {
         const d = o.data_entrada ? new Date(o.data_entrada) : null;
-        return d && !isNaN(d.getTime()) && d.getFullYear() === hoje.getFullYear() && d.getMonth() === i;
+        return d && !isNaN(d.getTime()) && d.getFullYear() === hoje.getFullYear() && d.getMonth() === mesIdx;
       });
       const produzidas = ordensMes.length;
       const entregues = ordensMes.filter((o) => (o.estado || o.status) === "entregue").length;
-      return { produzidas, entregues, pct: produzidas > 0 ? Math.round((entregues / produzidas) * 100) : 0 };
+      result[mesIdx] = { produzidas, entregues, pct: produzidas > 0 ? Math.round((entregues / produzidas) * 100) : 0 };
     });
-  }, [ordens]);
+    return result;
+  }, [ordens, ultimosMeses]);
 
   const opsPorStatus = useMemo(() => ["aguardando", "em_producao", "finalizado", "entregue"].map((s) => ({
     status: s, label: s.replace("_", " ").replace(/\b\w/g, l => l.toUpperCase()),
@@ -160,9 +193,9 @@ export default function RelatoriosPage() {
           </div>
 
           <div className="flex gap-2 flex-wrap">
-            {meses.map((mes, i) => (
-              <Button key={mes} variant={periodo === mes ? "default" : "outline"} size="sm" onClick={() => setPeriodo(mes)}>
-                {["Jan", "Fev", "Mar", "Abr", "Mai", "Jun"][i]}
+            {ultimosMeses.map((m) => (
+              <Button key={m.labelCurto} variant={periodo === m.labelCurto ? "default" : "outline"} size="sm" onClick={() => setPeriodo(m.labelCurto)}>
+                {m.label}
               </Button>
             ))}
           </div>
@@ -174,8 +207,8 @@ export default function RelatoriosPage() {
             <CardContent>
               <div className="flex items-end gap-2 h-48">
                 {vendasPorMes.map((v) => (
-                  <div key={v.mes} className="flex-1 flex flex-col items-center gap-1 h-full justify-end">
-                    <span className="text-[10px] font-bold text-foreground">{Math.round(v.valor / 10000)}k</span>
+                  <div key={v.mes} className="flex-1 flex flex-col items-center gap-1 h-full justify-end" title={`${v.label}: ${fmtKz(v.valor)}`}>
+                    <span className="text-[10px] font-bold text-foreground whitespace-nowrap">{v.valor > 0 ? compactKz(v.valor) : "0"}</span>
                     <div className="w-full rounded-lg bg-primary/20 relative overflow-hidden" style={{ height: `${(v.valor / maxValor) * 100}%` }}>
                       <div className="absolute bottom-0 w-full bg-primary rounded-lg transition-all duration-500" style={{ height: `${(v.valor / maxValor) * 100}%` }} />
                     </div>
@@ -193,8 +226,8 @@ export default function RelatoriosPage() {
             <CardContent>
               <div className="flex items-end gap-2 h-48">
                 {recebidoPorMes.map((v) => (
-                  <div key={v.mes} className="flex-1 flex flex-col items-center gap-1 h-full justify-end">
-                    <span className="text-[10px] font-bold text-foreground">{Math.round(v.valor / 10000)}k</span>
+                  <div key={v.mes} className="flex-1 flex flex-col items-center gap-1 h-full justify-end" title={`${v.label}: ${fmtKz(v.valor)}`}>
+                    <span className="text-[10px] font-bold text-foreground whitespace-nowrap">{v.valor > 0 ? compactKz(v.valor) : "0"}</span>
                     <div className="w-full rounded-lg bg-emerald-500/20 relative overflow-hidden" style={{ height: `${(v.valor / maxRecebido) * 100}%` }}>
                       <div className="absolute bottom-0 w-full bg-emerald-500 rounded-lg transition-all duration-500" style={{ height: `${(v.valor / maxRecebido) * 100}%` }} />
                     </div>
@@ -277,11 +310,11 @@ export default function RelatoriosPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {meses.map((mes, i) => {
-                  const { produzidas, entregues, pct } = producaoPorMes[i] || { produzidas: 0, entregues: 0, pct: 0 };
+                {ultimosMeses.map((m) => {
+                  const { produzidas, entregues, pct } = producaoPorMes[m.mes] || { produzidas: 0, entregues: 0, pct: 0 };
                   return (
-                    <div key={mes} className="flex items-center gap-3">
-                      <span className="text-xs font-bold text-muted-foreground w-8">{["Jan", "Fev", "Mar", "Abr", "Mai", "Jun"][i]}</span>
+                    <div key={m.labelCurto} className="flex items-center gap-3">
+                      <span className="text-xs font-bold text-muted-foreground w-8">{m.label}</span>
                       <div className="flex-1">
                         <div className="flex justify-between text-xs mb-1">
                           <span className="text-muted-foreground">{produzidas} ordens</span>

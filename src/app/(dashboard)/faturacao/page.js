@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
 import { criarFatura, listarFaturas, exportarFaturas, marcarPaga } from "@/services/faturacao";
+import { listar as listarOrcamentos } from "@/services/orcamentos";
 import { listarOrdens } from "@/services/producao";
 import { listar as listarClientes } from "@/services/clientes";
 import { buscarOrganizacao } from "@/services/configuracoes";
@@ -40,8 +41,8 @@ const faturaEstados = {
 const hoje = new Date().toISOString().split("T")[0];
 const blankItem = { descricao: "", quantidade: "", preco_unit: "" };
 const blankFaturaForm = {
-  tipo: "fatura", cliente_id: "", op: "", data_emissao: hoje, data_vencimento: "", iva: 14,
-  metodo: "transferencia", itens: [{ ...blankItem }], observacoes: "",
+  tipo: "fatura", cliente_id: "", orcamento_id: "", op: "", data_emissao: hoje, data_vencimento: "", iva: 14,
+  metodo: "transferencia", itens: [{ ...blankItem }], observacoes: "", valor_pago: "",
 };
 
 function formatKz(v) { return `Kz ${Number(v || 0).toLocaleString("pt-AO")}`; }
@@ -50,6 +51,7 @@ export default function FaturacaoPage() {
   const [faturas, setFaturas] = useState([]);
   const [ordens, setOrdens] = useState([]);
   const [clientes, setClientes] = useState([]);
+  const [orcamentos, setOrcamentos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState("faturas");
@@ -61,11 +63,12 @@ export default function FaturacaoPage() {
   const { addToast } = useToast();
 
   useEffect(() => {
-    Promise.all([listarFaturas(), listarOrdens(), listarClientes({ tipo: "cliente" }), buscarOrganizacao().catch(() => null)])
-      .then(([f, o, c, emp]) => {
+    Promise.all([listarFaturas(), listarOrdens(), listarClientes({ tipo: "cliente" }), listarOrcamentos(), buscarOrganizacao().catch(() => null)])
+      .then(([f, o, c, orcData, emp]) => {
         setFaturas(Array.isArray(f) ? f : f?.data || []);
         setOrdens(Array.isArray(o) ? o : o?.ordens || []);
         setClientes(Array.isArray(c) ? c : c?.data || []);
+        setOrcamentos((Array.isArray(orcData) ? orcData : orcData?.data || []).map((o) => ({ ...o, cliente_id: Number(o.cliente_id) || Number(o.cliente?.id) || null })));
         if (emp) setEmpresa(emp);
       })
       .catch((err) => setError(err.message))
@@ -95,6 +98,8 @@ export default function FaturacaoPage() {
   const faturaSubtotal = faturaForm.itens.reduce((s, i) => s + (Number(i.quantidade) || 0) * (Number(i.preco_unit) || 0), 0);
   const faturaIva = (faturaSubtotal * (Number(faturaForm.iva) || 0)) / 100;
   const faturaTotal = faturaSubtotal + faturaIva;
+  const faturaPago = Number(faturaForm.valor_pago) || 0;
+  const faturaDivida = faturaForm.tipo === "factura_recibo" ? 0 : Math.max(0, faturaTotal - faturaPago);
 
   const setFaturaItem = (idx, key, val) => {
     setFaturaForm((p) => {
@@ -107,6 +112,27 @@ export default function FaturacaoPage() {
   const addFaturaItem = () => setFaturaForm((p) => ({ ...p, itens: [...p.itens, { ...blankItem }] }));
   const removeFaturaItem = (idx) => setFaturaForm((p) => (p.itens.length <= 1 ? p : { ...p, itens: p.itens.filter((_, i) => i !== idx) }));
 
+  const orcamentosDoCliente = faturaForm.cliente_id
+    ? orcamentos.filter((o) => String(o.cliente_id) === String(faturaForm.cliente_id) && (o.estado === "aprovado" || o.estado === "pendente"))
+    : orcamentos.filter((o) => o.estado === "aprovado" || o.estado === "pendente");
+
+  const handleOrcamentoSelect = (e) => {
+    const id = e.target.value;
+    const o = orcamentos.find((x) => String(x.id) === id);
+    if (!o) {
+      setFaturaForm((p) => ({ ...p, orcamento_id: "" }));
+      return;
+    }
+    setFaturaForm((p) => ({
+      ...p,
+      orcamento_id: o.id,
+      cliente_id: p.cliente_id || o.cliente_id,
+      itens: (o.itens || []).length
+        ? o.itens.map((it) => ({ descricao: it.descricao || "", quantidade: Number(it.quantidade) || 0, preco_unit: Number(it.preco_unit != null ? it.preco_unit : it.valorUnitario) || 0 }))
+        : [{ ...blankItem }],
+    }));
+  };
+
   const handleSubmitFatura = async (e) => {
     e.preventDefault();
     const itens = faturaForm.itens
@@ -117,15 +143,17 @@ export default function FaturacaoPage() {
       return;
     }
     try {
-      const criado = await criarFatura({
+       const criado = await criarFatura({
         tipo: faturaForm.tipo || "fatura",
         cliente_id: Number(faturaForm.cliente_id) || null,
+        orcamento_id: Number(faturaForm.orcamento_id) || null,
         op: Number(faturaForm.op) || null,
         data_emissao: faturaForm.data_emissao,
         data_vencimento: faturaForm.data_vencimento || undefined,
         iva: Number(faturaForm.iva) || 0,
         itens,
         metodo: faturaForm.metodo,
+        valor_pago: faturaForm.tipo === "factura_recibo" ? undefined : Number(faturaForm.valor_pago) || 0,
         observacoes: faturaForm.observacoes,
       });
       setFaturas((prev) => [criado, ...prev]);
@@ -137,14 +165,39 @@ export default function FaturacaoPage() {
     }
   };
 
-  const handleMarcarPaga = async (f) => {
+  const handleMarcarPaga = async (f, valorPago) => {
     try {
-      const atual = await marcarPaga(f.id, { metodo: f.metodo_pagamento || "transferencia" });
+      const atual = await marcarPaga(f.id, { valor_pago: Number(valorPago) || undefined, metodo: f.metodo_pagamento || "transferencia" });
       setFaturas((prev) => prev.map((x) => (x.id === f.id ? atual : x)));
       setSelectedFatura(atual);
-      addToast("Fatura marcada como paga", "success");
+      addToast(valorPago && Number(valorPago) < Number(f.total || f.valor) ? "Pagamento parcial registado" : "Fatura marcada como paga", "success");
     } catch (err) {
       addToast(err.response?.data?.erro || "Erro ao marcar fatura como paga", "error");
+    }
+  };
+
+  const [pagamentoExtra, setPagamentoExtra] = useState("");
+  const [registrando, setRegistrando] = useState(false);
+  const handleRegistarPagamento = async () => {
+    const extra = Number(pagamentoExtra) || 0;
+    if (extra <= 0) {
+      addToast("Informe um valor maior que zero", "error");
+      return;
+    }
+    const total = Number(selectedFatura.total || selectedFatura.valor) || 0;
+    const atual = Number(selectedFatura.valor_pago) || 0;
+    const novoTotal = atual + extra;
+    setRegistrando(true);
+    try {
+      const atualizada = await marcarPaga(selectedFatura.id, { valor_pago: novoTotal, metodo: selectedFatura.metodo_pagamento || "transferencia" });
+      setFaturas((prev) => prev.map((x) => (x.id === selectedFatura.id ? atualizada : x)));
+      setSelectedFatura(atualizada);
+      setPagamentoExtra("");
+      addToast(novoTotal >= total ? "Fatura paga integralmente" : "Pagamento parcial registado", "success");
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao registar pagamento", "error");
+    } finally {
+      setRegistrando(false);
     }
   };
 
@@ -295,14 +348,15 @@ export default function FaturacaoPage() {
         </Card>
       )}
 
-      <Modal open={fatModalOpen} onClose={() => { setFaturaForm(blankFaturaForm); setFatModalOpen(false); }} title={faturaForm.tipo === "factura_recibo" ? "Nova Factura Recibo" : "Nova Fatura"} icon="receipt_long" size="2xl"
-        footer={<><Button type="button" variant="outline" onClick={() => { setFaturaForm(blankFaturaForm); setFatModalOpen(false); }}>Cancelar</Button><Button type="submit" form="form-fatura">{faturaForm.tipo === "factura_recibo" ? "Registar Factura Recibo" : "Registar Fatura"}</Button></>}>
+      <Modal open={fatModalOpen} onClose={() => { setFaturaForm(blankFaturaForm); setFatModalOpen(false); }} title={faturaForm.tipo === "recibo" ? "Novo Recibo" : faturaForm.tipo === "factura_recibo" ? "Nova Factura Recibo" : "Nova Fatura"} icon="receipt_long" size="2xl"
+        footer={<><Button type="button" variant="outline" onClick={() => { setFaturaForm(blankFaturaForm); setFatModalOpen(false); }}>Cancelar</Button><Button type="submit" form="form-fatura">{faturaForm.tipo === "recibo" ? "Registar Recibo" : faturaForm.tipo === "factura_recibo" ? "Registar Factura Recibo" : "Registar Fatura"}</Button></>}>
         <form id="form-fatura" onSubmit={handleSubmitFatura} className="space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Tipo de Documento *</label>
-              <select required value={faturaForm.tipo} onChange={(e) => setFaturaForm({ ...faturaForm, tipo: e.target.value })} className={inputCls}>
+              <select required value={faturaForm.tipo} onChange={(e) => setFaturaForm({ ...faturaForm, tipo: e.target.value, valor_pago: e.target.value === "factura_recibo" ? "" : faturaForm.valor_pago })} className={inputCls}>
                 <option value="fatura">Fatura (a receber)</option>
+                <option value="recibo">Recibo (pagamento)</option>
                 <option value="factura_recibo">Factura Recibo (já paga)</option>
               </select>
               {faturaForm.tipo === "factura_recibo" && (
@@ -311,9 +365,18 @@ export default function FaturacaoPage() {
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Cliente *</label>
-              <select required value={faturaForm.cliente_id} onChange={(e) => setFaturaForm({ ...faturaForm, cliente_id: e.target.value })} className={inputCls}>
+              <select required value={faturaForm.cliente_id} onChange={(e) => setFaturaForm({ ...faturaForm, cliente_id: e.target.value, orcamento_id: "" })} className={inputCls}>
                 <option value="">Seleccionar...</option>
                 {clientes.map((c) => <option key={c.id} value={c.id}>{c.nome || c.razao_social}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Orçamento</label>
+              <select value={faturaForm.orcamento_id || ""} onChange={handleOrcamentoSelect} className={inputCls} disabled={!faturaForm.cliente_id}>
+                <option value="">Seleccionar orçamento...</option>
+                {orcamentosDoCliente.map((o) => (
+                  <option key={o.id} value={o.id}>{o.numero || o.id} — {formatKz(o.total || o.subtotal + o.valorIva)}</option>
+                ))}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
@@ -341,6 +404,12 @@ export default function FaturacaoPage() {
                 {Object.entries(metodos).map(([key, m]) => <option key={key} value={key}>{m.label}</option>)}
               </select>
             </div>
+            {faturaForm.tipo !== "factura_recibo" && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Valor Pago Agora</label>
+                <input type="number" min="0" step="0.01" value={faturaForm.valor_pago} onChange={(e) => setFaturaForm({ ...faturaForm, valor_pago: e.target.value })} className={inputCls} placeholder="0,00" />
+              </div>
+            )}
           </div>
 
           <div className="space-y-3">
@@ -381,6 +450,12 @@ export default function FaturacaoPage() {
             <div className="text-xs text-muted-foreground">
               <p>Subtotal: <strong className="text-foreground">{formatKz(faturaSubtotal)}</strong></p>
               {faturaIva > 0 && <p>IVA ({Number(faturaForm.iva) || 0}%): <strong className="text-foreground">{formatKz(faturaIva)}</strong></p>}
+              {faturaForm.tipo !== "factura_recibo" && Number(faturaForm.valor_pago) > 0 && (
+                <p>Valor pago: <strong className="text-success">{formatKz(faturaForm.valor_pago)}</strong></p>
+              )}
+              {faturaForm.tipo !== "factura_recibo" && faturaDivida > 0 && (
+                <p>Em dívida a liquidar: <strong className="text-warning">{formatKz(faturaDivida)}</strong></p>
+              )}
             </div>
             <div className="text-right">
               <p className="text-[10px] text-muted-foreground uppercase font-bold">Total</p>
@@ -398,45 +473,81 @@ export default function FaturacaoPage() {
       {selectedFatura && (
         <Modal open={!!selectedFatura} onClose={() => setSelectedFatura(null)} title={`Fatura ${selectedFatura.numero}`} icon="receipt_long" size="lg"
           footer={<>
-            {!["paga", "cancelada"].includes(selectedFatura.estado) && selectedFatura.tipo !== "recibo" && (
-              <Button onClick={() => handleMarcarPaga(selectedFatura)}><Icon name="check_circle" className="text-sm" /> Marcar como Paga</Button>
-            )}
-            <Button type="button" variant="outline" onClick={() => gerarPDF(selectedFatura, empresa)}><Icon name="download" className="text-sm" /> Baixar PDF</Button>
-            <Button type="button" variant="outline" onClick={() => setSelectedFatura(null)}>Fechar</Button>
+            <div className="w-full space-y-3">
+              {!["paga", "cancelada"].includes(selectedFatura.estado) && selectedFatura.tipo !== "recibo" && (
+                <div className="flex flex-wrap items-end gap-3">
+                  <div className="flex flex-col gap-1 flex-1 min-w-[180px] max-w-[240px]">
+                    <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Valor a pagar agora</label>
+                    <div className="flex items-center rounded-xl border border-input bg-background overflow-hidden focus-within:ring-2 focus-within:ring-primary/30">
+                      <span className="pl-3 pr-1 text-sm font-semibold text-muted-foreground">Kz</span>
+                      <input
+                        type="number" min="0" step="0.01"
+                        value={pagamentoExtra}
+                        onChange={(e) => setPagamentoExtra(e.target.value)}
+                        className="w-full h-11 px-2 text-sm outline-none bg-transparent"
+                        placeholder={String(Math.max(0, Number(selectedFatura.total || selectedFatura.valor) - Number(selectedFatura.valor_pago || 0)))}
+                      />
+                    </div>
+                  </div>
+                  <Button onClick={handleRegistarPagamento} disabled={registrando || !pagamentoExtra || Number(pagamentoExtra) <= 0}>
+                    <Icon name="payments" className="text-sm" /> {registrando ? "A registar..." : "Registar Pagamento"}
+                  </Button>
+                  <Button variant="outline" onClick={() => handleMarcarPaga(selectedFatura, Number(selectedFatura.total || selectedFatura.valor))}>
+                    Paga Integralmente
+                  </Button>
+                </div>
+              )}
+              <div className="flex flex-wrap items-center justify-end gap-3">
+                <Button type="button" variant="outline" onClick={() => gerarPDF(selectedFatura, empresa)}><Icon name="download" className="text-sm" /> Baixar PDF</Button>
+                <Button type="button" onClick={() => setSelectedFatura(null)}>Fechar</Button>
+              </div>
+            </div>
           </>}>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Cliente</span>
-                <p className="font-medium text-foreground">{selectedFatura.cliente?.nome || "—"}</p>
+          <div className="space-y-5">
+            <div className="rounded-xl border bg-muted/30 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Cliente</p>
+                  <p className="text-sm font-semibold text-foreground truncate">{selectedFatura.cliente?.nome || "—"}</p>
+                  {selectedFatura.cliente?.nif && <p className="text-xs text-muted-foreground">NIF: {selectedFatura.cliente.nif}</p>}
+                </div>
+                <div className="flex flex-col items-end gap-1.5">
+                  <Badge variant={faturaEstados[selectedFatura.estado]?.variant || "outline"} className="text-[10px]">
+                    {faturaEstados[selectedFatura.estado]?.label || selectedFatura.estado}
+                  </Badge>
+                  {selectedFatura.orcamento && (
+                    <span className="text-[10px] text-muted-foreground">
+                      Origem: <span className="font-semibold text-foreground">{selectedFatura.orcamento.numero || selectedFatura.orcamento.id}</span>
+                      {selectedFatura.orcamento.total_com_iva != null && (
+                        <span> (Total orçamento: {formatKz(selectedFatura.orcamento.total_com_iva)})</span>
+                      )}
+                    </span>
+                  )}
+                </div>
               </div>
-              <div>
-                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Estado</span>
-                <Badge variant={faturaEstados[selectedFatura.estado]?.variant || "outline"} className="text-[10px] mt-1">
-                  {faturaEstados[selectedFatura.estado]?.label || selectedFatura.estado}
-                </Badge>
-              </div>
-              <div>
-                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Emissão</span>
-                <p className="font-medium text-foreground">{selectedFatura.data_emissao ? new Date(selectedFatura.data_emissao).toLocaleDateString("pt-BR") : "—"}</p>
-              </div>
-              <div>
-                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Vencimento</span>
-                <p className="font-medium text-foreground">{selectedFatura.data_vencimento ? new Date(selectedFatura.data_vencimento).toLocaleDateString("pt-BR") : "—"}</p>
-              </div>
-              <div>
-                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Método</span>
-                <p className="font-medium text-foreground">{metodos[selectedFatura.metodo_pagamento]?.label || selectedFatura.metodo_pagamento || "—"}</p>
-              </div>
-              <div>
-                <span className="text-[10px] font-semibold text-muted-foreground uppercase">OP</span>
-                <p className="font-medium text-foreground">{selectedFatura.ordem_producao?.id || "—"}</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+                <div>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Emissão</p>
+                  <p className="text-sm font-medium text-foreground">{selectedFatura.data_emissao ? new Date(selectedFatura.data_emissao).toLocaleDateString("pt-BR") : "—"}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Vencimento</p>
+                  <p className="text-sm font-medium text-foreground">{selectedFatura.data_vencimento ? new Date(selectedFatura.data_vencimento).toLocaleDateString("pt-BR") : "—"}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Método</p>
+                  <p className="text-sm font-medium text-foreground">{metodos[selectedFatura.metodo_pagamento]?.label || selectedFatura.metodo_pagamento || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">OP</p>
+                  <p className="text-sm font-medium text-foreground">{selectedFatura.ordem_producao?.id || "—"}</p>
+                </div>
               </div>
             </div>
 
             {selectedFatura.itens?.length > 0 && (
               <div>
-                <h3 className="text-[10px] font-bold text-muted-foreground uppercase mb-2">Itens</h3>
+                <h3 className="text-[10px] font-bold text-muted-foreground uppercase mb-2 tracking-wider">Itens</h3>
                 <div className="overflow-x-auto rounded-xl border">
                   <table className="w-full text-xs">
                     <thead>
@@ -462,20 +573,31 @@ export default function FaturacaoPage() {
               </div>
             )}
 
-            <div className="flex justify-end">
-              <div className="w-64 space-y-1 text-xs">
-                <div className="flex justify-between"><span className="text-muted-foreground">Subtotal:</span><span className="font-medium">{formatKz(selectedFatura.subtotal)}</span></div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-xl border p-4 space-y-1.5 text-xs">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase mb-2 tracking-wider">Resumo</p>
+                <div className="flex justify-between"><span className="text-muted-foreground">Subtotal:</span><span className="font-medium text-foreground">{formatKz(selectedFatura.subtotal)}</span></div>
                 {Number(selectedFatura.iva) > 0 && (
-                  <div className="flex justify-between"><span className="text-muted-foreground">IVA ({Number(selectedFatura.iva)}%):</span><span className="font-medium">{formatKz(selectedFatura.valor_iva)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">IVA ({Number(selectedFatura.iva)}%):</span><span className="font-medium text-foreground">{formatKz(selectedFatura.valor_iva)}</span></div>
                 )}
-                <div className="flex justify-between border-t pt-1 font-bold text-sm"><span>Total:</span><span className="text-primary">{formatKz(selectedFatura.total || selectedFatura.valor)}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Valor pago:</span><span className="font-medium text-success">{formatKz(selectedFatura.valor_pago)}</span></div>
+                <div className="flex justify-between border-t pt-1.5 font-bold text-sm"><span>Total:</span><span className="text-primary">{formatKz(selectedFatura.total || selectedFatura.valor)}</span></div>
+              </div>
+
+              <div className="rounded-xl border bg-emerald-50/50 p-4 space-y-1.5 text-xs">
+                <p className="text-[10px] font-bold text-emerald-700 uppercase mb-2 tracking-wider">Pagamento</p>
+                <div className="flex justify-between"><span className="text-muted-foreground">Valor pago:</span><span className="font-semibold text-emerald-700">{formatKz(selectedFatura.valor_pago)}</span></div>
+                {Number(selectedFatura.total || selectedFatura.valor) > Number(selectedFatura.valor_pago || 0) && (
+                  <div className="flex justify-between"><span className="text-muted-foreground">Em dívida a liquidar:</span><span className="font-semibold text-amber-600">{formatKz(Number(selectedFatura.total || selectedFatura.valor) - Number(selectedFatura.valor_pago || 0))}</span></div>
+                )}
+                {Number(selectedFatura.total || selectedFatura.valor) <= Number(selectedFatura.valor_pago || 0) && (
+                  <p className="pt-1 text-[11px] text-emerald-700">Fatura integralmente paga.</p>
+                )}
               </div>
             </div>
 
             {selectedFatura.observacoes && (
               <div className="bg-muted/50 rounded-xl p-3">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Observações</p>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1 tracking-wider">Observações</p>
                 <p className="text-foreground text-sm">{selectedFatura.observacoes}</p>
               </div>
             )}

@@ -1,9 +1,14 @@
 import axios from "axios";
 
+const DESKTOP_API =
+  typeof window !== "undefined" ? window.sigrafDesktop?.apiBase : null;
+
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api",
+  baseURL: DESKTOP_API || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api",
   timeout: 15000,
-  headers: { "Content-Type": "application/json" },
+  headers: {
+    "Cache-Control": "no-cache",
+  },
 });
 
 api.interceptors.request.use((config) => {

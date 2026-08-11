@@ -167,7 +167,7 @@ export default function DashboardPage() {
     const d = new Date(f.data_emissao);
     return d.getMonth() === hoje.getMonth() && d.getFullYear() === hoje.getFullYear();
   });
-  const totalFaturacao = faturacaoMes.reduce((s, f) => s + parseFloat(f.valor || 0), 0);
+  const totalFaturacao = faturacaoMes.reduce((s, f) => s + parseFloat(f.total || f.valor || 0), 0);
   const atrasados = ordens.filter((o) => {
     if (!o.data_entrega || o.estado === "entregue" || o.estado === "finalizado") return false;
     const d = parseDataEntrega(o);
@@ -240,14 +240,19 @@ export default function DashboardPage() {
       hora: formatHora(mv.createdAt),
     }));
 
-  const diasNoMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate();
-  const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1).getDay();
   const mesLabel = hoje.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const [mesAgenda, setMesAgenda] = useState(() => new Date(hoje.getFullYear(), hoje.getMonth(), 1));
+  const mesView = mesAgenda;
+  const eMesAtual = mesView.getFullYear() === hoje.getFullYear() && mesView.getMonth() === hoje.getMonth();
+  const diasNoMes = new Date(mesView.getFullYear(), mesView.getMonth() + 1, 0).getDate();
+  const primeiroDia = new Date(mesView.getFullYear(), mesView.getMonth(), 1).getDay();
+  const mesLabelView = mesView.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
   const entregasMes = ordens
     .map((o) => ({ o, d: parseDataEntrega(o) }))
-    .filter((x) => x.d && x.d.getMonth() === hoje.getMonth() && x.d.getFullYear() === hoje.getFullYear())
+    .filter((x) => x.d && x.d.getMonth() === mesView.getMonth() && x.d.getFullYear() === mesView.getFullYear())
     .sort((a, b) => a.d - b.d);
   const diasComEntrega = new Set(entregasMes.map((x) => x.d.getDate()));
+  const mudarMes = (delta) => setMesAgenda((m) => new Date(m.getFullYear(), m.getMonth() + delta, 1));
 
   const abrirRepor = (m) => {
     setReporForm({ quantidade: "", fornecedor: "", lote: "", observacoes: "" });
@@ -470,7 +475,15 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Agenda</CardTitle>
-            <span className="text-sm font-medium text-primary capitalize">{mesLabel}</span>
+            <div className="flex items-center gap-1">
+              <Button type="button" variant="ghost" size="icon" className="w-7 h-7" onClick={() => mudarMes(-1)} aria-label="Mês anterior" title="Mês anterior">
+                <Icon name="chevron_left" className="text-base" />
+              </Button>
+              <span className="text-sm font-medium text-primary capitalize w-28 text-center truncate">{mesLabelView}</span>
+              <Button type="button" variant="ghost" size="icon" className="w-7 h-7" onClick={() => mudarMes(1)} aria-label="Próximo mês" title="Próximo mês">
+                <Icon name="chevron_right" className="text-base" />
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-7 gap-1 text-center mb-4">
@@ -481,7 +494,7 @@ export default function DashboardPage() {
               {Array.from({ length: diasNoMes }).map((_, i) => {
                 const day = i + 1;
                 const temEntrega = diasComEntrega.has(day);
-                const eHoje = day === hoje.getDate();
+                const eHoje = eMesAtual && day === hoje.getDate();
                 return (
                   <div key={day} className="relative">
                     <span className={`inline-flex items-center justify-center w-8 h-8 text-xs rounded-lg cursor-pointer transition-all
@@ -493,8 +506,8 @@ export default function DashboardPage() {
                 );
               })}
             </div>
-            <div className="space-y-2">
-              {entregasMes.slice(0, 4).map(({ o, d }) => (
+            <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-1">
+              {entregasMes.map(({ o, d }) => (
                 <div key={o.id} className="p-3 bg-muted/50 rounded-xl border-l-4 border-primary flex gap-4 items-center">
                   <div className="text-center leading-tight">
                     <p className="text-[10px] font-semibold uppercase text-muted-foreground">
@@ -511,7 +524,7 @@ export default function DashboardPage() {
                 </div>
               ))}
               {entregasMes.length === 0 && (
-                <p className="text-xs text-muted-foreground text-center py-3">Nenhuma entrega agendada este mês</p>
+                <p className="text-xs text-muted-foreground text-center py-3">Nenhuma entrega agendada neste mês</p>
               )}
             </div>
           </CardContent>

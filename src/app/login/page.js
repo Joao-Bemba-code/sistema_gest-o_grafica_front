@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
+import DesktopConfig from "@/components/DesktopConfig";
 import { login } from "@/services/auth";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -95,6 +96,7 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
+      <DesktopConfig />
     </div>
   );
 }

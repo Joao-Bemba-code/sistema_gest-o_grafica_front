@@ -10,16 +10,11 @@ import { Badge } from "@/components/ui/Badge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import { ListSkeleton } from "@/components/Skeleton";
-import { inputCls } from "@/lib/estoque";
-import { formatCurrency } from "@/lib/utils";
-import jsPDF from "jspdf";
-import { applyPlugin } from "jspdf-autotable";
-applyPlugin(jsPDF);
+import { inputCls, entradasEspecificacao } from "@/lib/estoque";
 import { listar, criar, atualizar, remover, mudarEstado } from "@/services/orcamentos";
 import { listar as listarClientes } from "@/services/clientes";
+import { listar as listarMateriais } from "@/services/materiais";
 import { buscarOrganizacao } from "@/services/configuracoes";
-import { faturarOrcamento } from "@/services/faturacao";
-import gerarPDF from "@/lib/faturacaoPdf";
 
 const estadoColors = {
   aprovado: "success",
@@ -74,13 +69,7 @@ function normalizarOrcamento(o) {
       telefone: o.cliente?.telefone || "",
       email: o.cliente?.email || "",
     },
-    especificacao: {
-      produto: o.especificacao?.produto || "",
-      formato: o.especificacao?.formato || "",
-      papel: o.especificacao?.papel || "",
-      impressao: o.especificacao?.impressao || "",
-      acabamento: o.especificacao?.acabamento || "",
-    },
+    especificacao: (o.especificacao && typeof o.especificacao === "object" && !Array.isArray(o.especificacao)) ? o.especificacao : {},
     itens: Array.isArray(o.itens) ? o.itens : [],
     subtotal: Number(o.subtotal) || 0,
     iva: Number(o.iva) || 0,
@@ -91,192 +80,36 @@ function normalizarOrcamento(o) {
   };
 }
 
-const blankItem = { descricao: "", quantidade: "", valorUnitario: "" };
+const blankItem = { descricao: "", quantidade: "", valorUnitario: "", composto: false, margem: "", materiais: [] };
+const blankMaterial = { material_id: "", descricao: "", unidade: "un", quantidade: "", custo_unit: 0, custo_total: 0, mover_estoque: false };
+
+function placeholderSpec(rotulo) {
+  const chave = String(rotulo || "").toLowerCase();
+  if (chave.includes("produto")) return "Ex: Caderno Escolar A5";
+  if (chave.includes("formato")) return "Ex: A5 (148×210 mm)";
+  if (chave.includes("papel") || chave.includes("material")) return "Ex: Papel Couché 150g";
+  if (chave.includes("impress")) return "Ex: Offset, 4 cores";
+  if (chave.includes("acabamento")) return "Ex: Brochura com lombada";
+  return "Ex: Offset, 4 cores...";
+}
+const SPEC_DEFAULT_LINES = [
+  { rotulo: "Produto", valor: "" },
+  { rotulo: "Formato", valor: "" },
+  { rotulo: "Papel/Material", valor: "" },
+  { rotulo: "Impressão", valor: "" },
+  { rotulo: "Acabamento", valor: "" },
+];
 const blankForm = {
   cliente: "", empresa: "", nif: "", telefone: "", email: "",
   itens: [{ ...blankItem }],
-  produto: "", formato: "", papel: "", impressao: "", acabamento: "",
+  specLines: SPEC_DEFAULT_LINES.map((l) => ({ ...l })),
   iva: "", prazoExecucao: "", condicoesPagamento: "100% antecipado", observacoes: "",
 };
-
-function gerarProformaPDF(o, empresa) {
-  const doc = new jsPDF();
-  const pw = doc.internal.pageSize.getWidth();
-  const cli = o.cliente || {};
-  const spec = o.especificacao || {};
-  doc.setFillColor(5, 150, 105);
-  doc.rect(0, 0, pw, 42, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(16); doc.setFont("helvetica", "bold");
-  doc.text(empresa.nome || "SIGRAF", 14, 17);
-  doc.setFontSize(8); doc.setFont("helvetica", "normal");
-  doc.text(empresa.endereco || "", 14, 23);
-  doc.text(`NIF: ${empresa.nif || ""} | Tel: ${empresa.telefone || ""} | Email: ${empresa.email || ""}`, 14, 29);
-  doc.setFontSize(14); doc.setFont("helvetica", "bold");
-  doc.text("FATURA PROFORMA", pw - 14, 17, { align: "right" });
-  doc.setFontSize(9); doc.setFont("helvetica", "normal");
-  doc.text(`Nº: ${o.numero || o.id}`, pw - 14, 24, { align: "right" });
-  doc.text(`Data: ${new Date(o.data).toLocaleDateString("pt-BR")}`, pw - 14, 30, { align: "right" });
-  doc.text("Validade: 30 dias", pw - 14, 36, { align: "right" });
-
-  doc.setTextColor(50, 50, 50);
-  let y = 50;
-  doc.setFontSize(10); doc.setFont("helvetica", "bold");
-  doc.text("Dados do Cliente:", 14, y); y += 6;
-  doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-  doc.text(`Nome: ${cli.nome}`, 14, y); y += 5;
-  doc.text(`Empresa: ${cli.empresa}`, 14, y); y += 5;
-  doc.text(`NIF: ${cli.nif}`, 14, y); y += 5;
-  doc.text(`Telefone: ${cli.telefone}  |  Email: ${cli.email}`, 14, y); y += 8;
-
-  const headStyles = { fillColor: [5, 150, 105], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 };
-  const bodyStyles = { fontSize: 8, textColor: [50, 50, 50] };
-
-  doc.setFontSize(10); doc.setFont("helvetica", "bold");
-  doc.text("Descrição dos Serviços:", 14, y); y += 2;
-  doc.autoTable({
-    startY: y,
-    head: [["Descrição", "Qtd", "Valor Unit.", "Total"]],
-    body: (o.itens || []).map((it) => [it.descricao, String(it.quantidade), formatKz(it.valorUnitario), formatKz(it.total)]),
-    theme: "grid", headStyles, bodyStyles,
-    columnStyles: { 1: { halign: "center" }, 2: { halign: "right" }, 3: { halign: "right", fontStyle: "bold" } },
-    alternateRowStyles: { fillColor: [240, 253, 244] },
-    margin: { left: 14, right: 14 },
-  });
-
-  y = doc.lastAutoTable.finalY + 6;
-  doc.autoTable({
-    startY: y,
-    head: [["Especificação Técnica", "Detalhe"]],
-    body: [
-      ["Produto", o.especificacao.produto],
-      ["Formato", o.especificacao.formato],
-      ["Papel", o.especificacao.papel],
-      ["Impressão", o.especificacao.impressao],
-      ["Acabamento", o.especificacao.acabamento],
-    ],
-    theme: "grid", headStyles, bodyStyles,
-    columnStyles: { 0: { cellWidth: 45, fontStyle: "bold" } },
-    alternateRowStyles: { fillColor: [240, 253, 244] },
-    margin: { left: 14, right: 14 },
-  });
-
-  y = doc.lastAutoTable.finalY + 6;
-  doc.autoTable({
-    startY: y,
-    head: [["Especificação Técnica", "Detalhe"]],
-    body: [
-      ["Produto", o.especificacao.produto],
-      ["Formato", o.especificacao.formato],
-      ["Papel", o.especificacao.papel],
-      ["Impressão", o.especificacao.impressao],
-      ["Acabamento", o.especificacao.acabamento],
-    ],
-    theme: "grid", headStyles, bodyStyles,
-    columnStyles: { 0: { cellWidth: 45, fontStyle: "bold" } },
-    alternateRowStyles: { fillColor: [240, 253, 244] },
-    margin: { left: 14, right: 14 },
-  });
-
-  y = doc.lastAutoTable.finalY + 6;
-  const boxX = pw - 88;
-  doc.setFillColor(5, 150, 105);
-  doc.roundedRect(boxX, y, 74, 28, 2, 2, "F");
-  doc.setTextColor(255, 255, 255); doc.setFontSize(9);
-  doc.text("Subtotal:", boxX + 4, y + 8); doc.text(formatKz(o.subtotal), pw - 18, y + 8, { align: "right" });
-  if (o.valorIva > 0) { doc.text(`IVA (${o.iva}%):`, boxX + 4, y + 15); doc.text(formatKz(o.valorIva), pw - 18, y + 15, { align: "right" }); }
-  doc.setFontSize(11); doc.setFont("helvetica", "bold");
-  doc.text("TOTAL:", boxX + 4, y + 24); doc.text(formatKz(o.total), pw - 18, y + 24, { align: "right" });
-
-  y += 34;
-  doc.setTextColor(50, 50, 50); doc.setFontSize(9);
-  doc.text(`Prazo de Execução: ${o.prazoExecucao}`, 14, y); y += 5;
-  doc.text(`Condições de Pagamento: ${o.condicoesPagamento}`, 14, y); y += 8;
-  if (o.observacoes) { doc.setFont("helvetica", "italic"); doc.text(`Obs: ${o.observacoes}`, 14, y); y += 6; }
-
-  doc.setTextColor(180, 180, 180); doc.setFontSize(7);
-  doc.text(`Documento gerado por SIGRAF — ${new Date().toLocaleDateString("pt-BR")}`, pw / 2, 285, { align: "center" });
-  doc.save(`Proforma_${o.id}.pdf`);
-}
-
-function gerarReciboPDF(o, empresa) {
-  const doc = new jsPDF();
-  const pw = doc.internal.pageSize.getWidth();
-  const cli = o.cliente || {};
-  doc.setFillColor(5, 150, 105);
-  doc.rect(0, 0, pw, 42, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(16); doc.setFont("helvetica", "bold");
-  doc.text(empresa.nome, 14, 17);
-  doc.setFontSize(8); doc.setFont("helvetica", "normal");
-  doc.text(empresa.endereco, 14, 23);
-  doc.text(`NIF: ${empresa.nif} | Tel: ${empresa.telefone} | Email: ${empresa.email}`, 14, 29);
-  doc.setFontSize(14); doc.setFont("helvetica", "bold");
-  doc.text("FATURA DE RECIBO", pw - 14, 17, { align: "right" });
-  doc.setFontSize(9); doc.setFont("helvetica", "normal");
-  doc.text(`Nº: REC-${String(o.numero || o.id).replace("ORC-", "")}`, pw - 14, 24, { align: "right" });
-  doc.text(`Data: ${new Date().toLocaleDateString("pt-BR")}`, pw - 14, 30, { align: "right" });
-
-  doc.setTextColor(50, 50, 50);
-  let y = 50;
-  doc.setFontSize(10); doc.setFont("helvetica", "bold");
-  doc.text("Dados do Cliente:", 14, y); y += 6;
-  doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-  doc.text(`Nome: ${cli.nome}`, 14, y); y += 5;
-  doc.text(`Empresa: ${cli.empresa}`, 14, y); y += 5;
-  doc.text(`NIF: ${cli.nif}`, 14, y); y += 5;
-  doc.text(`Telefone: ${cli.telefone}  |  Email: ${cli.email}`, 14, y); y += 8;
-
-  const headStyles = { fillColor: [5, 150, 105], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 };
-  const bodyStyles = { fontSize: 8, textColor: [50, 50, 50] };
-
-  doc.setFontSize(10); doc.setFont("helvetica", "bold");
-  doc.text("Descrição dos Serviços:", 14, y); y += 2;
-  doc.autoTable({
-    startY: y,
-    head: [["Descrição", "Qtd", "Valor Unit.", "Total"]],
-    body: (o.itens || []).map((it) => [it.descricao, String(it.quantidade), formatKz(it.valorUnitario), formatKz(it.total)]),
-    theme: "grid", headStyles, bodyStyles,
-    columnStyles: { 1: { halign: "center" }, 2: { halign: "right" }, 3: { halign: "right", fontStyle: "bold" } },
-    alternateRowStyles: { fillColor: [240, 253, 244] },
-    margin: { left: 14, right: 14 },
-  });
-
-  y = doc.lastAutoTable.finalY + 6;
-  const boxX = pw - 88;
-  doc.setFillColor(5, 150, 105);
-  doc.roundedRect(boxX, y, 74, 28, 2, 2, "F");
-  doc.setTextColor(255, 255, 255); doc.setFontSize(9);
-  doc.text("Subtotal:", boxX + 4, y + 8); doc.text(formatKz(o.subtotal), pw - 18, y + 8, { align: "right" });
-  if (o.valorIva > 0) { doc.text(`IVA (${o.iva}%):`, boxX + 4, y + 15); doc.text(formatKz(o.valorIva), pw - 18, y + 15, { align: "right" }); }
-  doc.setFontSize(11); doc.setFont("helvetica", "bold");
-  doc.text("TOTAL PAGO:", boxX + 4, y + 24); doc.text(formatKz(o.total), pw - 18, y + 24, { align: "right" });
-
-  y += 34;
-  doc.setFillColor(232, 245, 233);
-  doc.roundedRect(14, y, pw - 28, 18, 2, 2, "F");
-  doc.setTextColor(5, 150, 105); doc.setFontSize(10); doc.setFont("helvetica", "bold");
-  doc.text("Pagamento recebido integralmente.", 18, y + 7);
-  doc.setFontSize(8); doc.setFont("helvetica", "normal");
-  doc.text(`Ref: ${o.id} | Condições: ${o.condicoesPagamento}`, 18, y + 13);
-  y += 24;
-  doc.setTextColor(50, 50, 50); doc.setFontSize(9);
-  doc.text(`Prazo de Execução: ${o.prazoExecucao}`, 14, y);
-  if (o.observacoes) { y += 5; doc.setFont("helvetica", "italic"); doc.text(`Obs: ${o.observacoes}`, 14, y); }
-  y += 10;
-  doc.setDrawColor(200, 200, 200);
-  doc.line(14, y, pw / 2 - 10, y);
-  doc.line(pw / 2 + 10, y, pw - 14, y);
-  doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.setTextColor(150, 150, 150);
-  doc.text("Assinatura do Responsável", pw / 2, y + 5, { align: "center" });
-  doc.setTextColor(180, 180, 180); doc.setFontSize(7);
-  doc.text(`Documento gerado por SIGRAF — ${new Date().toLocaleDateString("pt-BR")}`, pw / 2, 285, { align: "center" });
-  doc.save(`Recibo_${o.id}.pdf`);
-}
 
 export default function OrcamentosPage() {
   const [orcamentos, setOrcamentos] = useState([]);
   const [clientes, setClientes] = useState([]);
+  const [materiais, setMateriais] = useState([]);
   const [empresa, setEmpresa] = useState({ nome: "", nif: "", endereco: "", telefone: "", email: "" });
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState(null);
@@ -294,9 +127,10 @@ export default function OrcamentosPage() {
       setCarregando(true);
       setErro(null);
       try {
-        const [orcData, cliData, empData] = await Promise.all([listar(), listarClientes({ tipo: "cliente" }), buscarOrganizacao().catch(() => null)]);
+        const [orcData, cliData, empData, matData] = await Promise.all([listar(), listarClientes({ tipo: "cliente" }), buscarOrganizacao().catch(() => null), listarMateriais().catch(() => [])]);
         setOrcamentos((Array.isArray(orcData) ? orcData : orcData?.data ?? []).map(normalizarOrcamento));
         setClientes(Array.isArray(cliData) ? cliData : cliData?.data ?? []);
+        setMateriais(Array.isArray(matData) ? matData : matData?.data ?? []);
         if (empData) setEmpresa(empData);
       } catch (err) {
         addToast(err.response?.data?.erro || "Erro na operação", "error");
@@ -309,6 +143,8 @@ export default function OrcamentosPage() {
 
   const setField = (name, val) => setForm((p) => ({ ...p, [name]: val }));
 
+  const custoMateriais = (it) => (it.materiais || []).reduce((s, m) => s + (Number(m.quantidade) || 0) * (Number(m.custo_unit) || 0), 0);
+
   const setItem = (idx, key, val) => {
     setForm((p) => {
       const itens = [...p.itens];
@@ -318,12 +154,83 @@ export default function OrcamentosPage() {
         const v = Number(itens[idx].valorUnitario) || 0;
         itens[idx].total = q * v;
       }
+      if (key === "margem") {
+        const c = custoMateriais(itens[idx]);
+        const m = Number(val) || 0;
+        itens[idx].valorUnitario = c > 0 ? Number((c * (1 + m / 100)).toFixed(2)) : "";
+        const q = Number(itens[idx].quantidade) || 0;
+        const v = Number(itens[idx].valorUnitario) || 0;
+        itens[idx].total = q * v;
+      }
+      if (key === "valorUnitario" && itens[idx].composto) {
+        const c = custoMateriais(itens[idx]);
+        const v = Number(val) || 0;
+        itens[idx].margem = c > 0 ? Number(((v / c - 1) * 100).toFixed(2)) : itens[idx].margem;
+      }
       return { ...p, itens };
     });
   };
 
   const addItem = () => setForm((p) => ({ ...p, itens: [...p.itens, { ...blankItem }] }));
   const removeItem = (idx) => setForm((p) => p.itens.length <= 1 ? p : { ...p, itens: p.itens.filter((_, i) => i !== idx) });
+
+  const toggleComposto = (idx) => setForm((p) => {
+    const itens = [...p.itens];
+    const composto = !itens[idx].composto;
+    itens[idx] = {
+      ...itens[idx],
+      composto,
+      materiais: composto && !(itens[idx].materiais || []).length ? [{ ...blankMaterial }] : itens[idx].materiais || [],
+    };
+    return { ...p, itens };
+  });
+
+  const setItemMaterial = (idx, mi, key, val) => {
+    setForm((p) => {
+      const itens = [...p.itens];
+      const mat = [...(itens[idx].materiais || [])];
+      mat[mi] = { ...mat[mi], [key]: val };
+      if (key === "material_id") {
+        const matEstoque = materiais.find((m) => String(m.id) === String(val));
+        if (matEstoque) {
+          mat[mi].descricao = matEstoque.nome || matEstoque.nome_tecnico || "";
+          mat[mi].unidade = matEstoque.unidade || "un";
+          mat[mi].custo_unit = Number(matEstoque.custo_unit) || 0;
+        } else {
+          mat[mi].descricao = "";
+        }
+      }
+      if (key === "quantidade" || key === "custo_unit" || key === "material_id") {
+        const q = Number(mat[mi].quantidade) || 0;
+        const cu = Number(mat[mi].custo_unit) || 0;
+        mat[mi].custo_total = q * cu;
+      }
+      itens[idx] = { ...itens[idx], materiais: mat };
+      return { ...p, itens };
+    });
+  };
+
+  const addMaterial = (idx) => setForm((p) => {
+    const itens = [...p.itens];
+    itens[idx] = { ...itens[idx], materiais: [...(itens[idx].materiais || []), { ...blankMaterial }] };
+    return { ...p, itens };
+  });
+
+  const removeMaterial = (idx, mi) => setForm((p) => {
+    const itens = [...p.itens];
+    itens[idx] = { ...itens[idx], materiais: (itens[idx].materiais || []).filter((_, i) => i !== mi) };
+    return { ...p, itens };
+  });
+
+  const setSpecLine = (idx, key, val) => {
+    setForm((p) => {
+      const specLines = [...p.specLines];
+      specLines[idx] = { ...specLines[idx], [key]: val };
+      return { ...p, specLines };
+    });
+  };
+  const addSpecLine = () => setForm((p) => ({ ...p, specLines: [...p.specLines, { rotulo: "", valor: "" }] }));
+  const removeSpecLine = (idx) => setForm((p) => p.specLines.length <= 1 ? p : { ...p, specLines: p.specLines.filter((_, i) => i !== idx) });
 
   const subtotalCalc = form.itens.reduce((s, it) => s + (Number(it.total) || 0), 0);
   const ivaCalc = Number(form.iva) || 0;
@@ -334,8 +241,29 @@ export default function OrcamentosPage() {
     const dados = {
       cliente_id: form.cliente_id,
       cliente: { nome: form.cliente, empresa: form.empresa, nif: form.nif, telefone: form.telefone, email: form.email },
-      itens: form.itens.map((it) => ({ ...it, quantidade: Number(it.quantidade), valorUnitario: Number(it.valorUnitario), total: Number(it.total) || 0 })),
-      especificacao: { produto: form.produto, formato: form.formato, papel: form.papel, impressao: form.impressao, acabamento: form.acabamento },
+      itens: form.itens.map((it) => ({
+        descricao: it.descricao,
+        quantidade: Number(it.quantidade),
+        valorUnitario: Number(it.valorUnitario),
+        total: Number(it.total) || 0,
+        composto: Boolean(it.composto),
+        margem: Number(it.margem) || 0,
+        materiais: (it.materiais || [])
+          .map((m) => ({
+            material_id: m.material_id || null,
+            descricao: m.descricao || "",
+            unidade: m.unidade || "un",
+            quantidade: Number(m.quantidade) || 0,
+            custo_unit: Number(m.custo_unit) || 0,
+            mover_estoque: Boolean(m.mover_estoque),
+          }))
+          .filter((m) => m.material_id),
+      })),
+      especificacao: Object.fromEntries(
+        (form.specLines || [])
+          .filter((l) => l.rotulo?.trim() && l.valor?.trim())
+          .map((l) => [l.rotulo.trim(), l.valor.trim()])
+      ),
       subtotal: subtotalCalc, iva: ivaCalc,
       prazoExecucao: form.prazoExecucao, condicoesPagamento: form.condicoesPagamento, observacoes: form.observacoes,
     };
@@ -363,9 +291,26 @@ export default function OrcamentosPage() {
       cliente_id: o.cliente_id || "",
       cliente: o.cliente?.nome || "", empresa: o.cliente?.empresa || "", nif: o.cliente?.nif || "",
       telefone: o.cliente?.telefone || "", email: o.cliente?.email || "",
-      itens: (o.itens || []).map((it) => ({ descricao: it.descricao, quantidade: String(it.quantidade), valorUnitario: String(it.valorUnitario), total: it.total })),
-      produto: o.especificacao?.produto || "", formato: o.especificacao?.formato || "", papel: o.especificacao?.papel || "",
-      impressao: o.especificacao?.impressao || "", acabamento: o.especificacao?.acabamento || "",
+      itens: (o.itens || []).map((it) => ({
+        descricao: it.descricao,
+        quantidade: String(it.quantidade),
+        valorUnitario: String(it.valorUnitario),
+        composto: Boolean(it.composto),
+        margem: String(it.margem ?? ""),
+        materiais: (it.materiais || []).map((m) => ({
+          material_id: m.material_id ? String(m.material_id) : "",
+          descricao: m.descricao || "",
+          unidade: m.unidade || "un",
+          quantidade: String(m.quantidade ?? ""),
+          custo_unit: Number(m.custo_unit) || 0,
+          custo_total: Number(m.custo_total) || 0,
+          mover_estoque: Boolean(m.mover_estoque),
+        })),
+      })),
+      specLines: (() => {
+        const linhas = entradasEspecificacao(o.especificacao);
+        return linhas.length ? linhas.map((l) => ({ ...l })) : SPEC_DEFAULT_LINES.map((l) => ({ ...l }));
+      })(),
       iva: String(o.iva), prazoExecucao: o.prazoExecucao,
       condicoesPagamento: o.condicoesPagamento, observacoes: o.observacoes || "",
     });
@@ -393,16 +338,6 @@ export default function OrcamentosPage() {
     }
     const msg = encodeURIComponent(`Olá ${o.cliente?.nome || ""}! Segue o seu orçamento ${o.numero || o.id} da ${empresa.nome || "SIGRAF"}.`);
     window.open(`https://wa.me/${tel}?text=${msg}`, "_blank", "noopener,noreferrer");
-  };
-
-  const handleFaturar = async (o) => {
-    try {
-      const fatura = await faturarOrcamento(o.id, { tipo: "fatura" });
-      addToast(`Orçamento faturado — ${fatura.numero} criado`, "success");
-      gerarPDF(fatura, empresa);
-    } catch (err) {
-      addToast(err.response?.data?.erro || "Erro ao faturar orçamento", "error");
-    }
   };
 
   const confirmarEliminacao = async () => {
@@ -480,7 +415,7 @@ export default function OrcamentosPage() {
       <section className="grid grid-cols-2 sm:grid-cols-4 gap-5">
         {[
           { label: "Total Orçamentos", value: orcamentos.length, icon: "request_quote", iconVariant: "primary" },
-          { label: "Valor Total", value: `Kz ${(totalValor / 1000).toFixed(1)}k`, icon: "paid", iconVariant: "success" },
+          { label: "Valor Total", value: formatKz(totalValor), icon: "paid", iconVariant: "success" },
           { label: "Pendentes", value: pendentes, icon: "pending", iconVariant: "warning" },
           { label: "Aprovados", value: aprovadosCount, icon: "check_circle", iconVariant: "success" },
         ].map((kpi) => (
@@ -583,11 +518,6 @@ export default function OrcamentosPage() {
                       </select>
                       <Button variant="ghost" size="icon" onClick={() => handleEdit(o)} title="Editar"><Icon name="edit" className="text-[16px]" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => setEliminarItem(o)} title="Remover" className="text-error hover:text-error"><Icon name="delete" className="text-[16px]" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => gerarProformaPDF(o, empresa)} title="Fatura Proforma"><Icon name="description" className="text-[16px]" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => gerarReciboPDF(o, empresa)} title="Fatura de Recibo"><Icon name="receipt_long" className="text-[16px]" /></Button>
-                      {o.estado === "aprovado" && (
-                        <Button variant="ghost" size="icon" onClick={() => handleFaturar(o)} title="Faturar orçamento"><Icon name="point_of_sale" className="text-[16px]" /></Button>
-                      )}
                       <Button variant="ghost" size="icon" onClick={() => handleWhatsApp(o)} title="Enviar WhatsApp"><Icon name="chat" className="text-[16px]" /></Button>
                     </div>
                   </td>
@@ -622,11 +552,6 @@ export default function OrcamentosPage() {
                     </select>
                     <Button variant="ghost" size="sm" onClick={() => handleEdit(o)}><Icon name="edit" className="text-sm" /> Editar</Button>
                     <Button variant="ghost" size="sm" onClick={() => setEliminarItem(o)} className="text-error"><Icon name="delete" className="text-sm" /></Button>
-                    <Button variant="outline" size="sm" onClick={() => gerarProformaPDF(o, empresa)}><Icon name="description" className="text-sm" /> Proforma</Button>
-                    <Button variant="outline" size="sm" onClick={() => gerarReciboPDF(o, empresa)}><Icon name="receipt_long" className="text-sm" /> Recibo</Button>
-                    {o.estado === "aprovado" && (
-                      <Button variant="success" size="sm" onClick={() => handleFaturar(o)}><Icon name="point_of_sale" className="text-sm" /> Faturar</Button>
-                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -643,11 +568,7 @@ export default function OrcamentosPage() {
             <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <CardTitle className="flex items-center gap-2"><Icon name="description" className="text-primary" /> Detalhes — {o.numero || o.id}</CardTitle>
               <div className="flex gap-2">
-                <Button variant="default" size="sm" onClick={() => gerarProformaPDF(o, empresa)}><Icon name="description" className="text-[16px]" /> Proforma</Button>
-                <Button variant="outline" size="sm" onClick={() => gerarReciboPDF(o, empresa)}><Icon name="receipt_long" className="text-[16px]" /> Recibo</Button>
-                {o.estado === "aprovado" && (
-                  <Button variant="success" size="sm" onClick={() => handleFaturar(o)}><Icon name="point_of_sale" className="text-[16px]" /> Faturar</Button>
-                )}
+                <Button variant="outline" size="sm" onClick={() => handleWhatsApp(o)}><Icon name="chat" className="text-[16px]" /> WhatsApp</Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -665,14 +586,18 @@ export default function OrcamentosPage() {
                 </div>
                 <div className="space-y-3">
                   <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Especificação Técnica</h3>
-                  <div className="space-y-1.5 text-sm">
-                    {["Produto", "Formato", "Papel", "Impressão", "Acabamento"].map((campo) => (
-                      <div key={campo} className="flex justify-between">
-                        <span className="text-muted-foreground">{campo}:</span>
-                        <span className="font-medium text-foreground">{o.especificacao?.[campo.toLowerCase()] || "—"}</span>
-                      </div>
-                    ))}
-                  </div>
+                  {entradasEspecificacao(o.especificacao).length > 0 ? (
+                    <div className="space-y-1.5 text-sm">
+                      {entradasEspecificacao(o.especificacao).map((e) => (
+                        <div key={e.rotulo} className="flex justify-between gap-4">
+                          <span className="text-muted-foreground shrink-0">{e.rotulo}:</span>
+                          <span className="font-medium text-foreground text-right break-words">{e.valor}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Sem especificação técnica.</p>
+                  )}
                 </div>
               </div>
 
@@ -691,7 +616,10 @@ export default function OrcamentosPage() {
                     <tbody>
                       {(o.itens || []).map((it, i) => (
                         <tr key={i} className="border-b border-border/20">
-                          <td className="px-3 py-2 text-foreground">{it.descricao}</td>
+                          <td className="px-3 py-2 text-foreground">
+                            {it.descricao}
+                            {it.composto && <span className="ml-2 text-[9px] font-bold text-primary bg-primary/10 rounded px-1.5 py-0.5 uppercase">composto</span>}
+                          </td>
                           <td className="px-3 py-2 text-center text-muted-foreground">{it.quantidade}</td>
                           <td className="px-3 py-2 text-right text-muted-foreground">{formatKz(it.valorUnitario)}</td>
                           <td className="px-3 py-2 text-right font-bold text-foreground">{formatKz(it.total)}</td>
@@ -707,6 +635,54 @@ export default function OrcamentosPage() {
                     <div className="flex justify-between border-t pt-1 font-bold text-sm"><span>Total:</span><span className="text-primary">{formatKz(o.total || o.subtotal + o.valorIva)}</span></div>
                   </div>
                 </div>
+
+                {(o.itens || []).filter((it) => it.composto && (it.materiais || []).length).length > 0 && (
+                  <div className="mt-4 space-y-3">
+                    <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Materiais por produto composto</h4>
+                    {(o.itens || []).filter((it) => it.composto && (it.materiais || []).length).map((it) => {
+                      const custoUn = (it.materiais || []).reduce((s, m) => s + (Number(m.quantidade) || 0) * (Number(m.custo_unit) || 0), 0);
+                      return (
+                        <div key={it.id || it.descricao} className="rounded-xl border p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                            <p className="text-xs font-bold text-foreground">{it.descricao}</p>
+                            <p className="text-[10px] text-muted-foreground">
+                              Custo materiais/un.: <span className="font-bold text-foreground">{formatKz(custoUn)}</span>
+                              {Number(it.margem) > 0 && <> · Margem: <span className="font-bold text-foreground">{it.margem}%</span></>}
+                            </p>
+                          </div>
+                          <div className="overflow-x-auto rounded-lg border">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="border-b bg-muted/50">
+                                  <th className="text-left px-2 py-1.5 font-bold text-muted-foreground uppercase">Material</th>
+                                  <th className="text-center px-2 py-1.5 font-bold text-muted-foreground uppercase">Qtd/un.</th>
+                                  <th className="text-right px-2 py-1.5 font-bold text-muted-foreground uppercase">Custo Unit.</th>
+                                  <th className="text-right px-2 py-1.5 font-bold text-muted-foreground uppercase">Custo Total</th>
+                                  <th className="text-center px-2 py-1.5 font-bold text-muted-foreground uppercase">Estoque</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(it.materiais || []).map((m, mi) => (
+                                  <tr key={mi} className="border-b border-border/20">
+                                    <td className="px-2 py-1.5 text-foreground">{m.descricao}</td>
+                                    <td className="px-2 py-1.5 text-center text-muted-foreground">{m.quantidade} {m.unidade}</td>
+                                    <td className="px-2 py-1.5 text-right text-muted-foreground">{formatKz(m.custo_unit)}</td>
+                                    <td className="px-2 py-1.5 text-right font-semibold text-foreground">{formatKz(m.custo_total)}</td>
+                                    <td className="px-2 py-1.5 text-center">
+                                      {m.mover_estoque
+                                        ? <Badge variant="success" className="text-[9px]">Move estoque</Badge>
+                                        : <Badge variant="outline" className="text-[9px]">Não move</Badge>}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -780,61 +756,152 @@ export default function OrcamentosPage() {
               <Button type="button" variant="ghost" size="sm" onClick={addItem}><Icon name="add_circle" className="text-sm" /> Adicionar Item</Button>
             </div>
             {form.itens.map((it, idx) => (
-              <div key={idx} className="grid grid-cols-12 gap-2 items-end bg-muted/50 rounded-xl p-3">
-                <div className="col-span-12 sm:col-span-5 flex flex-col gap-1.5">
-                  {idx === 0 && <label className="text-[9px] font-semibold text-muted-foreground uppercase">Descrição *</label>}
-                  <input required value={it.descricao} onChange={(e) => setItem(idx, "descricao", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="Descrição do serviço" />
+              <div key={idx} className="bg-muted/50 rounded-xl p-3 space-y-3">
+                <div className="grid grid-cols-12 gap-2 items-end">
+                  <div className="col-span-12 sm:col-span-5 flex flex-col gap-1.5">
+                    {idx === 0 && <label className="text-[9px] font-semibold text-muted-foreground uppercase">Descrição *</label>}
+                    <input required value={it.descricao} onChange={(e) => setItem(idx, "descricao", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder={it.composto ? "Ex: Livro A5, brochura" : "Descrição do serviço"} />
+                  </div>
+                  <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
+                    {idx === 0 && <label className="text-[9px] font-semibold text-muted-foreground uppercase">Qtd *</label>}
+                    <input required type="number" min="1" value={it.quantidade} onChange={(e) => setItem(idx, "quantidade", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="0" />
+                  </div>
+                  <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
+                    {idx === 0 && <label className="text-[9px] font-semibold text-muted-foreground uppercase">{it.composto ? "Preço Venda/Un." : "Valor Unit. *"}</label>}
+                    <input required type="number" min="0" value={it.valorUnitario} onChange={(e) => setItem(idx, "valorUnitario", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="0" />
+                  </div>
+                  <div className="col-span-3 sm:col-span-2 flex flex-col gap-1.5">
+                    {idx === 0 && <label className="text-[9px] font-semibold text-muted-foreground uppercase">Total</label>}
+                    <div className="px-2.5 py-2 bg-muted border border-input rounded-lg text-xs font-bold text-foreground">{formatKz(it.total || 0)}</div>
+                  </div>
+                  <div className="col-span-1 flex justify-center">
+                    {form.itens.length > 1 && (
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(idx)} title="Remover" className="text-error">
+                        <Icon name="close" className="text-sm" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
-                <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
-                  {idx === 0 && <label className="text-[9px] font-semibold text-muted-foreground uppercase">Qtd *</label>}
-                  <input required type="number" min="1" value={it.quantidade} onChange={(e) => setItem(idx, "quantidade", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="0" />
-                </div>
-                <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
-                  {idx === 0 && <label className="text-[9px] font-semibold text-muted-foreground uppercase">Valor Unit. *</label>}
-                  <input required type="number" min="0" value={it.valorUnitario} onChange={(e) => setItem(idx, "valorUnitario", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="0" />
-                </div>
-                <div className="col-span-3 sm:col-span-2 flex flex-col gap-1.5">
-                  {idx === 0 && <label className="text-[9px] font-semibold text-muted-foreground uppercase">Total</label>}
-                  <div className="px-2.5 py-2 bg-muted border border-input rounded-lg text-xs font-bold text-foreground">{formatKz(it.total || 0)}</div>
-                </div>
-                <div className="col-span-1 flex justify-center">
-                  {form.itens.length > 1 && (
-                    <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(idx)} title="Remover" className="text-error">
-                      <Icon name="close" className="text-sm" />
-                    </Button>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-2.5">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input type="checkbox" checked={!!it.composto} onChange={() => toggleComposto(idx)} className="w-4 h-4 accent-primary" />
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Produto Composto (calculado a partir do estoque)</span>
+                  </label>
+                  {it.composto && (
+                    <span className="text-[10px] font-semibold text-primary bg-primary/10 rounded-lg px-2 py-1">
+                      Custo materiais/un.: {formatKz(custoMateriais(it))}
+                    </span>
                   )}
                 </div>
+
+                {it.composto && (
+                  <div className="border-t border-border/40 pt-2.5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Materiais do estoque (qtd por unidade do produto)</span>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => addMaterial(idx)}><Icon name="add_circle" className="text-sm" /> Adicionar material</Button>
+                    </div>
+                    {materiais.length === 0 && (
+                      <p className="text-[10px] text-muted-foreground">Ainda não há materiais no estoque. Adicione materiais no módulo Estoque para montar o composto.</p>
+                    )}
+                    {it.materiais.map((m, mi) => (
+                      <div key={mi} className="grid grid-cols-12 gap-2 items-end">
+                        <div className="col-span-12 sm:col-span-4 flex flex-col gap-1.5">
+                          <select value={m.material_id || ""} onChange={(e) => setItemMaterial(idx, mi, "material_id", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30">
+                            <option value="">Selecionar material...</option>
+                            {materiais.map((mat) => (
+                              <option key={mat.id} value={mat.id}>
+                                {mat.nome || mat.nome_tecnico}{Number(mat.quantidade) > 0 ? ` (${mat.quantidade} ${mat.unidade || "un"})` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
+                          <input type="number" min="0" step="any" value={m.quantidade} onChange={(e) => setItemMaterial(idx, mi, "quantidade", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="Qtd/un." />
+                        </div>
+                        <div className="col-span-3 sm:col-span-2 flex flex-col gap-1.5">
+                          <div className="px-2.5 py-2 bg-muted border border-input rounded-lg text-xs text-muted-foreground">{formatKz(m.custo_unit || 0)}/{m.unidade || "un"}</div>
+                        </div>
+                        <div className="col-span-3 sm:col-span-2 flex flex-col gap-1.5">
+                          <div className="px-2.5 py-2 bg-muted border border-input rounded-lg text-xs font-bold text-foreground">{formatKz(m.custo_total || 0)}</div>
+                        </div>
+                        <div className="col-span-1 flex justify-center">
+                          <label className="flex items-center gap-1 cursor-pointer" title="Marcar para mover o estoque ao faturar/produzir">
+                            <input type="checkbox" checked={!!m.mover_estoque} onChange={(e) => setItemMaterial(idx, mi, "mover_estoque", e.target.checked)} className="w-4 h-4 accent-emerald-600" />
+                            <span className="text-[9px] font-bold text-muted-foreground uppercase hidden sm:inline">Mover</span>
+                          </label>
+                        </div>
+                        <div className="col-span-1 flex justify-center">
+                          {it.materiais.length > 1 && (
+                            <Button type="button" variant="ghost" size="icon" onClick={() => removeMaterial(idx, mi)} title="Remover material" className="text-error"><Icon name="close" className="text-sm" /></Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 border-t border-border/40 pt-2.5">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[9px] font-semibold text-muted-foreground uppercase">Margem de lucro (%)</label>
+                        <input type="number" min="0" step="any" value={it.margem} onChange={(e) => setItem(idx, "margem", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="Ex: 40" />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[9px] font-semibold text-muted-foreground uppercase">Preço calculado/un. (custo+margem)</label>
+                        <div className="px-2.5 py-2 bg-primary/10 border border-primary/30 rounded-lg text-xs font-bold text-primary">
+                          {formatKz(custoMateriais(it) > 0 ? custoMateriais(it) * (1 + (Number(it.margem) || 0) / 100) : 0)}
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[9px] font-semibold text-muted-foreground uppercase">Total do item (sem IVA)</label>
+                        <div className="px-2.5 py-2 bg-muted border border-input rounded-lg text-xs font-bold text-foreground">{formatKz(it.total || 0)}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2"><Icon name="settings" className="text-sm text-primary" /> Especificação Técnica</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Produto *</label>
-                <input required name="produto" value={form.produto} onChange={(e) => setField("produto", e.target.value)} className={inputCls} placeholder="Ex: Catálogos Institucionais" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Formato *</label>
-                <input required name="formato" value={form.formato} onChange={(e) => setField("formato", e.target.value)} className={inputCls} placeholder="Ex: A4, 1x2m" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Papel / Material *</label>
-                <input required name="papel" value={form.papel} onChange={(e) => setField("papel", e.target.value)} className={inputCls} placeholder="Ex: Papel Couché 150g" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Impressão *</label>
-                <select required name="impressao" value={form.impressao} onChange={(e) => setField("impressao", e.target.value)} className={inputCls}>
-                  <option value="" disabled>Selecionar...</option>
-                  <option>Offset</option><option>Digital</option><option>Serigrafia</option><option>Flexografia</option>
-                </select>
-              </div>
-              <div className="flex flex-col gap-1 sm:col-span-2">
-                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Acabamento *</label>
-                <input required name="acabamento" value={form.acabamento} onChange={(e) => setField("acabamento", e.target.value)} className={inputCls} placeholder="Ex: Verniz Localizado, Corte e Dobra" />
-              </div>
+            <div className="flex items-center justify-between">
+              <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2"><Icon name="settings" className="text-sm text-primary" /> Especificação Técnica</h3>
+              <Button type="button" variant="ghost" size="sm" onClick={addSpecLine}><Icon name="add_circle" className="text-sm" /> Adicionar campo</Button>
             </div>
+            <p className="text-[10px] text-muted-foreground -mt-1">
+              Detalhes do produto que ficam visíveis no orçamento (formato, papel, impressão, acabamento, etc.). Opcional.
+            </p>
+            <div className="rounded-xl border bg-background overflow-hidden">
+              <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-muted/50 border-b items-center">
+                <span className="col-span-5 text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Campo</span>
+                <span className="col-span-6 text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Valor</span>
+                <span className="col-span-1" />
+              </div>
+              {form.specLines.map((line, idx) => {
+                const ehImpressao = String(line.rotulo || "").toLowerCase().includes("impress");
+                return (
+                  <div key={idx} className="grid grid-cols-12 gap-2 px-3 py-2.5 border-b border-border/30 last:border-0 items-center">
+                    <div className="col-span-5">
+                      <input required value={line.rotulo} onChange={(e) => setSpecLine(idx, "rotulo", e.target.value)} list="spec-campo-list" className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30 w-full" placeholder="Ex: Formato" />
+                    </div>
+                    <div className="col-span-6">
+                      <input required value={line.valor} onChange={(e) => setSpecLine(idx, "valor", e.target.value)} list={ehImpressao ? "spec-impressao-list" : undefined} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30 w-full" placeholder={placeholderSpec(line.rotulo)} />
+                    </div>
+                    <div className="col-span-1 flex justify-center">
+                      {form.specLines.length > 1 && (
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeSpecLine(idx)} title="Remover campo" className="text-error">
+                          <Icon name="close" className="text-sm" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <datalist id="spec-campo-list">
+              <option value="Produto" /><option value="Formato" /><option value="Papel/Material" /><option value="Impressão" /><option value="Acabamento" /><option value="Tiragem" /><option value="Nº de Cores" /><option value="Gramagem" />
+            </datalist>
+            <datalist id="spec-impressao-list">
+              <option value="Offset" /><option value="Digital" /><option value="Serigrafia" /><option value="Flexografia" />
+            </datalist>
           </div>
 
           <div className="space-y-3">

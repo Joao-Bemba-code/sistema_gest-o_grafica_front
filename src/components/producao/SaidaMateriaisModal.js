@@ -25,23 +25,69 @@ function Campo({ label, children, obrigatorio }) {
   );
 }
 
-export default function SaidaMateriaisModal({ open, op, matPorId, onClose, onConfirm, nomeUsuario }) {
+export default function SaidaMateriaisModal({ open, op, matPorId, materiais, onClose, onConfirm, nomeUsuario }) {
   const [passo, setPasso] = useState(1);
   const [form, setForm] = useState(() => ({ ...formVazio, solicitado_por: nomeUsuario || "" }));
   const [erro, setErro] = useState("");
   const [submetendo, setSubmetendo] = useState(false);
+  const [itensExtras, setItensExtras] = useState([]);
+  const [selMaterial, setSelMaterial] = useState("");
+  const [selQtd, setSelQtd] = useState("");
+  const [selLote, setSelLote] = useState("");
 
   const reservas = Array.isArray(op?.reserva_estoques) ? op.reserva_estoques : [];
-  const linhas = reservas.map((r) => ({
-    ...r,
-    nome: matPorId?.[r.material_id]?.nome || `Material #${r.material_id}`,
-    unidade: matPorId?.[r.material_id]?.unidade || "un",
+  const extras = itensExtras.map((i) => ({
+    material_id: i.material_id,
+    quantidade_reservada: i.quantidade,
+    lote: i.lote,
+    nome: matPorId?.[i.material_id]?.nome || `Material #${i.material_id}`,
+    unidade: matPorId?.[i.material_id]?.unidade || "un",
   }));
+  const linhas = [
+    ...reservas.map((r) => ({
+      ...r,
+      nome: matPorId?.[r.material_id]?.nome || `Material #${r.material_id}`,
+      unidade: matPorId?.[r.material_id]?.unidade || "un",
+    })),
+    ...extras,
+  ];
   const total = linhas.reduce((acc, l) => acc + (Number(l.quantidade_reservada) || 0), 0);
 
+  const opcoes = Array.isArray(materiais) && materiais.length ? materiais : Object.values(matPorId || {});
+
+  const adicionarExtra = () => {
+    const qtd = Number(selQtd);
+    const mid = Number(selMaterial);
+    if (!mid || !qtd || qtd <= 0) {
+      setErro("Selecione o material e indique a quantidade");
+      return;
+    }
+    if (reservas.some((r) => Number(r.material_id) === mid)) {
+      setErro("Este material já está reservado nesta OP");
+      return;
+    }
+    if (itensExtras.some((i) => Number(i.material_id) === mid)) {
+      setErro("Material já adicionado — edite a quantidade se necessário");
+      return;
+    }
+    setItensExtras([...itensExtras, { material_id: mid, quantidade: qtd, lote: selLote.trim() || null }]);
+    setErro("");
+    setSelMaterial("");
+    setSelQtd("");
+    setSelLote("");
+  };
+
+  const removerExtra = (idx) => setItensExtras(itensExtras.filter((_, i) => i !== idx));
+
   const validaPasso1 = () => {
-    if (linhas.length === 0) { setErro("Esta OP não tem materiais reservados"); return false; }
-    if (!form.permitido_por.trim()) { setErro("Informe quem autoriza a saída no estoque"); return false; }
+    if (linhas.length === 0) {
+      setErro("Adicione pelo menos um material para dar saída no estoque");
+      return false;
+    }
+    if (!form.permitido_por.trim()) {
+      setErro("Informe quem autoriza a saída no estoque");
+      return false;
+    }
     return true;
   };
 
@@ -63,11 +109,13 @@ export default function SaidaMateriaisModal({ open, op, matPorId, onClose, onCon
       solicitado_por: form.solicitado_por.trim() || null,
       permitido_por: form.permitido_por.trim() || null,
       observacoes: form.observacoes.trim() || null,
+      itens_materiais: itensExtras.length ? itensExtras.map((i) => ({ material_id: i.material_id, quantidade: i.quantidade, lote: i.lote })) : undefined,
     });
     setSubmetendo(false);
     if (ok) {
       onClose();
       setForm((f) => ({ ...formVazio, solicitado_por: nomeUsuario || "" }));
+      setItensExtras([]);
       setPasso(1);
     }
   };
@@ -80,7 +128,7 @@ export default function SaidaMateriaisModal({ open, op, matPorId, onClose, onCon
       onClose={onClose}
       title="Dar saída de materiais"
       icon="inventory"
-      size="md"
+      size="lg"
       footer={
         <>
           <Button variant="outline" onClick={passo === 1 ? onClose : voltar}>
@@ -128,6 +176,54 @@ export default function SaidaMateriaisModal({ open, op, matPorId, onClose, onCon
               </p>
             </div>
 
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Materiais para saída</p>
+              {linhas.length > 0 && (
+                <div className="space-y-1.5">
+                  {linhas.map((l, i) => (
+                    <div key={l.id || `extra-${i}`} className="flex items-center justify-between gap-2 bg-muted/40 rounded-lg px-3 py-2 text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-medium text-foreground truncate">{l.nome}</span>
+                        <span className="text-muted-foreground shrink-0">{l.lote ? `Lote ${l.lote}` : ""}</span>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-muted-foreground">
+                          {Number(l.quantidade_reservada).toLocaleString("pt-AO")} {l.unidade}
+                          {l.id ? " reservado" : " (novo)"}
+                        </span>
+                        {!l.id && (
+                          <button type="button" onClick={() => removerExtra(i - reservas.length)} className="text-red-500 hover:text-red-700 transition-colors" title="Remover"><Icon name="delete" /></button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {reservas.length === 0 && itensExtras.length === 0 && (
+                <p className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2">
+                  Esta OP ainda não tem materiais reservados. Selecione abaixo os materiais a dar saída — a reserva é criada automaticamente.
+                </p>
+              )}
+              <div className="flex flex-col sm:flex-row gap-2">
+                <select value={selMaterial} onChange={(e) => setSelMaterial(e.target.value)} className={`${inputCls} flex-1`}>
+                  <option value="">Seleccionar material...</option>
+                  {opcoes.map((m) => (
+                    <option key={m.id} value={m.id} disabled={m.estoque_disponivel <= 0}>
+                      {m.nome} — {m.estoque_disponivel} {m.unidade || "un"} disponível
+                    </option>
+                  ))}
+                </select>
+                <input type="number" min="1" value={selQtd} onChange={(e) => setSelQtd(e.target.value)} className={`${inputCls} sm:w-32`} placeholder="Qtd." />
+                <input value={selLote} onChange={(e) => setSelLote(e.target.value)} className={`${inputCls} sm:w-40`} placeholder="Lote (opcional)" />
+                <Button type="button" size="sm" onClick={adicionarExtra}><Icon name="add" className="text-lg" /> Adicionar</Button>
+              </div>
+              {selMaterial && matPorId?.[Number(selMaterial)]?.percentual_quebra > 0 && (
+                <p className="text-[10px] text-amber-600">
+                  Quebra técnica de {matPorId[Number(selMaterial)].percentual_quebra}% será adicionada à quantidade.
+                </p>
+              )}
+            </div>
+
             <Campo label="Responsável">
               <input value={form.solicitado_por} onChange={set("solicitado_por")} className={inputCls} placeholder="Responsável pela requisição/trabalho" />
             </Campo>
@@ -156,8 +252,8 @@ export default function SaidaMateriaisModal({ open, op, matPorId, onClose, onCon
               <Linha label="Autorizado por" valor={form.permitido_por || "—"} />
               {form.observacoes && <Linha label="Observações" valor={form.observacoes} />}
               <div className="border-t border-border/60 pt-2 space-y-2">
-                {linhas.map((l) => (
-                  <div key={l.id} className="flex items-center justify-between gap-3 text-sm">
+                {linhas.map((l, i) => (
+                  <div key={l.id || `extra-${i}`} className="flex items-center justify-between gap-3 text-sm">
                     <span className="text-xs text-foreground truncate">{l.nome}</span>
                     <span className="font-bold text-foreground shrink-0">
                       {Number(l.quantidade_reservada).toLocaleString("pt-AO")} <span className="text-xs text-muted-foreground font-semibold">{l.unidade}</span>
