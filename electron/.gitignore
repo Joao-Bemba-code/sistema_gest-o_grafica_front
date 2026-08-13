@@ -1,0 +1,7 @@
+node_modules/
+dist/
+backend/
+web/
+config.json
+sgg.sqlite
+*.log
