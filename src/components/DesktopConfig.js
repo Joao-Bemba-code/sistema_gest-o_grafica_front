@@ -125,7 +125,8 @@ export default function DesktopConfig() {
                     <div>
                       <p className="text-xs font-bold">Sincronizar com a versão online</p>
                       <p className="text-[11px] text-muted-foreground mt-0.5">
-                        Sempre que houver internet, os dados são enviados para o site (a cada 5 minutos).
+                        Sempre que houver internet, os dados são sincronizados nos dois sentidos
+                        (a cada 5 minutos). O computador continua a ser o principal.
                       </p>
                     </div>
                   </label>
