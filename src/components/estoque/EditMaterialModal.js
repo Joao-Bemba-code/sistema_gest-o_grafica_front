@@ -4,7 +4,7 @@ import { useState } from "react";
 import Modal from "@/components/Modal";
 import { Button } from "@/components/ui/Button";
 import MaterialForm from "./MaterialForm";
-import { toNum } from "@/lib/estoque";
+import { toNum, especificacoesObjeto } from "@/lib/estoque";
 
 function deItem(item) {
   return {
@@ -30,7 +30,7 @@ function deItem(item) {
     especificidade: item.especificidade || "",
     condicao_armazenagem: item.condicao_armazenagem || "",
     localizacao: item.localizacao || "",
-    especificacoes: item.especificacoes || {},
+    especificacoes: especificacoesObjeto(item.especificacoes),
   };
 }
 

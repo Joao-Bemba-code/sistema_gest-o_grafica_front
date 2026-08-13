@@ -60,8 +60,20 @@ export function camposDeCategoria(categoria) {
 const CHAVES_LEGADO = new Set(["produto", "formato", "papel", "impressao", "impressão", "acabamento"]);
 const CHAVES_BONITAS = { produto: "Produto", formato: "Formato", papel: "Papel", impressao: "Impressão", impressão: "Impressão", acabamento: "Acabamento" };
 
+export function especificacoesObjeto(espec) {
+  if (typeof espec === "string" && espec.trim()) {
+    try {
+      const parsed = JSON.parse(espec);
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+  return espec && typeof espec === "object" ? espec : {};
+}
+
 export function entradasEspecificacao(espec) {
-  if (!espec || typeof espec !== "object") return [];
+  espec = especificacoesObjeto(espec);
   const keys = Object.keys(espec);
   return keys
     .filter((k) => {
