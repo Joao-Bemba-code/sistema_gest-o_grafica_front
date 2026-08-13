@@ -37,24 +37,28 @@ export default function useEstoque() {
 
   const nomeUsuario = useMemo(() => getUsuario()?.nome || "", []);
 
-  const carregar = useCallback(() => {
-    return Promise.allSettled([
+  const carregar = useCallback(async (tentativa = 0) => {
+    setCarregando(true);
+    const resultados = await Promise.allSettled([
       listar(),
       listarCategorias(),
       listarFornecedores(),
       listarClientes({ tipo: "cliente" }),
       listarFormatos(),
       buscarOrganizacao(),
-    ]).then(([m, c, f, cl, fm, o]) => {
-      setMateriais(m.status === "fulfilled" && Array.isArray(m.value) ? m.value : []);
-      setCategorias(c.status === "fulfilled" && Array.isArray(c.value) ? c.value : []);
-      setFornecedores(f.status === "fulfilled" && Array.isArray(f.value) ? f.value : []);
-      setClientes(cl.status === "fulfilled" && Array.isArray(cl.value) ? cl.value : []);
-      setFormatos(fm.status === "fulfilled" && Array.isArray(fm.value) ? fm.value : []);
-      setOrg(o.status === "fulfilled" ? o.value || {} : {});
-      setErro(m.status === "rejected" ? true : null);
-      setCarregando(false);
-    });
+    ]);
+    const [m, c, f, cl, fm, o] = resultados;
+    if (m.status === "rejected" && tentativa === 0) {
+      return carregar(1);
+    }
+    setMateriais(m.status === "fulfilled" && Array.isArray(m.value) ? m.value : []);
+    setCategorias(c.status === "fulfilled" && Array.isArray(c.value) ? c.value : []);
+    setFornecedores(f.status === "fulfilled" && Array.isArray(f.value) ? f.value : []);
+    setClientes(cl.status === "fulfilled" && Array.isArray(cl.value) ? cl.value : []);
+    setFormatos(fm.status === "fulfilled" && Array.isArray(fm.value) ? fm.value : []);
+    setOrg(o.status === "fulfilled" ? o.value || {} : {});
+    setErro(m.status === "rejected" ? true : null);
+    setCarregando(false);
   }, []);
 
   useEffect(() => {

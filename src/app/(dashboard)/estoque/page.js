@@ -20,7 +20,7 @@ import { gerarFichaMaterialPDF } from "@/lib/estoquePdf";
 export default function EstoquePage() {
   const {
     materiais, categorias, fornecedores, clientes, org, formatos,
-    carregando, erro, nomeUsuario, totais, alertas,
+    carregando, erro, carregar, nomeUsuario, totais, alertas,
     salvarMaterial, registrarMovimentacao, converterFormatos,
     carregarReservas, cancelarReservaDe,
   } = useEstoque();
@@ -100,8 +100,14 @@ export default function EstoquePage() {
 
   if (erro && materiais.length === 0) {
     return (
-      <div role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/10 text-destructive p-6 text-center font-semibold">
-        Erro ao carregar estoque
+      <div role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/10 p-8 text-center">
+        <Icon name="error" className="text-4xl text-destructive mb-2 block mx-auto" />
+        <p className="font-semibold text-destructive">Erro ao carregar estoque</p>
+        <p className="text-xs text-muted-foreground mt-1">Não foi possível obter os materiais do servidor. Verifica a ligação à internet e tenta de novo.</p>
+        <Button className="mt-4" variant="outline" onClick={() => carregar()} loading={carregando}>
+          <Icon name="refresh" className="text-sm" />
+          Tentar novamente
+        </Button>
       </div>
     );
   }

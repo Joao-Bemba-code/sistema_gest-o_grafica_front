@@ -47,12 +47,14 @@ export default function RelatoriosPage() {
   const [faturas, setFaturas] = useState([]);
   const [periodo, setPeriodo] = useState(getUltimos6Meses()[5].labelCurto);
   const [aba, setAba] = useState("vendas");
+  const [filtroTipo, setFiltroTipo] = useState("todos");
+  const [busca, setBusca] = useState("");
   const { addToast } = useToast();
 
   const carregarDados = useCallback(async () => {
     setLoading(true);
     try {
-      const [ords, clis, fats] = await Promise.all([listarOrdens(), listar({ tipo: "cliente" }), listarFaturas()]);
+      const [ords, clis, fats] = await Promise.all([listarOrdens(), listar(), listarFaturas()]);
       setOrdens(Array.isArray(ords) ? ords : ords?.ordens || []);
       setClientes(Array.isArray(clis) ? clis : clis?.data || []);
       setFaturas(Array.isArray(fats) ? fats : fats?.data || []);
@@ -160,6 +162,23 @@ export default function RelatoriosPage() {
     status: s, label: s.replace("_", " ").replace(/\b\w/g, l => l.toUpperCase()),
     quantidade: ordens.filter(o => (o.estado || o.status) === s).length,
   })), [ordens]);
+
+  const cadastrosFiltrados = useMemo(() => {
+    let lista = clientes;
+    if (filtroTipo !== "todos") lista = lista.filter((c) => c.tipo === filtroTipo);
+    if (busca.trim()) {
+      const b = busca.trim().toLowerCase();
+      lista = lista.filter((c) =>
+        [c.nome, c.empresa, c.nif, c.codigo, c.telefone, c.email].some((v) =>
+          String(v || "").toLowerCase().includes(b)
+        )
+      );
+    }
+    return lista;
+  }, [clientes, filtroTipo, busca]);
+
+  const totalClientes = useMemo(() => clientes.filter((c) => c.tipo === "cliente").length, [clientes]);
+  const totalFornecedores = useMemo(() => clientes.filter((c) => c.tipo === "fornecedor").length, [clientes]);
 
   return (
     <div className="space-y-5">
@@ -336,13 +355,37 @@ export default function RelatoriosPage() {
       {aba === "clientes" && (
         <Card>
           <CardHeader>
-            <CardTitle>Lista de Clientes</CardTitle>
+            <CardTitle>Cadastros (Clientes e Fornecedores)</CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+              <div className="flex gap-2">
+                {[
+                  { v: "todos", label: `Todos (${clientes.length})`, icon: "badge" },
+                  { v: "cliente", label: `Clientes (${totalClientes})`, icon: "person" },
+                  { v: "fornecedor", label: `Fornecedores (${totalFornecedores})`, icon: "local_shipping" },
+                ].map((f) => (
+                  <Button key={f.v} variant={filtroTipo === f.v ? "default" : "outline"} size="sm" onClick={() => setFiltroTipo(f.v)}>
+                    <Icon name={f.icon} className="text-sm" />
+                    {f.label}
+                  </Button>
+                ))}
+              </div>
+              <div className="relative w-full sm:w-64">
+                <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[18px]" />
+                <input
+                  className="pl-10 pr-4 py-2 bg-background border border-input rounded-full text-xs w-full focus:ring-2 focus:ring-primary/30 outline-none transition-all"
+                  placeholder="Buscar por nome, empresa, NIF, código..."
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                />
+              </div>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50">
+                    <th className="text-left px-4 py-3 text-[10px] font-bold text-muted-foreground uppercase">Tipo</th>
                     <th className="text-left px-4 py-3 text-[10px] font-bold text-muted-foreground uppercase">Nome</th>
                     <th className="text-left px-4 py-3 text-[10px] font-bold text-muted-foreground uppercase hidden sm:table-cell">Empresa</th>
                     <th className="text-left px-4 py-3 text-[10px] font-bold text-muted-foreground uppercase">NIF</th>
@@ -351,8 +394,14 @@ export default function RelatoriosPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {clientes.map((c, i) => (
+                  {cadastrosFiltrados.map((c, i) => (
                     <tr key={c.id || c.codigo || i} className="border-b border-border/20 hover:bg-muted/30 transition-colors">
+                      <td className="px-4 py-3">
+                        <Badge variant={c.tipo === "cliente" ? "info" : "secondary"} className="text-[10px]">
+                          <Icon name={c.tipo === "cliente" ? "person" : "local_shipping"} className="text-[10px] mr-0.5" />
+                          {c.tipo === "cliente" ? "Cliente" : "Fornecedor"}
+                        </Badge>
+                      </td>
                       <td className="px-4 py-3 font-medium text-foreground">{c.nome}</td>
                       <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{c.empresa || "—"}</td>
                       <td className="px-4 py-3 text-muted-foreground font-mono text-xs">{c.nif || "—"}</td>
@@ -362,8 +411,10 @@ export default function RelatoriosPage() {
                   ))}
                 </tbody>
               </table>
-              {clientes.length === 0 && (
-                <p className="text-center p-8 text-muted-foreground">Nenhum cliente encontrado</p>
+              {cadastrosFiltrados.length === 0 && (
+                <p className="text-center p-8 text-muted-foreground">
+                  {clientes.length === 0 ? "Nenhum cadastro encontrado" : "Nenhum resultado para os filtros escolhidos"}
+                </p>
               )}
             </div>
           </CardContent>
