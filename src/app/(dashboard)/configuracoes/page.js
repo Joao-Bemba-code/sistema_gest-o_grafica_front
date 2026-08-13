@@ -21,6 +21,7 @@ import {
   alterarEmail, alterarSenha,
 } from "@/services/configuracoes";
 import { baixarBackup } from "@/services/backup";
+import SyncConfig from "@/components/SyncConfig";
 
 const CONTRATO_TEMPLATE = ``;
 
@@ -395,6 +396,8 @@ export default function ConfiguracoesPage() {
               </p>
             </CardContent>
           </Card>
+
+          <SyncConfig />
         </div>
 
         <div className="space-y-6">
