@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/Toast";
 import { KPIGridSkeleton, CardSkeleton, ListSkeleton } from "@/components/Skeleton";
 import FornecedorSelect from "@/components/estoque/FornecedorSelect";
+import NumeroInput from "@/components/ui/NumeroInput";
 
 const inputCls =
   "w-full px-3 py-2.5 bg-background border border-input rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/30 transition-all";
@@ -557,7 +558,7 @@ export default function DashboardPage() {
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Quantidade *</label>
-              <input required type="number" min="1" step="any" value={reporForm.quantidade}
+              <NumeroInput required value={reporForm.quantidade}
                 onChange={(e) => setReporForm({ ...reporForm, quantidade: e.target.value })}
                 className={inputCls} placeholder="0" />
             </div>

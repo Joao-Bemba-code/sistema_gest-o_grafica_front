@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Icon from "@/components/Icon";
 import FornecedorSelect from "./FornecedorSelect";
+import NumeroInput from "@/components/ui/NumeroInput";
 import { inputCls, tiposEstoque, unidades, camposDeCategoria } from "@/lib/estoque";
 
 const tabs = [
@@ -29,7 +30,7 @@ function CampoEspecificacao({ campo, valor, onChange }) {
     return (
       <Campo label={rotulo} obrigatorio={obrigatorio}>
         <div className="flex items-center gap-2">
-          <input type="number" min="0" step="any" value={valor || ""} onChange={(e) => onChange(chave, e.target.value)} className={inputCls} placeholder="0" />
+          <NumeroInput value={valor || ""} onChange={(e) => onChange(chave, e.target.value)} className={inputCls} placeholder="0" />
           {sufixo}
         </div>
       </Campo>
@@ -155,7 +156,7 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
             ))}
 
             <Campo label="Quebra técnica (%)">
-              <input type="number" min="0" max="100" value={form.percentual_quebra} onChange={(e) => onChange("percentual_quebra", e.target.value)} className={inputCls} placeholder="Ex: 5" />
+              <NumeroInput value={form.percentual_quebra} onChange={(e) => onChange("percentual_quebra", e.target.value)} className={inputCls} placeholder="Ex: 5" />
             </Campo>
             <label className="flex items-center gap-3 p-3 bg-muted/50 rounded-xl self-end cursor-pointer sm:col-span-2">
               <input type="checkbox" checked={!!form.controla_lote} onChange={(e) => onChange("controla_lote", e.target.checked)} className="w-4 h-4 rounded accent-primary" />
@@ -173,19 +174,19 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
         {tab === "estoque" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Campo label="Estoque Mínimo">
-              <input type="number" min="0" value={form.estoque_min} onChange={(e) => onChange("estoque_min", e.target.value)} className={inputCls} placeholder="Ex: 500" />
+              <NumeroInput inteiro value={form.estoque_min} onChange={(e) => onChange("estoque_min", e.target.value)} className={inputCls} placeholder="Ex: 500" />
             </Campo>
             <Campo label="Estoque Máximo">
-              <input type="number" min="0" value={form.estoque_max} onChange={(e) => onChange("estoque_max", e.target.value)} className={inputCls} placeholder="Ex: 5000" />
+              <NumeroInput inteiro value={form.estoque_max} onChange={(e) => onChange("estoque_max", e.target.value)} className={inputCls} placeholder="Ex: 5000" />
             </Campo>
             <Campo label="Ponto de Pedido">
-              <input type="number" min="0" value={form.ponto_ressuprimento} onChange={(e) => onChange("ponto_ressuprimento", e.target.value)} className={inputCls} placeholder="Ex: 800" />
+              <NumeroInput inteiro value={form.ponto_ressuprimento} onChange={(e) => onChange("ponto_ressuprimento", e.target.value)} className={inputCls} placeholder="Ex: 800" />
             </Campo>
             <Campo label="Custo Unitário (Kz)">
-              <input type="number" min="0" value={form.custo_unit} onChange={(e) => onChange("custo_unit", e.target.value)} className={inputCls} placeholder="Ex: 45" />
+              <NumeroInput value={form.custo_unit} onChange={(e) => onChange("custo_unit", e.target.value)} className={inputCls} placeholder="Ex: 45" />
             </Campo>
             <Campo label="Margem (%)">
-              <input type="number" min="0" value={form.margem} onChange={(e) => onChange("margem", e.target.value)} className={inputCls} placeholder="Ex: 30" />
+              <NumeroInput value={form.margem} onChange={(e) => onChange("margem", e.target.value)} className={inputCls} placeholder="Ex: 30" />
             </Campo>
           </div>
         )}

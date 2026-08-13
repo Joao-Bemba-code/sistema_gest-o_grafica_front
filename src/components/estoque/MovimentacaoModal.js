@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import Icon from "@/components/Icon";
 import FornecedorSelect from "./FornecedorSelect";
+import NumeroInput from "@/components/ui/NumeroInput";
 import { inputCls, toNum } from "@/lib/estoque";
 
 const formVazio = {
@@ -131,9 +132,7 @@ export default function MovimentacaoModal({ open, item, tipo, onClose, onConfirm
             </div>
 
             <Campo label="Quantidade" obrigatorio>
-              <input
-                type="number"
-                min="1"
+              <NumeroInput
                 required
                 aria-required="true"
                 value={form.quantidade}

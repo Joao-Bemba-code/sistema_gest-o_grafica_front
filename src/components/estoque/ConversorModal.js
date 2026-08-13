@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Modal from "@/components/Modal";
 import Icon from "@/components/Icon";
+import NumeroInput from "@/components/ui/NumeroInput";
 
 const convVazio = {
   largura: "1000",
@@ -83,9 +84,7 @@ function Campo({ label, valor, onChange, hint }) {
         {label}
         {hint && <span className="ml-1 normal-case tracking-normal text-[9px] opacity-70">{hint}</span>}
       </label>
-      <input
-        type="number"
-        min="0"
+      <NumeroInput
         value={valor}
         onChange={(e) => onChange(e.target.value)}
         className="w-full bg-transparent text-on-surface font-mono text-lg focus:outline-none focus:ring-0 border-none p-0"

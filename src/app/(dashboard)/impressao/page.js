@@ -6,6 +6,7 @@ import Icon from "@/components/Icon";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import KpiCard from "@/components/ui/KpiCard";
 import { inputCls } from "@/lib/estoque";
+import NumeroInput from "@/components/ui/NumeroInput";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/Toast";
@@ -169,11 +170,11 @@ export default function ImpressaoPage() {
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Qtd Produzida *</label>
-              <input required type="number" value={form.produzido} onChange={(e) => setForm({ ...form, produzido: e.target.value })} className={inputCls} placeholder="0" />
+              <NumeroInput required value={form.produzido} onChange={(e) => setForm({ ...form, produzido: e.target.value })} className={inputCls} placeholder="0" />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Qtd Rejeitada</label>
-              <input type="number" value={form.rejeitado} onChange={(e) => setForm({ ...form, rejeitado: e.target.value })} className={inputCls} placeholder="0" />
+              <NumeroInput value={form.rejeitado} onChange={(e) => setForm({ ...form, rejeitado: e.target.value })} className={inputCls} placeholder="0" />
             </div>
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Observações</label>

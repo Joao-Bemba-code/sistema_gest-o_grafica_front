@@ -11,6 +11,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import { ListSkeleton } from "@/components/Skeleton";
 import { inputCls, entradasEspecificacao } from "@/lib/estoque";
+import NumeroInput from "@/components/ui/NumeroInput";
 import { listar, criar, atualizar, remover, mudarEstado } from "@/services/orcamentos";
 import { listar as listarClientes } from "@/services/clientes";
 import { listar as listarMateriais } from "@/services/materiais";
@@ -764,11 +765,11 @@ export default function OrcamentosPage() {
                   </div>
                   <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
                     {idx === 0 && <label className="text-[9px] font-semibold text-muted-foreground uppercase">Qtd *</label>}
-                    <input required type="number" min="1" value={it.quantidade} onChange={(e) => setItem(idx, "quantidade", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="0" />
+                    <NumeroInput required value={it.quantidade} onChange={(e) => setItem(idx, "quantidade", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="0" />
                   </div>
                   <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
                     {idx === 0 && <label className="text-[9px] font-semibold text-muted-foreground uppercase">{it.composto ? "Preço Venda/Un." : "Valor Unit. *"}</label>}
-                    <input required type="number" min="0" value={it.valorUnitario} onChange={(e) => setItem(idx, "valorUnitario", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="0" />
+                    <NumeroInput required value={it.valorUnitario} onChange={(e) => setItem(idx, "valorUnitario", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="0" />
                   </div>
                   <div className="col-span-3 sm:col-span-2 flex flex-col gap-1.5">
                     {idx === 0 && <label className="text-[9px] font-semibold text-muted-foreground uppercase">Total</label>}
@@ -817,7 +818,7 @@ export default function OrcamentosPage() {
                           </select>
                         </div>
                         <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
-                          <input type="number" min="0" step="any" value={m.quantidade} onChange={(e) => setItemMaterial(idx, mi, "quantidade", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="Qtd/un." />
+                          <NumeroInput value={m.quantidade} onChange={(e) => setItemMaterial(idx, mi, "quantidade", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="Qtd/un." />
                         </div>
                         <div className="col-span-3 sm:col-span-2 flex flex-col gap-1.5">
                           <div className="px-2.5 py-2 bg-muted border border-input rounded-lg text-xs text-muted-foreground">{formatKz(m.custo_unit || 0)}/{m.unidade || "un"}</div>
@@ -842,7 +843,7 @@ export default function OrcamentosPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 border-t border-border/40 pt-2.5">
                       <div className="flex flex-col gap-1.5">
                         <label className="text-[9px] font-semibold text-muted-foreground uppercase">Margem de lucro (%)</label>
-                        <input type="number" min="0" step="any" value={it.margem} onChange={(e) => setItem(idx, "margem", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="Ex: 40" />
+                        <NumeroInput value={it.margem} onChange={(e) => setItem(idx, "margem", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="Ex: 40" />
                       </div>
                       <div className="flex flex-col gap-1.5">
                         <label className="text-[9px] font-semibold text-muted-foreground uppercase">Preço calculado/un. (custo+margem)</label>
@@ -909,7 +910,7 @@ export default function OrcamentosPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">IVA (Kz) — Opcional</label>
-                <input type="number" min="0" name="iva" value={form.iva} onChange={(e) => setField("iva", e.target.value)} className={inputCls} placeholder="0" />
+                <NumeroInput name="iva" value={form.iva} onChange={(e) => setField("iva", e.target.value)} className={inputCls} placeholder="0" />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Prazo de Execução *</label>

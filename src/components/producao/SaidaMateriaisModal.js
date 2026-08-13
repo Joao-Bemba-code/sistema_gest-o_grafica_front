@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import Icon from "@/components/Icon";
 import { inputCls } from "@/lib/estoque";
+import NumeroInput from "@/components/ui/NumeroInput";
 
 const formVazio = {
   solicitado_por: "",
@@ -213,7 +214,7 @@ export default function SaidaMateriaisModal({ open, op, matPorId, materiais, onC
                     </option>
                   ))}
                 </select>
-                <input type="number" min="1" value={selQtd} onChange={(e) => setSelQtd(e.target.value)} className={`${inputCls} sm:w-32`} placeholder="Qtd." />
+                <NumeroInput value={selQtd} onChange={(e) => setSelQtd(e.target.value)} className={`${inputCls} sm:w-32`} placeholder="Qtd." />
                 <input value={selLote} onChange={(e) => setSelLote(e.target.value)} className={`${inputCls} sm:w-40`} placeholder="Lote (opcional)" />
                 <Button type="button" size="sm" onClick={adicionarExtra}><Icon name="add" className="text-lg" /> Adicionar</Button>
               </div>

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
 import { inputCls } from "@/lib/estoque";
+import NumeroInput from "@/components/ui/NumeroInput";
 import { listarOrdens, criarOrdem, libertarMateriais } from "@/services/producao";
 import { getUsuario } from "@/services/auth";
 import SaidaMateriaisModal from "@/components/producao/SaidaMateriaisModal";
@@ -343,7 +344,7 @@ export default function OrdensProducaoPage() {
                     </option>
                   ))}
                 </select>
-                <input name="qtdSel" type="number" min="1" value={qtdSel} onChange={(e) => setQtdSel(e.target.value)} className={`${inputCls} sm:w-32`} placeholder="Qtd." />
+                <NumeroInput name="qtdSel" value={qtdSel} onChange={(e) => setQtdSel(e.target.value)} className={`${inputCls} sm:w-32`} placeholder="Qtd." />
                 <input name="loteSel" value={loteSel} onChange={(e) => setLoteSel(e.target.value)} className={`${inputCls} sm:w-40`} placeholder="Lote (opcional)" />
                 <Button type="button" size="sm" onClick={adicionarItem}><Icon name="add" className="text-lg" /> Adicionar</Button>
               </div>

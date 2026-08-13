@@ -6,6 +6,7 @@ import Icon from "@/components/Icon";
 import { Card, CardContent } from "@/components/ui/Card";
 import KpiCard from "@/components/ui/KpiCard";
 import { inputCls } from "@/lib/estoque";
+import NumeroInput from "@/components/ui/NumeroInput";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/Toast";
@@ -396,7 +397,7 @@ export default function FaturacaoPage() {
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">IVA (%)</label>
-              <input type="number" min="0" value={faturaForm.iva} onChange={(e) => setFaturaForm({ ...faturaForm, iva: e.target.value })} className={inputCls} />
+              <NumeroInput value={faturaForm.iva} onChange={(e) => setFaturaForm({ ...faturaForm, iva: e.target.value })} className={inputCls} />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Método de Pagamento</label>
@@ -407,7 +408,7 @@ export default function FaturacaoPage() {
             {faturaForm.tipo !== "factura_recibo" && (
               <div className="flex flex-col gap-1.5">
                 <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Valor Pago Agora</label>
-                <input type="number" min="0" step="0.01" value={faturaForm.valor_pago} onChange={(e) => setFaturaForm({ ...faturaForm, valor_pago: e.target.value })} className={inputCls} placeholder="0,00" />
+                <NumeroInput value={faturaForm.valor_pago} onChange={(e) => setFaturaForm({ ...faturaForm, valor_pago: e.target.value })} className={inputCls} placeholder="0,00" />
               </div>
             )}
           </div>
@@ -425,11 +426,11 @@ export default function FaturacaoPage() {
                 </div>
                 <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
                   {idx === 0 && <label className="text-[9px] font-semibold text-muted-foreground uppercase">Qtd *</label>}
-                  <input required type="number" min="1" value={it.quantidade} onChange={(e) => setFaturaItem(idx, "quantidade", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="0" />
+                  <NumeroInput required value={it.quantidade} onChange={(e) => setFaturaItem(idx, "quantidade", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="0" />
                 </div>
                 <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
                   {idx === 0 && <label className="text-[9px] font-semibold text-muted-foreground uppercase">Valor Unit. *</label>}
-                  <input required type="number" min="0" value={it.preco_unit} onChange={(e) => setFaturaItem(idx, "preco_unit", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="0" />
+                  <NumeroInput required value={it.preco_unit} onChange={(e) => setFaturaItem(idx, "preco_unit", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="0" />
                 </div>
                 <div className="col-span-3 sm:col-span-2 flex flex-col gap-1.5">
                   {idx === 0 && <label className="text-[9px] font-semibold text-muted-foreground uppercase">Total</label>}
@@ -480,8 +481,7 @@ export default function FaturacaoPage() {
                     <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Valor a pagar agora</label>
                     <div className="flex items-center rounded-xl border border-input bg-background overflow-hidden focus-within:ring-2 focus-within:ring-primary/30">
                       <span className="pl-3 pr-1 text-sm font-semibold text-muted-foreground">Kz</span>
-                      <input
-                        type="number" min="0" step="0.01"
+                      <NumeroInput
                         value={pagamentoExtra}
                         onChange={(e) => setPagamentoExtra(e.target.value)}
                         className="w-full h-11 px-2 text-sm outline-none bg-transparent"
