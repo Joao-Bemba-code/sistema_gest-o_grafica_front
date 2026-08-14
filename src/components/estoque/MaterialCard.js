@@ -59,7 +59,7 @@ function BotaoIcone({ icon, label, onClick, critico, cor }) {
   );
 }
 
-function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEditar, onFichaPdf }) {
+function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEditar, onFichaPdf, onPedido }) {
   const [menuPos, setMenuPos] = useState(null);
   const btnRef = useRef(null);
   const menuRef = useRef(null);
@@ -161,6 +161,7 @@ function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEdita
                   className="fixed z-[90] w-44 obsidian-glass rounded-xl border overflow-hidden animate-scale-in shadow-xl"
                   style={{ top: menuPos.top, right: menuPos.right }}
                 >
+                  <MenuItem icon="shopping_cart" label="Pedido ao fornecedor" onClick={() => { fecharMenu(); onPedido(item); }} />
                   <MenuItem icon="lock" label="Reservas" onClick={() => { fecharMenu(); onReservas(item); }} />
                   <MenuItem icon="edit" label="Editar" onClick={() => { fecharMenu(); onEditar(item); }} />
                   <MenuItem icon="print" label="Ficha PDF" onClick={() => { fecharMenu(); onFichaPdf(item); }} />

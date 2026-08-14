@@ -14,10 +14,16 @@ import ConversorModal from "@/components/estoque/ConversorModal";
 import ReservasModal from "@/components/estoque/ReservasModal";
 import EditMaterialModal from "@/components/estoque/EditMaterialModal";
 import EmptyState from "@/components/estoque/EmptyState";
+import PedidosModal from "@/components/estoque/PedidosModal";
+import PedidoFormModal from "@/components/estoque/PedidoFormModal";
+import PedidoReceberModal from "@/components/estoque/PedidoReceberModal";
 import { grupos, normalizarGrupo } from "@/lib/estoque";
-import { gerarFichaMaterialPDF } from "@/lib/estoquePdf";
+import { gerarFichaMaterialPDF, gerarPedidoPDF } from "@/lib/estoquePdf";
+import { listar as listarPedidos, criar as criarPedido, cancelar as cancelarPedido, receber as receberPedido } from "@/services/pedidos";
+import { useToast } from "@/components/Toast";
 
 export default function EstoquePage() {
+  const { addToast } = useToast();
   const {
     materiais, categorias, fornecedores, clientes, org, formatos,
     carregando, erro, carregar, nomeUsuario, totais, alertas,
@@ -25,6 +31,12 @@ export default function EstoquePage() {
     carregarReservas, cancelarReservaDe,
   } = useEstoque();
   const movs = useMovimentacoes({ org });
+
+  const [pedidos, setPedidos] = useState([]);
+  const [pedOpen, setPedOpen] = useState(false);
+  const [pedCarregando, setPedCarregando] = useState(false);
+  const [novoPedido, setNovoPedido] = useState({ open: false, materialInicial: null, sessao: 0 });
+  const [receberPedido, setReceberPedido] = useState({ open: false, pedido: null, sessao: 0 });
 
   const [filtro, setFiltro] = useState("todos");
   const [mov, setMov] = useState({ open: false, item: null, tipo: "entrada" });
@@ -97,6 +109,76 @@ export default function EstoquePage() {
   );
 
   const fichaPdf = useCallback((item) => gerarFichaMaterialPDF(item, org), [org]);
+  const pedidoPdf = useCallback((pedido) => gerarPedidoPDF(pedido, org), [org]);
+
+  const recarregarPedidos = useCallback(async () => {
+    try {
+      const data = await listarPedidos();
+      setPedidos(Array.isArray(data) ? data : []);
+    } catch {
+      // silencioso: o modal mostra o estado atual
+    }
+  }, []);
+
+  const abrirPedidos = useCallback(async () => {
+    setPedOpen(true);
+    setPedCarregando(true);
+    try {
+      const data = await listarPedidos();
+      setPedidos(Array.isArray(data) ? data : []);
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao carregar pedidos", "error");
+    } finally {
+      setPedCarregando(false);
+    }
+  }, [addToast]);
+
+  const abrirNovoPedido = useCallback((item = null) => {
+    setNovoPedido((s) => ({ open: true, materialInicial: item, sessao: s.sessao + 1 }));
+  }, []);
+  const fecharNovoPedido = useCallback(() => setNovoPedido((s) => ({ ...s, open: false })), []);
+
+  const confirmarCriacao = useCallback(async (dados) => {
+    try {
+      await criarPedido(dados);
+      await recarregarPedidos();
+      addToast("Pedido de compra criado", "success");
+      return true;
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao criar pedido", "error");
+      return false;
+    }
+  }, [recarregarPedidos, addToast]);
+
+  const abrirRecebimento = useCallback((pedido) => {
+    setReceberPedido((s) => ({ open: true, pedido, sessao: s.sessao + 1 }));
+  }, []);
+  const fecharRecebimento = useCallback(() => setReceberPedido((s) => ({ ...s, open: false })), []);
+
+  const confirmarRecebimento = useCallback(async (itens) => {
+    const pedido = receberPedido.pedido;
+    if (!pedido) return false;
+    try {
+      await receberPedido(pedido.id, itens);
+      await Promise.all([recarregarPedidos(), carregar()]);
+      addToast("Entrada registada — stock atualizado", "success");
+      return true;
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao registar entrada", "error");
+      return false;
+    }
+  }, [receberPedido.pedido, recarregarPedidos, carregar, addToast]);
+
+  const cancelarPedidoAtual = useCallback(async (pedido) => {
+    if (!window.confirm(`Cancelar o pedido ${pedido.numero}?`)) return;
+    try {
+      await cancelarPedido(pedido.id);
+      await recarregarPedidos();
+      addToast("Pedido cancelado", "success");
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao cancelar pedido", "error");
+    }
+  }, [recarregarPedidos, addToast]);
 
   if (erro && materiais.length === 0) {
     return (
@@ -135,6 +217,9 @@ export default function EstoquePage() {
           <p className="text-primary mt-1 font-mono text-xs uppercase tracking-widest">Visão geral e gestão de inventário // {org?.sigla || org?.nome || "T-001"}</p>
         </div>
         <div className="flex flex-wrap gap-3">
+          <button onClick={abrirPedidos} className="bg-surface-variant text-on-surface border border-outline-variant px-4 py-2 rounded font-mono flex items-center gap-2 hover:border-primary hover:text-primary transition-all text-[11px] uppercase tracking-wider">
+            <Icon name="shopping_cart" className="text-[16px]" /> Pedidos
+          </button>
           <button onClick={movs.abrir} className="bg-surface-variant text-on-surface border border-outline-variant px-4 py-2 rounded font-mono flex items-center gap-2 hover:border-primary hover:text-primary transition-all text-[11px] uppercase tracking-wider">
             <Icon name="sync_alt" className="text-[16px]" /> Movimentações
           </button>
@@ -158,9 +243,16 @@ export default function EstoquePage() {
             <p className="text-sm font-bold text-error">Materiais abaixo do ponto de pedido</p>
             <div className="flex flex-wrap gap-2 mt-2">
               {alertas.map((a) => (
-                <span key={a.id} className="px-2.5 py-1 bg-error/10 text-error text-[10px] font-mono font-bold rounded-full border border-error/20">
-                  {a.nome}: {a.estoque_disponivel}/{a.ponto_ressuprimento || a.estoque_min} {a.unidade}
-                </span>
+                <div key={a.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-error/10 text-error text-[10px] font-mono font-bold rounded-full border border-error/20">
+                  <span>{a.nome}: {a.estoque_disponivel}/{a.ponto_ressuprimento || a.estoque_min} {a.unidade}</span>
+                  <button
+                    onClick={() => abrirNovoPedido(a)}
+                    className="ml-1 px-1.5 py-0.5 rounded-full bg-error/20 hover:bg-error hover:text-white transition-colors"
+                    title={`Criar pedido de compra para ${a.nome}`}
+                  >
+                    <Icon name="add_shopping_cart" className="text-[12px]" /> Pedir
+                  </button>
+                </div>
               ))}
             </div>
           </div>
@@ -219,6 +311,7 @@ export default function EstoquePage() {
                       onReservas={abrirReservas}
                       onEditar={abrirEdicao}
                       onFichaPdf={fichaPdf}
+                      onPedido={abrirNovoPedido}
                     />
                   ))}
                 </div>
@@ -255,6 +348,36 @@ export default function EstoquePage() {
         setBusca={movs.setBusca}
         gerarPDF={movs.gerarPDF}
         pdfId={movs.pdfId}
+      />
+
+      <PedidosModal
+        open={pedOpen}
+        onClose={() => setPedOpen(false)}
+        pedidos={pedidos}
+        carregando={pedCarregando}
+        onNovo={() => abrirNovoPedido()}
+        onPdf={pedidoPdf}
+        onReceber={abrirRecebimento}
+        onCancelar={cancelarPedidoAtual}
+      />
+
+      <PedidoFormModal
+        key={`novo-${novoPedido.sessao}`}
+        open={novoPedido.open}
+        onClose={fecharNovoPedido}
+        fornecedores={fornecedores}
+        materiais={materiais}
+        materialInicial={novoPedido.materialInicial}
+        nomeUsuario={nomeUsuario}
+        onConfirm={confirmarCriacao}
+      />
+
+      <PedidoReceberModal
+        key={`receber-${receberPedido.sessao}`}
+        open={receberPedido.open}
+        pedido={receberPedido.pedido}
+        onClose={fecharRecebimento}
+        onConfirm={confirmarRecebimento}
       />
 
       <ConversorModal

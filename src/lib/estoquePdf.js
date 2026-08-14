@@ -219,3 +219,80 @@ export async function gerarFichaMaterialPDF(mat, org = {}) {
   doc.text(`Documento gerado por SIGRAF — ${new Date().toLocaleDateString("pt-BR")}`, cx, 285, { align: "center" });
   doc.save(`Ficha_Material_${(mat.codigo || mat.id || "Material").replace(/[^\w-]+/g, "_")}.pdf`);
 }
+
+export async function gerarPedidoPDF(pedido, org = {}) {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const pw = doc.internal.pageSize.getWidth();
+  const cx = pw / 2;
+  const { linhaY } = await desenharCabecalho(doc, org, "Pedido de Compra");
+
+  const headStyles = { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 };
+  const bodyStyles = { fontSize: 8, textColor: [50, 50, 50] };
+
+  const numero = pedido.numero || `PED-${pedido.id || ""}`;
+  const data = pedido.data_pedido ? new Date(pedido.data_pedido) : null;
+  const dataStr = data && !isNaN(data.getTime()) ? data.toLocaleDateString("pt-BR") : "—";
+  const itens = (pedido.itens || []).map((i) => ({
+    codigo: i.codigo || "—",
+    nome: i.nome || "—",
+    unidade: i.unidade || "un",
+    quantidade: Number(i.quantidade) || 0,
+    preco_unit: Number(i.preco_unit) || 0,
+    total: Number(i.total) || 0,
+  }));
+  const total = itens.reduce((s, i) => s + i.total, 0);
+
+  doc.autoTable({
+    startY: linhaY + 6,
+    head: [["", ""]],
+    body: [
+      ["Pedido nº", numero],
+      ["Fornecedor", pedido.fornecedor_nome || "—"],
+      ["Data do pedido", dataStr],
+      ["Solicitado por", pedido.solicitado_por || "—"],
+    ],
+    theme: "plain", styles: { fontSize: 9, cellPadding: 1.5 },
+    columnStyles: { 0: { cellWidth: 40, fontStyle: "bold", textColor: [15, 118, 110] }, 1: { cellWidth: 128 } },
+    margin: { left: 14, right: 14 },
+  });
+
+  doc.autoTable({
+    startY: doc.lastAutoTable.finalY + 6,
+    head: [["Código", "Material", "Unid.", "Quantidade", "Preço Unit.", "Total"]],
+    body: itens.map((i) => [
+      i.codigo,
+      i.nome,
+      i.unidade,
+      String(i.quantidade),
+      formatKz(i.preco_unit),
+      formatKz(i.total),
+    ]),
+    foot: [["", "", "", "", "Total", formatKz(total)]],
+    theme: "grid", headStyles, bodyStyles,
+    footStyles: { fillColor: [236, 248, 245], textColor: [15, 118, 110], fontStyle: "bold", fontSize: 9 },
+    columnStyles: {
+      0: { cellWidth: 24 },
+      1: { cellWidth: 62 },
+      2: { cellWidth: 16, halign: "center" },
+      3: { cellWidth: 30, halign: "right" },
+      4: { cellWidth: 30, halign: "right" },
+      5: { cellWidth: 30, halign: "right" },
+    },
+    margin: { left: 14, right: 14 },
+  });
+
+  if (pedido.observacoes) {
+    const yObs = doc.lastAutoTable.finalY + 10;
+    doc.setFontSize(9); doc.setFont("helvetica", "bold");
+    doc.setTextColor(24, 33, 48);
+    doc.text("Observações:", 14, yObs);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(70, 70, 70);
+    const obsLines = doc.splitTextToSize(String(pedido.observacoes), pw - 28);
+    doc.text(obsLines, 14, yObs + 5);
+  }
+
+  doc.setTextColor(180, 180, 180); doc.setFontSize(7);
+  doc.text(`Documento gerado por SIGRAF — ${new Date().toLocaleDateString("pt-BR")}`, cx, 285, { align: "center" });
+  doc.save(`Pedido_${numero.replace(/[^\w-]+/g, "_")}.pdf`);
+}
