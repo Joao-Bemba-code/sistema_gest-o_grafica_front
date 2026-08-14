@@ -30,6 +30,16 @@ export async function guardarSeguranca(dados) {
   return data;
 }
 
+export async function buscarEmail() {
+  const { data } = await api.get("/configuracoes/email");
+  return data;
+}
+
+export async function guardarEmail(dados) {
+  const { data } = await api.put("/configuracoes/email", dados);
+  return data;
+}
+
 export async function uploadLogo(file) {
   const form = new FormData();
   form.append("logo", file);
