@@ -6,5 +6,4 @@ contextBridge.exposeInMainWorld("sigrafDesktop", {
   setConfig: (cfg) => ipcRenderer.invoke("desktop:set-config", cfg),
   setSyncConfig: (cfg) => ipcRenderer.invoke("desktop:set-sync", cfg),
   syncNow: () => ipcRenderer.invoke("desktop:sync-now"),
-  enviarMailto: (url) => ipcRenderer.invoke("desktop:mailto", url),
 });

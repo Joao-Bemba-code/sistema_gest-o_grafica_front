@@ -22,7 +22,7 @@ function estadoBadge(p) {
   return <Badge variant={base.variant}>{base.label}</Badge>;
 }
 
-export default function PedidosModal({ open, onClose, pedidos, carregando, onNovo, onPdf, onEmail, onReceber, onCancelar }) {
+export default function PedidosModal({ open, onClose, pedidos, carregando, onNovo, onPdf, onReceber, onCancelar }) {
   const [busca, setBusca] = useState("");
   const termo = busca.trim().toLowerCase();
   const filtrados = termo
@@ -89,7 +89,6 @@ export default function PedidosModal({ open, onClose, pedidos, carregando, onNov
                       <div className="min-w-0">
                         <p className="text-sm font-bold text-foreground">{p.numero} <span className="text-muted-foreground font-medium">· {dataStr}</span></p>
                         <p className="text-xs text-muted-foreground truncate">Fornecedor: <strong className="text-foreground">{p.fornecedor_nome}</strong></p>
-                        {p.email && <p className="text-[11px] text-muted-foreground truncate"><Icon name="mail" className="text-[12px] inline align-text-bottom mr-0.5" />{p.email}</p>}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -117,11 +116,6 @@ export default function PedidosModal({ open, onClose, pedidos, carregando, onNov
                     <Button size="sm" variant="outline" onClick={() => onPdf(p)}>
                       <Icon name="print" className="text-base" /> PDF
                     </Button>
-                    {onEmail && (
-                      <Button size="sm" variant="outline" onClick={() => onEmail(p)}>
-                        <Icon name="mail" className="text-base" /> Email
-                      </Button>
-                    )}
                     {p.estado === "enviado" && (
                       <Button size="sm" onClick={() => onReceber(p)}>
                         <Icon name="download" className="text-base" /> Registar Entrada

@@ -172,7 +172,6 @@ async function aplicarMigracoes(sequelize) {
   await adicionar("orcamento", "especificacao_json", "TEXT");
   await adicionar("orcamento_item", "composto", "TINYINT(1) DEFAULT 0");
   await adicionar("orcamento_item", "margem", "DECIMAL(12,2) DEFAULT 0");
-  await adicionar("pedido", "email", "TEXT");
 }
 
 async function iniciarServidor(porta) {

@@ -24,7 +24,6 @@ export default function PedidoFormModal({ open, onClose, fornecedores, materiais
   const inicial = materialInicial || {};
   const [form, setForm] = useState(() => ({
     fornecedor: inicial.fornecedor || "",
-    email: inicial.email || "",
     solicitado_por: nomeUsuario || "",
     observacoes: "",
     itens: [
@@ -58,15 +57,6 @@ export default function PedidoFormModal({ open, onClose, fornecedores, materiais
     if (mat && (toNum(mat.custo_unit) > 0)) setItem(idx, "preco_unit", String(toNum(mat.custo_unit)));
   };
 
-  const trocarFornecedor = (nome) => {
-    const forn = fornecedores.find((f) => String(f.nome).toLowerCase() === String(nome).toLowerCase());
-    setForm((f) => ({
-      ...f,
-      fornecedor: nome,
-      email: forn?.email || f.email,
-    }));
-  };
-
   const valida = () => {
     if (!String(form.fornecedor || "").trim()) { setErro("Informe o fornecedor do pedido"); return false; }
     const validos = form.itens.filter((i) => i.material_id && toNum(i.quantidade) > 0);
@@ -90,7 +80,6 @@ export default function PedidoFormModal({ open, onClose, fornecedores, materiais
     const ok = await onConfirm({
       fornecedor_id: fornecedor?.id || null,
       fornecedor_nome: fornecedorNome,
-      email: String(form.email || "").trim(),
       solicitado_por: form.solicitado_por,
       observacoes: form.observacoes,
       itens,
@@ -120,23 +109,12 @@ export default function PedidoFormModal({ open, onClose, fornecedores, materiais
           <Campo label="Fornecedor" obrigatorio>
             <FornecedorSelect
               value={form.fornecedor}
-              onChange={trocarFornecedor}
+              onChange={(v) => setForm((f) => ({ ...f, fornecedor: v }))}
               fornecedores={fornecedores}
               placeholder="Procurar fornecedor ou escrever novo..."
               required
             />
           </Campo>
-          <Campo label="Email do fornecedor">
-            <input
-              type="email"
-              value={form.email}
-              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-              className={inputCls}
-              placeholder="fornecedor@email.com"
-            />
-          </Campo>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Campo label="Solicitado por">
             <input value={form.solicitado_por} onChange={(e) => setForm((f) => ({ ...f, solicitado_por: e.target.value }))} className={inputCls} placeholder="Responsável pelo pedido" />
           </Campo>

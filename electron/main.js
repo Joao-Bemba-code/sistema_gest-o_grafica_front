@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell } = require("electron");
+const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
 const fs = require("fs");
 
@@ -72,13 +72,6 @@ ipcMain.handle("desktop:set-sync", (_event, cfg) => {
     sync_email: cfg.sync_email || "",
     sync_senha: cfg.sync_senha || "",
   });
-  return true;
-});
-
-ipcMain.handle("desktop:mailto", (_event, url) => {
-  if (typeof url === "string" && url.startsWith("mailto:")) {
-    shell.openExternal(url);
-  }
   return true;
 });
 

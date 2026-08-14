@@ -220,7 +220,7 @@ export async function gerarFichaMaterialPDF(mat, org = {}) {
   doc.save(`Ficha_Material_${(mat.codigo || mat.id || "Material").replace(/[^\w-]+/g, "_")}.pdf`);
 }
 
-export async function gerarPedidoPDF(pedido, org = {}, opcoes = {}) {
+export async function gerarPedidoPDF(pedido, org = {}) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
   const cx = pw / 2;
@@ -294,10 +294,5 @@ export async function gerarPedidoPDF(pedido, org = {}, opcoes = {}) {
 
   doc.setTextColor(180, 180, 180); doc.setFontSize(7);
   doc.text(`Documento gerado por SIGRAF — ${new Date().toLocaleDateString("pt-BR")}`, cx, 285, { align: "center" });
-
-  const nome = `Pedido_${numero.replace(/[^\w-]+/g, "_")}.pdf`;
-  if (opcoes.retornarBase64) {
-    return { base64: doc.output("datauristring"), nome };
-  }
-  doc.save(nome);
+  doc.save(`Pedido_${numero.replace(/[^\w-]+/g, "_")}.pdf`);
 }

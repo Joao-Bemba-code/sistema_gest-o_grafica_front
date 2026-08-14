@@ -17,9 +17,9 @@ import EmptyState from "@/components/estoque/EmptyState";
 import PedidosModal from "@/components/estoque/PedidosModal";
 import PedidoFormModal from "@/components/estoque/PedidoFormModal";
 import PedidoReceberModal from "@/components/estoque/PedidoReceberModal";
-import { grupos, normalizarGrupo, formatKz } from "@/lib/estoque";
+import { grupos, normalizarGrupo } from "@/lib/estoque";
 import { gerarFichaMaterialPDF, gerarPedidoPDF } from "@/lib/estoquePdf";
-import { listar as listarPedidos, criar as criarPedido, cancelar as cancelarPedido, receber as apiReceberPedido } from "@/services/pedidos";
+import { listar as listarPedidos, criar as criarPedido, cancelar as cancelarPedido, receber as receberPedido } from "@/services/pedidos";
 import { useToast } from "@/components/Toast";
 
 export default function EstoquePage() {
@@ -111,44 +111,6 @@ export default function EstoquePage() {
   const fichaPdf = useCallback((item) => gerarFichaMaterialPDF(item, org), [org]);
   const pedidoPdf = useCallback((pedido) => gerarPedidoPDF(pedido, org), [org]);
 
-  const enviarEmailPedido = useCallback((pedido) => {
-    const para = String(pedido.email || "").trim();
-    if (!para) {
-      return { mensagem: "Fornecedor sem email registado — preencha o email no cadastro do fornecedor", erro: true };
-    }
-    const linhas = (pedido.itens || []).map(
-      (i) => `${i.codigo || "—"} | ${i.nome || "—"} | ${i.unidade || "un"} | Qtd: ${Number(i.quantidade) || 0} | ${formatKz(Number(i.preco_unit) || 0)} | ${formatKz(Number(i.total) || 0)}`
-    );
-    const corpo = [
-      `Pedido de Compra ${pedido.numero}`,
-      `Fornecedor: ${pedido.fornecedor_nome || "—"}`,
-      ...(pedido.solicitado_por ? [`Solicitado por: ${pedido.solicitado_por}`] : []),
-      "",
-      ...linhas,
-      "",
-      `Total: ${formatKz(Number(pedido.total) || 0)}`,
-      ...(pedido.observacoes ? [`Observações: ${pedido.observacoes}`] : []),
-    ].join("\n");
-    const assunto = `Pedido de Compra ${pedido.numero} — ${pedido.fornecedor_nome || "Fornecedor"}`;
-    const url = `mailto:${para}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
-    if (typeof window !== "undefined") {
-      if (window.sigrafDesktop?.enviarMailto) {
-        window.sigrafDesktop.enviarMailto(url);
-      } else {
-        window.location.href = url;
-      }
-    }
-    return { mensagem: "Email aberto no seu programa de email — verifique e envie", erro: false };
-  }, []);
-
-  const reenviarEmailPedido = useCallback(
-    (pedido) => {
-      const resultado = enviarEmailPedido(pedido);
-      addToast(resultado.mensagem, resultado.erro ? "warning" : "success", resultado.erro ? 6000 : 4000);
-    },
-    [enviarEmailPedido, addToast]
-  );
-
   const recarregarPedidos = useCallback(async () => {
     try {
       const data = await listarPedidos();
@@ -197,7 +159,7 @@ export default function EstoquePage() {
     const pedido = receberPedido.pedido;
     if (!pedido) return false;
     try {
-      await apiReceberPedido(pedido.id, itens);
+      await receberPedido(pedido.id, itens);
       await Promise.all([recarregarPedidos(), carregar()]);
       addToast("Entrada registada — stock atualizado", "success");
       return true;
@@ -395,7 +357,6 @@ export default function EstoquePage() {
         carregando={pedCarregando}
         onNovo={() => abrirNovoPedido()}
         onPdf={pedidoPdf}
-        onEmail={reenviarEmailPedido}
         onReceber={abrirRecebimento}
         onCancelar={cancelarPedidoAtual}
       />
