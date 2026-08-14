@@ -96,6 +96,7 @@ export default function ConfiguracoesPage() {
   const { dark, toggleTheme } = useTheme();
   const { addToast } = useToast() || {};
   const logoRef = useRef();
+  const desktop = typeof window !== "undefined" && !!window.sigrafDesktop;
 
   const [carregando, setCarregando] = useState(true);
   const [org, setOrg] = useState({ nome: "", sigla: "", endereco: "", telefone: "", email: "", nif: "", website: "", logo_url: "", template_contrato: CONTRATO_TEMPLATE });
@@ -369,33 +370,35 @@ export default function ConfiguracoesPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <SectionHeader icon="archive" title="Backup e Restauro" desc="Cópia de segurança dos dados" />
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-xs text-muted-foreground">
-                Baixa um ficheiro ZIP com toda a base de dados e ficheiros (uploads). Guarda-o num local seguro
-                (pen, disco externo ou nuvem) para recuperares os dados em caso de avaria ou reinstalação.
-              </p>
-              <div className="flex items-center gap-3 rounded-xl border bg-muted/30 p-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                  <Icon name="download" className="text-primary" />
+          {desktop && (
+            <Card>
+              <CardHeader>
+                <SectionHeader icon="archive" title="Backup e Restauro" desc="Cópia de segurança dos dados" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-xs text-muted-foreground">
+                  Baixa um ficheiro ZIP com toda a base de dados e ficheiros (uploads). Guarda-o num local seguro
+                  (pen, disco externo ou nuvem) para recuperares os dados em caso de avaria ou reinstalação.
+                </p>
+                <div className="flex items-center gap-3 rounded-xl border bg-muted/30 p-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                    <Icon name="download" className="text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground">Backup completo</p>
+                    <p className="text-[11px] text-muted-foreground">Base de dados + uploads • em formato ZIP</p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-foreground">Backup completo</p>
-                  <p className="text-[11px] text-muted-foreground">Base de dados + uploads • em formato ZIP</p>
-                </div>
-              </div>
-              <Button className="w-full" onClick={handleBaixarBackup} loading={baixando}>
-                <Icon name="archive" className="text-sm" />
-                {baixando ? "A gerar backup..." : "Baixar Backup (ZIP)"}
-              </Button>
-              <p className="text-[10px] text-muted-foreground">
-                O sistema também cria backups automáticos em cada arranque (guardados em %APPDATA%\sigraf-desktop\backups).
-              </p>
-            </CardContent>
-          </Card>
+                <Button className="w-full" onClick={handleBaixarBackup} loading={baixando}>
+                  <Icon name="archive" className="text-sm" />
+                  {baixando ? "A gerar backup..." : "Baixar Backup (ZIP)"}
+                </Button>
+                <p className="text-[10px] text-muted-foreground">
+                  O sistema também cria backups automáticos em cada arranque (guardados em %APPDATA%\sigraf-desktop\backups).
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           <SyncConfig />
         </div>

@@ -15,6 +15,18 @@ api.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
     const token = window.sessionStorage.getItem("sigraf_token");
     if (token) config.headers.Authorization = `Bearer ${token}`;
+
+    const rota = config.url || "";
+    const metodo = (config.method || "get").toLowerCase();
+    const ehEscrita = ["post", "put", "patch", "delete"].includes(metodo);
+    const permitida = /^\/auth\/(login|registrar)/.test(rota);
+    if (ehEscrita && !window.sigrafDesktop && !permitida) {
+      const erro = new Error(
+        "Modo leitura: a versão web só permite consultar dados e gerar PDF. As alterações são feitas na aplicação desktop."
+      );
+      erro.response = { status: 403, data: { erro: erro.message } };
+      return Promise.reject(erro);
+    }
   }
   return config;
 });

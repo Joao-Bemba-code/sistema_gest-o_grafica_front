@@ -27,7 +27,7 @@ function pedirJson(baseUrl, caminho, method, corpo, token) {
         ...(token ? { Authorization: "Bearer " + token } : {}),
         ...(payload ? { "Content-Length": Buffer.byteLength(payload) } : {}),
       },
-      timeout: 120000,
+      timeout: 300000,
     };
     const req = lib.request(options, (res) => {
       let dados = "";
@@ -165,6 +165,8 @@ async function sincronizar(config) {
     qualidades,
     reservas,
     faturacaoes,
+    pedidos,
+    pedido_itens,
     sequencias,
   ] = await Promise.all([
     d(models.Categoria),
@@ -182,6 +184,8 @@ async function sincronizar(config) {
     d(models.Qualidade),
     d(models.ReservaEstoque),
     d(models.Faturacao),
+    d(models.Pedido),
+    d(models.PedidoItem),
     d(models.Sequencia),
   ]);
 
@@ -213,6 +217,8 @@ async function sincronizar(config) {
       qualidades,
       reservas,
       faturacaoes,
+      pedidos,
+      pedido_itens,
       sequencias,
     },
     login.token
@@ -239,6 +245,8 @@ async function sincronizar(config) {
   await mesclarFilhosLocal(models.Qualidade, remoto.qualidades, localOrgId);
   await mesclarOrgLocal(models.ReservaEstoque, remoto.reservas, localOrgId);
   await mesclarOrgLocal(models.Faturacao, remoto.faturacaoes, localOrgId);
+  await mesclarOrgLocal(models.Pedido, remoto.pedidos, localOrgId);
+  await mesclarFilhosLocal(models.PedidoItem, remoto.pedido_itens);
   await mesclarSequenciaLocal(models.Sequencia, remoto.sequencias, localOrgId);
 
   return { ok: true, mensagem: "Sincronização concluída (ida e volta)" };

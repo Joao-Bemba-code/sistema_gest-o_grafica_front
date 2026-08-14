@@ -19,7 +19,7 @@ import PedidoFormModal from "@/components/estoque/PedidoFormModal";
 import PedidoReceberModal from "@/components/estoque/PedidoReceberModal";
 import { grupos, normalizarGrupo } from "@/lib/estoque";
 import { gerarFichaMaterialPDF, gerarPedidoPDF } from "@/lib/estoquePdf";
-import { listar as listarPedidos, criar as criarPedido, cancelar as cancelarPedido, receber as receberPedido } from "@/services/pedidos";
+import { listar as listarPedidos, criar as criarPedido, cancelar as cancelarPedido, receber as apiReceberPedido } from "@/services/pedidos";
 import { useToast } from "@/components/Toast";
 
 export default function EstoquePage() {
@@ -159,7 +159,7 @@ export default function EstoquePage() {
     const pedido = receberPedido.pedido;
     if (!pedido) return false;
     try {
-      await receberPedido(pedido.id, itens);
+      await apiReceberPedido(pedido.id, itens);
       await Promise.all([recarregarPedidos(), carregar()]);
       addToast("Entrada registada — stock atualizado", "success");
       return true;
