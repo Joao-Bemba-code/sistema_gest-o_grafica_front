@@ -173,13 +173,6 @@ export default function OrcamentosPage() {
       const itens = [...p.itens];
       const mat = [...(itens[idx].materiais || [])];
       mat[mi] = { ...mat[mi], [key]: val };
-      if (key === "material_id" && val) {
-        const duplicado = mat.some((m, j) => j !== mi && String(m.material_id) === String(val));
-        if (duplicado) {
-          addToast("Este material já foi adicionado a este item", "error");
-          mat[mi] = { ...mat[mi], material_id: "", descricao: "", preco_venda: 0, custo_total: 0 };
-        }
-      }
       if (key === "material_id") {
         const matEstoque = materiais.find((m) => String(m.id) === String(val));
         if (matEstoque) {
