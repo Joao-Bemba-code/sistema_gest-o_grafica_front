@@ -266,10 +266,19 @@ async function ligarServidor(db, { url, email, senha }) {
     return { ok: false, erro: "Não foi possível ligar ao servidor: " + (e.message || e) };
   }
   const org = login.usuario && login.usuario.organizacao ? login.usuario.organizacao : null;
+  const novaOrgId = String(login.usuario.organizacao_id);
+  const orgAntiga = lerMeta(db, "org_id", "");
+  if (orgAntiga && orgAntiga !== novaOrgId) {
+    console.log(`SIGRAF offline: organização trocou (${orgAntiga} -> ${novaOrgId}), limpando dados locais...`);
+    const tabelas = ["cliente", "categoria", "fornecedor", "material", "orcamento", "producao", "faturacao"];
+    for (const t of tabelas) {
+      try { db.exec(`DELETE FROM ${t}`); } catch (_) {}
+    }
+  }
   escreverMeta(db, "server_url", base);
   escreverMeta(db, "sync_email", email);
   escreverMeta(db, "sync_senha", senha);
-  escreverMeta(db, "org_id", String(login.usuario.organizacao_id));
+  escreverMeta(db, "org_id", novaOrgId);
   if (org) escreverMeta(db, "org_nome", org.nome || "");
   try {
     await registarUtilizadorLocal(login, senha);
