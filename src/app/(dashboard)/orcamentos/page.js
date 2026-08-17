@@ -81,8 +81,8 @@ function normalizarOrcamento(o) {
   };
 }
 
-const blankItem = { descricao: "", quantidade: "", valorUnitario: "", composto: false, margem: "", materiais: [] };
-const blankMaterial = { material_id: "", descricao: "", unidade: "un", quantidade: "", custo_unit: 0, custo_total: 0, mover_estoque: false };
+const blankItem = { descricao: "", quantidade: "", materiais: [] };
+const blankMaterial = { material_id: "", descricao: "", unidade: "un", quantidade: "", preco_venda: 0, custo_total: 0, mover_estoque: true };
 
 function placeholderSpec(rotulo) {
   const chave = String(rotulo || "").toLowerCase();
@@ -102,7 +102,7 @@ const SPEC_DEFAULT_LINES = [
 ];
 const blankForm = {
   cliente: "", empresa: "", nif: "", telefone: "", email: "",
-  itens: [{ ...blankItem }],
+  itens: [{ ...blankItem, materiais: [{ ...blankMaterial }] }],
   specLines: SPEC_DEFAULT_LINES.map((l) => ({ ...l })),
   iva: "", prazoExecucao: "", condicoesPagamento: "100% antecipado", observacoes: "",
 };
@@ -144,47 +144,29 @@ export default function OrcamentosPage() {
 
   const setField = (name, val) => setForm((p) => ({ ...p, [name]: val }));
 
-  const custoMateriais = (it) => (it.materiais || []).reduce((s, m) => s + (Number(m.quantidade) || 0) * (Number(m.custo_unit) || 0), 0);
+  const custoUnitItem = (it) => (it.materiais || []).reduce((s, m) => s + (Number(m.quantidade) || 0) * (Number(m.preco_venda) || 0), 0);
+
+  const recalcularItem = (it) => {
+    const preco = custoUnitItem(it);
+    const q = Number(it.quantidade) || 0;
+    return { valorUnitario: Number(preco.toFixed(2)), total: Number((preco * q).toFixed(2)) };
+  };
 
   const setItem = (idx, key, val) => {
     setForm((p) => {
       const itens = [...p.itens];
       itens[idx] = { ...itens[idx], [key]: val };
-      if (key === "quantidade" || key === "valorUnitario") {
-        const q = Number(itens[idx].quantidade) || 0;
-        const v = Number(itens[idx].valorUnitario) || 0;
-        itens[idx].total = q * v;
-      }
-      if (key === "margem") {
-        const c = custoMateriais(itens[idx]);
-        const m = Number(val) || 0;
-        itens[idx].valorUnitario = c > 0 ? Number((c * (1 + m / 100)).toFixed(2)) : "";
-        const q = Number(itens[idx].quantidade) || 0;
-        const v = Number(itens[idx].valorUnitario) || 0;
-        itens[idx].total = q * v;
-      }
-      if (key === "valorUnitario" && itens[idx].composto) {
-        const c = custoMateriais(itens[idx]);
-        const v = Number(val) || 0;
-        itens[idx].margem = c > 0 ? Number(((v / c - 1) * 100).toFixed(2)) : itens[idx].margem;
+      if (key === "quantidade") {
+        const calc = recalcularItem(itens[idx]);
+        itens[idx].valorUnitario = calc.valorUnitario;
+        itens[idx].total = calc.total;
       }
       return { ...p, itens };
     });
   };
 
-  const addItem = () => setForm((p) => ({ ...p, itens: [...p.itens, { ...blankItem }] }));
+  const addItem = () => setForm((p) => ({ ...p, itens: [...p.itens, { ...blankItem, materiais: [{ ...blankMaterial }] }] }));
   const removeItem = (idx) => setForm((p) => p.itens.length <= 1 ? p : { ...p, itens: p.itens.filter((_, i) => i !== idx) });
-
-  const toggleComposto = (idx) => setForm((p) => {
-    const itens = [...p.itens];
-    const composto = !itens[idx].composto;
-    itens[idx] = {
-      ...itens[idx],
-      composto,
-      materiais: composto && !(itens[idx].materiais || []).length ? [{ ...blankMaterial }] : itens[idx].materiais || [],
-    };
-    return { ...p, itens };
-  });
 
   const setItemMaterial = (idx, mi, key, val) => {
     setForm((p) => {
@@ -196,17 +178,21 @@ export default function OrcamentosPage() {
         if (matEstoque) {
           mat[mi].descricao = matEstoque.nome || matEstoque.nome_tecnico || "";
           mat[mi].unidade = matEstoque.unidade || "un";
-          mat[mi].custo_unit = Number(matEstoque.custo_unit) || 0;
+          mat[mi].preco_venda = Number(matEstoque.preco_venda) || Number(matEstoque.custo_unit) || 0;
         } else {
           mat[mi].descricao = "";
+          mat[mi].preco_venda = 0;
         }
       }
-      if (key === "quantidade" || key === "custo_unit" || key === "material_id") {
+      if (key === "quantidade" || key === "preco_venda" || key === "material_id") {
         const q = Number(mat[mi].quantidade) || 0;
-        const cu = Number(mat[mi].custo_unit) || 0;
-        mat[mi].custo_total = q * cu;
+        const pv = Number(mat[mi].preco_venda) || 0;
+        mat[mi].custo_total = Number((q * pv).toFixed(2));
       }
       itens[idx] = { ...itens[idx], materiais: mat };
+      const calc = recalcularItem(itens[idx]);
+      itens[idx].valorUnitario = calc.valorUnitario;
+      itens[idx].total = calc.total;
       return { ...p, itens };
     });
   };
@@ -220,6 +206,9 @@ export default function OrcamentosPage() {
   const removeMaterial = (idx, mi) => setForm((p) => {
     const itens = [...p.itens];
     itens[idx] = { ...itens[idx], materiais: (itens[idx].materiais || []).filter((_, i) => i !== mi) };
+    const calc = recalcularItem(itens[idx]);
+    itens[idx].valorUnitario = calc.valorUnitario;
+    itens[idx].total = calc.total;
     return { ...p, itens };
   });
 
@@ -242,24 +231,27 @@ export default function OrcamentosPage() {
     const dados = {
       cliente_id: form.cliente_id,
       cliente: { nome: form.cliente, empresa: form.empresa, nif: form.nif, telefone: form.telefone, email: form.email },
-      itens: form.itens.map((it) => ({
-        descricao: it.descricao,
-        quantidade: Number(it.quantidade),
-        valorUnitario: Number(it.valorUnitario),
-        total: Number(it.total) || 0,
-        composto: Boolean(it.composto),
-        margem: Number(it.margem) || 0,
-        materiais: (it.materiais || [])
-          .map((m) => ({
-            material_id: m.material_id || null,
-            descricao: m.descricao || "",
-            unidade: m.unidade || "un",
-            quantidade: Number(m.quantidade) || 0,
-            custo_unit: Number(m.custo_unit) || 0,
-            mover_estoque: Boolean(m.mover_estoque),
-          }))
-          .filter((m) => m.material_id),
-      })),
+      itens: form.itens.map((it) => {
+        const calc = recalcularItem(it);
+        return {
+          descricao: it.descricao,
+          quantidade: Number(it.quantidade),
+          valorUnitario: calc.valorUnitario,
+          total: calc.total,
+          composto: (it.materiais || []).filter((m) => m.material_id).length > 0,
+          margem: 0,
+          materiais: (it.materiais || [])
+            .map((m) => ({
+              material_id: m.material_id || null,
+              descricao: m.descricao || "",
+              unidade: m.unidade || "un",
+              quantidade: Number(m.quantidade) || 0,
+              custo_unit: Number(m.preco_venda) || 0,
+              mover_estoque: Boolean(m.mover_estoque),
+            }))
+            .filter((m) => m.material_id),
+        };
+      }),
       especificacao: Object.fromEntries(
         (form.specLines || [])
           .filter((l) => l.rotulo?.trim() && l.valor?.trim())
@@ -281,7 +273,7 @@ export default function OrcamentosPage() {
     } catch (err) {
       addToast(err.response?.data?.erro || "Erro na operação", "error");
     }
-    setForm({ ...blankForm, itens: [{ ...blankItem }] });
+    setForm({ ...blankForm, itens: [{ ...blankItem, materiais: [{ ...blankMaterial }] }] });
     setEditandoId(null);
     setModalOpen(false);
   };
@@ -296,14 +288,12 @@ export default function OrcamentosPage() {
         descricao: it.descricao,
         quantidade: String(it.quantidade),
         valorUnitario: String(it.valorUnitario),
-        composto: Boolean(it.composto),
-        margem: String(it.margem ?? ""),
         materiais: (it.materiais || []).map((m) => ({
           material_id: m.material_id ? String(m.material_id) : "",
           descricao: m.descricao || "",
           unidade: m.unidade || "un",
           quantidade: String(m.quantidade ?? ""),
-          custo_unit: Number(m.custo_unit) || 0,
+          preco_venda: Number(m.custo_unit) || 0,
           custo_total: Number(m.custo_total) || 0,
           mover_estoque: Boolean(m.mover_estoque),
         })),
@@ -406,7 +396,7 @@ export default function OrcamentosPage() {
             <p className="text-primary mt-1 font-mono text-xs uppercase tracking-widest">{orcamentos.length} orçamentos registados // ORC</p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <button onClick={() => { setForm({ ...blankForm, itens: [{ ...blankItem }] }); setEditandoId(null); setModalOpen(true); }} className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold shadow-[0_0_15px_rgba(128,213,203,0.2)] hover:shadow-[0_0_25px_rgba(128,213,203,0.4)]">
+            <button onClick={() => { setForm({ ...blankForm, itens: [{ ...blankItem, materiais: [{ ...blankMaterial }] }] }); setEditandoId(null); setModalOpen(true); }} className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold shadow-[0_0_15px_rgba(128,213,203,0.2)] hover:shadow-[0_0_25px_rgba(128,213,203,0.4)]">
               <Icon name="add" className="text-[16px]" /> Novo Orçamento
             </button>
           </div>
@@ -617,10 +607,7 @@ export default function OrcamentosPage() {
                     <tbody>
                       {(o.itens || []).map((it, i) => (
                         <tr key={i} className="border-b border-border/20">
-                          <td className="px-3 py-2 text-foreground">
-                            {it.descricao}
-                            {it.composto && <span className="ml-2 text-[9px] font-bold text-primary bg-primary/10 rounded px-1.5 py-0.5 uppercase">composto</span>}
-                          </td>
+                          <td className="px-3 py-2 text-foreground">{it.descricao}</td>
                           <td className="px-3 py-2 text-center text-muted-foreground">{it.quantidade}</td>
                           <td className="px-3 py-2 text-right text-muted-foreground">{formatKz(it.valorUnitario)}</td>
                           <td className="px-3 py-2 text-right font-bold text-foreground">{formatKz(it.total)}</td>
@@ -637,10 +624,10 @@ export default function OrcamentosPage() {
                   </div>
                 </div>
 
-                {(o.itens || []).filter((it) => it.composto && (it.materiais || []).length).length > 0 && (
+                {(o.itens || []).filter((it) => (it.materiais || []).length).length > 0 && (
                   <div className="mt-4 space-y-3">
-                    <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Materiais por produto composto</h4>
-                    {(o.itens || []).filter((it) => it.composto && (it.materiais || []).length).map((it) => {
+                    <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Materiais por item</h4>
+                    {(o.itens || []).filter((it) => (it.materiais || []).length).map((it) => {
                       const custoUn = (it.materiais || []).reduce((s, m) => s + (Number(m.quantidade) || 0) * (Number(m.custo_unit) || 0), 0);
                       return (
                         <div key={it.id || it.descricao} className="rounded-xl border p-3">
@@ -648,7 +635,6 @@ export default function OrcamentosPage() {
                             <p className="text-xs font-bold text-foreground">{it.descricao}</p>
                             <p className="text-[10px] text-muted-foreground">
                               Custo materiais/un.: <span className="font-bold text-foreground">{formatKz(custoUn)}</span>
-                              {Number(it.margem) > 0 && <> · Margem: <span className="font-bold text-foreground">{it.margem}%</span></>}
                             </p>
                           </div>
                           <div className="overflow-x-auto rounded-lg border">
@@ -657,8 +643,8 @@ export default function OrcamentosPage() {
                                 <tr className="border-b bg-muted/50">
                                   <th className="text-left px-2 py-1.5 font-bold text-muted-foreground uppercase">Material</th>
                                   <th className="text-center px-2 py-1.5 font-bold text-muted-foreground uppercase">Qtd/un.</th>
-                                  <th className="text-right px-2 py-1.5 font-bold text-muted-foreground uppercase">Custo Unit.</th>
-                                  <th className="text-right px-2 py-1.5 font-bold text-muted-foreground uppercase">Custo Total</th>
+                                  <th className="text-right px-2 py-1.5 font-bold text-muted-foreground uppercase">Preço Venda</th>
+                                  <th className="text-right px-2 py-1.5 font-bold text-muted-foreground uppercase">Total</th>
                                   <th className="text-center px-2 py-1.5 font-bold text-muted-foreground uppercase">Estoque</th>
                                 </tr>
                               </thead>
@@ -668,7 +654,7 @@ export default function OrcamentosPage() {
                                     <td className="px-2 py-1.5 text-foreground">{m.descricao}</td>
                                     <td className="px-2 py-1.5 text-center text-muted-foreground">{m.quantidade} {m.unidade}</td>
                                     <td className="px-2 py-1.5 text-right text-muted-foreground">{formatKz(m.custo_unit)}</td>
-                                    <td className="px-2 py-1.5 text-right font-semibold text-foreground">{formatKz(m.custo_total)}</td>
+                                    <td className="px-2 py-1.5 text-right font-semibold text-foreground">{formatKz(m.custo_total || (Number(m.quantidade) * Number(m.custo_unit)))}</td>
                                     <td className="px-2 py-1.5 text-center">
                                       {m.mover_estoque
                                         ? <Badge variant="success" className="text-[9px]">Move estoque</Badge>
@@ -719,8 +705,8 @@ export default function OrcamentosPage() {
         );
       })()}
 
-      <Modal open={modalOpen} onClose={() => { setForm({ ...blankForm, itens: [{ ...blankItem }] }); setEditandoId(null); setModalOpen(false); }} title={editandoId ? "Editar Orçamento" : "Novo Orçamento"} icon="request_quote" size="2xl"
-        footer={<><Button type="button" variant="outline" onClick={() => { setForm({ ...blankForm, itens: [{ ...blankItem }] }); setEditandoId(null); setModalOpen(false); }}>Cancelar</Button><Button type="submit" form="form-orcamento">{editandoId ? "Atualizar Orçamento" : "Criar Orçamento"}</Button></>}>
+      <Modal open={modalOpen} onClose={() => { setForm({ ...blankForm, itens: [{ ...blankItem, materiais: [{ ...blankMaterial }] }] }); setEditandoId(null); setModalOpen(false); }} title={editandoId ? "Editar Orçamento" : "Novo Orçamento"} icon="request_quote" size="2xl"
+        footer={<><Button type="button" variant="outline" onClick={() => { setForm({ ...blankForm, itens: [{ ...blankItem, materiais: [{ ...blankMaterial }] }] }); setEditandoId(null); setModalOpen(false); }}>Cancelar</Button><Button type="submit" form="form-orcamento">{editandoId ? "Atualizar Orçamento" : "Criar Orçamento"}</Button></>}>
         <form id="form-orcamento" onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-3">
             <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2"><Icon name="person" className="text-sm text-primary" /> Dados do Cliente</h3>
@@ -759,23 +745,19 @@ export default function OrcamentosPage() {
             {form.itens.map((it, idx) => (
               <div key={idx} className="bg-muted/50 rounded-xl p-3 space-y-3">
                 <div className="grid grid-cols-12 gap-2 items-end">
-                  <div className="col-span-12 sm:col-span-5 flex flex-col gap-1.5">
-                    {idx === 0 && <label className="text-[9px] font-semibold text-muted-foreground uppercase">Descrição *</label>}
-                    <input required value={it.descricao} onChange={(e) => setItem(idx, "descricao", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder={it.composto ? "Ex: Livro A5, brochura" : "Descrição do serviço"} />
+                  <div className="col-span-12 sm:col-span-6 flex flex-col gap-1.5">
+                    {idx === 0 && <label className="text-[9px] font-semibold text-muted-foreground uppercase">Descrição do Produto *</label>}
+                    <input required value={it.descricao} onChange={(e) => setItem(idx, "descricao", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="Ex: Caderno A5, Cartão de visita" />
                   </div>
                   <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
-                    {idx === 0 && <label className="text-[9px] font-semibold text-muted-foreground uppercase">Qtd *</label>}
+                    {idx === 0 && <label className="text-[9px] font-semibold text-muted-foreground uppercase">Quantidade *</label>}
                     <NumeroInput required value={it.quantidade} onChange={(e) => setItem(idx, "quantidade", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="0" />
                   </div>
                   <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
-                    {idx === 0 && <label className="text-[9px] font-semibold text-muted-foreground uppercase">{it.composto ? "Preço Venda/Un." : "Valor Unit. *"}</label>}
-                    <NumeroInput required value={it.valorUnitario} onChange={(e) => setItem(idx, "valorUnitario", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="0" />
+                    {idx === 0 && <label className="text-[9px] font-semibold text-muted-foreground uppercase">Preço Venda/Un.</label>}
+                    <div className="px-2.5 py-2 bg-primary/10 border border-primary/30 rounded-lg text-xs font-bold text-primary">{formatKz(it.valorUnitario || 0)}</div>
                   </div>
-                  <div className="col-span-3 sm:col-span-2 flex flex-col gap-1.5">
-                    {idx === 0 && <label className="text-[9px] font-semibold text-muted-foreground uppercase">Total</label>}
-                    <div className="px-2.5 py-2 bg-muted border border-input rounded-lg text-xs font-bold text-foreground">{formatKz(it.total || 0)}</div>
-                  </div>
-                  <div className="col-span-1 flex justify-center">
+                  <div className="col-span-3 sm:col-span-1 flex justify-center">
                     {form.itens.length > 1 && (
                       <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(idx)} title="Remover" className="text-error">
                         <Icon name="close" className="text-sm" />
@@ -784,80 +766,60 @@ export default function OrcamentosPage() {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-2.5">
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input type="checkbox" checked={!!it.composto} onChange={() => toggleComposto(idx)} className="w-4 h-4 accent-primary" />
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Produto Composto (calculado a partir do estoque)</span>
-                  </label>
-                  {it.composto && (
-                    <span className="text-[10px] font-semibold text-primary bg-primary/10 rounded-lg px-2 py-1">
-                      Custo materiais/un.: {formatKz(custoMateriais(it))}
-                    </span>
+                <div className="border-t border-border/40 pt-2.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Materiais do estoque (qtd por unidade do produto)</span>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => addMaterial(idx)}><Icon name="add_circle" className="text-sm" /> Adicionar material</Button>
+                  </div>
+                  {materiais.length === 0 && (
+                    <p className="text-[10px] text-muted-foreground">Ainda não há materiais no estoque. Adicione materiais no módulo Estoque.</p>
                   )}
-                </div>
-
-                {it.composto && (
-                  <div className="border-t border-border/40 pt-2.5 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Materiais do estoque (qtd por unidade do produto)</span>
-                      <Button type="button" variant="ghost" size="sm" onClick={() => addMaterial(idx)}><Icon name="add_circle" className="text-sm" /> Adicionar material</Button>
+                  {(it.materiais || []).map((m, mi) => (
+                    <div key={mi} className="grid grid-cols-12 gap-2 items-end">
+                      <div className="col-span-12 sm:col-span-4 flex flex-col gap-1.5">
+                        <select value={m.material_id || ""} onChange={(e) => setItemMaterial(idx, mi, "material_id", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30">
+                          <option value="">Selecionar material...</option>
+                          {materiais.map((mat) => (
+                            <option key={mat.id} value={mat.id}>
+                              {mat.nome || mat.nome_tecnico}{Number(mat.quantidade) > 0 ? ` (${mat.quantidade} ${mat.unidade || "un"})` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
+                        <NumeroInput value={m.quantidade} onChange={(e) => setItemMaterial(idx, mi, "quantidade", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="Qtd/un." />
+                      </div>
+                      <div className="col-span-3 sm:col-span-2 flex flex-col gap-1.5">
+                        <div className="px-2.5 py-2 bg-muted border border-input rounded-lg text-xs text-muted-foreground">{formatKz(m.preco_venda || 0)}/{m.unidade || "un"}</div>
+                      </div>
+                      <div className="col-span-3 sm:col-span-2 flex flex-col gap-1.5">
+                        <div className="px-2.5 py-2 bg-muted border border-input rounded-lg text-xs font-bold text-foreground">{formatKz(m.custo_total || 0)}</div>
+                      </div>
+                      <div className="col-span-1 flex justify-center">
+                        <label className="flex items-center gap-1 cursor-pointer" title="Marcar para mover o estoque ao faturar/produzir">
+                          <input type="checkbox" checked={!!m.mover_estoque} onChange={(e) => setItemMaterial(idx, mi, "mover_estoque", e.target.checked)} className="w-4 h-4 accent-emerald-600" />
+                          <span className="text-[9px] font-bold text-muted-foreground uppercase hidden sm:inline">Mover</span>
+                        </label>
+                      </div>
+                      <div className="col-span-1 flex justify-center">
+                        {it.materiais.length > 1 && (
+                          <Button type="button" variant="ghost" size="icon" onClick={() => removeMaterial(idx, mi)} title="Remover material" className="text-error"><Icon name="close" className="text-sm" /></Button>
+                        )}
+                      </div>
                     </div>
-                    {materiais.length === 0 && (
-                      <p className="text-[10px] text-muted-foreground">Ainda não há materiais no estoque. Adicione materiais no módulo Estoque para montar o composto.</p>
-                    )}
-                    {it.materiais.map((m, mi) => (
-                      <div key={mi} className="grid grid-cols-12 gap-2 items-end">
-                        <div className="col-span-12 sm:col-span-4 flex flex-col gap-1.5">
-                          <select value={m.material_id || ""} onChange={(e) => setItemMaterial(idx, mi, "material_id", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30">
-                            <option value="">Selecionar material...</option>
-                            {materiais.map((mat) => (
-                              <option key={mat.id} value={mat.id}>
-                                {mat.nome || mat.nome_tecnico}{Number(mat.quantidade) > 0 ? ` (${mat.quantidade} ${mat.unidade || "un"})` : ""}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
-                          <NumeroInput value={m.quantidade} onChange={(e) => setItemMaterial(idx, mi, "quantidade", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="Qtd/un." />
-                        </div>
-                        <div className="col-span-3 sm:col-span-2 flex flex-col gap-1.5">
-                          <div className="px-2.5 py-2 bg-muted border border-input rounded-lg text-xs text-muted-foreground">{formatKz(m.custo_unit || 0)}/{m.unidade || "un"}</div>
-                        </div>
-                        <div className="col-span-3 sm:col-span-2 flex flex-col gap-1.5">
-                          <div className="px-2.5 py-2 bg-muted border border-input rounded-lg text-xs font-bold text-foreground">{formatKz(m.custo_total || 0)}</div>
-                        </div>
-                        <div className="col-span-1 flex justify-center">
-                          <label className="flex items-center gap-1 cursor-pointer" title="Marcar para mover o estoque ao faturar/produzir">
-                            <input type="checkbox" checked={!!m.mover_estoque} onChange={(e) => setItemMaterial(idx, mi, "mover_estoque", e.target.checked)} className="w-4 h-4 accent-emerald-600" />
-                            <span className="text-[9px] font-bold text-muted-foreground uppercase hidden sm:inline">Mover</span>
-                          </label>
-                        </div>
-                        <div className="col-span-1 flex justify-center">
-                          {it.materiais.length > 1 && (
-                            <Button type="button" variant="ghost" size="icon" onClick={() => removeMaterial(idx, mi)} title="Remover material" className="text-error"><Icon name="close" className="text-sm" /></Button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                  ))}
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 border-t border-border/40 pt-2.5">
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[9px] font-semibold text-muted-foreground uppercase">Margem de lucro (%)</label>
-                        <NumeroInput value={it.margem} onChange={(e) => setItem(idx, "margem", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="Ex: 40" />
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[9px] font-semibold text-muted-foreground uppercase">Preço calculado/un. (custo+margem)</label>
-                        <div className="px-2.5 py-2 bg-primary/10 border border-primary/30 rounded-lg text-xs font-bold text-primary">
-                          {formatKz(custoMateriais(it) > 0 ? custoMateriais(it) * (1 + (Number(it.margem) || 0) / 100) : 0)}
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[9px] font-semibold text-muted-foreground uppercase">Total do item (sem IVA)</label>
-                        <div className="px-2.5 py-2 bg-muted border border-input rounded-lg text-xs font-bold text-foreground">{formatKz(it.total || 0)}</div>
-                      </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 border-t border-border/40 pt-2.5">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[9px] font-semibold text-muted-foreground uppercase">Custo materiais/un.</label>
+                      <div className="px-2.5 py-2 bg-muted border border-input rounded-lg text-xs font-bold text-foreground">{formatKz(custoUnitItem(it))}</div>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[9px] font-semibold text-muted-foreground uppercase">Total do item</label>
+                      <div className="px-2.5 py-2 bg-primary/10 border border-primary/30 rounded-lg text-xs font-bold text-primary">{formatKz(it.total || 0)}</div>
                     </div>
                   </div>
-                )}
+                </div>
               </div>
             ))}
           </div>
