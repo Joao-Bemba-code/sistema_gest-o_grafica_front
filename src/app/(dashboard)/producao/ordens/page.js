@@ -15,7 +15,7 @@ import { listarOrdens, criarOrdem, libertarMateriais } from "@/services/producao
 import { getUsuario } from "@/services/auth";
 import SaidaMateriaisModal from "@/components/producao/SaidaMateriaisModal";
 import { listar as listarClientes } from "@/services/clientes";
-import { listar as listarOrcamentos } from "@/services/orcamentos";
+import { listar as listarOrcamentos, buscarPorId as buscarOrcamento } from "@/services/orcamentos";
 import { listar as listarMateriais } from "@/services/materiais";
 
 const statusConfig = {
@@ -110,6 +110,44 @@ export default function OrdensProducaoPage() {
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
+  const handleOrcamentoSelect = async (e) => {
+    const id = e.target.value;
+    setForm((p) => ({ ...p, orcamento: id }));
+    if (!id) return;
+    try {
+      const orc = await buscarOrcamento(id);
+      const clienteId = orc.cliente_id || orc.cliente?.id || "";
+      const empresa = orc.cliente?.empresa || "";
+      const produto = orc.especificacao?.produto || orc.itens?.[0]?.descricao || "";
+      const quantidade = orc.itens?.[0]?.quantidade || "";
+      const materiaisMap = {};
+      for (const item of (orc.itens || [])) {
+        const qtdItem = Number(item.quantidade) || 1;
+        for (const mat of (item.materiais || [])) {
+          const mid = Number(mat.material_id);
+          if (!mid) continue;
+          const qtdTotal = (Number(mat.quantidade) || 0) * qtdItem;
+          if (materiaisMap[mid]) {
+            materiaisMap[mid].quantidade += qtdTotal;
+          } else {
+            materiaisMap[mid] = { material_id: mid, quantidade: qtdTotal, lote: null };
+          }
+        }
+      }
+      setItens(Object.values(materiaisMap));
+      setForm((p) => ({
+        ...p,
+        orcamento: id,
+        cliente: String(clienteId),
+        empresa,
+        produto,
+        quantidade: String(quantidade),
+      }));
+    } catch {
+      addToast("Erro ao buscar orçamento", "error");
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -160,7 +198,7 @@ export default function OrdensProducaoPage() {
           <p className="text-primary mt-1 font-mono text-xs uppercase tracking-widest">{ops.length} OPs registadas // ORD</p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <button onClick={() => setModalOpen(true)} className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold shadow-[0_0_15px_rgba(128,213,203,0.2)] hover:shadow-[0_0_25px_rgba(128,213,203,0.4)]">
+          <button onClick={() => { setForm(initialForm); setItens([]); setModalOpen(true); }} className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold shadow-[0_0_15px_rgba(128,213,203,0.2)] hover:shadow-[0_0_25px_rgba(128,213,203,0.4)]">
             <Icon name="add" className="text-[16px]" /> Nova OP
           </button>
         </div>
@@ -306,8 +344,8 @@ export default function OrdensProducaoPage() {
         </div>
       )}
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Nova Ordem de Produção" icon="add" size="lg"
-        footer={<><Button type="button" variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button><Button type="submit" form="form-ordem">Criar OP</Button></>}>
+      <Modal open={modalOpen} onClose={() => { setForm(initialForm); setItens([]); setModalOpen(false); }} title="Nova Ordem de Produção" icon="add" size="lg"
+        footer={<><Button type="button" variant="outline" onClick={() => { setForm(initialForm); setItens([]); setModalOpen(false); }}>Cancelar</Button><Button type="submit" form="form-ordem">Criar OP</Button></>}>
         <form id="form-ordem" onSubmit={handleSubmit} className="space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
@@ -370,7 +408,7 @@ export default function OrdensProducaoPage() {
             </div>
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Orçamento de Referência</label>
-              <select name="orcamento" value={form.orcamento} onChange={handleChange} className={inputCls}>
+              <select name="orcamento" value={form.orcamento} onChange={handleOrcamentoSelect} className={inputCls}>
                 <option value="">Nenhum</option>
                 {orcamentos.map((o) => <option key={o.id} value={o.id}>{o.numero}{o.cliente?.nome ? ` — ${o.cliente.nome}` : ""}</option>)}
               </select>
