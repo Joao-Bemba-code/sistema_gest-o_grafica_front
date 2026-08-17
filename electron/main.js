@@ -63,27 +63,6 @@ ipcMain.handle("desktop:set-config", (_event, cfg) => {
   return true;
 });
 
-ipcMain.handle("desktop:set-sync", (_event, cfg) => {
-  const atual = leConfig();
-  gravaConfig({
-    ...atual,
-    sync_ativo: !!cfg.sync_ativo,
-    sync_url: cfg.sync_url || "",
-    sync_email: cfg.sync_email || "",
-    sync_senha: cfg.sync_senha || "",
-  });
-  return true;
-});
-
-ipcMain.handle("desktop:sync-now", async () => {
-  const { sincronizar } = require("./sync");
-  try {
-    return await sincronizar(leConfig());
-  } catch (e) {
-    return { ok: false, erro: e.message || String(e) };
-  }
-});
-
 app.whenReady().then(async () => {
   try {
     await iniciarServidor(PORTA);

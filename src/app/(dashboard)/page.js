@@ -136,6 +136,10 @@ export default function DashboardPage() {
   const [histFiltro, setHistFiltro] = useState("");
   const [histPagina, setHistPagina] = useState(1);
   const HIST_POR_PAGINA = 8;
+  const [consumoAberto, setConsumoAberto] = useState(false);
+  const [consumoFiltro, setConsumoFiltro] = useState("");
+  const [consumoPagina, setConsumoPagina] = useState(1);
+  const CONSUMO_POR_PAGINA = 10;
   const { addToast } = useToast();
 
   const nomeUsuario = getUsuario()?.nome || "";
@@ -240,6 +244,29 @@ export default function DashboardPage() {
       detalhe: `${Number(mv.quantidade)} ${mv.material?.unidade || "un"}`,
       hora: formatHora(mv.createdAt),
     }));
+
+  const saidasOrdenadas = useMemo(
+    () => movimentos.filter((mv) => mv.tipo === "saida").sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)),
+    [movimentos]
+  );
+
+  const consumoFiltradas = useMemo(() => {
+    const q = (consumoFiltro || "").trim().toLowerCase();
+    return saidasOrdenadas.filter((mv) => {
+      if (q) {
+        const material = (mv.material?.nome || "").toLowerCase();
+        const motivo = (mv.motivo || "").toLowerCase();
+        const lote = (mv.lote || "").toLowerCase();
+        const fornecedor = (mv.fornecedor_nome || "").toLowerCase();
+        const quantidade = String(mv.quantidade || "");
+        if (!material.includes(q) && !motivo.includes(q) && !lote.includes(q) && !fornecedor.includes(q) && !quantidade.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [saidasOrdenadas, consumoFiltro]);
+
+  const consumoPaginas = Math.max(1, Math.ceil(consumoFiltradas.length / CONSUMO_POR_PAGINA));
+  const consumoVisiveis = consumoFiltradas.slice((consumoPagina - 1) * CONSUMO_POR_PAGINA, consumoPagina * CONSUMO_POR_PAGINA);
 
   const mesLabel = hoje.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
   const [mesAgenda, setMesAgenda] = useState(() => new Date(hoje.getFullYear(), hoje.getMonth(), 1));
@@ -413,7 +440,13 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="pt-4 border-t">
-              <p className="text-sm font-semibold mb-3 text-foreground">Consumo Recente</p>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-semibold text-foreground">Consumo Recente</p>
+                <Button variant="ghost" size="sm" onClick={() => setConsumoAberto(true)} className="shrink-0 gap-1.5">
+                  <Icon name="history" className="text-base" />
+                  Ver Histórico Completo
+                </Button>
+              </div>
               <div className="space-y-2.5">
                 {consumoRecente.map((item, i) => (
                   <div key={i} className="flex items-center justify-between text-sm gap-2">
@@ -667,6 +700,86 @@ export default function DashboardPage() {
                       </tr>
                     );
                   })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      <Modal
+        open={consumoAberto}
+        onClose={() => { setConsumoAberto(false); setConsumoPagina(1); setConsumoFiltro(""); }}
+        title="Histórico Completo de Consumos"
+        icon="bar_chart"
+        size="xl"
+        footer={
+          <div className="flex items-center justify-between w-full gap-3">
+            <p className="text-xs text-muted-foreground">
+              {consumoFiltradas.length} consumo{consumoFiltradas.length === 1 ? "" : "s"} (saídas)
+            </p>
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="outline" size="sm" disabled={consumoPagina <= 1} onClick={() => setConsumoPagina((p) => Math.max(1, p - 1))}>
+                Anterior
+              </Button>
+              <span className="text-xs font-semibold text-muted-foreground px-1">
+                {consumoPagina} / {consumoPaginas}
+              </span>
+              <Button type="button" variant="outline" size="sm" disabled={consumoPagina >= consumoPaginas} onClick={() => setConsumoPagina((p) => Math.min(consumoPaginas, p + 1))}>
+                Seguinte
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+            <div className="relative flex-1 min-w-0">
+              <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm" />
+              <input
+                value={consumoFiltro}
+                onChange={(e) => { setConsumoFiltro(e.target.value); setConsumoPagina(1); }}
+                className="w-full pl-9 pr-3 py-2 bg-muted/50 border rounded-xl text-xs focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                placeholder="Pesquisar por material, motivo, lote, fornecedor..."
+              />
+            </div>
+            <Button type="button" variant="ghost" size="sm" className="shrink-0" onClick={() => { setConsumoFiltro(""); setConsumoPagina(1); }}>
+              Limpar
+            </Button>
+          </div>
+
+          {consumoVisiveis.length === 0 ? (
+            <div className="py-12 text-center">
+              <Icon name="inbox" className="text-3xl text-muted-foreground/40 mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">Nenhum consumo registado</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-left text-[10px] uppercase tracking-wider text-muted-foreground border-b">
+                    <th className="py-2 pr-3 font-semibold">Material</th>
+                    <th className="py-2 pr-3 font-semibold">Quantidade</th>
+                    <th className="py-2 pr-3 font-semibold">Motivo</th>
+                    <th className="py-2 pr-3 font-semibold">Lote</th>
+                    <th className="py-2 pr-3 font-semibold">Fornecedor</th>
+                    <th className="py-2 font-semibold">Data / Hora</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {consumoVisiveis.map((mv) => (
+                    <tr key={mv.id} className="border-b last:border-0 hover:bg-muted/40 transition-colors">
+                      <td className="py-2.5 pr-3 font-semibold text-foreground">{mv.material?.nome || "—"}</td>
+                      <td className="py-2.5 pr-3">
+                        <span className="font-semibold text-foreground">{Number(mv.quantidade)}</span>
+                        <span className="text-muted-foreground"> {mv.material?.unidade || "un"}</span>
+                      </td>
+                      <td className="py-2.5 pr-3 text-muted-foreground">{mv.motivo || "—"}</td>
+                      <td className="py-2.5 pr-3 text-muted-foreground">{mv.lote || "—"}</td>
+                      <td className="py-2.5 pr-3 text-muted-foreground">{mv.fornecedor_nome || "—"}</td>
+                      <td className="py-2.5 text-muted-foreground">{formatHora(mv.createdAt)}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

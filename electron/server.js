@@ -27,6 +27,7 @@ function gravaConfig(cfg) {
     sync_url: cfg.sync_url || "",
     sync_email: cfg.sync_email || "",
     sync_senha: cfg.sync_senha || "",
+    id_base: cfg.id_base || 0,
   };
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(dados, null, 2), "utf8");
   return dados;
@@ -172,6 +173,50 @@ async function aplicarMigracoes(sequelize) {
   await adicionar("orcamento", "especificacao_json", "TEXT");
   await adicionar("orcamento_item", "composto", "TINYINT(1) DEFAULT 0");
   await adicionar("orcamento_item", "margem", "DECIMAL(12,2) DEFAULT 0");
+
+  // Tombstones (soft-delete) para sincronizar eliminações entre computadores.
+  const tabelasTomb = [
+    "cliente",
+    "fornecedor",
+    "categoria",
+    "material",
+    "movimento_estoque",
+    "orcamento",
+    "orcamento_item",
+    "orcamento_material",
+    "ordem_producao",
+    "pre_impressao",
+    "impressao",
+    "acabamento",
+    "qualidade",
+    "reserva_estoque",
+    "faturacao",
+    "pedido",
+    "pedido_item",
+  ];
+  for (const t of tabelasTomb) {
+    await adicionar(t, "deleted", "TINYINT(1) NOT NULL DEFAULT 0");
+    await adicionar(t, "deletedAt", "DATETIME NULL");
+  }
+}
+
+// Faixa de IDs própria deste computador: os novos registos usam IDs altos,
+// para nunca colidirem com os IDs de outro PC nem com os existentes na nuvem.
+// O SQLite AUTOINCREMENT guarda o próximo ID em sqlite_sequence; semeá-lo com
+// a base garante que os próximos inserts tenham IDs na faixa deste PC.
+async function garantirFaixaIds(sequelize) {
+  const { TABELAS_SINC } = require("./offline/sync");
+  const cfg = leConfig();
+  let base = cfg.id_base;
+  if (!base) {
+    base = 1000000000 + Math.floor(Math.random() * 1000000000);
+    gravaConfig({ ...cfg, id_base: base });
+  }
+  for (const tabela of TABELAS_SINC) {
+    await sequelize.query(`DELETE FROM sqlite_sequence WHERE name = ?`, { replacements: [tabela] });
+    await sequelize.query(`INSERT INTO sqlite_sequence(name, seq) VALUES(?, ?)`, { replacements: [tabela, base] });
+  }
+  console.log(`SIGRAF offline: faixa de IDs deste PC = ${base}`);
 }
 
 async function iniciarServidor(porta) {
@@ -182,40 +227,33 @@ async function iniciarServidor(porta) {
 
   if (config.modo === "servidor" && config.servidor_url) {
     const { criarApp } = require(path.join(backendDir, "app.js"));
-    app.use(criarApp({ proxyUrl: config.servidor_url }));
+    app.use(criarApp({ proxyUrl: config.servidor_url, semRotaRaiz: true }));
   } else {
     process.env.Lang = "sqlite";
     process.env.Sqlite_File = path.join(DIR_DADOS, "sgg.sqlite");
     const { criarApp } = require(path.join(backendDir, "app.js"));
     const { sequelize } = require(path.join(backendDir, "models"));
-    app.use(criarApp());
+    app.use(criarApp({ semRotaRaiz: true }));
     await sequelize.sync();
     await aplicarMigracoes(sequelize);
     await garantirDadosIniciais(backendDir);
+    await garantirFaixaIds(sequelize);
     await criarBackupAutomatico();
   }
 
+  // Camada offline (better-sqlite3 + UUID + is_dirty): dados locais com
+  // sincronização bidirecional para o servidor quando há ligação.
   if (config.modo === "local") {
-    const { sincronizar } = require("./sync");
-    const INTERVALO_SYNC = 5 * 60 * 1000;
-    let sincronizando = false;
-    const executarSync = async () => {
-      if (sincronizando) return;
-      const cfg = leConfig();
-      if (!cfg.sync_ativo) return;
-      sincronizando = true;
-      try {
-        const r = await sincronizar(cfg);
-        console.log(r.ok ? `SIGRAF: ${r.mensagem}` : `SIGRAF: ${r.erro}`);
-      } catch (e) {
-        console.log(`SIGRAF: sincronização falhou (sem internet?): ${e.message || e}`);
-      } finally {
-        sincronizando = false;
-      }
-    };
-    setTimeout(executarSync, 5000);
-    setInterval(executarSync, INTERVALO_SYNC);
-    console.log("SIGRAF: sincronização automática ativa (a cada 5 minutos)");
+    try {
+      const { iniciarOffline } = require("./offline");
+      const offline = iniciarOffline(DIR_DADOS);
+      app.use(express.json());
+      app.use("/api/offline", offline.router);
+      offline.iniciarSync();
+      console.log("SIGRAF offline: camada local com better-sqlite3 ativa");
+    } catch (e) {
+      console.error("SIGRAF offline: erro ao iniciar camada offline:", e);
+    }
   }
 
   app.use(express.static(webDir));
