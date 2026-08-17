@@ -268,9 +268,10 @@ async function ligarServidor(db, { url, email, senha }) {
   const org = login.usuario && login.usuario.organizacao ? login.usuario.organizacao : null;
   const novaOrgId = String(login.usuario.organizacao_id);
   const orgAntiga = lerMeta(db, "org_id", "");
-  if (orgAntiga && orgAntiga !== novaOrgId) {
-    console.log(`SIGRAF offline: organização trocou (${orgAntiga} -> ${novaOrgId}), limpando dados locais...`);
-    const tabelas = ["cliente", "categoria", "fornecedor", "material", "orcamento", "producao", "faturacao"];
+  const tabelas = ["cliente", "categoria", "fornecedor", "material", "orcamento", "producao", "faturacao"];
+  const deveLimpar = orgAntiga !== novaOrgId;
+  if (deveLimpar) {
+    console.log(`SIGRAF offline: organização trocou (${orgAntiga || "nenhuma"} -> ${novaOrgId}), limpando dados locais...`);
     for (const t of tabelas) {
       try { db.exec(`DELETE FROM ${t}`); } catch (_) {}
     }
