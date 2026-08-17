@@ -14,12 +14,36 @@ function caminhoModelos() {
 
 async function registarUtilizadorLocal(login, senha) {
   const modelos = require(caminhoModelos());
-  const { Organizacao, Usuario } = modelos;
+  const { Organizacao, Usuario, Cliente, Fornecedor, Categoria, Material, Orcamento, Producao, Faturacao } = modelos;
   const real = login.usuario || {};
   const orgRemota = real.organizacao || {};
+  const novaOrgId = real.organizacao_id;
 
-  const org = await Organizacao.findOne();
-  if (org && (orgRemota.nome || orgRemota.email)) {
+  const orgLocal = await Organizacao.findOne();
+
+  if (orgLocal && String(orgLocal.id) !== String(novaOrgId)) {
+    console.log(`SIGRAF: organização local (${orgLocal.id}) ≠ cloud (${novaOrgId}), substituindo...`);
+    const tabelas = [Cliente, Fornecedor, Categoria, Material, Orcamento, Producao, Faturacao];
+    for (const M of tabelas) {
+      try { await M.destroy({ where: {} }); } catch (_) {}
+    }
+    try { await Usuario.destroy({ where: {} }); } catch (_) {}
+    try { await Organizacao.destroy({ where: {} }); } catch (_) {}
+  }
+
+  let org = novaOrgId ? await Organizacao.findByPk(novaOrgId) : null;
+  if (!org && orgRemota) {
+    org = await Organizacao.create({
+      id: novaOrgId || undefined,
+      nome: orgRemota.nome || orgRemota.name || "Organização",
+      sigla: orgRemota.sigla || "",
+      nif: orgRemota.nif || "",
+      email: orgRemota.email || "",
+      telefone: orgRemota.telefone || "",
+      endereco: orgRemota.endereco || "",
+      website: orgRemota.website || "",
+    });
+  } else if (org && (orgRemota.nome || orgRemota.email)) {
     const mudancas = {};
     if (orgRemota.nome && org.nome !== orgRemota.nome) mudancas.nome = orgRemota.nome;
     if (orgRemota.sigla && org.sigla !== orgRemota.sigla) mudancas.sigla = orgRemota.sigla;
@@ -34,7 +58,7 @@ async function registarUtilizadorLocal(login, senha) {
   const [usuario, criado] = await Usuario.findOrCreate({
     where: { email: real.email },
     defaults: {
-      organizacao_id: org ? org.id : null,
+      organizacao_id: novaOrgId || (org ? org.id : null),
       nome: real.nome || real.email || "Utilizador",
       email: real.email,
       senha: hash,
@@ -43,6 +67,7 @@ async function registarUtilizadorLocal(login, senha) {
   });
   if (!criado && usuario.senha !== hash) {
     await usuario.update({
+      organizacao_id: novaOrgId || usuario.organizacao_id,
       senha: hash,
       nome: real.nome || usuario.nome,
       funcao: real.funcao || usuario.funcao,

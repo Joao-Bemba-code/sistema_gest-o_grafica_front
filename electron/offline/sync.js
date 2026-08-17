@@ -271,9 +271,11 @@ async function ligarServidor(db, { url, email, senha }) {
   const tabelas = ["cliente", "categoria", "fornecedor", "material", "orcamento", "producao", "faturacao"];
   if (orgAntiga !== novaOrgId) {
     console.log(`SIGRAF offline: isolamento de organização (${orgAntiga || "nenhuma"} -> ${novaOrgId}), limpando dados locais...`);
-    for (const t of tabelas) {
+    const tabelasSync = ["cliente", "categoria", "fornecedor", "material", "orcamento", "producao", "faturacao"];
+    for (const t of tabelasSync) {
       try { db.exec(`DELETE FROM ${t}`); } catch (_) {}
     }
+    escreverMeta(db, "last_sync_time", "1970-01-01T00:00:00.000Z");
   }
   escreverMeta(db, "server_url", base);
   escreverMeta(db, "sync_email", email);
