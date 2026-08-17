@@ -396,9 +396,16 @@ export default function OrdensProducaoPage() {
                   {itens.map((item, i) => {
                     const m = matPorId[item.material_id];
                     return (
-                      <div key={i} className="flex items-center justify-between gap-2 bg-muted/40 rounded-lg px-3 py-2 text-xs">
-                        <span className="font-medium text-foreground truncate">{m?.nome || `Material #${item.material_id}`}</span>
-                        <span className="text-muted-foreground shrink-0">{item.quantidade} {m?.unidade || "un"}{m?.percentual_quebra > 0 ? ` (+${m.percentual_quebra}% quebra)` : ""}{item.lote ? ` · Lote ${item.lote}` : ""}</span>
+                      <div key={i} className="flex items-center gap-2 bg-muted/40 rounded-lg px-3 py-2 text-xs">
+                        <span className="font-medium text-foreground truncate min-w-0 flex-1">{m?.nome || `Material #${item.material_id}`}</span>
+                        <NumeroInput value={String(item.quantidade)} onChange={(e) => {
+                          const v = Number(e.target.value) || 0;
+                          setItens((prev) => prev.map((x, j) => j === i ? { ...x, quantidade: v } : x));
+                        }} className="px-2 py-1 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30 w-24 text-right" placeholder="Qtd." />
+                        <span className="text-muted-foreground shrink-0">{m?.unidade || "un"}{m?.percentual_quebra > 0 ? ` (+${m.percentual_quebra}% quebra)` : ""}</span>
+                        <input value={item.lote || ""} onChange={(e) => {
+                          setItens((prev) => prev.map((x, j) => j === i ? { ...x, lote: e.target.value || null } : x));
+                        }} className="px-2 py-1 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30 w-24" placeholder="Lote" />
                         <button type="button" onClick={() => removerItem(i)} className="shrink-0 text-red-500 hover:text-red-700 transition-colors" title="Remover"><Icon name="delete" /></button>
                       </div>
                     );
