@@ -84,10 +84,13 @@ async function temLigacao(url) {
   }
 }
 
-// Envia todas as linhas de cada tabela real (o servidor faz LWW por updatedAt).
-async function enviarTabelas(sequelize, url, token) {
+// Envia APENAS registos modificados localmente desde o último sync.
+// Evita que dados antigos de outro PC sobrescrevam dados correctos na cloud.
+async function enviarTabelas(sequelize, url, token, db) {
   const base = url.replace(/\/+$/, "");
   const cab = { headers: { Authorization: `Bearer ${token}` } };
+  const since = lerMeta(db, "last_sync_time", "1970-01-01T00:00:00.000Z");
+  const desde = new Date(since || "1970-01-01T00:00:00.000Z");
   const enviados = {};
   for (const tabela of TABELAS_SINC) {
     try {
@@ -95,7 +98,8 @@ async function enviarTabelas(sequelize, url, token) {
       if (!Model) continue;
       const colunas = colunasReais(Model);
       const [linhas] = await sequelize.query(
-        `SELECT id, createdAt, \`${colunas.join("`, `")}\`, updatedAt FROM \`${tabela}\``
+        `SELECT id, createdAt, \`${colunas.join("`, `")}\`, updatedAt FROM \`${tabela}\` WHERE \`updatedAt\` > ?`,
+        { replacements: [desde] }
       );
       if (!linhas.length) continue;
       const registos = linhas.map((r) => ({
@@ -244,7 +248,7 @@ async function sincronizar(db) {
   const token = login.token;
   try {
     const { sequelize } = require(caminhoModelos());
-    const enviados = await enviarTabelas(sequelize, url, token);
+    const enviados = await enviarTabelas(sequelize, url, token, db);
     const puxados = await puxarTabelas(sequelize, url, token, db);
     const organizacao = await sincronizarOrganizacaoComServidor(db, url, token);
     const temDadosNovos = Object.values(puxados).some((n) => n > 0);
