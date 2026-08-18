@@ -116,11 +116,15 @@ async function enviarTabelas(sequelize, url, token, db) {
 }
 
 // Puxa o que mudou nas tabelas reais desde o último sync e aplica com LWW.
+// Retorna {registos, maxUpdatedAt} — maxUpdatedAt é o maior updatedAt entre
+// os registos recebidos do servidor, para o caller ajustar last_sync_time
+// e evitar que esses mesmos registos sejam reenviados no próximo ciclo.
 async function puxarTabelas(sequelize, url, token, db) {
   const base = url.replace(/\/+$/, "");
   const cab = { headers: { Authorization: `Bearer ${token}` } };
   const since = lerMeta(db, "last_sync_time", "1970-01-01T00:00:00.000Z");
   const puxados = {};
+  let maxUpdatedAt = 0;
   for (const tabela of TABELAS_SINC) {
     try {
       const Model = sequelize.models[tabela];
@@ -135,6 +139,7 @@ async function puxarTabelas(sequelize, url, token, db) {
       let n = 0;
       for (const reg of registos) {
         const novoT = Date.parse(reg.updatedAt) || 0;
+        if (novoT > maxUpdatedAt) maxUpdatedAt = novoT;
         const existente = await Model.unscoped().findByPk(reg.id, { raw: true });
         if (!existente) {
           const valores = { id: reg.id };
@@ -177,7 +182,7 @@ async function puxarTabelas(sequelize, url, token, db) {
       console.log(`SIGRAF offline: tabela ${tabela} não puxada (${e.message || e})`);
     }
   }
-  return puxados;
+  return { registos: puxados, maxUpdatedAt };
 }
 
 async function sincronizarOrganizacaoComServidor(db, url, token) {
@@ -249,14 +254,21 @@ async function sincronizar(db) {
   try {
     const { sequelize } = require(caminhoModelos());
     const enviados = await enviarTabelas(sequelize, url, token, db);
-    const puxados = await puxarTabelas(sequelize, url, token, db);
+    const resultadoPuxar = await puxarTabelas(sequelize, url, token, db);
+    const puxados = resultadoPuxar.registos;
+    const maxUpdatedAt = resultadoPuxar.maxUpdatedAt || 0;
     const organizacao = await sincronizarOrganizacaoComServidor(db, url, token);
     const temDadosNovos = Object.values(puxados).some((n) => n > 0);
     if (temDadosNovos) {
       const v = Number(lerMeta(db, "sync_version", "0")) + 1;
       escreverMeta(db, "sync_version", String(v));
     }
-    escreverMeta(db, "last_sync_time", agora());
+    // Usa o MAX entre agora() e o maior updatedAt dos dados puxados do
+    // servidor para evitar reenvio no próximo ciclo (relógio do servidor
+    // pode estar à frente do PC).
+    const agoraMs = Date.now();
+    const lastSyncMs = Math.max(agoraMs, maxUpdatedAt);
+    escreverMeta(db, "last_sync_time", new Date(lastSyncMs).toISOString());
     return { ok: true, enviados, puxados, organizacao };
   } catch (e) {
     return { ok: false, erro: e.message || String(e) };
@@ -277,14 +289,10 @@ async function ligarServidor(db, { url, email, senha }) {
   const org = login.usuario && login.usuario.organizacao ? login.usuario.organizacao : null;
   const novaOrgId = String(login.usuario.organizacao_id);
   const orgAntiga = lerMeta(db, "org_id", "");
-  const tabelas = ["cliente", "categoria", "fornecedor", "material", "orcamento", "producao", "faturacao"];
   if (orgAntiga !== novaOrgId) {
     console.log(`SIGRAF offline: isolamento de organização (${orgAntiga || "nenhuma"} -> ${novaOrgId}), limpando dados locais...`);
-    const tabelasSync = ["cliente", "categoria", "fornecedor", "material", "orcamento", "producao", "faturacao"];
-    for (const t of tabelasSync) {
-      try { db.exec(`DELETE FROM ${t}`); } catch (_) {}
-    }
     escreverMeta(db, "last_sync_time", "1970-01-01T00:00:00.000Z");
+    escreverMeta(db, "sync_version", "0");
   }
   escreverMeta(db, "server_url", base);
   escreverMeta(db, "sync_email", email);

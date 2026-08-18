@@ -27,6 +27,22 @@ async function registarUtilizadorLocal(login, senha) {
     for (const M of tabelas) {
       try { await M.destroy({ where: {} }); } catch (_) {}
     }
+    const tabelasExtra = [
+      modelos.MovimentoEstoque,
+      modelos.ReservaEstoque,
+      modelos.OrcamentoItem,
+      modelos.OrcamentoMaterial,
+      modelos.OrdemProducao,
+      modelos.PreImpressao,
+      modelos.Impressao,
+      modelos.Acabamento,
+      modelos.Qualidade,
+      modelos.Pedido,
+      modelos.PedidoItem,
+    ].filter(Boolean);
+    for (const M of tabelasExtra) {
+      try { await M.destroy({ where: {} }); } catch (_) {}
+    }
     try { await Usuario.destroy({ where: {} }); } catch (_) {}
     try { await Organizacao.destroy({ where: {} }); } catch (_) {}
   }
