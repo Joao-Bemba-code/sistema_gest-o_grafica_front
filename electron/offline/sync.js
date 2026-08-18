@@ -296,7 +296,7 @@ async function ligarServidor(db, { url, email, senha }) {
   };
 }
 
-function iniciarSync(db, { intervaloMs = 60 * 1000 } = {}) {
+function iniciarSync(db, { intervaloMs = 15 * 1000 } = {}) {
   let aCorrer = false;
   const executar = async () => {
     if (aCorrer) return;
