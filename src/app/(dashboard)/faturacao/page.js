@@ -17,6 +17,7 @@ import { listarOrdens } from "@/services/producao";
 import { listar as listarClientes } from "@/services/clientes";
 import { buscarOrganizacao } from "@/services/configuracoes";
 import gerarPDF from "@/lib/faturacaoPdf";
+import { useSyncRefresh } from "@/contexts/SyncContext";
 
 const metodos = {
   dinheiro: { label: "Dinheiro", icon: "payments" },
@@ -63,7 +64,7 @@ export default function FaturacaoPage() {
   const [empresa, setEmpresa] = useState({ nome: "", nif: "", endereco: "", telefone: "", email: "" });
   const { addToast } = useToast();
 
-  useEffect(() => {
+  const carregarDados = () => {
     Promise.all([listarFaturas(), listarOrdens(), listarClientes({ tipo: "cliente" }), listarOrcamentos(), buscarOrganizacao().catch(() => null)])
       .then(([f, o, c, orcData, emp]) => {
         setFaturas(Array.isArray(f) ? f : f?.data || []);
@@ -74,7 +75,13 @@ export default function FaturacaoPage() {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    carregarDados();
   }, []);
+
+  useSyncRefresh(carregarDados, [carregarDados]);
 
   const filteredFaturas = filtroFatura === "todas" ? faturas : faturas.filter((f) => f.estado === filtroFatura);
 

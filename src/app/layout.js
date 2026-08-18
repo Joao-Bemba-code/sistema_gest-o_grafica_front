@@ -1,5 +1,6 @@
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { SyncProvider } from "@/contexts/SyncContext";
 import { Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -20,7 +21,9 @@ export default function RootLayout({ children }) {
       </head>
       <body className="bg-surface-container-lowest text-on-surface min-h-screen">
         <ThemeProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <SyncProvider>{children}</SyncProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

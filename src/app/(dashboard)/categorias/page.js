@@ -10,6 +10,7 @@ import { useToast } from "@/components/Toast";
 import { ListSkeleton } from "@/components/Skeleton";
 import { inputCls, grupos, normalizarGrupo, tiposCampoEspecificacao } from "@/lib/estoque";
 import { listar, criar, atualizar, remover } from "@/services/categorias";
+import { useSyncRefresh } from "@/contexts/SyncContext";
 
 const TIPOS_CATEGORIA = ["material", "servico", "produto"];
 
@@ -99,6 +100,9 @@ export default function CategoriasPage() {
   useEffect(() => {
     carregar();
   }, [carregar]);
+
+  useSyncRefresh(carregar, [carregar]);
+
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const abrirNova = () => {

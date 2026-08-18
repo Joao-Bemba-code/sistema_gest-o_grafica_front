@@ -16,6 +16,7 @@ import { listar, criar, atualizar, remover, mudarEstado } from "@/services/orcam
 import { listar as listarClientes } from "@/services/clientes";
 import { listar as listarMateriais } from "@/services/materiais";
 import { buscarOrganizacao } from "@/services/configuracoes";
+import { useSyncRefresh } from "@/contexts/SyncContext";
 
 const estadoColors = {
   aprovado: "success",
@@ -123,24 +124,27 @@ export default function OrcamentosPage() {
   const [deletando, setDeletando] = useState(false);
   const { addToast } = useToast();
 
-  useEffect(() => {
-    async function fetchData() {
-      setCarregando(true);
-      setErro(null);
-      try {
-        const [orcData, cliData, empData, matData] = await Promise.all([listar(), listarClientes({ tipo: "cliente" }), buscarOrganizacao().catch(() => null), listarMateriais().catch(() => [])]);
-        setOrcamentos((Array.isArray(orcData) ? orcData : orcData?.data ?? []).map(normalizarOrcamento));
-        setClientes(Array.isArray(cliData) ? cliData : cliData?.data ?? []);
-        setMateriais(Array.isArray(matData) ? matData : matData?.data ?? []);
-        if (empData) setEmpresa(empData);
-      } catch (err) {
-        addToast(err.response?.data?.erro || "Erro na operação", "error");
-      } finally {
-        setCarregando(false);
-      }
+  async function carregarDados() {
+    setCarregando(true);
+    setErro(null);
+    try {
+      const [orcData, cliData, empData, matData] = await Promise.all([listar(), listarClientes({ tipo: "cliente" }), buscarOrganizacao().catch(() => null), listarMateriais().catch(() => [])]);
+      setOrcamentos((Array.isArray(orcData) ? orcData : orcData?.data ?? []).map(normalizarOrcamento));
+      setClientes(Array.isArray(cliData) ? cliData : cliData?.data ?? []);
+      setMateriais(Array.isArray(matData) ? matData : matData?.data ?? []);
+      if (empData) setEmpresa(empData);
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro na operação", "error");
+    } finally {
+      setCarregando(false);
     }
-    fetchData();
+  }
+
+  useEffect(() => {
+    carregarDados();
   }, [addToast]);
+
+  useSyncRefresh(carregarDados, [carregarDados]);
 
   const setField = (name, val) => setForm((p) => ({ ...p, [name]: val }));
 

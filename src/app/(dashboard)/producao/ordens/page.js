@@ -17,6 +17,7 @@ import SaidaMateriaisModal from "@/components/producao/SaidaMateriaisModal";
 import { listar as listarClientes } from "@/services/clientes";
 import { listar as listarOrcamentos, buscarPorId as buscarOrcamento } from "@/services/orcamentos";
 import { listar as listarMateriais } from "@/services/materiais";
+import { useSyncRefresh } from "@/contexts/SyncContext";
 
 const statusConfig = {
   aguardando: { label: "Aguardando", variant: "warning" },
@@ -81,14 +82,20 @@ export default function OrdensProducaoPage() {
   const [libertando, setLibertando] = useState(false);
   const { addToast } = useToast();
 
-  useEffect(() => {
+  const carregarDados = () => {
     Promise.all([listarOrdens(), listarClientes({ tipo: "cliente" }), listarOrcamentos(), listarMateriais()]).then(([ordensData, clientesData, orcamentosData, materiaisData]) => {
       setOps((Array.isArray(ordensData) ? ordensData : ordensData?.ordens || []).map(normalizar));
       setClientes(Array.isArray(clientesData) ? clientesData : clientesData?.clientes || []);
       setOrcamentos(Array.isArray(orcamentosData) ? orcamentosData : orcamentosData?.orcamentos || []);
       setMateriais(Array.isArray(materiaisData) ? materiaisData : materiaisData?.materiais || []);
     }).finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    carregarDados();
   }, []);
+
+  useSyncRefresh(carregarDados, [carregarDados]);
 
   const matPorId = Object.fromEntries(materiais.map((m) => [m.id, m]));
 

@@ -16,6 +16,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/Toast";
+import { useSyncRefresh } from "@/contexts/SyncContext";
 import { KPIGridSkeleton, CardSkeleton, ListSkeleton } from "@/components/Skeleton";
 import FornecedorSelect from "@/components/estoque/FornecedorSelect";
 import NumeroInput from "@/components/ui/NumeroInput";
@@ -144,7 +145,7 @@ export default function DashboardPage() {
 
   const nomeUsuario = getUsuario()?.nome || "";
 
-  useEffect(() => {
+  const carregarDados = () => {
     Promise.all([
       listarOrcamentos().catch(() => []),
       listarClientes({ tipo: "cliente" }).catch(() => []),
@@ -157,7 +158,13 @@ export default function DashboardPage() {
       setOrcamentos(o); setClientes(c); setMateriais(m);
       setFaturas(f); setOrdens(p); setMovimentos(mv); setFornecedores(fo);
     }).finally(() => setCarregando(false));
+  };
+
+  useEffect(() => {
+    carregarDados();
   }, []);
+
+  useSyncRefresh(carregarDados, [carregarDados]);
 
   const hoje = new Date();
   const orcamentosHoje = orcamentos.filter((o) => {

@@ -247,6 +247,11 @@ async function sincronizar(db) {
     const enviados = await enviarTabelas(sequelize, url, token);
     const puxados = await puxarTabelas(sequelize, url, token, db);
     const organizacao = await sincronizarOrganizacaoComServidor(db, url, token);
+    const temDadosNovos = Object.values(puxados).some((n) => n > 0);
+    if (temDadosNovos) {
+      const v = Number(lerMeta(db, "sync_version", "0")) + 1;
+      escreverMeta(db, "sync_version", String(v));
+    }
     escreverMeta(db, "last_sync_time", agora());
     return { ok: true, enviados, puxados, organizacao };
   } catch (e) {

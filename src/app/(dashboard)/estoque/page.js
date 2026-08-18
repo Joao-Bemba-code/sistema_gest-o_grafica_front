@@ -21,6 +21,7 @@ import { grupos, normalizarGrupo } from "@/lib/estoque";
 import { gerarFichaMaterialPDF, gerarPedidoPDF } from "@/lib/estoquePdf";
 import { listar as listarPedidos, criar as criarPedido, cancelar as cancelarPedido, receber as apiReceberPedido } from "@/services/pedidos";
 import { useToast } from "@/components/Toast";
+import { useSyncRefresh } from "@/contexts/SyncContext";
 
 export default function EstoquePage() {
   const { addToast } = useToast();
@@ -31,6 +32,8 @@ export default function EstoquePage() {
     carregarReservas, cancelarReservaDe,
   } = useEstoque();
   const movs = useMovimentacoes({ org });
+
+  useSyncRefresh(carregar, [carregar]);
 
   const [pedidos, setPedidos] = useState([]);
   const [pedOpen, setPedOpen] = useState(false);

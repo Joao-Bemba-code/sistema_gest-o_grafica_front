@@ -44,6 +44,7 @@ function criarApi(db) {
       org_id: lerMeta(db, "org_id", ""),
       org_nome: lerMeta(db, "org_nome", ""),
       last_sync_time: lerMeta(db, "last_sync_time", ""),
+      sync_version: Number(lerMeta(db, "sync_version", "0")),
       pendentes: pendentes(db),
     });
   });

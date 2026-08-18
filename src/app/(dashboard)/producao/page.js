@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
 import { listarOrdens, salvarPreImpressao, salvarImpressao, salvarAcabamento, salvarQualidade, atualizarOrdem } from "@/services/producao";
+import { useSyncRefresh } from "@/contexts/SyncContext";
 
 const etapas = [
   { id: "pre_impressao", label: "Pré-Impressão", icon: "rule" },
@@ -80,13 +81,19 @@ export default function ProducaoPage() {
   const [loading, setLoading] = useState(true);
   const { addToast } = useToast();
 
-  useEffect(() => {
+  const carregarDados = () => {
     listarOrdens().then((data) => {
       const arr = (Array.isArray(data) ? data : data?.ordens || []).map(normalizar);
       setJobs(arr);
       setSelectedJob((prev) => prev ?? arr[0]?.id ?? null);
     }).catch(() => addToast("Erro ao carregar ordens", "error")).finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    carregarDados();
   }, [addToast]);
+
+  useSyncRefresh(carregarDados, [carregarDados]);
 
   const updateJob = (jobId, section, key, value) => {
     setJobs(jobs.map(j => j.id === jobId ? { ...j, [section]: { ...j[section], [key]: value } } : j));
