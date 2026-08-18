@@ -1,12 +1,12 @@
 const express = require("express");
+const bcrypt = require("bcryptjs");
 const { novoUuid, listar, obter, salvarLocal, pendentes, lerMeta } = require("./db");
-const { sincronizar, ligarServidor, loginRemoto } = require("./sync");
-const { registarUtilizadorLocal } = require("./usuario");
+const { sincronizar, ligarServidor, loginRemoto, temLigacao } = require("./sync");
+const { registarUtilizadorLocal, caminhoModelos } = require("./usuario");
 
 function criarApi(db) {
   const router = express.Router();
 
-  // Exemplo: guardar um registo de cliente localmente (UUID + is_dirty = 1).
   router.get("/clientes", (req, res) => {
     return res.json(listar(db, "clientes"));
   });
@@ -43,13 +43,12 @@ function criarApi(db) {
       server_url: lerMeta(db, "server_url", ""),
       org_id: lerMeta(db, "org_id", ""),
       org_nome: lerMeta(db, "org_nome", ""),
-      last_sync_time: lerMeta(db, "last_sync_time", ""),
+      last_push_time: lerMeta(db, "last_push_time", ""),
       sync_version: Number(lerMeta(db, "sync_version", "0")),
       pendentes: pendentes(db),
     });
   });
 
-  // Primeiro acesso: liga este computador ao servidor e faz a 1.ª sincronização.
   router.post("/sync/ligar", async (req, res) => {
     const { url, email, senha } = req.body || {};
     const r = await ligarServidor(db, { url, email, senha });
@@ -63,10 +62,30 @@ function criarApi(db) {
     return res.json(r);
   });
 
-  // Login de um utilizador que ainda não fez o primeiro acesso neste
-  // computador: valida sempre contra o servidor real (exige internet) e,
-  // se válido, regista o utilizador localmente para os acessos seguintes.
   router.post("/auth/login", async (req, res) => {
+    const { email, senha } = req.body || {};
+    if (!email || !senha) return res.status(422).json({ erro: "Email e senha são obrigatórios" });
+
+    try {
+      const modelos = require(caminhoModelos());
+      const { Usuario, Organizacao } = modelos;
+      const usuario = await Usuario.findOne({ where: { email } });
+      if (!usuario) return res.status(401).json({ erro: "Credenciais inválidas" });
+      const hash = await bcrypt.hash(senha, 10);
+      const valido = await bcrypt.compare(senha, usuario.senha);
+      if (!valido) return res.status(401).json({ erro: "Credenciais inválidas" });
+      const org = await Organizacao.findByPk(usuario.organizacao_id);
+      return res.json({
+        ok: true,
+        online: false,
+        usuario: { ...usuario.toJSON(), organizacao: org ? org.toJSON() : null },
+      });
+    } catch (e) {
+      return res.status(500).json({ erro: "Erro ao fazer login: " + (e.message || e) });
+    }
+  });
+
+  router.post("/auth/login-online", async (req, res) => {
     const { email, senha } = req.body || {};
     if (!email || !senha) return res.status(422).json({ erro: "Email e senha são obrigatórios" });
     const url = lerMeta(db, "server_url", "");
@@ -77,7 +96,7 @@ function criarApi(db) {
       return res.json({ ok: true, online: true, usuario: login.usuario });
     } catch (e) {
       return res.status(401).json({
-        erro: "Sem ligação ao servidor ou credenciais inválidas. O primeiro acesso neste computador precisa de internet.",
+        erro: "Sem ligação ao servidor ou credenciais inválidas.",
       });
     }
   });

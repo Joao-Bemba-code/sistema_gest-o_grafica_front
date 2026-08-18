@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
 import DesktopConfig from "@/components/DesktopConfig";
 import { login } from "@/services/auth";
-import { desktopDisponivel, estadoOffline, ligarServidor, loginServidor, SERVIDOR_PADRAO } from "@/services/offline";
+import { desktopDisponivel } from "@/services/offline";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function LoginPage() {
@@ -13,54 +13,17 @@ export default function LoginPage() {
   const { setUsuario } = useAuth();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
-  const [ligado, setLigado] = useState(() => (desktopDisponivel() ? null : true));
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!desktopDisponivel()) return;
-    let activo = true;
-    estadoOffline()
-      .then((s) => {
-        if (activo) setLigado(!!(s && s.org_id));
-      })
-      .catch(() => {
-        if (activo) setLigado(false);
-      });
-    return () => {
-      activo = false;
-    };
-  }, []);
-
-  const entrar = async (emailLogin, senhaLogin) => {
-    const data = await login(emailLogin, senhaLogin);
-    setUsuario(data.usuario);
-    router.push("/");
-  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      if (desktopDisponivel() && ligado === false) {
-        // Primeiro acesso neste computador: valida contra o servidor real.
-        await ligarServidor({ url: SERVIDOR_PADRAO, email, senha });
-        await entrar(email, senha);
-        return;
-      }
-      try {
-        await entrar(email, senha);
-      } catch (err) {
-        // Credenciais desconhecidas neste computador: pode ser o primeiro
-        // acesso deste utilizador — valida online e regista localmente.
-        if (desktopDisponivel() && err.response?.status === 401) {
-          await loginServidor({ email, senha });
-          await entrar(email, senha);
-          return;
-        }
-        throw err;
-      }
+      const data = await login(email, senha);
+      setUsuario(data.usuario);
+      router.push("/");
     } catch (err) {
       setError(err.response?.data?.erro || "Credenciais inválidas");
     } finally {
@@ -130,11 +93,11 @@ export default function LoginPage() {
           </form>
 
           <p className="text-[11px] text-muted-foreground text-center mt-6">
-            Use as credenciais da sua conta
+            Login offline — os dados são guardados localmente
           </p>
-          {desktopDisponivel() && ligado === false && (
+          {desktopDisponivel() && (
             <p className="text-[10px] text-muted-foreground/70 text-center mt-2">
-              Primeiro acesso neste computador: precisa de internet para validar a conta no servidor.
+              Configure o backup na nuvem em Definições após o login.
             </p>
           )}
         </div>

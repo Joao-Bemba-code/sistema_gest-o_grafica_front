@@ -4,40 +4,17 @@ const { registarUtilizadorLocal, caminhoModelos } = require("./usuario");
 
 const HTTP = axios.create({ timeout: 15000 });
 
-// Colunas de negócio da organização (registo único; sem UUID). Convenção
-// partilhada com o servidor (services/sincronizacao.js -> COLUNAS_ORG).
 const COLUNAS_ORG = [
-  "nome",
-  "sigla",
-  "nif",
-  "email",
-  "telefone",
-  "endereco",
-  "website",
-  "template_contrato",
-  "logo_url",
+  "nome", "sigla", "nif", "email", "telefone", "endereco",
+  "website", "template_contrato", "logo_url",
 ];
 
-// Tabelas reais sincronizadas (mesmo nome em sgg.sqlite e MySQL). Ordem
-// respeita as dependências (pais antes dos filhos) para as FKs existirem.
 const TABELAS_SINC = [
-  "cliente",
-  "fornecedor",
-  "categoria",
-  "material",
-  "movimento_estoque",
-  "orcamento",
-  "orcamento_item",
-  "orcamento_material",
-  "ordem_producao",
-  "pre_impressao",
-  "impressao",
-  "acabamento",
-  "qualidade",
-  "reserva_estoque",
-  "faturacao",
-  "pedido",
-  "pedido_item",
+  "cliente", "fornecedor", "categoria", "material",
+  "movimento_estoque", "orcamento", "orcamento_item",
+  "orcamento_material", "ordem_producao", "pre_impressao",
+  "impressao", "acabamento", "qualidade", "reserva_estoque",
+  "faturacao", "pedido", "pedido_item",
 ];
 
 function colunasReais(Model) {
@@ -84,12 +61,10 @@ async function temLigacao(url) {
   }
 }
 
-// Envia APENAS registos modificados localmente desde o último sync.
-// Evita que dados antigos de outro PC sobrescrevam dados correctos na cloud.
 async function enviarTabelas(sequelize, url, token, db) {
   const base = url.replace(/\/+$/, "");
   const cab = { headers: { Authorization: `Bearer ${token}` } };
-  const since = lerMeta(db, "last_sync_time", "1970-01-01T00:00:00.000Z");
+  const since = lerMeta(db, "last_push_time", "1970-01-01T00:00:00.000Z");
   const desde = new Date(since || "1970-01-01T00:00:00.000Z");
   const enviados = {};
   for (const tabela of TABELAS_SINC) {
@@ -115,132 +90,28 @@ async function enviarTabelas(sequelize, url, token, db) {
   return enviados;
 }
 
-// Puxa o que mudou nas tabelas reais desde o último sync e aplica com LWW.
-// Retorna {registos, maxUpdatedAt} — maxUpdatedAt é o maior updatedAt entre
-// os registos recebidos do servidor, para o caller ajustar last_sync_time
-// e evitar que esses mesmos registos sejam reenviados no próximo ciclo.
-async function puxarTabelas(sequelize, url, token, db) {
+async function enviarOrganizacao(sequelize, url, token) {
   const base = url.replace(/\/+$/, "");
   const cab = { headers: { Authorization: `Bearer ${token}` } };
-  const since = lerMeta(db, "last_sync_time", "1970-01-01T00:00:00.000Z");
-  const puxados = {};
-  let maxUpdatedAt = 0;
-  for (const tabela of TABELAS_SINC) {
-    try {
-      const Model = sequelize.models[tabela];
-      if (!Model) continue;
-      const resp = await HTTP.get(`${base}/api/sinc/tabela`, {
-        params: { tabela, since },
-        ...cab,
-      });
-      const registos = (resp.data && resp.data.registos) || [];
-      if (!registos.length) continue;
-      const colunas = colunasReais(Model);
-      let n = 0;
-      for (const reg of registos) {
-        const novoT = Date.parse(reg.updatedAt) || 0;
-        if (novoT > maxUpdatedAt) maxUpdatedAt = novoT;
-        const existente = await Model.unscoped().findByPk(reg.id, { raw: true });
-        if (!existente) {
-          const valores = { id: reg.id };
-          for (const c of colunas) {
-            const v = normalizarValor(Model, c, reg[c]);
-            if (v !== null) valores[c] = v;
-          }
-          valores.createdAt = new Date(Date.parse(reg.createdAt) || Date.now());
-          valores.updatedAt = new Date(novoT || Date.now());
-          const chaves = Object.keys(valores);
-          await sequelize.query(
-            `INSERT INTO \`${tabela}\` (\`${chaves.join("`, `")}\`) VALUES (${chaves.map(() => "?").join(", ")})`,
-            { replacements: chaves.map((k) => valores[k]) }
-          );
-          n++;
-        } else {
-          const atualT = Date.parse(existente.updatedAt) || 0;
-          if (!novoT || novoT <= atualT) continue;
-          const sets = [];
-          const params = [];
-          for (const c of colunas) {
-            const v = normalizarValor(Model, c, reg[c]);
-            if (v !== null) {
-              sets.push(`\`${c}\` = ?`);
-              params.push(v);
-            }
-          }
-          sets.push("`updatedAt` = ?");
-          params.push(new Date(novoT));
-          params.push(reg.id);
-          await sequelize.query(
-            `UPDATE \`${tabela}\` SET ${sets.join(", ")} WHERE id = ?`,
-            { replacements: params }
-          );
-          n++;
-        }
-      }
-      if (n) puxados[tabela] = n;
-    } catch (e) {
-      console.log(`SIGRAF offline: tabela ${tabela} não puxada (${e.message || e})`);
-    }
-  }
-  return { registos: puxados, maxUpdatedAt };
-}
-
-async function sincronizarOrganizacaoComServidor(db, url, token) {
-  const { sequelize, Organizacao } = require(caminhoModelos());
-  const base = url.replace(/\/+$/, "");
-  const cab = { headers: { Authorization: `Bearer ${token}` } };
-  const push = { ok: true, atualizado: false };
-  const pull = { ok: true, atualizado: false };
-
-  // Envia: dados da org local (sgg.sqlite) para o servidor, com LWW.
+  const { Organizacao } = require(caminhoModelos());
   const local = await Organizacao.findOne();
-  if (local && local.nome) {
-    try {
-      const r = await HTTP.post(
-        `${base}/api/sinc/organizacao`,
-        { organizacao: { ...local.toJSON(), updated_at: local.updatedAt } },
-        cab
-      );
-      if (r.data) push.atualizado = !!r.data.atualizado;
-    } catch (e) {
-      throw e;
-    }
+  if (!local || !local.nome) return { push: { ok: true, atualizado: false } };
+  try {
+    const r = await HTTP.post(
+      `${base}/api/sinc/organizacao`,
+      { organizacao: { ...local.toJSON(), updated_at: local.updatedAt } },
+      cab
+    );
+    return { push: { ok: true, atualizado: r.data ? !!r.data.atualizado : false } };
+  } catch (e) {
+    return { push: { ok: false, erro: e.message } };
   }
-
-  // Puxa: estado atual no servidor; aplica localmente se for mais recente.
-  const r = await HTTP.get(`${base}/api/sinc/organizacao`, cab);
-  const remota = r.data && r.data.organizacao;
-  if (remota) {
-    const novoT = Date.parse(remota.updated_at || remota.updatedAt) || 0;
-    const atualT = local ? Date.parse(local.updatedAt) || 0 : 0;
-    if (novoT && novoT > atualT) {
-      const campos = {};
-      for (const c of COLUNAS_ORG) {
-        if (remota[c] !== undefined && remota[c] !== null) campos[c] = remota[c];
-      }
-      campos.updatedAt = new Date(novoT);
-      if (local) {
-        // Sequelize ignora updatedAt em update(): SQL direto para o LWW.
-        const sets = Object.keys(campos)
-          .map((c) => `"${c}" = ?`)
-          .join(", ");
-        await sequelize.query(`UPDATE "organizacao" SET ${sets} WHERE id = ?`, {
-          replacements: [...Object.values(campos), local.id],
-        });
-      } else {
-        await Organizacao.create(campos);
-      }
-      pull.atualizado = true;
-    }
-  }
-  return { push, pull };
 }
 
 async function sincronizar(db) {
   const url = lerMeta(db, "server_url", "");
   const email = lerMeta(db, "sync_email", "");
   const senha = lerMeta(db, "sync_senha", "");
-  const orgId = lerMeta(db, "org_id", "");
   if (!url || !email || !senha) {
     return { ok: false, erro: "Servidor ainda não foi ligado." };
   }
@@ -254,22 +125,14 @@ async function sincronizar(db) {
   try {
     const { sequelize } = require(caminhoModelos());
     const enviados = await enviarTabelas(sequelize, url, token, db);
-    const resultadoPuxar = await puxarTabelas(sequelize, url, token, db);
-    const puxados = resultadoPuxar.registos;
-    const maxUpdatedAt = resultadoPuxar.maxUpdatedAt || 0;
-    const organizacao = await sincronizarOrganizacaoComServidor(db, url, token);
-    const temDadosNovos = Object.values(puxados).some((n) => n > 0);
-    if (temDadosNovos) {
+    const organizacao = await enviarOrganizacao(sequelize, url, token);
+    const temDados = Object.values(enviados).some((n) => n > 0) || (organizacao.push && organizacao.push.atualizado);
+    if (temDados) {
       const v = Number(lerMeta(db, "sync_version", "0")) + 1;
       escreverMeta(db, "sync_version", String(v));
     }
-    // Usa o MAX entre agora() e o maior updatedAt dos dados puxados do
-    // servidor para evitar reenvio no próximo ciclo (relógio do servidor
-    // pode estar à frente do PC).
-    const agoraMs = Date.now();
-    const lastSyncMs = Math.max(agoraMs, maxUpdatedAt);
-    escreverMeta(db, "last_sync_time", new Date(lastSyncMs).toISOString());
-    return { ok: true, enviados, puxados, organizacao };
+    escreverMeta(db, "last_push_time", agora());
+    return { ok: true, enviados, organizacao };
   } catch (e) {
     return { ok: false, erro: e.message || String(e) };
   }
@@ -289,10 +152,25 @@ async function ligarServidor(db, { url, email, senha }) {
   const org = login.usuario && login.usuario.organizacao ? login.usuario.organizacao : null;
   const novaOrgId = String(login.usuario.organizacao_id);
   const orgAntiga = lerMeta(db, "org_id", "");
-  if (orgAntiga !== novaOrgId) {
-    console.log(`SIGRAF offline: isolamento de organização (${orgAntiga || "nenhuma"} -> ${novaOrgId}), limpando dados locais...`);
-    escreverMeta(db, "last_sync_time", "1970-01-01T00:00:00.000Z");
-    escreverMeta(db, "sync_version", "0");
+  if (orgAntiga && orgAntiga !== novaOrgId) {
+    console.log(`SIGRAF offline: isolamento de organização (${orgAntiga} -> ${novaOrgId}), limpando dados locais...`);
+    const { sequelize, Organizacao, Usuario, Cliente, Fornecedor, Categoria, Material, Orcamento, Producao, Faturacao } = require(caminhoModelos());
+    const tabelas = [Cliente, Fornecedor, Categoria, Material, Orcamento, Producao, Faturacao];
+    for (const M of tabelas) {
+      try { await M.destroy({ where: {} }); } catch (_) {}
+    }
+    const extras = [
+      sequelize.models.movimento_estoque, sequelize.models.reserva_estoque,
+      sequelize.models.orcamento_item, sequelize.models.orcamento_material,
+      sequelize.models.ordem_producao, sequelize.models.pre_impressao,
+      sequelize.models.impressao, sequelize.models.acabamento,
+      sequelize.models.qualidade, sequelize.models.pedido, sequelize.models.pedido_item,
+    ].filter(Boolean);
+    for (const M of extras) {
+      try { await M.destroy({ where: {} }); } catch (_) {}
+    }
+    try { await Usuario.destroy({ where: {} }); } catch (_) {}
+    try { await Organizacao.destroy({ where: {} }); } catch (_) {}
   }
   escreverMeta(db, "server_url", base);
   escreverMeta(db, "sync_email", email);
@@ -313,7 +191,7 @@ async function ligarServidor(db, { url, email, senha }) {
   };
 }
 
-function iniciarSync(db, { intervaloMs = 15 * 1000 } = {}) {
+function iniciarSync(db, { intervaloMs = 60 * 1000 } = {}) {
   let aCorrer = false;
   const executar = async () => {
     if (aCorrer) return;
@@ -322,7 +200,7 @@ function iniciarSync(db, { intervaloMs = 15 * 1000 } = {}) {
       const url = lerMeta(db, "server_url", "");
       if (url && (await temLigacao(url))) {
         const r = await sincronizar(db);
-        if (r.ok) console.log(`SIGRAF offline: sincronização OK (${JSON.stringify(r.enviados)}/${JSON.stringify(r.puxados)}/org${r.organizacao ? ":" + (r.organizacao.push.atualizado ? "push" : "") + (r.organizacao.pull.atualizado ? "pull" : "") : ""})`);
+        if (r.ok) console.log(`SIGRAF offline: backup OK (${JSON.stringify(r.enviados)})`);
         else console.log(`SIGRAF offline: ${r.erro}`);
       }
     } catch (e) {
@@ -332,7 +210,7 @@ function iniciarSync(db, { intervaloMs = 15 * 1000 } = {}) {
     }
   };
   const timer = setInterval(executar, intervaloMs);
-  setTimeout(executar, 2000);
+  setTimeout(executar, 5000);
   return () => clearInterval(timer);
 }
 

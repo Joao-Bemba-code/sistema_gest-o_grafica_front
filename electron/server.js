@@ -237,7 +237,6 @@ async function iniciarServidor(porta) {
     await sequelize.sync();
     await aplicarMigracoes(sequelize);
     await garantirDadosIniciais(backendDir);
-    await garantirFaixaIds(sequelize);
     await criarBackupAutomatico();
   }
 
