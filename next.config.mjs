@@ -30,4 +30,8 @@ export default withPWA({
     skipWaiting: true,
     disable: process.env.NEXT_PUBLIC_DISABLE_PWA === "true",
     scope: "/",
+    // Add favicon link tags
+    // link: [
+    //   { rel: "icon", type: "image/x-icon", href: "/favicon.ico" },
+    // ],
   });
