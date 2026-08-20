@@ -28,7 +28,7 @@
     "xss": "^1.0.15"
   },
   "devDependencies": {
-    "electron": "43.2.0",
+    "electron": "43.4.1",
     "electron-builder": "^24.13.3",
     "electron-rebuild": "^3.2.9"
   },

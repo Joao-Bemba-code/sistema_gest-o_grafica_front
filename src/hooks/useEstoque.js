@@ -21,7 +21,7 @@ import { statusDe, toNum } from "@/lib/estoque";
 
 const camposNumericos = [
   "gramagem", "largura", "altura", "percentual_quebra",
-  "estoque_min", "estoque_max", "ponto_ressuprimento", "custo_unit", "margem",
+  "estoque_min", "estoque_max", "ponto_ressuprimento", "custo_unit", "margem", "lucro",
 ];
 
 export default function useEstoque() {

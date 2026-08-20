@@ -7,7 +7,7 @@ import NumeroInput from "@/components/ui/NumeroInput";
 import { inputCls, tiposEstoque, unidades, camposDeCategoria, familias, normalizarFamilia, prefixoFamilia } from "@/lib/estoque";
 
 const tabs = [
-  { key: "basicos", label: "Dados Básicos", icon: "badge" },
+  { key: "basicos", label: "Identificação do Material", icon: "badge" },
   { key: "especificacoes", label: "Especificações", icon: "straighten" },
   { key: "estoque", label: "Estoque", icon: "inventory" },
 ];
@@ -149,6 +149,9 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
             </Campo>
             <Campo label="Localização na Prateleira" full>
               <input value={form.localizacao} onChange={(e) => onChange("localizacao", e.target.value)} className={inputCls} placeholder="Ex: Prateleira A3, seção 2" />
+            </Campo>
+            <Campo label="Lucro (%)">
+              <NumeroInput value={form.lucro} onChange={(e) => onChange("lucro", e.target.value)} className={inputCls} placeholder="Ex: 25" />
             </Campo>
           </div>
         )}
