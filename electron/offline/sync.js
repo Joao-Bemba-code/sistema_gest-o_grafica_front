@@ -138,6 +138,7 @@ async function buscarAlteracoesTabelas(sequelize, url, token, db) {
         if (!reg || reg.id == null) continue;
         const novoT = Date.parse(reg.updated_at || reg.updatedAt) || 0;
         const existente = await Model.unscoped().findByPk(reg.id, { raw: true });
+        const deletado = reg.deleted === 1 || reg.deleted === true;
         if (!existente) {
           const dados = {};
           const colunas = colunasReais(Model);
@@ -147,6 +148,7 @@ async function buscarAlteracoesTabelas(sequelize, url, token, db) {
           dados.id = reg.id;
           dados.createdAt = reg.createdAt ? new Date(Date.parse(reg.createdAt) || Date.now()) : new Date();
           dados.updatedAt = novoT ? new Date(novoT) : new Date();
+          if (deletado) dados.deleted = 1;
           try {
             await Model.create(dados);
             aplicados++;
@@ -162,6 +164,7 @@ async function buscarAlteracoesTabelas(sequelize, url, token, db) {
             if (reg[c] !== undefined) dados[c] = reg[c];
           }
           dados.updatedAt = new Date(novoT);
+          if (deletado) dados.deleted = 1;
           try {
             await Model.update(dados, { where: { id: reg.id }, silent: true });
             aplicados++;
