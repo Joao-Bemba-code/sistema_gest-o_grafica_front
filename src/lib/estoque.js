@@ -1,13 +1,52 @@
-export const grupos = {
-  papel: { label: "Papéis e Mídias", icon: "description", classe: "text-blue-500 bg-blue-500/10" },
-  insumo: { label: "Insumos e Consumíveis", icon: "water_drop", classe: "text-amber-500 bg-amber-500/10" },
-  acabamento: { label: "Acabamento e Logística", icon: "handyman", classe: "text-purple-500 bg-purple-500/10" },
-  produto: { label: "Produtos Prontos", icon: "inventory_2", classe: "text-emerald-500 bg-emerald-500/10" },
-  outros: { label: "Outros", icon: "category", classe: "text-muted-foreground bg-muted" },
+export const categoriasTipo = {
+  consumiveis: { label: "Consumíveis", icon: "local_fire_department", classe: "text-orange-500 bg-orange-500/10" },
+  materiais: { label: "Materiais", icon: "inventory", classe: "text-blue-500 bg-blue-500/10" },
+  ferramentas: { label: "Ferramentas", icon: "handyman", classe: "text-gray-500 bg-gray-500/10" },
+  equipamentos: { label: "Equipamentos", icon: "precision_manufacturing", classe: "text-indigo-500 bg-indigo-500/10" },
+  produtos_quimicos: { label: "Produtos Químicos", icon: "science", classe: "text-yellow-600 bg-yellow-600/10" },
+  pecas_sobressalentes: { label: "Peças e Sobressalentes", icon: "settings_suggest", classe: "text-cyan-500 bg-cyan-500/10" },
+  servicos: { label: "Serviços", icon: "miscellaneous_services", classe: "text-violet-500 bg-violet-500/10" },
+  produtos_acabados: { label: "Produtos Acabados", icon: "inventory_2", classe: "text-emerald-500 bg-emerald-500/10" },
 };
 
-export function normalizarGrupo(g) {
-  return g && grupos[g] ? g : "outros";
+export const familias = {
+  papeis: { label: "Papéis", icon: "description", classe: "text-blue-500 bg-blue-500/10" },
+  tintas: { label: "Tintas", icon: "water_drop", classe: "text-amber-500 bg-amber-500/10" },
+  chapas: { label: "Chapas", icon: "square_foot", classe: "text-slate-500 bg-slate-500/10" },
+  produto_quimico: { label: "Produto Químico", icon: "science", classe: "text-yellow-600 bg-yellow-600/10" },
+  equipamentos: { label: "Equipamentos", icon: "precision_manufacturing", classe: "text-indigo-500 bg-indigo-500/10" },
+  ferramentas: { label: "Ferramentas", icon: "construction", classe: "text-gray-500 bg-gray-500/10" },
+  suporte_especial: { label: "Suporte Especial", icon: "view_carousel", classe: "text-pink-500 bg-pink-500/10" },
+  material_acabamento: { label: "Material de Acabamento", icon: "palette", classe: "text-purple-500 bg-purple-500/10" },
+  consumiveis: { label: "Consumíveis", icon: "local_fire_department", classe: "text-orange-500 bg-orange-500/10" },
+};
+
+export const tiposItem = {
+  materia_prima: { label: "Matéria-Prima", classe: "text-blue-500" },
+  produto_acabado: { label: "Produto Acabado", classe: "text-emerald-500" },
+  servico: { label: "Serviço", classe: "text-violet-500" },
+};
+
+export function normalizarFamilia(f) {
+  return f && familias[f] ? f : "papeis";
+}
+
+export const FAMILIA_PREFIXO = {
+  papeis: "PAP", tintas: "TIN", chapas: "CHA", produto_quimico: "PQU",
+  equipamentos: "EQU", ferramentas: "FER", suporte_especial: "SPE",
+  material_acabamento: "MAC", consumiveis: "CON",
+};
+
+export function prefixoFamilia(familia) {
+  return FAMILIA_PREFIXO[normalizarFamilia(familia)] || "MAT";
+}
+
+export function normalizarCategoriaTipo(t) {
+  return t && categoriasTipo[t] ? t : "materiais";
+}
+
+export function normalizarTipoItem(t) {
+  return t && tiposItem[t] ? t : "materia_prima";
 }
 
 export const statusCfg = {
@@ -26,8 +65,8 @@ export const tiposCampoEspecificacao = [
   { valor: "selecao", label: "Lista de opções" },
 ];
 
-export const camposPadraoPorGrupo = {
-  papel: [
+export const camposPadraoPorFamilia = {
+  papeis: [
     { chave: "gramagem", rotulo: "Gramagem", tipo: "numero", unidade: "g/m²" },
     { chave: "cor", rotulo: "Cor", tipo: "selecao", opcoes: ["Branco", "Creme", "Off-white", "Colorido"] },
     { chave: "formato", rotulo: "Formato", tipo: "texto" },
@@ -35,18 +74,38 @@ export const camposPadraoPorGrupo = {
     { chave: "largura", rotulo: "Largura", tipo: "numero", unidade: "cm" },
     { chave: "altura", rotulo: "Altura", tipo: "numero", unidade: "cm" },
   ],
-  insumo: [
+  tintas: [
+    { chave: "cor", rotulo: "Cor", tipo: "texto" },
+    { chave: "base", rotulo: "Base", tipo: "selecao", opcoes: ["Solvente", "Aquosa", "UV", "Latex"] },
+    { chave: "marca", rotulo: "Marca", tipo: "texto" },
+  ],
+  chapas: [
+    { chave: "tipo", rotulo: "Tipo", tipo: "selecao", opcoes: ["CTP", "Film", "Digital"] },
+    { chave: "formato", rotulo: "Formato", tipo: "texto" },
+  ],
+  produto_quimico: [
+    { chave: "composicao", rotulo: "Composição", tipo: "texto" },
+    { chave: "perigo", rotulo: "Nível de Perigo", tipo: "selecao", opcoes: ["Baixo", "Médio", "Alto"] },
+  ],
+  equipamentos: [
+    { chave: "marca", rotulo: "Marca", tipo: "texto" },
+    { chave: "modelo", rotulo: "Modelo", tipo: "texto" },
+    { chave: "numero_serie", rotulo: "Nº de Série", tipo: "texto" },
+  ],
+  ferramentas: [
     { chave: "marca", rotulo: "Marca", tipo: "texto" },
     { chave: "tipo", rotulo: "Tipo", tipo: "texto" },
   ],
-  acabamento: [
+  suporte_especial: [
     { chave: "tipo", rotulo: "Tipo", tipo: "texto" },
+    { chave: "especificacoes", rotulo: "Especificações", tipo: "area" },
   ],
-  produto: [
-    { chave: "descricao_tecnica", rotulo: "Descrição técnica", tipo: "area" },
+  material_acabamento: [
+    { chave: "tipo", rotulo: "Tipo", tipo: "selecao", opcoes: ["Cola", "Fita", "Lona", "Vinil", "Cordão"] },
   ],
-  outros: [
+  consumiveis: [
     { chave: "marca", rotulo: "Marca", tipo: "texto" },
+    { chave: "tipo", rotulo: "Tipo", tipo: "texto" },
   ],
 };
 
@@ -54,7 +113,7 @@ export function camposDeCategoria(categoria) {
   if (categoria?.campos_especificacao && Array.isArray(categoria.campos_especificacao) && categoria.campos_especificacao.length) {
     return categoria.campos_especificacao;
   }
-  return camposPadraoPorGrupo[categoria?.grupo || "outros"] || camposPadraoPorGrupo.outros;
+  return [];
 }
 
 const CHAVES_LEGADO = new Set(["produto", "formato", "papel", "impressao", "impressão", "acabamento"]);

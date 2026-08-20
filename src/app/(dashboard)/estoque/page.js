@@ -17,7 +17,7 @@ import EmptyState from "@/components/estoque/EmptyState";
 import PedidosModal from "@/components/estoque/PedidosModal";
 import PedidoFormModal from "@/components/estoque/PedidoFormModal";
 import PedidoReceberModal from "@/components/estoque/PedidoReceberModal";
-import { grupos, normalizarGrupo } from "@/lib/estoque";
+import { familias, normalizarFamilia } from "@/lib/estoque";
 import { gerarFichaMaterialPDF, gerarPedidoPDF } from "@/lib/estoquePdf";
 import { listar as listarPedidos, criar as criarPedido, cancelar as cancelarPedido, receber as apiReceberPedido } from "@/services/pedidos";
 import { useToast } from "@/components/Toast";
@@ -51,14 +51,14 @@ export default function EstoquePage() {
   const [res, setRes] = useState({ open: false, item: null, reservas: [], carregando: false });
 
   const filtrados = useMemo(
-    () => (filtro === "todos" ? materiais : materiais.filter((i) => normalizarGrupo(i.categoria?.grupo) === filtro)),
+    () => (filtro === "todos" ? materiais : materiais.filter((i) => normalizarFamilia(i.categoria?.familia) === filtro)),
     [materiais, filtro]
   );
 
-  const porGrupo = useMemo(() => {
+  const porFamilia = useMemo(() => {
     const mapa = {};
-    Object.keys(grupos).forEach((g) => {
-      mapa[g] = filtrados.filter((i) => normalizarGrupo(i.categoria?.grupo) === g);
+    Object.keys(familias).forEach((g) => {
+      mapa[g] = filtrados.filter((i) => normalizarFamilia(i.categoria?.familia) === g);
     });
     return mapa;
   }, [filtrados]);
@@ -264,8 +264,8 @@ export default function EstoquePage() {
 
       <KpiGrid totais={totais} alertas={alertas} materiais={materiais} />
 
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide border-b border-outline-variant/50" role="group" aria-label="Filtrar materiais por grupo">
-        {["todos", ...Object.keys(grupos)].map((g) => {
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide border-b border-outline-variant/50" role="group" aria-label="Filtrar materiais por família">
+        {["todos", ...Object.keys(familias)].map((g) => {
           const ativo = filtro === g;
           return (
             <button
@@ -276,8 +276,8 @@ export default function EstoquePage() {
                 ativo ? "bg-primary/10 text-primary border-b-2 border-primary" : "text-on-surface-variant hover:text-on-surface border-b-2 border-transparent hover:border-outline"
               }`}
             >
-              <Icon name={g === "todos" ? "filter_list" : grupos[g].icon} className={`text-[14px] ${ativo ? "ms-fill" : ""}`} />
-              {g === "todos" ? "Todos" : grupos[g].label}
+              <Icon name={g === "todos" ? "filter_list" : familias[g].icon} className={`text-[14px] ${ativo ? "ms-fill" : ""}`} />
+              {g === "todos" ? "Todos" : familias[g].label}
             </button>
           );
         })}
@@ -289,16 +289,16 @@ export default function EstoquePage() {
 
       {!carregandoInicial && materiais.length > 0 && (
         <>
-          {Object.keys(grupos).map((g) => {
-            const itens = porGrupo[g];
+          {Object.keys(familias).map((g) => {
+            const itens = porFamilia[g];
             if (itens.length === 0) return null;
             return (
               <section key={g} className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <span className={`w-10 h-10 rounded-lg flex items-center justify-center ${grupos[g].classe} border border-outline-variant/30`}>
-                    <Icon name={grupos[g].icon} className="text-xl" />
+                  <span className={`w-10 h-10 rounded-lg flex items-center justify-center ${familias[g].classe} border border-outline-variant/30`}>
+                    <Icon name={familias[g].icon} className="text-xl" />
                   </span>
-                  <h2 className="font-mono text-xs font-bold uppercase tracking-widest text-foreground">{grupos[g].label}</h2>
+                  <h2 className="font-mono text-xs font-bold uppercase tracking-widest text-foreground">{familias[g].label}</h2>
                   <span className="text-[10px] font-mono text-on-surface-variant">
                     {itens.length} {itens.length === 1 ? "material" : "materiais"}
                   </span>

@@ -3,7 +3,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Icon from "@/components/Icon";
-import { formatKz, grupos, normalizarGrupo, statusCfg, toNum } from "@/lib/estoque";
+import { formatKz, familias, normalizarFamilia, statusCfg, toNum } from "@/lib/estoque";
 
 const textoStatus = {
   ok: { label: "Saudável", cor: "text-primary" },
@@ -64,7 +64,7 @@ function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEdita
   const btnRef = useRef(null);
   const menuRef = useRef(null);
   const st = statusCfg[item.status] || statusCfg.ok;
-  const grupo = grupos[normalizarGrupo(item.categoria?.grupo)];
+  const familiaCfg = familias[normalizarFamilia(item.categoria?.familia)];
   const pct = toNum(item.estoque_max) > 0 ? (toNum(item.estoque_disponivel) / toNum(item.estoque_max)) * 100 : 100;
   const critico = item.status === "repor" || item.status === "esgotado";
   const stText = textoStatus[item.status] || textoStatus.ok;
@@ -110,13 +110,13 @@ function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEdita
         {/* Col 1: Detalhes */}
         <div className="md:col-span-5 flex gap-4 items-center min-w-0">
           <div className={`w-10 h-10 rounded flex items-center justify-center shrink-0 border ${critico ? "bg-error/10 border-error/30 animate-pulse" : "bg-surface-variant border-outline-variant group-hover:border-primary/50"} transition-colors`}>
-            <Icon name={grupo.icon} className={`text-[20px] ${critico ? "text-error" : "text-primary"}`} />
+            <Icon name={familiaCfg.icon} className={`text-[20px] ${critico ? "text-error" : "text-primary"}`} />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
               <h3 className="font-sans text-base text-on-surface tracking-wide font-medium truncate">{item.nome}</h3>
               <span className={`px-1.5 py-0.5 rounded-sm border text-[9px] font-mono tracking-widest bg-surface-variant ${critico ? "border-error/50 text-error bg-error/10" : "border-outline-variant text-on-surface-variant"}`}>
-                {grupo.label}
+                {familiaCfg.label}
               </span>
             </div>
             <div className="flex items-center gap-3 text-[11px] font-mono text-on-surface-variant">

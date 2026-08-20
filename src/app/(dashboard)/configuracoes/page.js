@@ -21,14 +21,9 @@ import {
   alterarEmail, alterarSenha,
 } from "@/services/configuracoes";
 import { baixarBackup } from "@/services/backup";
+import { desktopDisponivel, estadoOffline, ligarServidor, desligarServidor, sincronizarAgora, SERVIDOR_PADRAO } from "@/services/offline";
 
 const CONTRATO_TEMPLATE = ``;
-
-const SECTIONS = {
-  organizacao: { icon: "business", title: "Organização", desc: "Dados da Organização" },
-  sistema: { icon: "settings", title: "Sistema", desc: "Parâmetros do Sistema" },
-  seguranca: { icon: "shield", title: "Segurança", desc: "Acesso e Privacidade" },
-};
 
 function Toggle({ ativo, onClick }) {
   return (
@@ -108,6 +103,21 @@ export default function ConfiguracoesPage() {
   const [senhaForm, setSenhaForm] = useState({ senha_atual: "", nova_senha: "", confirmar_senha: "" });
   const [baixando, setBaixando] = useState(false);
 
+  const [syncEstado, setSyncEstado] = useState(null);
+  const [syncForm, setSyncForm] = useState({ url: SERVIDOR_PADRAO, email: "", senha: "" });
+  const [syncLigando, setSyncLigando] = useState(false);
+  const [syncAgora, setSyncAgora] = useState(false);
+
+  const carregarEstadoSync = async () => {
+    try {
+      const e = await estadoOffline();
+      if (e) {
+        setSyncEstado(e);
+        if (e.server_url) setSyncForm((p) => ({ ...p, url: e.server_url }));
+      }
+    } catch {}
+  };
+
   useEffect(() => {
     Promise.all([
       buscarOrganizacao().catch(() => null),
@@ -120,6 +130,14 @@ export default function ConfiguracoesPage() {
       if (sg) setSeg(sg);
       if (u) setUserAtual(u);
     }).finally(() => setCarregando(false));
+
+    if (desktopDisponivel()) carregarEstadoSync();
+  }, []);
+
+  useEffect(() => {
+    if (!desktopDisponivel()) return;
+    const timer = setInterval(carregarEstadoSync, 10000);
+    return () => clearInterval(timer);
   }, []);
 
   const notificar = (msg, tipo = "success") => addToast?.(msg, tipo);
@@ -166,6 +184,48 @@ export default function ConfiguracoesPage() {
       notificar("Erro ao gerar o backup", "error");
     } finally {
       setBaixando(false);
+    }
+  };
+
+  const handleLigarServidor = async () => {
+    if (!syncForm.url || !syncForm.email || !syncForm.senha) {
+      notificar("Preencha URL, email e senha", "error");
+      return;
+    }
+    setSyncLigando(true);
+    try {
+      await ligarServidor(syncForm);
+      notificar("Ligado ao servidor com sucesso");
+      setSyncForm((p) => ({ ...p, senha: "" }));
+      await carregarEstadoSync();
+    } catch (e) {
+      notificar(e?.response?.data?.erro || e.message || "Erro ao ligar ao servidor", "error");
+    } finally {
+      setSyncLigando(false);
+    }
+  };
+
+  const handleDesligarServidor = async () => {
+    try {
+      await desligarServidor();
+      setSyncEstado(null);
+      setSyncForm({ url: SERVIDOR_PADRAO, email: "", senha: "" });
+      notificar("Desligado do servidor");
+    } catch {
+      notificar("Erro ao desligar", "error");
+    }
+  };
+
+  const handleSincronizarAgora = async () => {
+    setSyncAgora(true);
+    try {
+      await sincronizarAgora();
+      notificar("Sincronização concluída");
+      await carregarEstadoSync();
+    } catch (e) {
+      notificar(e?.response?.data?.erro || "Falha na sincronização", "error");
+    } finally {
+      setSyncAgora(false);
     }
   };
 
@@ -268,7 +328,7 @@ export default function ConfiguracoesPage() {
               <div className="flex items-center justify-between gap-6 rounded-xl border bg-muted/30 p-5">
                 <div className="flex items-center gap-4 min-w-0">
                   <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5 overflow-hidden">
-                     {org.logo_url ? (
+                    {org.logo_url ? (
                       <Image src={getImageUrl(org.logo_url)} alt="Logo" className="h-full w-full object-contain" width={64} height={64} />
                     ) : (
                       <Icon name="image" className="text-2xl text-primary/50" />
@@ -395,6 +455,76 @@ export default function ConfiguracoesPage() {
                 <p className="text-[10px] text-muted-foreground">
                   O sistema também cria backups automáticos em cada arranque (guardados em %APPDATA%\sigraf-desktop\backups).
                 </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {desktop && (
+            <Card>
+              <CardHeader>
+                <SectionHeader icon="cloud_sync" title="Sincronização" desc="Backup e sincronização com a nuvem" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {!syncEstado?.ligado ? (
+                  <>
+                    <p className="text-xs text-muted-foreground">
+                      Ligue este computador ao servidor na nuvem para manter os dados sincronizados entre múltiplos PC&apos;s e acesso online.
+                    </p>
+                    <div className="space-y-3">
+                      <FormField label="URL do Servidor">
+                        <Input value={syncForm.url} onChange={(e) => setSyncForm((p) => ({ ...p, url: e.target.value }))} placeholder="https://..." />
+                      </FormField>
+                      <FormField label="Email da Organização">
+                        <Input type="email" value={syncForm.email} onChange={(e) => setSyncForm((p) => ({ ...p, email: e.target.value }))} placeholder="admin@organizacao.com" />
+                      </FormField>
+                      <FormField label="Senha">
+                        <Input type="password" value={syncForm.senha} onChange={(e) => setSyncForm((p) => ({ ...p, senha: e.target.value }))} placeholder="••••••••" />
+                      </FormField>
+                    </div>
+                    <Button className="w-full" onClick={handleLigarServidor} loading={syncLigando}>
+                      <Icon name="link" className="text-sm" />
+                      {syncLigando ? "A ligar..." : "Ligar ao Servidor"}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-3 rounded-xl border bg-success/10 p-4">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-success/20">
+                        <Icon name="cloud_done" className="text-success" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground">Ligado ao Servidor</p>
+                        <p className="text-[11px] text-muted-foreground truncate">{syncEstado.org_nome || syncEstado.server_url}</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 text-[11px]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Último envio</span>
+                        <span className="font-mono text-foreground">{syncEstado.last_push_time ? new Date(syncEstado.last_push_time).toLocaleString("pt-BR") : "Nunca"}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Última recepção</span>
+                        <span className="font-mono text-foreground">{syncEstado.last_pull_time ? new Date(syncEstado.last_pull_time).toLocaleString("pt-BR") : "Nunca"}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Versão sync</span>
+                        <span className="font-mono text-foreground">#{syncEstado.sync_version}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button variant="outline" className="flex-1" onClick={handleSincronizarAgora} loading={syncAgora}>
+                        <Icon name="sync" className="text-sm" />
+                        {syncAgora ? "A sincronizar..." : "Sincronizar Agora"}
+                      </Button>
+                      <Button variant="ghost" className="text-error" onClick={handleDesligarServidor}>
+                        <Icon name="link_off" className="text-sm" />
+                        Desligar
+                      </Button>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           )}

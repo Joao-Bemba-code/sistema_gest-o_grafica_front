@@ -1,6 +1,6 @@
 const { abrirBase } = require("./db");
 const { criarApi } = require("./api");
-const { iniciarSync, sincronizar } = require("./sync");
+const { iniciarSync, sincronizar, desligarServidor } = require("./sync");
 
 function iniciarOffline(diretorio) {
   const db = abrirBase(diretorio);
@@ -10,6 +10,7 @@ function iniciarOffline(diretorio) {
     db,
     iniciarSync: () => iniciarSync(db),
     sincronizarAgora: () => sincronizar(db),
+    desligarServidor: () => desligarServidor(db),
   };
 }
 

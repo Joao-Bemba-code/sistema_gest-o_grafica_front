@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Icon from "@/components/Icon";
 import FornecedorSelect from "./FornecedorSelect";
 import NumeroInput from "@/components/ui/NumeroInput";
-import { inputCls, tiposEstoque, unidades, camposDeCategoria } from "@/lib/estoque";
+import { inputCls, tiposEstoque, unidades, camposDeCategoria, familias, normalizarFamilia, prefixoFamilia } from "@/lib/estoque";
 
 const tabs = [
   { key: "basicos", label: "Dados Básicos", icon: "badge" },
@@ -60,11 +60,29 @@ function CampoEspecificacao({ campo, valor, onChange }) {
   );
 }
 
-export default function MaterialForm({ formId = "form-material", form, onChange, onSubmit, categorias, fornecedores }) {
+export default function MaterialForm({ formId = "form-material", form, onChange, onSubmit, categorias, fornecedores, materiais = [] }) {
   const [tab, setTab] = useState("basicos");
   const id = (sufixo) => `${formId}-${sufixo}`;
   const categoria = categorias.find((c) => String(c.id) === String(form.categoria_id));
   const camposEspec = camposDeCategoria(categoria);
+
+  const aoMudarCategoria = useCallback((e) => {
+    const novaCatId = e.target.value;
+    onChange("categoria_id", novaCatId);
+    const cat = categorias.find((c) => String(c.id) === String(novaCatId));
+    if (cat) {
+      const prefixo = prefixoFamilia(cat.familia);
+      let maxNum = 0;
+      for (const m of materiais) {
+        const cod = m.codigo || "";
+        if (cod.startsWith(prefixo + "-")) {
+          const num = parseInt(cod.split("-")[1], 10);
+          if (num > maxNum) maxNum = num;
+        }
+      }
+      onChange("codigo", `${prefixo}-${String(maxNum + 1).padStart(4, "0")}`);
+    }
+  }, [categorias, materiais, onChange]);
 
   const aoMudarEspec = (chave, valor) => {
     const especificacoes = { ...(form.especificacoes || {}) };
@@ -96,13 +114,16 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
         {tab === "basicos" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Campo label="Código" obrigatorio>
-              <input required aria-required="true" value={form.codigo} onChange={(e) => onChange("codigo", e.target.value)} className={inputCls} placeholder="Ex: PAP-013" />
+              <div className="flex items-center gap-2">
+                <input required aria-required="true" value={form.codigo} readOnly className={`${inputCls} bg-muted/50 cursor-not-allowed`} placeholder="Selecione a categoria" />
+                {form.codigo && <span className="text-[10px] font-mono text-primary whitespace-nowrap">AUTO</span>}
+              </div>
             </Campo>
             <Campo label="Nome" obrigatorio>
               <input required aria-required="true" value={form.nome} onChange={(e) => onChange("nome", e.target.value)} className={inputCls} placeholder="Ex: Papel Couché 150g A3" />
             </Campo>
             <Campo label="Categoria" obrigatorio>
-              <select required aria-required="true" value={form.categoria_id} onChange={(e) => onChange("categoria_id", e.target.value)} className={inputCls}>
+              <select required aria-required="true" value={form.categoria_id} onChange={aoMudarCategoria} className={inputCls}>
                 <option value="" disabled>Selecionar...</option>
                 {categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
               </select>

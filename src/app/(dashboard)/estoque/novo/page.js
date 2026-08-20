@@ -6,7 +6,7 @@ import Icon from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
 import MaterialForm from "@/components/estoque/MaterialForm";
 import useEstoque from "@/hooks/useEstoque";
-import { blankItem, entradasEspecificacao, formatKz, toNum, tiposEstoque } from "@/lib/estoque";
+import { blankItem, entradasEspecificacao, formatKz, toNum, tiposEstoque, familias, tiposItem, normalizarFamilia } from "@/lib/estoque";
 
 function PreviewLinha({ label, valor, acento }) {
   return (
@@ -19,7 +19,7 @@ function PreviewLinha({ label, valor, acento }) {
 
 export default function NovoMaterialPage() {
   const router = useRouter();
-  const { categorias, fornecedores, formatos, carregando, salvarMaterial } = useEstoque();
+  const { categorias, fornecedores, formatos, materiais, carregando, salvarMaterial } = useEstoque();
   const [form, setForm] = useState(blankItem);
   const [salvando, setSalvando] = useState(false);
 
@@ -32,6 +32,7 @@ export default function NovoMaterialPage() {
   };
 
   const categoria = categorias.find((c) => String(c.id) === String(form.categoria_id));
+  const catFamilia = normalizarFamilia(categoria?.familia);
   const custoTotal = toNum(form.custo_unit) * toNum(form.estoque_max);
 
   return (
@@ -76,6 +77,7 @@ export default function NovoMaterialPage() {
                   onSubmit={aoSubmeter}
                   categorias={categorias}
                   fornecedores={fornecedores}
+                  materiais={materiais}
                   formatos={formatos}
                 />
               )}
@@ -92,7 +94,7 @@ export default function NovoMaterialPage() {
           </div>
 
           <div className="relative w-24 h-24 rounded-2xl obsidian-glass cyber-border flex items-center justify-center mx-auto">
-            <Icon name={categoria?.grupo && { papel: "description", acabamento: "palette", insumo: "blur_on", produto: "inventory_2", outros: "category" }[categoria.grupo] || "category"} className="text-4xl text-primary" />
+            <Icon name={familias[catFamilia]?.icon || "category"} className="text-4xl text-primary" />
             <span className="absolute -top-2 -right-2 w-6 h-6 rounded-lg bg-success flex items-center justify-center">
               <Icon name="check" className="text-sm text-on-success" />
             </span>
@@ -105,6 +107,9 @@ export default function NovoMaterialPage() {
 
           <div>
             <PreviewLinha label="Categoria" valor={categoria?.nome} />
+            <PreviewLinha label="Família" valor={familias[catFamilia]?.label} />
+            <PreviewLinha label="Subfamília" valor={categoria?.subfamilia} />
+            <PreviewLinha label="Tipo" valor={tiposItem[categoria?.tipo]?.label} />
             <PreviewLinha label="Unidade" valor={form.unidade} />
             {entradasEspecificacao(form.especificacoes).length > 0 ? (
               entradasEspecificacao(form.especificacoes).map((e) => (

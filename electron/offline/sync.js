@@ -61,6 +61,8 @@ async function temLigacao(url) {
   }
 }
 
+// ── PUSH: Local → Cloud ──────────────────────────────────────────────
+// Envia todos os registos locais alterados desde a última sincronização.
 async function enviarTabelas(sequelize, url, token, db) {
   const base = url.replace(/\/+$/, "");
   const cab = { headers: { Authorization: `Bearer ${token}` } };
@@ -84,12 +86,13 @@ async function enviarTabelas(sequelize, url, token, db) {
       const resp = await HTTP.post(`${base}/api/sinc/tabela`, { tabela, registos }, cab);
       if (resp.data && resp.data.ok) enviados[tabela] = linhas.length;
     } catch (e) {
-      console.log(`SIGRAF offline: tabela ${tabela} não enviada (${e.message || e})`);
+      console.log(`SIGRAF offline: push ${tabela} falhou (${e.message || e})`);
     }
   }
   return enviados;
 }
 
+// ── PUSH ORG ─────────────────────────────────────────────────────────
 async function enviarOrganizacao(sequelize, url, token) {
   const base = url.replace(/\/+$/, "");
   const cab = { headers: { Authorization: `Bearer ${token}` } };
@@ -108,6 +111,101 @@ async function enviarOrganizacao(sequelize, url, token) {
   }
 }
 
+// ── PULL: Cloud → Local ──────────────────────────────────────────────
+// Busca alterações na cloud desde a última sincronização e aplica no SQLite local.
+// Usa Last-Write-Wins: só sobrescreve se o registo remoto for mais recente.
+async function buscarAlteracoesTabelas(sequelize, url, token, db) {
+  const base = url.replace(/\/+$/, "");
+  const cab = { headers: { Authorization: `Bearer ${token}` } };
+  const since = lerMeta(db, "last_pull_time", "1970-01-01T00:00:00.000Z");
+  const recebidos = {};
+
+  for (const tabela of TABELAS_SINC) {
+    try {
+      const Model = sequelize.models[tabela];
+      if (!Model) continue;
+      const resp = await HTTP.get(`${base}/api/sinc/tabela`, {
+        params: { tabela, since },
+        ...cab,
+      });
+      const registos = resp.data && resp.data.registos;
+      if (!Array.isArray(registos) || !registos.length) continue;
+
+      let aplicados = 0;
+      for (const reg of registos) {
+        if (!reg || reg.id == null) continue;
+        const novoT = Date.parse(reg.updated_at || reg.updatedAt) || 0;
+        const existente = await Model.unscoped().findByPk(reg.id, { raw: true });
+        if (!existente) {
+          const dados = {};
+          const colunas = colunasReais(Model);
+          for (const c of colunas) {
+            if (reg[c] !== undefined && reg[c] !== null) dados[c] = reg[c];
+          }
+          dados.id = reg.id;
+          dados.createdAt = reg.createdAt ? new Date(Date.parse(reg.createdAt) || Date.now()) : new Date();
+          dados.updatedAt = novoT ? new Date(novoT) : new Date();
+          try {
+            await Model.create(dados);
+            aplicados++;
+          } catch (e) {
+            console.log(`SIGRAF offline: pull insert ${tabela}#${reg.id} falhou: ${e.message}`);
+          }
+        } else {
+          const atualT = Date.parse(existente.updatedAt) || 0;
+          if (!novoT || novoT <= atualT) continue;
+          const dados = {};
+          const colunas = colunasReais(Model);
+          for (const c of colunas) {
+            if (reg[c] !== undefined) dados[c] = reg[c];
+          }
+          dados.updatedAt = new Date(novoT);
+          try {
+            await Model.update(dados, { where: { id: reg.id }, silent: true });
+            aplicados++;
+          } catch (e) {
+            console.log(`SIGRAF offline: pull update ${tabela}#${reg.id} falhou: ${e.message}`);
+          }
+        }
+      }
+      if (aplicados > 0) recebidos[tabela] = aplicados;
+    } catch (e) {
+      console.log(`SIGRAF offline: pull ${tabela} falhou (${e.message || e})`);
+    }
+  }
+  return recebidos;
+}
+
+// ── PULL ORG ─────────────────────────────────────────────────────────
+async function buscarOrganizacaoRemota(sequelize, url, token, db) {
+  const base = url.replace(/\/+$/, "");
+  const cab = { headers: { Authorization: `Bearer ${token}` } };
+  try {
+    const resp = await HTTP.get(`${base}/api/sinc/organizacao`, cab);
+    const remota = resp.data && resp.data.organizacao;
+    if (!remota) return { pull: { ok: true, atualizado: false } };
+    const { Organizacao } = require(caminhoModelos());
+    const local = await Organizacao.findOne();
+    const novoT = Date.parse(remota.updated_at || remota.updatedAt) || 0;
+    const atualT = local ? Date.parse(local.updatedAt) || 0 : 0;
+    if (novoT && novoT > atualT) {
+      const campos = {};
+      for (const c of COLUNAS_ORG) {
+        if (remota[c] !== undefined && remota[c] !== null) campos[c] = String(remota[c]);
+      }
+      if (Object.keys(campos).length) {
+        if (local) await local.update(campos);
+        else await Organizacao.create({ ...campos, id: remota.id || undefined });
+        return { pull: { ok: true, atualizado: true } };
+      }
+    }
+    return { pull: { ok: true, atualizado: false } };
+  } catch (e) {
+    return { pull: { ok: false, erro: e.message } };
+  }
+}
+
+// ── SINCRONIZAÇÃO COMPLETA (Push + Pull) ─────────────────────────────
 async function sincronizar(db) {
   const url = lerMeta(db, "server_url", "");
   const email = lerMeta(db, "sync_email", "");
@@ -124,20 +222,32 @@ async function sincronizar(db) {
   const token = login.token;
   try {
     const { sequelize } = require(caminhoModelos());
+
+    // 1. PUSH: enviar alterações locais para a cloud
     const enviados = await enviarTabelas(sequelize, url, token, db);
-    const organizacao = await enviarOrganizacao(sequelize, url, token);
-    const temDados = Object.values(enviados).some((n) => n > 0) || (organizacao.push && organizacao.push.atualizado);
-    if (temDados) {
+    const orgPush = await enviarOrganizacao(sequelize, url, token);
+
+    // 2. PULL: receber alterações da cloud para o local
+    const recebidos = await buscarAlteracoesTabelas(sequelize, url, token, db);
+    const orgPull = await buscarOrganizacaoRemota(sequelize, url, token, db);
+
+    // 3. Actualizar metadados
+    const temDadosEnvio = Object.values(enviados).some((n) => n > 0) || (orgPush.push && orgPush.push.atualizado);
+    const temDadosRecebidos = Object.values(recebidos).some((n) => n > 0) || (orgPull.pull && orgPull.pull.atualizado);
+    if (temDadosEnvio || temDadosRecebidos) {
       const v = Number(lerMeta(db, "sync_version", "0")) + 1;
       escreverMeta(db, "sync_version", String(v));
     }
     escreverMeta(db, "last_push_time", agora());
-    return { ok: true, enviados, organizacao };
+    escreverMeta(db, "last_pull_time", agora());
+
+    return { ok: true, enviados, recebidos, organizacao: { push: orgPush.push, pull: orgPull.pull } };
   } catch (e) {
     return { ok: false, erro: e.message || String(e) };
   }
 }
 
+// ── LIGAR SERVIDOR ───────────────────────────────────────────────────
 async function ligarServidor(db, { url, email, senha }) {
   const base = String(url || "").trim().replace(/\/+$/, "");
   if (!base || !email || !senha) {
@@ -191,27 +301,88 @@ async function ligarServidor(db, { url, email, senha }) {
   };
 }
 
-function iniciarSync(db, { intervaloMs = 60 * 1000 } = {}) {
-  let aCorrer = false;
-  const executar = async () => {
-    if (aCorrer) return;
-    aCorrer = true;
-    try {
-      const url = lerMeta(db, "server_url", "");
-      if (url && (await temLigacao(url))) {
-        const r = await sincronizar(db);
-        if (r.ok) console.log(`SIGRAF offline: backup OK (${JSON.stringify(r.enviados)})`);
-        else console.log(`SIGRAF offline: ${r.erro}`);
-      }
-    } catch (e) {
-      console.log(`SIGRAF offline: sem ligação (${e.message || e})`);
-    } finally {
-      aCorrer = false;
-    }
-  };
-  const timer = setInterval(executar, intervaloMs);
-  setTimeout(executar, 5000);
-  return () => clearInterval(timer);
+// ── DESLIGAR SERVIDOR ────────────────────────────────────────────────
+function desligarServidor(db) {
+  escreverMeta(db, "server_url", "");
+  escreverMeta(db, "sync_email", "");
+  escreverMeta(db, "sync_senha", "");
+  escreverMeta(db, "last_push_time", "");
+  escreverMeta(db, "last_pull_time", "");
+  return { ok: true };
 }
 
-module.exports = { sincronizar, ligarServidor, iniciarSync, temLigacao, loginRemoto, TABELAS_SINC };
+// ── SYNC EM BACKGROUND ───────────────────────────────────────────────
+// Push a cada 10 segundos, pull a cada 15 segundos, desfasados.
+function iniciarSync(db) {
+  let aCorrerPush = false;
+  let aCorrerPull = false;
+
+  const executarPush = async () => {
+    if (aCorrerPush) return;
+    aCorrerPush = true;
+    try {
+      const url = lerMeta(db, "server_url", "");
+      if (!url || !(await temLigacao(url))) return;
+      const { sequelize } = require(caminhoModelos());
+      const email = lerMeta(db, "sync_email", "");
+      const senha = lerMeta(db, "sync_senha", "");
+      if (!email || !senha) return;
+      const login = await loginRemoto(url, email, senha);
+      const enviados = await enviarTabelas(sequelize, url, login.token, db);
+      const orgPush = await enviarOrganizacao(sequelize, url, login.token);
+      const temDados = Object.values(enviados).some((n) => n > 0) || (orgPush.push && orgPush.push.atualizado);
+      if (temDados) {
+        const v = Number(lerMeta(db, "sync_version", "0")) + 1;
+        escreverMeta(db, "sync_version", String(v));
+      }
+      escreverMeta(db, "last_push_time", agora());
+      if (Object.keys(enviados).length) {
+        console.log(`SIGRAF sync [push]: ${JSON.stringify(enviados)}`);
+      }
+    } catch (e) {
+      console.log(`SIGRAF sync [push]: falhou (${e.message || e})`);
+    } finally {
+      aCorrerPush = false;
+    }
+  };
+
+  const executarPull = async () => {
+    if (aCorrerPull) return;
+    aCorrerPull = true;
+    try {
+      const url = lerMeta(db, "server_url", "");
+      if (!url || !(await temLigacao(url))) return;
+      const { sequelize } = require(caminhoModelos());
+      const email = lerMeta(db, "sync_email", "");
+      const senha = lerMeta(db, "sync_senha", "");
+      if (!email || !senha) return;
+      const login = await loginRemoto(url, email, senha);
+      const recebidos = await buscarAlteracoesTabelas(sequelize, url, login.token, db);
+      const orgPull = await buscarOrganizacaoRemota(sequelize, url, login.token, db);
+      const temDados = Object.values(recebidos).some((n) => n > 0) || (orgPull.pull && orgPull.pull.atualizado);
+      if (temDados) {
+        const v = Number(lerMeta(db, "sync_version", "0")) + 1;
+        escreverMeta(db, "sync_version", String(v));
+      }
+      escreverMeta(db, "last_pull_time", agora());
+      if (Object.keys(recebidos).length) {
+        console.log(`SIGRAF sync [pull]: ${JSON.stringify(recebidos)}`);
+      }
+    } catch (e) {
+      console.log(`SIGRAF sync [pull]: falhou (${e.message || e})`);
+    } finally {
+      aCorrerPull = false;
+    }
+  };
+
+  // Push a cada 10s
+  const timerPush = setInterval(executarPush, 10 * 1000);
+  // Pull a cada 15s, desfasado 5s do push
+  const timerPull = setInterval(executarPull, 15 * 1000);
+  setTimeout(executarPush, 5000);
+  setTimeout(executarPull, 10000);
+
+  return () => { clearInterval(timerPush); clearInterval(timerPull); };
+}
+
+module.exports = { sincronizar, ligarServidor, desligarServidor, iniciarSync, temLigacao, loginRemoto, TABELAS_SINC };

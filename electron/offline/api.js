@@ -1,7 +1,7 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const { novoUuid, listar, obter, salvarLocal, pendentes, lerMeta } = require("./db");
-const { sincronizar, ligarServidor, loginRemoto, temLigacao } = require("./sync");
+const { sincronizar, ligarServidor, desligarServidor, loginRemoto, temLigacao } = require("./sync");
 const { registarUtilizadorLocal, caminhoModelos } = require("./usuario");
 
 function criarApi(db) {
@@ -38,17 +38,24 @@ function criarApi(db) {
     return res.json(registo);
   });
 
+  // ── SYNC ENDPOINTS ──────────────────────────────────────────────────
+
+  // Estado atual da sincronização
   router.get("/sync/estado", (req, res) => {
+    const url = lerMeta(db, "server_url", "");
     return res.json({
-      server_url: lerMeta(db, "server_url", ""),
+      ligado: !!url,
+      server_url: url,
       org_id: lerMeta(db, "org_id", ""),
       org_nome: lerMeta(db, "org_nome", ""),
       last_push_time: lerMeta(db, "last_push_time", ""),
+      last_pull_time: lerMeta(db, "last_pull_time", ""),
       sync_version: Number(lerMeta(db, "sync_version", "0")),
       pendentes: pendentes(db),
     });
   });
 
+  // Ligar ao servidor cloud (autenticar + sync inicial)
   router.post("/sync/ligar", async (req, res) => {
     const { url, email, senha } = req.body || {};
     const r = await ligarServidor(db, { url, email, senha });
@@ -56,11 +63,20 @@ function criarApi(db) {
     return res.json({ ok: true, usuario: r.usuario, sincronizacao: r.sincronizacao });
   });
 
+  // Sincronizar agora (push + pull manual)
   router.post("/sync/agora", async (req, res) => {
     const r = await sincronizar(db);
     if (!r.ok) return res.status(502).json({ erro: r.erro || "Falha ao sincronizar" });
     return res.json(r);
   });
+
+  // Desligar do servidor cloud
+  router.post("/sync/desligar", (req, res) => {
+    desligarServidor(db);
+    return res.json({ ok: true });
+  });
+
+  // ── AUTH ENDPOINTS ──────────────────────────────────────────────────
 
   router.post("/auth/login", async (req, res) => {
     const { email, senha } = req.body || {};
@@ -71,7 +87,6 @@ function criarApi(db) {
       const { Usuario, Organizacao } = modelos;
       const usuario = await Usuario.findOne({ where: { email } });
       if (!usuario) return res.status(401).json({ erro: "Credenciais inválidas" });
-      const hash = await bcrypt.hash(senha, 10);
       const valido = await bcrypt.compare(senha, usuario.senha);
       if (!valido) return res.status(401).json({ erro: "Credenciais inválidas" });
       const org = await Organizacao.findByPk(usuario.organizacao_id);

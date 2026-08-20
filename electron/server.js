@@ -45,11 +45,42 @@ function caminhoWeb() {
   return path.join(__dirname, "..", "sigraf", "out");
 }
 
+async function corrigirFamiliasCategorias(backendDir) {
+  const { Categoria } = require(path.join(backendDir, "models"));
+  const cats = await Categoria.findAll();
+  const mapa = {
+    tintas: /tinta|tintas/i,
+    chapas: /chapa|chapas/i,
+    material_acabamento: /cola|acabamento|vinil|vinis/i,
+    suporte_especial: /lona|lonas|suporte/i,
+    consumiveis: /consum[ií]vei|insumo|produto.?pronto|produtos.?prontos/i,
+    equipamentos: /equipamento/i,
+    ferramentas: /ferramenta/i,
+    produto_quimico: /qu[ií]mico|solvente/i,
+  };
+  let corrigidas = 0;
+  for (const c of cats) {
+    const atual = (c.familia || "").toLowerCase();
+    if (atual !== "papeis") continue;
+    for (const [fam, regex] of Object.entries(mapa)) {
+      if (regex.test(c.nome)) {
+        await c.update({ familia: fam });
+        corrigidas++;
+        break;
+      }
+    }
+  }
+  if (corrigidas > 0) console.log(`SIGRAF: ${corrigidas} categorias tiveram a família corrigida`);
+}
+
 async function garantirDadosIniciais(backendDir) {
   const bcrypt = require("bcryptjs");
   const { Organizacao, Usuario, Categoria, Cliente } = require(path.join(backendDir, "models"));
   const count = await Organizacao.count();
-  if (count > 0) return;
+  if (count > 0) {
+    await corrigirFamiliasCategorias(backendDir);
+    return;
+  }
 
   const org = await Organizacao.create({
     nome: "Minha Gráfica",
@@ -70,36 +101,24 @@ async function garantirDadosIniciais(backendDir) {
     funcao: "Administrador",
   });
 
-  const grupos = {
-    "Papel": "papel",
-    "Tintas": "insumo",
-    "Lonas": "papel",
-    "Vinil": "papel",
-    "Cola": "insumo",
-    "Chapas": "insumo",
-    "Papéis e Mídias": "papel",
-    "Insumos e Consumíveis": "insumo",
-    "Acabamento e Logística": "acabamento",
-    "Produtos Prontos": "produto",
-  };
-  const categorias = [
-    "Papel",
-    "Tintas",
-    "Lonas",
-    "Vinil",
-    "Cola",
-    "Chapas",
-    "Papéis e Mídias",
-    "Insumos e Consumíveis",
-    "Acabamento e Logística",
-    "Produtos Prontos",
+  const categoriasSeed = [
+    { nome: "Papel Couché", familia: "papeis", subfamilia: "Couché", tipo: "materia_prima" },
+    { nome: "Papel Offset", familia: "papeis", subfamilia: "Offset", tipo: "materia_prima" },
+    { nome: "Tinta Solvente", familia: "tintas", subfamilia: "Solvente", tipo: "materia_prima" },
+    { nome: "Tinta UV", familia: "tintas", subfamilia: "UV", tipo: "materia_prima" },
+    { nome: "Chapa CTP", familia: "chapas", subfamilia: "CTP", tipo: "materia_prima" },
+    { nome: "Cola", familia: "material_acabamento", subfamilia: "", tipo: "materia_prima" },
+    { nome: "Lona", familia: "suporte_especial", subfamilia: "", tipo: "materia_prima" },
+    { nome: "Vinil", familia: "suporte_especial", subfamilia: "", tipo: "materia_prima" },
+    { nome: "Produto Pronto", familia: "consumiveis", subfamilia: "", tipo: "produto_acabado" },
   ];
-  for (const nome of categorias) {
+  for (const cat of categoriasSeed) {
     await Categoria.create({
       organizacao_id: org.id,
-      nome,
-      tipo: "material",
-      grupo: grupos[nome] || "outros",
+      nome: cat.nome,
+      familia: cat.familia,
+      subfamilia: cat.subfamilia,
+      tipo: cat.tipo,
     });
   }
 
@@ -160,16 +179,27 @@ async function criarBackupAutomatico() {
 }
 
 async function aplicarMigracoes(sequelize) {
+  const dialect = sequelize.getDialect();
   const adicionar = async (tabela, coluna, tipo) => {
-    const [res] = await sequelize.query(`PRAGMA table_info(${tabela})`);
-    if (!res.some((c) => c.name === coluna)) {
-      await sequelize.query(`ALTER TABLE ${tabela} ADD COLUMN ${coluna} ${tipo}`);
+    let existe = false;
+    if (dialect === "sqlite") {
+      const [res] = await sequelize.query(`PRAGMA table_info(${tabela})`);
+      existe = res.some((c) => c.name === coluna);
+    } else {
+      const [res] = await sequelize.query(`SHOW COLUMNS FROM \`${tabela}\` LIKE '${coluna}'`);
+      existe = Array.isArray(res) ? res.length > 0 : false;
+    }
+    if (!existe) {
+      await sequelize.query(`ALTER TABLE \`${tabela}\` ADD COLUMN \`${coluna}\` ${tipo}`);
       console.log(`SIGRAF: coluna ${tabela}.${coluna} adicionada`);
     }
   };
   await adicionar("categoria", "campos_especificacao", "TEXT");
+  await adicionar("categoria", "familia", "VARCHAR(50) DEFAULT 'papeis'");
+  await adicionar("categoria", "subfamilia", "VARCHAR(100)");
+  await adicionar("categoria", "tipo", "VARCHAR(50) DEFAULT 'materia_prima'");
   await adicionar("material", "especificacoes", "TEXT");
-  await adicionar("material", "localizacao", "TEXT");
+  await adicionar("material", "localizacao", "VARCHAR(200)");
   await adicionar("orcamento", "especificacao_json", "TEXT");
   await adicionar("orcamento_item", "composto", "TINYINT(1) DEFAULT 0");
   await adicionar("orcamento_item", "margem", "DECIMAL(12,2) DEFAULT 0");

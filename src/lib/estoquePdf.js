@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
 import { applyPlugin } from "jspdf-autotable";
-import { formatKz, grupos, normalizarGrupo, entradasEspecificacao } from "./estoque";
+import { formatKz, familias, normalizarFamilia, tiposItem, entradasEspecificacao } from "./estoque";
 
 applyPlugin(jsPDF);
 
@@ -176,7 +176,9 @@ export async function gerarFichaMaterialPDF(mat, org = {}) {
     ["Nome", mat.nome || "—"],
     ["Nome Técnico", mat.nome_tecnico || "—"],
     ["Categoria", categoria],
-    ["Grupo", grupos[normalizarGrupo(mat.categoria?.grupo || mat.grupo)]?.label || "—"],
+    ["Família", familias[normalizarFamilia(mat.categoria?.familia)]?.label || "—"],
+    ["Subfamília", mat.categoria?.subfamilia || "—"],
+    ["Tipo", tiposItem[mat.categoria?.tipo]?.label || "—"],
     ["Fornecedor", mat.fornecedor || "—"],
     ["Unidade", mat.unidade || "—"],
     ...entradasEspecificacao(mat.especificacoes).map((e) => [e.rotulo, e.valor]),
