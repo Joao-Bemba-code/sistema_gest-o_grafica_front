@@ -74,8 +74,10 @@ async function enviarTabelas(sequelize, url, token, db) {
       const Model = sequelize.models[tabela];
       if (!Model) continue;
       const colunas = colunasReais(Model);
+      const temDeleted = colunas.includes("deleted");
+      const whereDeleted = temDeleted ? ` OR \`deleted\` = 1` : "";
       const [linhas] = await sequelize.query(
-        `SELECT id, createdAt, \`${colunas.join("`, `")}\`, updatedAt FROM \`${tabela}\` WHERE \`updatedAt\` > ?`,
+        `SELECT id, createdAt, \`${colunas.join("`, `")}\`, updatedAt FROM \`${tabela}\` WHERE \`updatedAt\` > ?${whereDeleted}`,
         { replacements: [desde] }
       );
       if (!linhas.length) continue;
