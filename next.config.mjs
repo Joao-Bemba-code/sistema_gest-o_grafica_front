@@ -7,6 +7,7 @@ const nextConfig = {
       { protocol: "https", hostname: "lh3.googleusercontent.com" },
       { protocol: "http", hostname: "localhost", port: "8000" },
       { protocol: "http", hostname: "localhost", port: "3000" },
+      { protocol: "https", hostname: "sistema-gest-o-grafica-back-m6px.onrender.com" },
     ],
   },
   async rewrites() {

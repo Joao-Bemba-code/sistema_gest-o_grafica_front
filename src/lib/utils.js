@@ -44,9 +44,10 @@ const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"
 
 export function getImageUrl(url) {
   if (!url) return null;
-  if (url.startsWith("/uploads/")) return url;
-  if (url.startsWith(API_BASE + "/uploads/")) return url.replace(API_BASE, "");
-  if (url.startsWith("http://localhost:8000/uploads/")) return url.replace("http://localhost:8000", "");
-  if (url.startsWith("http://localhost:3000/uploads/")) return url.replace("http://localhost:3000", "");
-  return url;
+  if (url.startsWith("http://")) return url;
+  if (url.startsWith("https://")) return url;
+  if (typeof window !== "undefined" && window.sigrafDesktop) {
+    if (url.startsWith("/uploads/")) return url;
+  }
+  return API_BASE + (url.startsWith("/") ? url : "/" + url);
 }
