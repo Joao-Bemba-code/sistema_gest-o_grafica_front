@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
-import { criarFatura, listarFaturas, exportarFaturas, marcarPaga } from "@/services/faturacao";
+import { criarFatura, listarFaturas, exportarFaturas, marcarPaga, buscarFatura } from "@/services/faturacao";
 import { listar as listarOrcamentos } from "@/services/orcamentos";
 import { listarOrdens } from "@/services/producao";
 import { listar as listarClientes } from "@/services/clientes";
@@ -82,6 +82,17 @@ export default function FaturacaoPage() {
 
 
   const filteredFaturas = filtroFatura === "todas" ? faturas : faturas.filter((f) => f.estado === filtroFatura);
+
+  const abrirFatura = async (f) => {
+    setSelectedFatura(f);
+    try {
+      const fresca = await buscarFatura(f.id);
+      if (fresca && fresca.id) setSelectedFatura(fresca);
+    } catch {
+      // mantém os dados já carregados da lista
+    }
+  };
+
 
   const valorDoc = (f) => Number(f.total || f.valor || 0);
   const pagoDoc = (f) => Number(f.valor_pago || f.total || f.valor || 0);
@@ -278,7 +289,7 @@ export default function FaturacaoPage() {
 
           <div className="space-y-3">
             {filteredFaturas.map((f) => (
-              <Card key={f.id} className="hover-lift cursor-pointer" onClick={() => setSelectedFatura(f)}>
+              <Card key={f.id} className="hover-lift cursor-pointer" onClick={() => abrirFatura(f)}>
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4 min-w-0">
