@@ -24,14 +24,12 @@ const nextConfig = {
   },
 };
 
-export default withPWA({
-    dest: "public",
-    register: true,
-    skipWaiting: true,
-    disable: process.env.NEXT_PUBLIC_DISABLE_PWA === "true",
-    scope: "/",
-    // Add favicon link tags
-    // link: [
-    //   { rel: "icon", type: "image/x-icon", href: "/favicon.ico" },
-    // ],
-  });
+const withPWAConfig = withPWA({
+  dest: "public",
+  register: true,
+  skipWaiting: true,
+  disable: process.env.NEXT_PUBLIC_DISABLE_PWA === "true",
+  scope: "/",
+});
+
+export default withPWAConfig(nextConfig);

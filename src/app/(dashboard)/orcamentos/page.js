@@ -16,7 +16,6 @@ import { listar, criar, atualizar, remover, mudarEstado } from "@/services/orcam
 import { listar as listarClientes } from "@/services/clientes";
 import { listar as listarMateriais } from "@/services/materiais";
 import { buscarOrganizacao } from "@/services/configuracoes";
-import { useSyncRefresh } from "@/contexts/SyncContext";
 
 const estadoColors = {
   aprovado: "success",
@@ -144,7 +143,6 @@ export default function OrcamentosPage() {
     carregarDados();
   }, [addToast]);
 
-  useSyncRefresh(carregarDados, [carregarDados]);
 
   const setField = (name, val) => setForm((p) => ({ ...p, [name]: val }));
 

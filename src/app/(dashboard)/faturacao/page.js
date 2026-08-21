@@ -17,7 +17,6 @@ import { listarOrdens } from "@/services/producao";
 import { listar as listarClientes } from "@/services/clientes";
 import { buscarOrganizacao } from "@/services/configuracoes";
 import gerarPDF from "@/lib/faturacaoPdf";
-import { useSyncRefresh } from "@/contexts/SyncContext";
 
 const metodos = {
   dinheiro: { label: "Dinheiro", icon: "payments" },
@@ -81,7 +80,6 @@ export default function FaturacaoPage() {
     carregarDados();
   }, []);
 
-  useSyncRefresh(carregarDados, [carregarDados]);
 
   const filteredFaturas = filtroFatura === "todas" ? faturas : faturas.filter((f) => f.estado === filtroFatura);
 

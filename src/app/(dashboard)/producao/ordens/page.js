@@ -17,7 +17,6 @@ import SaidaMateriaisModal from "@/components/producao/SaidaMateriaisModal";
 import { listar as listarClientes } from "@/services/clientes";
 import { listar as listarOrcamentos, buscarPorId as buscarOrcamento } from "@/services/orcamentos";
 import { listar as listarMateriais } from "@/services/materiais";
-import { useSyncRefresh } from "@/contexts/SyncContext";
 
 const statusConfig = {
   aguardando: { label: "Aguardando", variant: "warning" },
@@ -95,7 +94,6 @@ export default function OrdensProducaoPage() {
     carregarDados();
   }, []);
 
-  useSyncRefresh(carregarDados, [carregarDados]);
 
   const matPorId = Object.fromEntries(materiais.map((m) => [m.id, m]));
 

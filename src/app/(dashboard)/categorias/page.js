@@ -10,7 +10,6 @@ import { useToast } from "@/components/Toast";
 import { ListSkeleton } from "@/components/Skeleton";
 import { inputCls, familias, tiposItem, normalizarFamilia, normalizarTipoItem } from "@/lib/estoque";
 import { listar, criar, atualizar, remover } from "@/services/categorias";
-import { useSyncRefresh } from "@/contexts/SyncContext";
 
 const blankForm = { nome: "", familia: "papeis", subfamilia: "", tipo: "materia_prima" };
 
@@ -38,7 +37,6 @@ export default function CategoriasPage() {
     carregar();
   }, [carregar]);
 
-  useSyncRefresh(carregar, [carregar]);
 
   const abrirNova = () => {
     setModal({ aberto: true, id: null });

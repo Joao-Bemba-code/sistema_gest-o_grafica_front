@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { listar, criar, atualizar, remover } from "@/services/clientes";
-import { useSyncRefresh } from "@/contexts/SyncContext";
 
 const initialForm = {
   tipo: "cliente", nome: "", empresa: "", nif: "", telefone: "",
@@ -49,7 +48,6 @@ export default function CadastrosPage() {
     carregar({});
   }, [carregar]);
 
-  useSyncRefresh(carregar, [carregar]);
 
   useEffect(() => {
     const params = {};

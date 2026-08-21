@@ -46,8 +46,5 @@ export function getImageUrl(url) {
   if (!url) return null;
   if (url.startsWith("http://")) return url;
   if (url.startsWith("https://")) return url;
-  if (typeof window !== "undefined" && window.sigrafDesktop) {
-    if (url.startsWith("/uploads/")) return url;
-  }
   return API_BASE + (url.startsWith("/") ? url : "/" + url);
 }

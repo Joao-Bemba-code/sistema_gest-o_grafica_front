@@ -16,7 +16,6 @@ import KpiCard from "@/components/ui/KpiCard";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/Toast";
-import { useSyncRefresh } from "@/contexts/SyncContext";
 import { KPIGridSkeleton, CardSkeleton, ListSkeleton } from "@/components/Skeleton";
 import FornecedorSelect from "@/components/estoque/FornecedorSelect";
 import NumeroInput from "@/components/ui/NumeroInput";
@@ -164,7 +163,6 @@ export default function DashboardPage() {
     carregarDados();
   }, []);
 
-  useSyncRefresh(carregarDados, [carregarDados]);
 
   const hoje = new Date();
   const orcamentosHoje = orcamentos.filter((o) => {

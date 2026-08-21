@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
 import { listarOrdens, salvarPreImpressao, salvarImpressao, salvarAcabamento, salvarQualidade, atualizarOrdem } from "@/services/producao";
-import { useSyncRefresh } from "@/contexts/SyncContext";
 
 const etapas = [
   { id: "pre_impressao", label: "Pré-Impressão", icon: "rule" },
@@ -93,7 +92,6 @@ export default function ProducaoPage() {
     carregarDados();
   }, [addToast]);
 
-  useSyncRefresh(carregarDados, [carregarDados]);
 
   const updateJob = (jobId, section, key, value) => {
     setJobs(jobs.map(j => j.id === jobId ? { ...j, [section]: { ...j[section], [key]: value } } : j));

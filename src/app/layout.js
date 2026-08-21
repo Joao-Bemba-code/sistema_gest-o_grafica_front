@@ -1,6 +1,5 @@
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { SyncProvider } from "@/contexts/SyncContext";
 import { Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -11,6 +10,20 @@ const jetBrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jbm
 export const metadata = {
   title: "SIGRAF - Gestão de Gráfica",
   description: "Sistema de Gestão para Indústria Gráfica",
+  applicationName: "SIGRAF",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
+};
+
+export const viewport = {
+  themeColor: "#0f766e",
 };
 
 export default function RootLayout({ children }) {
@@ -22,7 +35,7 @@ export default function RootLayout({ children }) {
       <body className="bg-surface-container-lowest text-on-surface min-h-screen">
         <ThemeProvider>
           <AuthProvider>
-            <SyncProvider>{children}</SyncProvider>
+            {children}
           </AuthProvider>
         </ThemeProvider>
       </body>

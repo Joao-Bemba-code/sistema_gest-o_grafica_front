@@ -3,9 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
-import DesktopConfig from "@/components/DesktopConfig";
 import { login } from "@/services/auth";
-import { desktopDisponivel } from "@/services/offline";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function LoginPage() {
@@ -91,18 +89,8 @@ export default function LoginPage() {
               {loading ? "A entrar..." : "Entrar"}
             </button>
           </form>
-
-          <p className="text-[11px] text-muted-foreground text-center mt-6">
-            Login offline — os dados são guardados localmente
-          </p>
-          {desktopDisponivel() && (
-            <p className="text-[10px] text-muted-foreground/70 text-center mt-2">
-              Configure o backup na nuvem em Definições após o login.
-            </p>
-          )}
         </div>
       </div>
-      <DesktopConfig />
     </div>
   );
 }

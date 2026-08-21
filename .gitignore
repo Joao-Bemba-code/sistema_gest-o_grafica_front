@@ -40,15 +40,3 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# electron (aplicação desktop)
-/electron/node_modules/
-/electron/backend/
-/electron/web/
-/electron/dist/
-/electron/config.json
-/electron/sgg.sqlite
-/electron/*.log
-/electron/electron-build/
-/electron/.sync-backup/
-/electron/uploads/
-
