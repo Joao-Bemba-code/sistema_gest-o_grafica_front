@@ -20,7 +20,7 @@ import {
   uploadLogo, buscarUtilizadorAtual,
   alterarEmail, alterarSenha,
 } from "@/services/configuracoes";
-import { baixarBackup } from "@/services/backup";
+
 
 const CONTRATO_TEMPLATE = ``;
 
@@ -99,7 +99,6 @@ export default function ConfiguracoesPage() {
   const [mostrarAlterarSenha, setMostrarAlterarSenha] = useState(false);
   const [emailForm, setEmailForm] = useState({ novo_email: "", senha_atual: "" });
   const [senhaForm, setSenhaForm] = useState({ senha_atual: "", nova_senha: "", confirmar_senha: "" });
-  const [baixando, setBaixando] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -150,17 +149,6 @@ export default function ConfiguracoesPage() {
     } catch { notificar("Erro ao alterar senha", "error"); }
   };
 
-  const handleBaixarBackup = async () => {
-    setBaixando(true);
-    try {
-      const nome = await baixarBackup();
-      notificar(`Backup ${nome} gerado com sucesso`);
-    } catch {
-      notificar("Erro ao gerar o backup", "error");
-    } finally {
-      setBaixando(false);
-    }
-  };
 
   const handleGerarPDF = async () => {
     const jsPDF = (await import("jspdf")).default;
@@ -359,31 +347,6 @@ export default function ConfiguracoesPage() {
                   Guardar Parâmetros do Sistema
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <SectionHeader icon="archive" title="Backup e Restauro" desc="Cópia de segurança dos dados" />
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-xs text-muted-foreground">
-                Baixa um ficheiro ZIP com toda a base de dados e ficheiros (uploads). Guarda-o num local seguro
-                (pen, disco externo ou nuvem) para recuperares os dados em caso de avaria ou reinstalação.
-              </p>
-              <div className="flex items-center gap-3 rounded-xl border bg-muted/30 p-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                  <Icon name="download" className="text-primary" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-foreground">Backup completo</p>
-                  <p className="text-[11px] text-muted-foreground">Base de dados + uploads • em formato ZIP</p>
-                </div>
-              </div>
-              <Button className="w-full" onClick={handleBaixarBackup} loading={baixando}>
-                <Icon name="archive" className="text-sm" />
-                {baixando ? "A gerar backup..." : "Baixar Backup (ZIP)"}
-              </Button>
             </CardContent>
           </Card>
         </div>
