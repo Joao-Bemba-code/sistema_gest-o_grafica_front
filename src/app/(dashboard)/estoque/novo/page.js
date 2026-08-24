@@ -111,18 +111,13 @@ export default function NovoMaterialPage() {
             <PreviewLinha label="Subfamília" valor={(form.especificacoes?.subfamilia || "").trim() || categoria?.subfamilia} />
             <PreviewLinha label="Tipo" valor={tiposItem[categoria?.tipo]?.label} />
             <PreviewLinha label="Unidade" valor={form.unidade} />
-            {entradasEspecificacao(form.especificacoes).length > 0 ? (
-              entradasEspecificacao(form.especificacoes)
-                .filter((e) => e.rotulo.toLowerCase().replace(/[^a-z]/g, "") !== "subfamilia")
-                .map((e) => (
-                  <PreviewLinha key={e.rotulo} label={e.rotulo} valor={e.valor} />
-                ))
-            ) : (
-              <>
-                <PreviewLinha label="Formato" valor={form.formato} />
-                <PreviewLinha label="Gramagem" valor={form.gramagem ? `${form.gramagem} g/m²` : ""} />
-              </>
-            )}
+            {entradasEspecificacao(form.especificacoes)
+              .filter((e) => !["subfamilia", "formato", "gramagem"].includes(e.rotulo.toLowerCase().replace(/[^a-z]/g, "")))
+              .map((e) => (
+                <PreviewLinha key={e.rotulo} label={e.rotulo} valor={e.valor} />
+              ))}
+            <PreviewLinha label="Formato" valor={form.formato} />
+            <PreviewLinha label="Gramagem" valor={form.gramagem ? `${form.gramagem} g/m²` : "—"} />
             <PreviewLinha label="Tipo de Estoque" valor={tiposEstoque.find((t) => t === form.tipo_estoque)} />
             <PreviewLinha label="Custo Unitário" valor={formatKz(form.custo_unit)} />
             <PreviewLinha label="Localização" valor={form.localizacao} />

@@ -182,6 +182,15 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
                 {tiposEstoque.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </Campo>
+            <Campo label="Formato">
+              <input value={form.formato || ""} onChange={(e) => onChange("formato", e.target.value)} className={inputCls} placeholder="Ex: A3, 70×100, SRA3..." />
+            </Campo>
+            <Campo label="Gramagem">
+              <div className="flex items-center gap-2">
+                <NumeroInput value={form.gramagem || ""} onChange={(e) => onChange("gramagem", e.target.value)} className={inputCls} placeholder="Ex: 150" />
+                <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap">g/m²</span>
+              </div>
+            </Campo>
 
             {!categoria && (
               <div className="sm:col-span-2 rounded-xl border border-dashed border-outline-variant p-4 text-xs text-muted-foreground">

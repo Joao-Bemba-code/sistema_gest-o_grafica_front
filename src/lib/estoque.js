@@ -67,9 +67,7 @@ export const tiposCampoEspecificacao = [
 
 export const camposPadraoPorFamilia = {
   papeis: [
-    { chave: "gramagem", rotulo: "Gramagem", tipo: "numero", unidade: "g/m²" },
     { chave: "cor", rotulo: "Cor", tipo: "selecao", opcoes: ["Branco", "Creme", "Off-white", "Colorido"] },
-    { chave: "formato", rotulo: "Formato", tipo: "texto" },
     { chave: "tipo", rotulo: "Tipo", tipo: "selecao", opcoes: ["Couché", "Offset", "Autocopiativo", "Cartolina", "Etiqueta"] },
     { chave: "largura", rotulo: "Largura", tipo: "numero", unidade: "cm" },
     { chave: "altura", rotulo: "Altura", tipo: "numero", unidade: "cm" },
@@ -81,7 +79,6 @@ export const camposPadraoPorFamilia = {
   ],
   chapas: [
     { chave: "tipo", rotulo: "Tipo", tipo: "selecao", opcoes: ["CTP", "Film", "Digital"] },
-    { chave: "formato", rotulo: "Formato", tipo: "texto" },
   ],
   produto_quimico: [
     { chave: "composicao", rotulo: "Composição", tipo: "texto" },
