@@ -108,7 +108,7 @@ export default function NovoMaterialPage() {
           <div>
             <PreviewLinha label="Categoria" valor={categoria?.nome} />
             <PreviewLinha label="Família" valor={familias[catFamilia]?.label} />
-            <PreviewLinha label="Subfamília" valor={(form.especificacoes?.subfamilia || "").trim() || categoria?.subfamilia} />
+            <PreviewLinha label="Subfamília" valor={(form.especificacoes?.subfamilia || "").trim()} />
             <PreviewLinha label="Tipo" valor={tiposItem[categoria?.tipo]?.label} />
             <PreviewLinha label="Unidade" valor={form.unidade} />
             {entradasEspecificacao(form.especificacoes)

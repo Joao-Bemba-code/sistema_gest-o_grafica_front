@@ -35,7 +35,7 @@ function deItem(item) {
   };
 }
 
-export default function EditMaterialModal({ open, item, categorias, fornecedores, formatos, onClose, onSave }) {
+export default function EditMaterialModal({ open, item, categorias, fornecedores, formatos, materiais = [], onClose, onSave }) {
   const [form, setForm] = useState(() => deItem(item || {}));
   const [submetendo, setSubmetendo] = useState(false);
 
@@ -71,6 +71,7 @@ export default function EditMaterialModal({ open, item, categorias, fornecedores
         categorias={categorias}
         fornecedores={fornecedores}
         formatos={formatos}
+        materiais={materiais}
       />
     </Modal>
   );

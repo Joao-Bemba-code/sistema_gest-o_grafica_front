@@ -11,7 +11,7 @@ import { ListSkeleton } from "@/components/Skeleton";
 import { inputCls, familias, tiposItem, normalizarFamilia, normalizarTipoItem } from "@/lib/estoque";
 import { listar, criar, atualizar, remover } from "@/services/categorias";
 
-const blankForm = { nome: "", familia: "papeis", subfamilia: "", tipo: "materia_prima" };
+const blankForm = { nome: "", familia: "papeis", tipo: "materia_prima" };
 
 export default function CategoriasPage() {
   const { addToast } = useToast();
@@ -34,8 +34,23 @@ export default function CategoriasPage() {
   }, [addToast]);
 
   useEffect(() => {
-    carregar();
-  }, [carregar]);
+    let ativo = true;
+    const iniciar = async () => {
+      try {
+        const dados = await listar();
+        if (ativo) setCategorias(dados);
+      } catch {
+        if (ativo) addToast?.("Erro ao carregar categorias", "error");
+      } finally {
+        if (ativo) setCarregando(false);
+      }
+    };
+    iniciar();
+    return () => {
+      ativo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
 
   const abrirNova = () => {
@@ -48,7 +63,6 @@ export default function CategoriasPage() {
     setForm({
       nome: categoria.nome || "",
       familia: categoria.familia || "papeis",
-      subfamilia: categoria.subfamilia || "",
       tipo: categoria.tipo || "materia_prima",
     });
   };
@@ -64,7 +78,6 @@ export default function CategoriasPage() {
       const payload = {
         nome: form.nome.trim(),
         familia: form.familia,
-        subfamilia: form.subfamilia.trim(),
         tipo: form.tipo,
       };
       if (modal.id) await atualizar(modal.id, payload);
@@ -183,10 +196,6 @@ export default function CategoriasPage() {
               <select required value={form.familia} onChange={(e) => setForm((p) => ({ ...p, familia: e.target.value }))} className={inputCls}>
                 {Object.keys(familias).map((f) => <option key={f} value={f}>{familias[f].label}</option>)}
               </select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Subfamília</label>
-              <input value={form.subfamilia} onChange={(e) => setForm((p) => ({ ...p, subfamilia: e.target.value }))} className={inputCls} placeholder="Ex: Couché, Offset, etc." />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Tipo *</label>

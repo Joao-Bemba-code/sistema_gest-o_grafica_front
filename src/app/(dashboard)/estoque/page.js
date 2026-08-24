@@ -405,6 +405,7 @@ export default function EstoquePage() {
         categorias={categorias}
         fornecedores={fornecedores}
         formatos={formatos}
+        materiais={materiais}
         onClose={fecharEdicao}
         onSave={salvarEdicao}
       />

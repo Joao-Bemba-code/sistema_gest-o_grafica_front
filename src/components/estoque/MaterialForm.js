@@ -66,14 +66,14 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
   const categoria = categorias.find((c) => String(c.id) === String(form.categoria_id));
   const camposEspec = camposDeCategoria(categoria);
 
-  const subfamiliasDaFamilia = (() => {
+  const subfamiliasSugeridas = (() => {
     if (!categoria) return [];
     const fam = normalizarFamilia(categoria.familia);
     const vistas = new Set();
-    for (const c of categorias) {
-      if (normalizarFamilia(c.familia) === fam && c.subfamilia && String(c.subfamilia).trim()) {
-        vistas.add(String(c.subfamilia).trim());
-      }
+    for (const m of materiais) {
+      if (normalizarFamilia(m.categoria?.familia) !== fam) continue;
+      const s = String(m.especificacoes?.subfamilia || "").trim();
+      if (s) vistas.add(s);
     }
     return [...vistas];
   })();
@@ -93,9 +93,8 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
         }
       }
       onChange("codigo", `${prefixo}-${String(maxNum + 1).padStart(4, "0")}`);
-      onChange("especificacoes", { ...(form.especificacoes || {}), subfamilia: (cat.subfamilia || "").trim() });
     }
-  }, [categorias, materiais, form.especificacoes, onChange]);
+  }, [categorias, materiais, onChange]);
 
   const aoMudarEspec = (chave, valor) => {
     const especificacoes = { ...(form.especificacoes || {}) };
@@ -150,7 +149,7 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
                 placeholder="Ex: Couché, Offset, etc."
               />
               <datalist id={`${formId}-subfamilias`}>
-                {subfamiliasDaFamilia.map((s) => <option key={s} value={s} />)}
+                {subfamiliasSugeridas.map((s) => <option key={s} value={s} />)}
               </datalist>
             </Campo>
             <Campo label="Fornecedor">
