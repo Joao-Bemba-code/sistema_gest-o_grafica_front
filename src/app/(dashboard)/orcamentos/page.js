@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Modal from "@/components/Modal";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import KpiCard from "@/components/ui/KpiCard";
@@ -10,11 +11,8 @@ import { Badge } from "@/components/ui/Badge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import { ListSkeleton } from "@/components/Skeleton";
-import { inputCls, entradasEspecificacao } from "@/lib/estoque";
-import NumeroInput from "@/components/ui/NumeroInput";
-import { listar, criar, atualizar, remover, mudarEstado } from "@/services/orcamentos";
-import { listar as listarClientes } from "@/services/clientes";
-import { listar as listarMateriais } from "@/services/materiais";
+import { entradasEspecificacao } from "@/lib/estoque";
+import { listar, remover, mudarEstado } from "@/services/orcamentos";
 import { buscarOrganizacao } from "@/services/configuracoes";
 
 const estadoColors = {
@@ -81,44 +79,14 @@ function normalizarOrcamento(o) {
   };
 }
 
-const blankItem = { descricao: "", quantidade: "", materiais: [] };
-const blankMaterial = { material_id: "", descricao: "", unidade: "un", quantidade: "", preco_venda: 0, custo_total: 0, mover_estoque: true };
-
-function placeholderSpec(rotulo) {
-  const chave = String(rotulo || "").toLowerCase();
-  if (chave.includes("produto")) return "Ex: Caderno Escolar A5";
-  if (chave.includes("formato")) return "Ex: A5 (148×210 mm)";
-  if (chave.includes("papel") || chave.includes("material")) return "Ex: Papel Couché 150g";
-  if (chave.includes("impress")) return "Ex: Offset, 4 cores";
-  if (chave.includes("acabamento")) return "Ex: Brochura com lombada";
-  return "Ex: Offset, 4 cores...";
-}
-const SPEC_DEFAULT_LINES = [
-  { rotulo: "Produto", valor: "" },
-  { rotulo: "Formato", valor: "" },
-  { rotulo: "Papel/Material", valor: "" },
-  { rotulo: "Impressão", valor: "" },
-  { rotulo: "Acabamento", valor: "" },
-];
-const blankForm = {
-  cliente: "", empresa: "", nif: "", telefone: "", email: "",
-  itens: [{ ...blankItem, materiais: [{ ...blankMaterial }] }],
-  specLines: SPEC_DEFAULT_LINES.map((l) => ({ ...l })),
-  iva: "", prazoExecucao: "", condicoesPagamento: "100% antecipado", observacoes: "",
-};
-
 export default function OrcamentosPage() {
+  const router = useRouter();
   const [orcamentos, setOrcamentos] = useState([]);
-  const [clientes, setClientes] = useState([]);
-  const [materiais, setMateriais] = useState([]);
   const [empresa, setEmpresa] = useState({ nome: "", nif: "", endereco: "", telefone: "", email: "" });
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState(null);
   const [filter, setFilter] = useState("todos");
   const [selected, setSelected] = useState(null);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editandoId, setEditandoId] = useState(null);
-  const [form, setForm] = useState({ ...blankForm });
   const [eliminarItem, setEliminarItem] = useState(null);
   const [deletando, setDeletando] = useState(false);
   const { addToast } = useToast();
@@ -127,10 +95,8 @@ export default function OrcamentosPage() {
     setCarregando(true);
     setErro(null);
     try {
-      const [orcData, cliData, empData, matData] = await Promise.all([listar(), listarClientes({ tipo: "cliente" }), buscarOrganizacao().catch(() => null), listarMateriais().catch(() => [])]);
+      const [orcData, empData] = await Promise.all([listar(), buscarOrganizacao().catch(() => null)]);
       setOrcamentos((Array.isArray(orcData) ? orcData : orcData?.data ?? []).map(normalizarOrcamento));
-      setClientes(Array.isArray(cliData) ? cliData : cliData?.data ?? []);
-      setMateriais(Array.isArray(matData) ? matData : matData?.data ?? []);
       if (empData) setEmpresa(empData);
     } catch (err) {
       addToast(err.response?.data?.erro || "Erro na operação", "error");
@@ -143,172 +109,7 @@ export default function OrcamentosPage() {
     carregarDados();
   }, [addToast]);
 
-
-  const setField = (name, val) => setForm((p) => ({ ...p, [name]: val }));
-
-  const custoUnitItem = (it) => (it.materiais || []).reduce((s, m) => s + (Number(m.quantidade) || 0) * (Number(m.preco_venda) || 0), 0);
-
-  const recalcularItem = (it) => {
-    const preco = custoUnitItem(it);
-    const q = Number(it.quantidade) || 0;
-    return { valorUnitario: Number(preco.toFixed(2)), total: Number((preco * q).toFixed(2)) };
-  };
-
-  const setItem = (idx, key, val) => {
-    setForm((p) => {
-      const itens = [...p.itens];
-      itens[idx] = { ...itens[idx], [key]: val };
-      if (key === "quantidade") {
-        const calc = recalcularItem(itens[idx]);
-        itens[idx].valorUnitario = calc.valorUnitario;
-        itens[idx].total = calc.total;
-      }
-      return { ...p, itens };
-    });
-  };
-
-  const addItem = () => setForm((p) => ({ ...p, itens: [...p.itens, { ...blankItem, materiais: [{ ...blankMaterial }] }] }));
-  const removeItem = (idx) => setForm((p) => p.itens.length <= 1 ? p : { ...p, itens: p.itens.filter((_, i) => i !== idx) });
-
-  const setItemMaterial = (idx, mi, key, val) => {
-    setForm((p) => {
-      const itens = [...p.itens];
-      const mat = [...(itens[idx].materiais || [])];
-      mat[mi] = { ...mat[mi], [key]: val };
-      if (key === "material_id") {
-        const matEstoque = materiais.find((m) => String(m.id) === String(val));
-        if (matEstoque) {
-          mat[mi].descricao = matEstoque.nome || matEstoque.nome_tecnico || "";
-          mat[mi].unidade = matEstoque.unidade || "un";
-          mat[mi].preco_venda = Number(matEstoque.preco_venda) || Number(matEstoque.custo_unit) || 0;
-        } else {
-          mat[mi].descricao = "";
-          mat[mi].preco_venda = 0;
-        }
-      }
-      if (key === "quantidade" || key === "preco_venda" || key === "material_id") {
-        const q = Number(mat[mi].quantidade) || 0;
-        const pv = Number(mat[mi].preco_venda) || 0;
-        mat[mi].custo_total = Number((q * pv).toFixed(2));
-      }
-      itens[idx] = { ...itens[idx], materiais: mat };
-      const calc = recalcularItem(itens[idx]);
-      itens[idx].valorUnitario = calc.valorUnitario;
-      itens[idx].total = calc.total;
-      return { ...p, itens };
-    });
-  };
-
-  const addMaterial = (idx) => setForm((p) => {
-    const itens = [...p.itens];
-    itens[idx] = { ...itens[idx], materiais: [...(itens[idx].materiais || []), { ...blankMaterial }] };
-    return { ...p, itens };
-  });
-
-  const removeMaterial = (idx, mi) => setForm((p) => {
-    const itens = [...p.itens];
-    itens[idx] = { ...itens[idx], materiais: (itens[idx].materiais || []).filter((_, i) => i !== mi) };
-    const calc = recalcularItem(itens[idx]);
-    itens[idx].valorUnitario = calc.valorUnitario;
-    itens[idx].total = calc.total;
-    return { ...p, itens };
-  });
-
-  const setSpecLine = (idx, key, val) => {
-    setForm((p) => {
-      const specLines = [...p.specLines];
-      specLines[idx] = { ...specLines[idx], [key]: val };
-      return { ...p, specLines };
-    });
-  };
-  const addSpecLine = () => setForm((p) => ({ ...p, specLines: [...p.specLines, { rotulo: "", valor: "" }] }));
-  const removeSpecLine = (idx) => setForm((p) => p.specLines.length <= 1 ? p : { ...p, specLines: p.specLines.filter((_, i) => i !== idx) });
-
-  const subtotalCalc = form.itens.reduce((s, it) => s + (Number(it.total) || 0), 0);
-  const ivaCalc = Number(form.iva) || 0;
-  const totalCalc = subtotalCalc + ivaCalc;
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const dados = {
-      cliente_id: form.cliente_id,
-      cliente: { nome: form.cliente, empresa: form.empresa, nif: form.nif, telefone: form.telefone, email: form.email },
-      itens: form.itens.map((it) => {
-        const calc = recalcularItem(it);
-        return {
-          descricao: it.descricao,
-          quantidade: Number(it.quantidade),
-          valorUnitario: calc.valorUnitario,
-          total: calc.total,
-          composto: (it.materiais || []).filter((m) => m.material_id).length > 0,
-          margem: 0,
-          materiais: (it.materiais || [])
-            .map((m) => ({
-              material_id: m.material_id || null,
-              descricao: m.descricao || "",
-              unidade: m.unidade || "un",
-              quantidade: Number(m.quantidade) || 0,
-              custo_unit: Number(m.preco_venda) || 0,
-              mover_estoque: Boolean(m.mover_estoque),
-            }))
-            .filter((m) => m.material_id),
-        };
-      }),
-      especificacao: Object.fromEntries(
-        (form.specLines || [])
-          .filter((l) => l.rotulo?.trim() && l.valor?.trim())
-          .map((l) => [l.rotulo.trim(), l.valor.trim()])
-      ),
-      subtotal: subtotalCalc, iva: ivaCalc,
-      prazoExecucao: form.prazoExecucao, condicoesPagamento: form.condicoesPagamento, observacoes: form.observacoes,
-    };
-    try {
-      if (editandoId) {
-        const atualizado = await atualizar(editandoId, dados);
-        setOrcamentos((prev) => prev.map((o) => (o.id === editandoId ? normalizarOrcamento({ ...o, ...atualizado }) : o)));
-        addToast("Orçamento atualizado com sucesso", "success");
-      } else {
-        const criado = await criar(dados);
-        setOrcamentos((prev) => [normalizarOrcamento(criado), ...prev]);
-        addToast("Orçamento criado com sucesso", "success");
-      }
-    } catch (err) {
-      addToast(err.response?.data?.erro || "Erro na operação", "error");
-    }
-    setForm({ ...blankForm, itens: [{ ...blankItem, materiais: [{ ...blankMaterial }] }] });
-    setEditandoId(null);
-    setModalOpen(false);
-  };
-
-  const handleEdit = (o) => {
-    setEditandoId(o.id);
-    setForm({
-      cliente_id: o.cliente_id || "",
-      cliente: o.cliente?.nome || "", empresa: o.cliente?.empresa || "", nif: o.cliente?.nif || "",
-      telefone: o.cliente?.telefone || "", email: o.cliente?.email || "",
-      itens: (o.itens || []).map((it) => ({
-        descricao: it.descricao,
-        quantidade: String(it.quantidade),
-        valorUnitario: String(it.valorUnitario),
-        materiais: (it.materiais || []).map((m) => ({
-          material_id: m.material_id ? String(m.material_id) : "",
-          descricao: m.descricao || "",
-          unidade: m.unidade || "un",
-          quantidade: String(m.quantidade ?? ""),
-          preco_venda: Number(m.custo_unit) || 0,
-          custo_total: Number(m.custo_total) || 0,
-          mover_estoque: Boolean(m.mover_estoque),
-        })),
-      })),
-      specLines: (() => {
-        const linhas = entradasEspecificacao(o.especificacao);
-        return linhas.length ? linhas.map((l) => ({ ...l })) : SPEC_DEFAULT_LINES.map((l) => ({ ...l }));
-      })(),
-      iva: String(o.iva), prazoExecucao: o.prazoExecucao,
-      condicoesPagamento: o.condicoesPagamento, observacoes: o.observacoes || "",
-    });
-    setModalOpen(true);
-  };
+  const irParaEdicao = (o) => router.push(`/orcamentos/novo?id=${o.id}`);
 
   const handleMudarEstado = async (o, novoEstado) => {
     if (!novoEstado || novoEstado === o.estado) return;
@@ -345,17 +146,6 @@ export default function OrcamentosPage() {
       addToast(err.response?.data?.erro || "Erro na operação", "error");
     } finally {
       setDeletando(false);
-    }
-  };
-
-  const handleClienteSelect = (e) => {
-    const id = e.target.value;
-    if (!id) { setField("cliente_id", ""); setField("cliente", ""); setField("empresa", ""); setField("nif", ""); setField("telefone", ""); setField("email", ""); return; }
-    const cli = clientes.find((c) => String(c.id) === id);
-    if (cli) {
-      setField("cliente_id", id); setField("cliente", cli.nome || cli.razao_social || "");
-      setField("empresa", cli.empresa || ""); setField("nif", cli.nif || "");
-      setField("telefone", cli.telefone || ""); setField("email", cli.email || "");
     }
   };
 
@@ -398,9 +188,11 @@ export default function OrcamentosPage() {
             <p className="text-primary mt-1 font-mono text-xs uppercase tracking-widest">{orcamentos.length} orçamentos registados // ORC</p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <button onClick={() => { setForm({ ...blankForm, itens: [{ ...blankItem, materiais: [{ ...blankMaterial }] }] }); setEditandoId(null); setModalOpen(true); }} className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold shadow-[0_0_15px_rgba(128,213,203,0.2)] hover:shadow-[0_0_25px_rgba(128,213,203,0.4)]">
-              <Icon name="add" className="text-[16px]" /> Novo Orçamento
-            </button>
+            <Link href="/orcamentos/novo">
+              <button className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold shadow-[0_0_15px_rgba(128,213,203,0.2)] hover:shadow-[0_0_25px_rgba(128,213,203,0.4)]">
+                <Icon name="add" className="text-[16px]" /> Novo Orçamento
+              </button>
+            </Link>
           </div>
         </div>
       )}
@@ -509,7 +301,7 @@ export default function OrcamentosPage() {
                       >
                         {ESTADOS.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
                       </select>
-                      <Button variant="ghost" size="icon" onClick={() => handleEdit(o)} title="Editar"><Icon name="edit" className="text-[16px]" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => irParaEdicao(o)} title="Editar"><Icon name="edit" className="text-[16px]" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => setEliminarItem(o)} title="Remover" className="text-error hover:text-error"><Icon name="delete" className="text-[16px]" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => handleWhatsApp(o)} title="Enviar WhatsApp"><Icon name="chat" className="text-[16px]" /></Button>
                     </div>
@@ -543,7 +335,7 @@ export default function OrcamentosPage() {
                     >
                       {ESTADOS.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
                     </select>
-                    <Button variant="ghost" size="sm" onClick={() => handleEdit(o)}><Icon name="edit" className="text-sm" /> Editar</Button>
+                    <Button variant="ghost" size="sm" onClick={() => irParaEdicao(o)}><Icon name="edit" className="text-sm" /> Editar</Button>
                     <Button variant="ghost" size="sm" onClick={() => setEliminarItem(o)} className="text-error"><Icon name="delete" className="text-sm" /></Button>
                   </div>
                 </CardContent>
