@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import Icon from "@/components/Icon";
 import FornecedorSelect from "./FornecedorSelect";
 import NumeroInput from "@/components/ui/NumeroInput";
-import { inputCls, tiposEstoque, unidades, camposDeCategoria, familias, normalizarFamilia, prefixoFamilia } from "@/lib/estoque";
+import { inputCls, unidades, camposDeCategoria, familias, normalizarFamilia, normalizarUnidade, prefixoFamilia } from "@/lib/estoque";
 
 const tabs = [
   { key: "basicos", label: "Identificação do Material", icon: "badge" },
@@ -65,6 +65,7 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
   const id = (sufixo) => `${formId}-${sufixo}`;
   const categoria = categorias.find((c) => String(c.id) === String(form.categoria_id));
   const camposEspec = camposDeCategoria(categoria, form.unidade);
+  const ePapel = ["folha", "resma"].includes(normalizarUnidade(form.unidade));
 
   const subfamiliasSugeridas = (() => {
     if (!categoria) return [];
@@ -176,20 +177,19 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
 
         {tab === "especificacoes" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Campo label="Tipo de Estoque">
-              <select value={form.tipo_estoque} onChange={(e) => onChange("tipo_estoque", e.target.value)} className={inputCls}>
-                {tiposEstoque.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </Campo>
-            <Campo label="Formato">
-              <input value={form.formato || ""} onChange={(e) => onChange("formato", e.target.value)} className={inputCls} placeholder="Ex: A3, 70×100, SRA3..." />
-            </Campo>
-            <Campo label="Gramagem">
-              <div className="flex items-center gap-2">
-                <NumeroInput value={form.gramagem || ""} onChange={(e) => onChange("gramagem", e.target.value)} className={inputCls} placeholder="Ex: 150" />
-                <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap">g/m²</span>
-              </div>
-            </Campo>
+            {ePapel && (
+              <>
+                <Campo label="Formato">
+                  <input value={form.formato || ""} onChange={(e) => onChange("formato", e.target.value)} className={inputCls} placeholder="Ex: A3, 70×100, SRA3..." />
+                </Campo>
+                <Campo label="Gramagem">
+                  <div className="flex items-center gap-2">
+                    <NumeroInput value={form.gramagem || ""} onChange={(e) => onChange("gramagem", e.target.value)} className={inputCls} placeholder="Ex: 150" />
+                    <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap">g/m²</span>
+                  </div>
+                </Campo>
+              </>
+            )}
 
             {!categoria && (
               <div className="sm:col-span-2 rounded-xl border border-dashed border-outline-variant p-4 text-xs text-muted-foreground">

@@ -153,17 +153,21 @@ export const camposPadraoPorFamilia = {
   ],
 };
 
+const CHAVES_DEDICADAS = new Set(["formato", "gramagem"]);
+
 export function camposDeCategoria(categoria, unidade) {
   if (!categoria) return [];
-  if (categoria.campos_especificacao && Array.isArray(categoria.campos_especificacao) && categoria.campos_especificacao.length) {
-    return categoria.campos_especificacao;
-  }
   const porChave = new Map();
   for (const c of camposPadraoPorUnidade[normalizarUnidade(unidade)] || []) {
     porChave.set(c.chave, c);
   }
   for (const c of camposPadraoPorFamilia[normalizarFamilia(categoria.familia)] || []) {
     if (!porChave.has(c.chave)) porChave.set(c.chave, c);
+  }
+  const personalizadas = Array.isArray(categoria.campos_especificacao) ? categoria.campos_especificacao : [];
+  for (const c of personalizadas) {
+    if (!c || !c.chave || CHAVES_DEDICADAS.has(c.chave)) continue;
+    porChave.set(c.chave, c);
   }
   return [...porChave.values()];
 }

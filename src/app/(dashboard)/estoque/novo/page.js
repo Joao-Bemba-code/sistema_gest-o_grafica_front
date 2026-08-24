@@ -6,7 +6,7 @@ import Icon from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
 import MaterialForm from "@/components/estoque/MaterialForm";
 import useEstoque from "@/hooks/useEstoque";
-import { blankItem, entradasEspecificacao, formatKz, toNum, tiposEstoque, familias, tiposItem, normalizarFamilia } from "@/lib/estoque";
+import { blankItem, entradasEspecificacao, formatKz, toNum, familias, tiposItem, normalizarFamilia, normalizarUnidade } from "@/lib/estoque";
 
 function PreviewLinha({ label, valor, acento }) {
   return (
@@ -116,9 +116,12 @@ export default function NovoMaterialPage() {
               .map((e) => (
                 <PreviewLinha key={e.rotulo} label={e.rotulo} valor={e.valor} />
               ))}
-            <PreviewLinha label="Formato" valor={form.formato} />
-            <PreviewLinha label="Gramagem" valor={form.gramagem ? `${form.gramagem} g/m²` : "—"} />
-            <PreviewLinha label="Tipo de Estoque" valor={tiposEstoque.find((t) => t === form.tipo_estoque)} />
+            {["folha", "resma"].includes(normalizarUnidade(form.unidade)) && (
+              <>
+                <PreviewLinha label="Formato" valor={form.formato} />
+                <PreviewLinha label="Gramagem" valor={form.gramagem ? `${form.gramagem} g/m²` : "—"} />
+              </>
+            )}
             <PreviewLinha label="Custo Unitário" valor={formatKz(form.custo_unit)} />
             <PreviewLinha label="Localização" valor={form.localizacao} />
             <PreviewLinha label="Valor Máx. Stock" valor={formatKz(custoTotal)} acento="text-primary" />
