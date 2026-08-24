@@ -369,6 +369,7 @@ return (
           </div>
         )}
       </div>
-    </form>
+    </div>
+  </form>
   );
 }
