@@ -73,7 +73,7 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
     const vistas = new Set();
     for (const m of materiais) {
       if (normalizarFamilia(m.categoria?.familia) !== fam) continue;
-      const s = String(m.especificacoes?.subfamilia || "").trim();
+      const s = String(m.especificacoes?.subfamilia || m.categoria?.subfamilia || "").trim();
       if (s) vistas.add(s);
     }
     return [...vistas];

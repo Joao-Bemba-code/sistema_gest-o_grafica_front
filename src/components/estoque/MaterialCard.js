@@ -121,12 +121,15 @@ function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEdita
             </div>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-mono text-on-surface-variant">
               <span>SKU: <span className={critico ? "text-error/80" : "text-primary/80"}>{item.codigo || "—"}</span></span>
-              {String(item.especificacoes?.subfamilia || "").trim() ? (
-                <>
-                  <span className="w-1 h-1 rounded-full bg-outline-variant" />
-                  <span>SUB: <span className={critico ? "text-error/80" : "text-primary/80"}>{String(item.especificacoes.subfamilia).trim()}</span></span>
-                </>
-              ) : null}
+              {(() => {
+                const sub = String(item.especificacoes?.subfamilia || item.categoria?.subfamilia || "").trim();
+                return sub ? (
+                  <>
+                    <span className="w-1 h-1 rounded-full bg-outline-variant" />
+                    <span>SUB: <span className={critico ? "text-error/80" : "text-primary/80"}>{sub}</span></span>
+                  </>
+                ) : null;
+              })()}
               {item.localizacao ? (
                 <>
                   <span className="w-1 h-1 rounded-full bg-outline-variant" />
