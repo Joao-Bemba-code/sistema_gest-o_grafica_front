@@ -108,13 +108,15 @@ export default function NovoMaterialPage() {
           <div>
             <PreviewLinha label="Categoria" valor={categoria?.nome} />
             <PreviewLinha label="Família" valor={familias[catFamilia]?.label} />
-            <PreviewLinha label="Subfamília" valor={categoria?.subfamilia} />
+            <PreviewLinha label="Subfamília" valor={(form.especificacoes?.subfamilia || "").trim() || categoria?.subfamilia} />
             <PreviewLinha label="Tipo" valor={tiposItem[categoria?.tipo]?.label} />
             <PreviewLinha label="Unidade" valor={form.unidade} />
             {entradasEspecificacao(form.especificacoes).length > 0 ? (
-              entradasEspecificacao(form.especificacoes).map((e) => (
-                <PreviewLinha key={e.rotulo} label={e.rotulo} valor={e.valor} />
-              ))
+              entradasEspecificacao(form.especificacoes)
+                .filter((e) => e.rotulo.toLowerCase().replace(/[^a-z]/g, "") !== "subfamilia")
+                .map((e) => (
+                  <PreviewLinha key={e.rotulo} label={e.rotulo} valor={e.valor} />
+                ))
             ) : (
               <>
                 <PreviewLinha label="Formato" valor={form.formato} />

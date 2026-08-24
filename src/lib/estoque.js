@@ -110,10 +110,11 @@ export const camposPadraoPorFamilia = {
 };
 
 export function camposDeCategoria(categoria) {
-  if (categoria?.campos_especificacao && Array.isArray(categoria.campos_especificacao) && categoria.campos_especificacao.length) {
+  if (!categoria) return [];
+  if (categoria.campos_especificacao && Array.isArray(categoria.campos_especificacao) && categoria.campos_especificacao.length) {
     return categoria.campos_especificacao;
   }
-  return [];
+  return camposPadraoPorFamilia[normalizarFamilia(categoria.familia)] || [];
 }
 
 const CHAVES_LEGADO = new Set(["produto", "formato", "papel", "impressao", "impressão", "acabamento"]);

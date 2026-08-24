@@ -26,6 +26,7 @@ function deItem(item) {
     ponto_ressuprimento: item.ponto_ressuprimento || "",
     custo_unit: toNum(item.custo_unitario) || item.custo_unit || "",
     margem: item.margem || "",
+    lucro: item.lucro || "",
     descricao: item.descricao || "",
     especificidade: item.especificidade || "",
     condicao_armazenagem: item.condicao_armazenagem || "",

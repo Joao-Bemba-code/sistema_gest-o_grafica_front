@@ -66,6 +66,18 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
   const categoria = categorias.find((c) => String(c.id) === String(form.categoria_id));
   const camposEspec = camposDeCategoria(categoria);
 
+  const subfamiliasDaFamilia = (() => {
+    if (!categoria) return [];
+    const fam = normalizarFamilia(categoria.familia);
+    const vistas = new Set();
+    for (const c of categorias) {
+      if (normalizarFamilia(c.familia) === fam && c.subfamilia && String(c.subfamilia).trim()) {
+        vistas.add(String(c.subfamilia).trim());
+      }
+    }
+    return [...vistas];
+  })();
+
   const aoMudarCategoria = useCallback((e) => {
     const novaCatId = e.target.value;
     onChange("categoria_id", novaCatId);
@@ -81,8 +93,9 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
         }
       }
       onChange("codigo", `${prefixo}-${String(maxNum + 1).padStart(4, "0")}`);
+      onChange("especificacoes", { ...(form.especificacoes || {}), subfamilia: (cat.subfamilia || "").trim() });
     }
-  }, [categorias, materiais, onChange]);
+  }, [categorias, materiais, form.especificacoes, onChange]);
 
   const aoMudarEspec = (chave, valor) => {
     const especificacoes = { ...(form.especificacoes || {}) };
@@ -128,6 +141,18 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
                 {categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
               </select>
             </Campo>
+            <Campo label="Subfamília">
+              <input
+                list={`${formId}-subfamilias`}
+                value={(form.especificacoes?.subfamilia || "").trim()}
+                onChange={(e) => aoMudarEspec("subfamilia", e.target.value)}
+                className={inputCls}
+                placeholder="Ex: Couché, Offset, etc."
+              />
+              <datalist id={`${formId}-subfamilias`}>
+                {subfamiliasDaFamilia.map((s) => <option key={s} value={s} />)}
+              </datalist>
+            </Campo>
             <Campo label="Fornecedor">
               <FornecedorSelect
                 value={form.fornecedor}
@@ -146,12 +171,6 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
             </Campo>
             <Campo label="Descrição" full>
               <textarea rows={2} value={form.descricao} onChange={(e) => onChange("descricao", e.target.value)} className={`${inputCls} resize-none`} placeholder="Descrição completa do material..." />
-            </Campo>
-            <Campo label="Localização na Prateleira" full>
-              <input value={form.localizacao} onChange={(e) => onChange("localizacao", e.target.value)} className={inputCls} placeholder="Ex: Prateleira A3, seção 2" />
-            </Campo>
-            <Campo label="Lucro (%)">
-              <NumeroInput value={form.lucro} onChange={(e) => onChange("lucro", e.target.value)} className={inputCls} placeholder="Ex: 25" />
             </Campo>
           </div>
         )}
@@ -211,6 +230,12 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
             </Campo>
             <Campo label="Margem (%)">
               <NumeroInput value={form.margem} onChange={(e) => onChange("margem", e.target.value)} className={inputCls} placeholder="Ex: 30" />
+            </Campo>
+            <Campo label="Lucro (%)">
+              <NumeroInput value={form.lucro} onChange={(e) => onChange("lucro", e.target.value)} className={inputCls} placeholder="Ex: 25" />
+            </Campo>
+            <Campo label="Localização na Prateleira" full>
+              <input value={form.localizacao} onChange={(e) => onChange("localizacao", e.target.value)} className={inputCls} placeholder="Ex: Prateleira A3, seção 2" />
             </Campo>
           </div>
         )}
