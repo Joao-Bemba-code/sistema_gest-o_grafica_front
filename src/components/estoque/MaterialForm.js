@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import Icon from "@/components/Icon";
 import FornecedorSelect from "./FornecedorSelect";
 import NumeroInput from "@/components/ui/NumeroInput";
-import { inputCls, unidades, camposDeCategoria, familias, normalizarFamilia, normalizarUnidade, prefixoFamilia } from "@/lib/estoque";
+import { inputCls, unidades, camposDeCategoria, familias, normalizarFamilia, normalizarUnidade, prefixoFamilia, especificacoesObjeto } from "@/lib/estoque";
 
 const tabs = [
   { key: "basicos", label: "Identificação do Material", icon: "badge" },
@@ -73,7 +73,7 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
     const vistas = new Set();
     for (const m of materiais) {
       if (normalizarFamilia(m.categoria?.familia) !== fam) continue;
-      const s = String(m.especificacoes?.subfamilia || m.categoria?.subfamilia || "").trim();
+      const s = String(especificacoesObjeto(m.especificacoes).subfamilia || m.categoria?.subfamilia || "").trim();
       if (s) vistas.add(s);
     }
     return [...vistas];

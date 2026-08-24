@@ -3,7 +3,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Icon from "@/components/Icon";
-import { formatKz, familias, normalizarFamilia, statusCfg, toNum } from "@/lib/estoque";
+import { especificacoesObjeto, formatKz, familias, normalizarFamilia, statusCfg, toNum } from "@/lib/estoque";
 
 const textoStatus = {
   ok: { label: "Saudável", cor: "text-primary" },
@@ -122,7 +122,8 @@ function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEdita
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-mono text-on-surface-variant">
               <span>SKU: <span className={critico ? "text-error/80" : "text-primary/80"}>{item.codigo || "—"}</span></span>
               {(() => {
-                const sub = String(item.especificacoes?.subfamilia || item.categoria?.subfamilia || "").trim();
+                const espec = especificacoesObjeto(item.especificacoes);
+                const sub = String(espec.subfamilia || item.categoria?.subfamilia || "").trim();
                 return sub ? (
                   <>
                     <span className="w-1 h-1 rounded-full bg-outline-variant" />
