@@ -113,24 +113,34 @@ function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEdita
             <Icon name={familiaCfg.icon} className={`text-[20px] ${critico ? "text-error" : "text-primary"}`} />
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
+            <div className="flex items-center gap-2 mb-1 min-w-0">
               <h3 className="font-sans text-base text-on-surface tracking-wide font-medium truncate">{item.nome}</h3>
-              <span className={`px-1.5 py-0.5 rounded-sm border text-[9px] font-mono tracking-widest bg-surface-variant ${critico ? "border-error/50 text-error bg-error/10" : "border-outline-variant text-on-surface-variant"}`}>
+              <span className={`px-1.5 py-0.5 rounded-sm border text-[9px] font-mono tracking-widest bg-surface-variant shrink-0 ${critico ? "border-error/50 text-error bg-error/10" : "border-outline-variant text-on-surface-variant"}`}>
                 {familiaCfg.label}
               </span>
             </div>
-            <div className="flex items-center gap-3 text-[11px] font-mono text-on-surface-variant">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-mono text-on-surface-variant">
               <span>SKU: <span className={critico ? "text-error/80" : "text-primary/80"}>{item.codigo || "—"}</span></span>
+              {String(item.especificacoes?.subfamilia || "").trim() ? (
+                <>
+                  <span className="w-1 h-1 rounded-full bg-outline-variant" />
+                  <span>SUB: <span className={critico ? "text-error/80" : "text-primary/80"}>{String(item.especificacoes.subfamilia).trim()}</span></span>
+                </>
+              ) : null}
+              {item.localizacao ? (
+                <>
+                  <span className="w-1 h-1 rounded-full bg-outline-variant" />
+                  <span>LOC: <span className={critico ? "text-error/80" : "text-primary/80"}>{item.localizacao}</span></span>
+                </>
+              ) : null}
               <span className="w-1 h-1 rounded-full bg-outline-variant" />
-              {item.localizacao ? <span>LOC: <span className={critico ? "text-error/80" : "text-primary/80"}>{item.localizacao}</span></span> : null}
-              <span className="w-1 h-1 rounded-full bg-outline-variant" />
-              <span>FRN: {item.fornecedor || "—"}</span>
+              <span className="truncate max-w-[160px]" title={item.fornecedor || ""}>FRN: {item.fornecedor || "—"}</span>
             </div>
           </div>
         </div>
 
         {/* Col 2: Stock */}
-        <div className="md:col-span-3 flex flex-col border-l border-outline-variant/30 pl-4">
+        <div className="md:col-span-3 flex flex-col md:border-l md:border-outline-variant/30 md:pl-4">
           <p className={`text-[10px] font-mono uppercase tracking-widest mb-1 ${critico ? "text-error/80" : "text-on-surface-variant"}`}>Qtd. Disponível</p>
           <div className="flex items-baseline gap-1">
             <p className={`font-mono text-xl font-bold ${critico ? "text-error" : "text-on-surface"}`}>{toNum(item.estoque_disponivel).toLocaleString("pt-AO")}</p>
@@ -139,7 +149,7 @@ function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEdita
         </div>
 
         {/* Col 3: Progresso */}
-        <div className="md:col-span-2 flex items-center gap-3 border-l border-outline-variant/30 pl-4">
+        <div className="md:col-span-2 flex items-center gap-3 md:border-l md:border-outline-variant/30 md:pl-4">
           <RadialMini pct={pct} status={item.status} />
           <div>
             <p className={`text-[9px] font-mono uppercase tracking-widest ${critico ? "text-error/80" : "text-on-surface-variant"}`}>Pt. Encomenda</p>
@@ -148,9 +158,10 @@ function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEdita
         </div>
 
         {/* Col 4: Ações */}
-        <div className="md:col-span-2 flex justify-end gap-1.5">
+        <div className="md:col-span-2 flex justify-start md:justify-end gap-1.5">
           <BotaoIcone icon="add" label="Entrada" critico={critico} onClick={() => onEntrada(item)} />
           <BotaoIcone icon="remove" label="Saída" cor="saida" critico={critico} onClick={() => onSaida(item)} />
+          <BotaoIcone icon="description" label="Ver ficha do material (PDF)" critico={critico} onClick={() => onFichaPdf(item)} />
           <div className="relative" ref={btnRef}>
             <BotaoIcone icon="more_vert" label="Mais opções" critico={critico} onClick={abrirMenu} />
             {menuPos &&

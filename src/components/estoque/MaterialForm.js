@@ -64,7 +64,7 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
   const [tab, setTab] = useState("basicos");
   const id = (sufixo) => `${formId}-${sufixo}`;
   const categoria = categorias.find((c) => String(c.id) === String(form.categoria_id));
-  const camposEspec = camposDeCategoria(categoria);
+  const camposEspec = camposDeCategoria(categoria, form.unidade);
 
   const subfamiliasSugeridas = (() => {
     if (!categoria) return [];

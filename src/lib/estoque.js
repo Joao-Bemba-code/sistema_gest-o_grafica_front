@@ -49,6 +49,53 @@ export function normalizarTipoItem(t) {
   return t && tiposItem[t] ? t : "materia_prima";
 }
 
+export function normalizarUnidade(u) {
+  return typeof u === "string" && u.trim() ? u.trim().toLowerCase() : "";
+}
+
+export const camposPadraoPorUnidade = {
+  folha: [
+    { chave: "cor", rotulo: "Cor", tipo: "selecao", opcoes: ["Branco", "Creme", "Off-white", "Colorido"] },
+    { chave: "tipo", rotulo: "Tipo de Papel", tipo: "selecao", opcoes: ["Couché", "Offset", "Autocopiativo", "Cartolina", "Etiqueta"] },
+  ],
+  resma: [
+    { chave: "folhas_por_resma", rotulo: "Folhas por Resma", tipo: "numero" },
+    { chave: "cor", rotulo: "Cor", tipo: "selecao", opcoes: ["Branco", "Creme", "Off-white", "Colorido"] },
+    { chave: "tipo", rotulo: "Tipo de Papel", tipo: "selecao", opcoes: ["Couché", "Offset", "Autocopiativo", "Cartolina", "Etiqueta"] },
+  ],
+  rolo: [
+    { chave: "largura", rotulo: "Largura do Rolo", tipo: "numero", unidade: "cm" },
+    { chave: "comprimento", rotulo: "Comprimento", tipo: "numero", unidade: "m" },
+  ],
+  metro: [
+    { chave: "largura", rotulo: "Largura (bobina/fita)", tipo: "numero", unidade: "cm" },
+  ],
+  "m²": [
+    { chave: "tipo", rotulo: "Tipo de Material", tipo: "selecao", opcoes: ["Lona", "Vinil", "Adesivo", "Tela"] },
+  ],
+  litro: [
+    { chave: "cor", rotulo: "Cor", tipo: "texto" },
+    { chave: "base", rotulo: "Base", tipo: "selecao", opcoes: ["Solvente", "Aquosa", "UV", "Latex"] },
+    { chave: "marca", rotulo: "Marca", tipo: "texto" },
+  ],
+  kg: [
+    { chave: "cor", rotulo: "Cor", tipo: "texto" },
+    { chave: "marca", rotulo: "Marca", tipo: "texto" },
+  ],
+  un: [
+    { chave: "marca", rotulo: "Marca", tipo: "texto" },
+    { chave: "modelo", rotulo: "Modelo", tipo: "texto" },
+  ],
+  pacote: [
+    { chave: "conteudo", rotulo: "Conteúdo do Pacote", tipo: "texto" },
+    { chave: "marca", rotulo: "Marca", tipo: "texto" },
+  ],
+  caixa: [
+    { chave: "conteudo", rotulo: "Conteúdo da Caixa", tipo: "texto" },
+    { chave: "marca", rotulo: "Marca", tipo: "texto" },
+  ],
+};
+
 export const statusCfg = {
   ok: { label: "OK", variant: "success" },
   repor: { label: "Repor", variant: "warning" },
@@ -106,12 +153,19 @@ export const camposPadraoPorFamilia = {
   ],
 };
 
-export function camposDeCategoria(categoria) {
+export function camposDeCategoria(categoria, unidade) {
   if (!categoria) return [];
   if (categoria.campos_especificacao && Array.isArray(categoria.campos_especificacao) && categoria.campos_especificacao.length) {
     return categoria.campos_especificacao;
   }
-  return camposPadraoPorFamilia[normalizarFamilia(categoria.familia)] || [];
+  const porChave = new Map();
+  for (const c of camposPadraoPorUnidade[normalizarUnidade(unidade)] || []) {
+    porChave.set(c.chave, c);
+  }
+  for (const c of camposPadraoPorFamilia[normalizarFamilia(categoria.familia)] || []) {
+    if (!porChave.has(c.chave)) porChave.set(c.chave, c);
+  }
+  return [...porChave.values()];
 }
 
 const CHAVES_LEGADO = new Set(["produto", "formato", "papel", "impressao", "impressão", "acabamento"]);
