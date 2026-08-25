@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Modal from "@/components/Modal";
 import Icon from "@/components/Icon";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -9,9 +9,11 @@ import { inputCls } from "@/lib/estoque";
 import NumeroInput from "@/components/ui/NumeroInput";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
-import { criarFatura, listarFaturas, exportarFaturas, marcarPaga, buscarFatura } from "@/services/faturacao";
+import FilterBar, { useFilter } from "@/components/ui/FilterBar";
+import { criarFatura, listarFaturas, exportarFaturas, marcarPaga, buscarFatura, removerFatura } from "@/services/faturacao";
 import { listar as listarOrcamentos } from "@/services/orcamentos";
 import { listarOrdens } from "@/services/producao";
 import { listar as listarClientes } from "@/services/clientes";
@@ -56,11 +58,12 @@ export default function FaturacaoPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState("faturas");
-  const [filtroFatura, setFiltroFatura] = useState("todas");
   const [fatModalOpen, setFatModalOpen] = useState(false);
   const [selectedFatura, setSelectedFatura] = useState(null);
   const [faturaForm, setFaturaForm] = useState(blankFaturaForm);
   const [empresa, setEmpresa] = useState({ nome: "", nif: "", endereco: "", telefone: "", email: "" });
+  const [eliminarItem, setEliminarItem] = useState(null);
+  const [deletando, setDeletando] = useState(false);
   const { addToast } = useToast();
 
   const carregarDados = () => {
@@ -81,7 +84,19 @@ export default function FaturacaoPage() {
   }, []);
 
 
-  const filteredFaturas = filtroFatura === "todas" ? faturas : faturas.filter((f) => f.estado === filtroFatura);
+  const filterConfig = useMemo(() => [
+    { value: "todas", label: "Todas", icon: "filter_list" },
+    ...Object.entries(faturaEstados).map(([k, v]) => ({
+      value: k, label: v.label, field: "estado",
+      icon: k === "paga" ? "check_circle" : k === "emitida" ? "pending" : k === "vencida" ? "warning" : k === "cancelada" ? "cancel" : "info",
+    })),
+  ], []);
+
+  const { search, setSearch, activeFilter, setActiveFilter, filtered: filteredFaturasFinal, total } = useFilter({
+    items: faturas,
+    searchFields: ["numero", "cliente.nome", "cliente.empresa"],
+    filterConfig,
+  });
 
   const abrirFatura = async (f) => {
     setSelectedFatura(f);
@@ -218,9 +233,25 @@ export default function FaturacaoPage() {
     }
   };
 
+  const confirmarEliminacao = async () => {
+    if (!eliminarItem) return;
+    setDeletando(true);
+    try {
+      await removerFatura(eliminarItem.id);
+      setFaturas((prev) => prev.filter((f) => f.id !== eliminarItem.id));
+      if (selectedFatura?.id === eliminarItem.id) setSelectedFatura(null);
+      addToast("Fatura removida com sucesso", "success");
+      setEliminarItem(null);
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao remover fatura", "error");
+    } finally {
+      setDeletando(false);
+    }
+  };
+
   const handleExportar = async () => {
     try {
-      const blob = await exportarFaturas({ estado: filtroFatura === "todas" ? undefined : filtroFatura });
+      const blob = await exportarFaturas({ estado: activeFilter === "todas" ? undefined : activeFilter });
       const url = window.URL.createObjectURL(new Blob([blob]));
       const a = document.createElement("a");
       a.href = url;
@@ -279,16 +310,19 @@ export default function FaturacaoPage() {
             ))}
           </section>
 
-          <div className="flex gap-2 flex-wrap">
-            {["todas", ...Object.keys(faturaEstados)].map((f) => (
-              <Button key={f} variant={filtroFatura === f ? "default" : "outline"} size="sm" onClick={() => setFiltroFatura(f)}>
-                {faturaEstados[f]?.label || "Todas"}
-              </Button>
-            ))}
-          </div>
+          <FilterBar
+            search={search}
+            onSearchChange={setSearch}
+            placeholder="Pesquisar por nº fatura, cliente..."
+            filters={filterConfig}
+            activeFilter={activeFilter}
+            onFilterChange={setActiveFilter}
+            count={total}
+            countLabel="faturas"
+          />
 
           <div className="space-y-3">
-            {filteredFaturas.map((f) => (
+            {filteredFaturasFinal.map((f) => (
               <Card key={f.id} className="hover-lift cursor-pointer" onClick={() => abrirFatura(f)}>
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between gap-4">
@@ -319,13 +353,14 @@ export default function FaturacaoPage() {
                       {f.iva > 0 && <p className="text-[10px] text-muted-foreground">IVA {Number(f.iva)}%</p>}
                       <div className="flex items-center justify-end gap-1 mt-1">
                         <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); gerarPDF(f, empresa); }} title="Baixar PDF"><Icon name="download" className="text-[16px]" /></Button>
+                        <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setEliminarItem(f); }} title="Remover fatura"><Icon name="delete" className="text-[16px] text-destructive" /></Button>
                       </div>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             ))}
-            {filteredFaturas.length === 0 && (
+            {filteredFaturasFinal.length === 0 && (
               <div className="text-center p-12 text-muted-foreground">
                 <Icon name="receipt_long" className="text-4xl block mx-auto mb-2 opacity-30" />
                 <p className="font-medium">Nenhuma fatura encontrada</p>
@@ -620,6 +655,15 @@ export default function FaturacaoPage() {
           </div>
         </Modal>
       )}
+
+      <ConfirmDialog
+        open={Boolean(eliminarItem)}
+        onClose={() => setEliminarItem(null)}
+        onConfirm={confirmarEliminacao}
+        loading={deletando}
+        title="Remover fatura"
+        description={eliminarItem ? `Tem a certeza que deseja remover a fatura "${eliminarItem.numero}"? Esta ação não pode ser desfeita.` : ""}
+      />
 
       <footer className="p-6 text-center border-t bg-muted/30 rounded-2xl">
         <p className="text-sm text-muted-foreground">SIGRAF — Sistema de Gestão para Indústria Gráfica</p>

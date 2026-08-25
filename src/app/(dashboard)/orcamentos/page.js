@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
@@ -11,9 +11,11 @@ import { Badge } from "@/components/ui/Badge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import { ListSkeleton } from "@/components/Skeleton";
+import FilterBar, { useFilter } from "@/components/ui/FilterBar";
 import { entradasEspecificacao } from "@/lib/estoque";
 import { listar, remover, mudarEstado } from "@/services/orcamentos";
 import { buscarOrganizacao } from "@/services/configuracoes";
+import gerarOrcamentoPdf from "@/lib/orcamentoPdf";
 
 const estadoColors = {
   aprovado: "success",
@@ -70,6 +72,7 @@ function normalizarOrcamento(o) {
     },
     especificacao: (o.especificacao && typeof o.especificacao === "object" && !Array.isArray(o.especificacao)) ? o.especificacao : {},
     itens: Array.isArray(o.itens) ? o.itens : [],
+    servicos: Array.isArray(o.servicos) ? o.servicos : [],
     subtotal: Number(o.subtotal) || 0,
     iva: Number(o.iva) || 0,
     valorIva: Number(o.valorIva) || 0,
@@ -90,6 +93,31 @@ export default function OrcamentosPage() {
   const [eliminarItem, setEliminarItem] = useState(null);
   const [deletando, setDeletando] = useState(false);
   const { addToast } = useToast();
+
+  const filterConfig = useMemo(() => [
+    { value: "todos", label: "Todos", icon: "apps", count: orcamentos.length },
+    ...ESTADOS.map((s) => ({
+      value: s, label: s.charAt(0).toUpperCase() + s.slice(1),
+      icon: s === "aprovado" ? "check_circle" : s === "pendente" ? "pending" : s === "cancelado" ? "cancel" : "block",
+      field: "estado",
+      count: orcamentos.filter((o) => o.estado === s).length,
+    })),
+  ], [orcamentos]);
+
+  const sortOptions = useMemo(() => [
+    { value: "data_desc", label: "Mais recente", field: "data", dir: "desc" },
+    { value: "data_asc", label: "Mais antigo", field: "data", dir: "asc" },
+    { value: "total_desc", label: "Maior valor", field: "total", dir: "desc" },
+    { value: "total_asc", label: "Menor valor", field: "total", dir: "asc" },
+    { value: "numero_desc", label: "Nº decrescente", field: "numero", dir: "desc" },
+  ], []);
+
+  const { search, setSearch, activeFilter, setActiveFilter, sortBy, setSortBy, filtered, total: totalFiltrados } = useFilter({
+    items: orcamentos,
+    searchFields: ["cliente.nome", "cliente.empresa", "numero", "especificacao.produto"],
+    filterConfig,
+    sortOptions,
+  });
 
   async function carregarDados() {
     setCarregando(true);
@@ -134,6 +162,15 @@ export default function OrcamentosPage() {
     window.open(`https://wa.me/${tel}?text=${msg}`, "_blank", "noopener,noreferrer");
   };
 
+  const handleGerarPdf = (o) => {
+    try {
+      gerarOrcamentoPdf(o, empresa);
+      addToast("PDF gerado com sucesso", "success");
+    } catch {
+      addToast("Erro ao gerar PDF", "error");
+    }
+  };
+
   const confirmarEliminacao = async () => {
     if (!eliminarItem) return;
     setDeletando(true);
@@ -149,7 +186,6 @@ export default function OrcamentosPage() {
     }
   };
 
-  const filtered = filter === "todos" ? orcamentos : orcamentos.filter((o) => o.estado === filter);
   const totalValor = orcamentos.reduce((s, o) => s + (o.total || o.subtotal + o.valorIva), 0);
   const pendentes = orcamentos.filter((o) => o.estado === "pendente").length;
   const aprovadosCount = orcamentos.filter((o) => o.estado === "aprovado").length;
@@ -258,13 +294,19 @@ export default function OrcamentosPage() {
         </Card>
       </div>
 
-      <div className="flex gap-2 flex-wrap">
-        {["todos", ...ESTADOS].map((f) => (
-          <Button key={f} variant={filter === f ? "default" : "outline"} size="sm" onClick={() => setFilter(f)}>
-            {f.charAt(0).toUpperCase() + f.slice(1)}
-          </Button>
-        ))}
-      </div>
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="Pesquisar por cliente, produto, nº do orçamento..."
+        filters={filterConfig}
+        activeFilter={activeFilter}
+        onFilterChange={setActiveFilter}
+        sortBy={sortBy}
+        onSortChange={setSortBy}
+        sortOptions={sortOptions}
+        count={totalFiltrados}
+        countLabel="orçamentos"
+      />
 
       <Card>
         <div className="overflow-x-auto">
@@ -303,6 +345,7 @@ export default function OrcamentosPage() {
                       </select>
                       <Button variant="ghost" size="icon" onClick={() => irParaEdicao(o)} title="Editar"><Icon name="edit" className="text-[16px]" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => setEliminarItem(o)} title="Remover" className="text-error hover:text-error"><Icon name="delete" className="text-[16px]" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleGerarPdf(o)} title="Gerar PDF"><Icon name="picture_as_pdf" className="text-[16px]" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => handleWhatsApp(o)} title="Enviar WhatsApp"><Icon name="chat" className="text-[16px]" /></Button>
                     </div>
                   </td>
@@ -336,6 +379,7 @@ export default function OrcamentosPage() {
                       {ESTADOS.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
                     </select>
                     <Button variant="ghost" size="sm" onClick={() => irParaEdicao(o)}><Icon name="edit" className="text-sm" /> Editar</Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleGerarPdf(o)}><Icon name="picture_as_pdf" className="text-sm" /></Button>
                     <Button variant="ghost" size="sm" onClick={() => setEliminarItem(o)} className="text-error"><Icon name="delete" className="text-sm" /></Button>
                   </div>
                 </CardContent>
@@ -353,6 +397,7 @@ export default function OrcamentosPage() {
             <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <CardTitle className="flex items-center gap-2"><Icon name="description" className="text-primary" /> Detalhes — {o.numero || o.id}</CardTitle>
               <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => handleGerarPdf(o)}><Icon name="picture_as_pdf" className="text-[16px]" /> PDF</Button>
                 <Button variant="outline" size="sm" onClick={() => handleWhatsApp(o)}><Icon name="chat" className="text-[16px]" /> WhatsApp</Button>
               </div>
             </CardHeader>
@@ -462,6 +507,38 @@ export default function OrcamentosPage() {
                         </div>
                       );
                     })}
+                  </div>
+                )}
+
+                {(o.servicos || []).length > 0 && (
+                  <div className="mt-4 space-y-3">
+                    <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Serviços (Mão de Obra)</h4>
+                    <div className="overflow-x-auto rounded-xl border">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b bg-muted/50">
+                            <th className="text-left px-3 py-2 font-bold text-muted-foreground uppercase">Descrição</th>
+                            <th className="text-center px-3 py-2 font-bold text-muted-foreground uppercase">MOB</th>
+                            <th className="text-center px-3 py-2 font-bold text-muted-foreground uppercase">Prazo</th>
+                            <th className="text-center px-3 py-2 font-bold text-muted-foreground uppercase">Horas</th>
+                            <th className="text-right px-3 py-2 font-bold text-muted-foreground uppercase">Valor/Hora</th>
+                            <th className="text-right px-3 py-2 font-bold text-muted-foreground uppercase">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(o.servicos || []).map((sv, i) => (
+                            <tr key={i} className="border-b border-border/20">
+                              <td className="px-3 py-2 text-foreground">{sv.descricao}</td>
+                              <td className="px-3 py-2 text-center text-muted-foreground">{sv.mob || 1}</td>
+                              <td className="px-3 py-2 text-center text-muted-foreground">{sv.prazoExecucao || 1} dia{Number(sv.prazoExecucao) !== 1 ? "s" : ""}</td>
+                              <td className="px-3 py-2 text-center text-muted-foreground">{sv.duracaoHoras || 8}h</td>
+                              <td className="px-3 py-2 text-right text-muted-foreground">{formatKz(sv.valorHora)}</td>
+                              <td className="px-3 py-2 text-right font-bold text-foreground">{formatKz(sv.total)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
               </div>

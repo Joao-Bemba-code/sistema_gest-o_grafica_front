@@ -12,7 +12,8 @@ import Modal from "./Modal";
 
 const breadcrumbs = {
   "/": ["Painel"],
-  "/orcamentos": ["Orçamentos", "Todos"],
+  "/vendas": ["Vendas"],
+  "/orcamentos": ["Vendas", "Orçamentos"],
   "/producao/ordens": ["Produção", "Ordens"],
   "/producao": ["Produção"],
   "/pre-impressao": ["Pré-Impressão"],
@@ -20,7 +21,7 @@ const breadcrumbs = {
   "/acabamento": ["Acabamento"],
   "/clientes": ["Cadastros"],
   "/estoque": ["Estoque"],
-  "/faturacao": ["Faturação"],
+  "/faturacao": ["Vendas", "Facturas"],
   "/qualidade": ["Qualidade"],
   "/relatorios": ["Relatórios"],
   "/configuracoes": ["Configurações"],
@@ -58,7 +59,7 @@ export default function TopBar() {
       </div>
       <div className="flex items-center gap-2 sm:gap-5">
         <nav className="hidden md:flex gap-5">
-          <Link href="/orcamentos" className="text-primary font-bold border-b-2 border-primary pb-1 text-xs uppercase tracking-widest transition-all">Orçamentos</Link>
+          <Link href="/vendas" className="text-primary font-bold border-b-2 border-primary pb-1 text-xs uppercase tracking-widest transition-all">Vendas</Link>
           <Link href="/producao" className="text-muted-foreground hover:text-primary transition-all text-xs font-bold uppercase tracking-widest">Produção</Link>
         </nav>
         <div className="flex items-center gap-3">

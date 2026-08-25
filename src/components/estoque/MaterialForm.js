@@ -236,9 +236,6 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
             <Campo label="Custo Unitário (Kz)">
               <NumeroInput value={form.custo_unit} onChange={(e) => onChange("custo_unit", e.target.value)} className={inputCls} placeholder="Ex: 45" />
             </Campo>
-            <Campo label="Margem (%)">
-              <NumeroInput value={form.margem} onChange={(e) => onChange("margem", e.target.value)} className={inputCls} placeholder="Ex: 30" />
-            </Campo>
             <Campo label="Lucro (%)">
               <NumeroInput value={form.lucro} onChange={(e) => onChange("lucro", e.target.value)} className={inputCls} placeholder="Ex: 25" />
             </Campo>

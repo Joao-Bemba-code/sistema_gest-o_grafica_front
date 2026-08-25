@@ -14,6 +14,7 @@ const tabs = [
 
 export const blankMaterial = { material_id: "", descricao: "", unidade: "un", quantidade: "", preco_venda: 0, custo_total: 0, mover_estoque: true };
 export const blankItem = { descricao: "", quantidade: "", materiais: [{ ...blankMaterial }] };
+export const blankServico = { servico_id: "", descricao: "", mob: 1, prazoExecucao: 1, valorHora: 0, duracaoHoras: 8, total: 0 };
 
 export const SPEC_DEFAULT_LINES = [
   { rotulo: "Produto", valor: "" },
@@ -27,8 +28,9 @@ export const blankForm = {
   cliente_id: "",
   cliente: "", empresa: "", nif: "", telefone: "", email: "",
   itens: [{ ...blankItem, materiais: [{ ...blankMaterial }] }],
+  servicos: [{ ...blankServico }],
   specLines: SPEC_DEFAULT_LINES.map((l) => ({ ...l })),
-  iva: "", prazoExecucao: "", condicoesPagamento: "100% antecipado", observacoes: "",
+  iva: "", desconto: "", prazoExecucao: "", condicoesPagamento: "100% antecipado", observacoes: "",
 };
 
 export function placeholderSpec(rotulo) {
@@ -46,9 +48,19 @@ export function custoUnitItem(it) {
 }
 
 export function recalcularItem(it) {
-  const preco = custoUnitItem(it);
-  const q = Number(it.quantidade) || 0;
-  return { valorUnitario: Number(preco.toFixed(2)), total: Number((preco * q).toFixed(2)) };
+  const custoTotal = custoUnitItem(it);
+  const q = Number(it.quantidade) || 1;
+  const valorUnitario = Number((custoTotal / q).toFixed(2));
+  return { valorUnitario, total: Number(custoTotal.toFixed(2)) };
+}
+
+export function recalcularServico(sv) {
+  const mob = Number(sv.mob) || 1;
+  const prazo = Number(sv.prazoExecucao) || 1;
+  const duracaoHoras = prazo * 8;
+  const valorHora = Number(sv.valorHora) || 0;
+  const total = mob * duracaoHoras * valorHora;
+  return { duracaoHoras, total: Number(total.toFixed(2)) };
 }
 
 const CONDICOES = ["100% antecipado", "50% de sinal + 50% na entrega", "Outro"];
@@ -64,12 +76,12 @@ function Campo({ label, children, obrigatorio, full }) {
   );
 }
 
-export default function OrcamentoForm({ formId = "form-orcamento", form, setField, setForm, onSubmit, onClienteSelect, clientes = [], materiais = [] }) {
+export default function OrcamentoForm({ formId = "form-orcamento", form, setField, setForm, onSubmit, onClienteSelect, clientes = [], materiais = [], servicosCatalogo = [] }) {
   const [tab, setTab] = useState("cliente");
   const id = (sufixo) => `${formId}-${sufixo}`;
 
   const addItem = () => setForm((p) => ({ ...p, itens: [...p.itens, { ...blankItem, materiais: [{ ...blankMaterial }] }] }));
-  const removeItem = (idx) => setForm((p) => (p.itens.length <= 1 ? p : { ...p, itens: p.itens.filter((_, i) => i !== idx) }));
+  const removeItem = (idx) => setForm((p) => ({ ...p, itens: p.itens.filter((_, i) => i !== idx) }));
 
   const setItem = (idx, key, val) => {
     setForm((p) => {
@@ -130,6 +142,40 @@ export default function OrcamentoForm({ formId = "form-orcamento", form, setFiel
       return { ...p, itens };
     });
 
+  const addServico = () => setForm((p) => ({ ...p, servicos: [...(p.servicos || []), { ...blankServico }] }));
+  const removeServico = (idx) => setForm((p) => (p.servicos.length <= 1 ? p : { ...p, servicos: p.servicos.filter((_, i) => i !== idx) }));
+
+  const selecionarServico = (idx, servicoId) => {
+    const catalogo = (servicosCatalogo || []).find((s) => String(s.id) === String(servicoId));
+    setForm((p) => {
+      const servicos = [...(p.servicos || [])];
+      if (catalogo) {
+        servicos[idx] = {
+          ...servicos[idx],
+          servico_id: catalogo.id,
+          descricao: catalogo.nome,
+        };
+      } else {
+        servicos[idx] = { ...servicos[idx], servico_id: "", descricao: "" };
+      }
+      const calc = recalcularServico(servicos[idx]);
+      servicos[idx].duracaoHoras = calc.duracaoHoras;
+      servicos[idx].total = calc.total;
+      return { ...p, servicos };
+    });
+  };
+
+  const setServico = (idx, key, val) => {
+    setForm((p) => {
+      const servicos = [...(p.servicos || [])];
+      servicos[idx] = { ...servicos[idx], [key]: val };
+      const calc = recalcularServico(servicos[idx]);
+      servicos[idx].duracaoHoras = calc.duracaoHoras;
+      servicos[idx].total = calc.total;
+      return { ...p, servicos };
+    });
+  };
+
   const setSpecLine = (idx, key, val) => {
     setForm((p) => {
       const specLines = [...p.specLines];
@@ -140,9 +186,10 @@ export default function OrcamentoForm({ formId = "form-orcamento", form, setFiel
   const addSpecLine = () => setForm((p) => ({ ...p, specLines: [...p.specLines, { rotulo: "", valor: "" }] }));
   const removeSpecLine = (idx) => setForm((p) => (p.specLines.length <= 1 ? p : { ...p, specLines: p.specLines.filter((_, i) => i !== idx) }));
 
-  const subtotalCalc = form.itens.reduce((s, it) => s + (Number(it.total) || 0), 0);
+  const subtotalCalc = form.itens.reduce((s, it) => s + (Number(it.total) || 0), 0) + (form.servicos || []).reduce((s, sv) => s + (Number(sv.total) || 0), 0);
+  const descontoCalc = Number(form.desconto) || 0;
   const ivaCalc = Number(form.iva) || 0;
-  const totalCalc = subtotalCalc + ivaCalc;
+  const totalCalc = subtotalCalc - descontoCalc + ivaCalc;
 
 return (
     <form id={formId} onSubmit={onSubmit} className="space-y-5">
@@ -199,6 +246,14 @@ return (
               <Button type="button" variant="ghost" size="sm" onClick={addItem}><Icon name="add_circle" className="text-sm" /> Adicionar Item</Button>
             </div>
 
+            {form.itens.length === 0 && (
+              <div className="text-center py-6 text-muted-foreground border border-dashed border-outline-variant/40 rounded-xl">
+                <Icon name="inventory_2" className="text-3xl block mx-auto mb-2 opacity-30" />
+                <p className="text-xs">Sem itens — pode ir directamente para a tab <strong>Serviços</strong> se pretende apenas cobrar mão de obra.</p>
+                <Button type="button" variant="ghost" size="sm" className="mt-2" onClick={addItem}><Icon name="add_circle" className="text-sm" /> Adicionar Item</Button>
+              </div>
+            )}
+
             {form.itens.map((it, idx) => (
               <div key={idx} className="bg-muted/50 rounded-xl p-3 space-y-3">
                 <div className="grid grid-cols-12 gap-2 items-end">
@@ -215,7 +270,7 @@ return (
                     <div className="px-2.5 py-2 bg-primary/10 border border-primary/30 rounded-lg text-xs font-bold font-mono text-primary">{`Kz ${(it.valorUnitario || 0).toLocaleString("pt-AO")}`}</div>
                   </div>
                   <div className="col-span-4 sm:col-span-1 flex justify-center">
-                    {form.itens.length > 1 && (
+                    {form.itens.length > 0 && (
                       <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(idx)} title="Remover item" className="text-error">
                         <Icon name="close" className="text-sm" />
                       </Button>
@@ -238,13 +293,16 @@ return (
                           <option value="">Selecionar material...</option>
                           {materiais.map((mat) => (
                             <option key={mat.id} value={mat.id}>
-                              {mat.nome || mat.nome_tecnico}{Number(mat.quantidade) > 0 ? ` (${mat.quantidade} ${mat.unidade || "un"})` : ""}
+                              {mat.nome || mat.nome_tecnico} — {mat.unidade || "un"}{Number(mat.quantidade) > 0 ? ` (${Number(mat.quantidade).toLocaleString("pt-AO")} disp.)` : ""}
                             </option>
                           ))}
                         </select>
                       </div>
                       <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
-                        <NumeroInput value={m.quantidade} onChange={(e) => setItemMaterial(idx, mi, "quantidade", e.target.value)} className={inputCls} placeholder="Qtd/un." aria-label="Quantidade por unidade" />
+                        <div className="flex items-center gap-1.5">
+                          <NumeroInput value={m.quantidade} onChange={(e) => setItemMaterial(idx, mi, "quantidade", e.target.value)} className={inputCls} placeholder="Qtd/un." aria-label="Quantidade por unidade" />
+                          {m.unidade && <span className="text-[10px] font-mono text-primary font-bold shrink-0">{m.unidade}</span>}
+                        </div>
                       </div>
                       <div className="col-span-3 sm:col-span-2 flex flex-col gap-1.5">
                         <div className="px-2.5 py-2 bg-muted border border-input rounded-lg text-xs font-mono text-muted-foreground truncate">{`Kz ${Number(m.preco_venda || 0).toLocaleString("pt-AO")}`}</div>
@@ -276,6 +334,53 @@ return (
                       <span className="text-xs font-bold font-mono text-primary">{`Kz ${(it.total || 0).toLocaleString("pt-AO")}`}</span>
                     </div>
                   </div>
+                </div>
+              </div>
+            ))}
+
+            <div className="flex items-center justify-between pt-3 border-t border-border/40">
+              <span className="cyber-label">Serviços</span>
+              <Button type="button" variant="ghost" size="sm" onClick={addServico}><Icon name="add_circle" className="text-sm" /> Adicionar serviço</Button>
+            </div>
+
+            {(form.servicos || []).map((sv, idx) => (
+              <div key={idx} className="bg-muted/50 rounded-xl p-3 space-y-2">
+                <div className="grid grid-cols-12 gap-2 items-end">
+                  <div className="col-span-12 sm:col-span-4 flex flex-col gap-1.5">
+                    {idx === 0 && <span className="cyber-label">Serviço *</span>}
+                    <select required aria-required="true" value={sv.servico_id || ""} onChange={(e) => selecionarServico(idx, e.target.value)} className={inputCls}>
+                      <option value="">Seleccionar serviço...</option>
+                      {(servicosCatalogo || []).map((s) => (
+                        <option key={s.id} value={s.id}>{s.nome}{s.categoria ? ` (${s.categoria.nome})` : ""}</option>
+                      ))}
+                    </select>
+                    {!sv.servico_id && sv.descricao && (
+                      <input value={sv.descricao} onChange={(e) => setServico(idx, "descricao", e.target.value)} className={`${inputCls} mt-1`} placeholder="Ou digite a descrição..." />
+                    )}
+                  </div>
+                  <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
+                    {idx === 0 && <span className="cyber-label">Trabalhadores *</span>}
+                    <NumeroInput required aria-required="true" value={sv.mob} onChange={(e) => setServico(idx, "mob", e.target.value)} className={inputCls} placeholder="1" />
+                  </div>
+                  <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
+                    {idx === 0 && <span className="cyber-label">Prazo (dias)</span>}
+                    <NumeroInput value={sv.prazoExecucao} onChange={(e) => setServico(idx, "prazoExecucao", e.target.value)} className={inputCls} placeholder="1" />
+                  </div>
+                  <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
+                    {idx === 0 && <span className="cyber-label">Valor/Hora</span>}
+                    <NumeroInput value={sv.valorHora} onChange={(e) => setServico(idx, "valorHora", e.target.value)} className={inputCls} placeholder="0" />
+                  </div>
+                  <div className="col-span-12 sm:col-span-2 flex flex-col gap-1.5">
+                    {idx === 0 && <span className="cyber-label">Total</span>}
+                    <div className="px-2.5 py-2 bg-primary/10 border border-primary/30 rounded-lg text-xs font-bold font-mono text-primary">{`Kz ${(sv.total || 0).toLocaleString("pt-AO")}`}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
+                  <span>Trabalhadores: <strong className="text-foreground">{sv.mob || 1}</strong></span>
+                  <span>Duração: <strong className="text-foreground">{sv.duracaoHoras || 8}h</strong> ({sv.prazoExecucao || 1} dia{Number(sv.prazoExecucao) !== 1 ? "s" : ""})</span>
+                  {(form.servicos || []).length > 1 && (
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeServico(idx)} title="Remover serviço" className="text-error ml-auto"><Icon name="close" className="text-sm" /></Button>
+                  )}
                 </div>
               </div>
             ))}
@@ -328,6 +433,9 @@ return (
             <Campo label="IVA (Kz) — Opcional">
               <NumeroInput name="iva" value={form.iva} onChange={(e) => setField("iva", e.target.value)} className={inputCls} placeholder="0" />
             </Campo>
+            <Campo label="Desconto (Kz) — Opcional">
+              <NumeroInput name="desconto" value={form.desconto} onChange={(e) => setField("desconto", e.target.value)} className={inputCls} placeholder="0" />
+            </Campo>
             <Campo label="Prazo de Execução" obrigatorio>
               <input required aria-required="true" name="prazoExecucao" value={form.prazoExecucao} onChange={(e) => setField("prazoExecucao", e.target.value)} className={inputCls} placeholder="Ex: 5 dias úteis" />
             </Campo>
@@ -359,6 +467,7 @@ return (
             <div className="bg-muted/50 rounded-xl p-4 flex items-center justify-between sm:col-span-2">
               <div className="text-xs font-mono text-muted-foreground space-y-0.5">
                 <p>Subtotal: <strong className="text-foreground">{`Kz ${subtotalCalc.toLocaleString("pt-AO")}`}</strong></p>
+                {descontoCalc > 0 && <p>Desconto: <strong className="text-green-600">{`-Kz ${descontoCalc.toLocaleString("pt-AO")}`}</strong></p>}
                 {ivaCalc > 0 && <p>IVA: <strong className="text-foreground">{`Kz ${ivaCalc.toLocaleString("pt-AO")}`}</strong></p>}
               </div>
               <div className="text-right">

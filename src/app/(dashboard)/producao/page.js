@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Icon from "@/components/Icon";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -78,6 +78,7 @@ export default function ProducaoPage() {
   const [activeTab, setActiveTab] = useState("pre_impressao");
   const [selectedJob, setSelectedJob] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
   const { addToast } = useToast();
 
   const carregarDados = () => {
@@ -91,6 +92,16 @@ export default function ProducaoPage() {
   useEffect(() => {
     carregarDados();
   }, [addToast]);
+
+  const filteredJobs = useMemo(() => {
+    if (!search.trim()) return jobs;
+    const q = search.toLowerCase();
+    return jobs.filter((j) =>
+      j.cliente?.toLowerCase().includes(q) ||
+      j.produto?.toLowerCase().includes(q) ||
+      String(j.id).includes(q)
+    );
+  }, [jobs, search]);
 
 
   const updateJob = (jobId, section, key, value) => {
@@ -153,8 +164,24 @@ export default function ProducaoPage() {
         ))}
       </div>
 
+      <div className="relative">
+        <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[18px]" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Pesquisar por cliente, produto, nº da OP..."
+          className="w-full pl-10 pr-4 py-2.5 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30"
+        />
+        {search && (
+          <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+            <Icon name="close" className="text-[16px]" />
+          </button>
+        )}
+      </div>
+
       <div className="space-y-3">
-        {jobs.map((job) => (
+        {filteredJobs.map((job) => (
           <Card key={job.id}>
             <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setSelectedJob(selectedJob === job.id ? null : job.id)}>
               <div className="flex items-center gap-3">

@@ -59,7 +59,7 @@ function BotaoIcone({ icon, label, onClick, critico, cor }) {
   );
 }
 
-function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEditar, onFichaPdf, onPedido }) {
+function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEditar, onFichaPdf, onPedido, onEliminar }) {
   const [menuPos, setMenuPos] = useState(null);
   const btnRef = useRef(null);
   const menuRef = useRef(null);
@@ -150,6 +150,12 @@ function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEdita
             <p className={`font-mono text-xl font-bold ${critico ? "text-error" : "text-on-surface"}`}>{toNum(item.estoque_disponivel).toLocaleString("pt-AO")}</p>
             <span className={`text-[10px] font-mono uppercase ${critico ? "text-error" : "text-primary"}`}>{unidade}</span>
           </div>
+          {item.preco_venda > 0 && (
+            <div className="flex items-baseline gap-1 mt-1">
+              <span className="text-[10px] font-mono text-muted-foreground">Venda:</span>
+              <span className="text-[11px] font-mono font-bold text-primary">{formatKz(item.preco_venda)}/{unidade}</span>
+            </div>
+          )}
         </div>
 
         {/* Col 3: Progresso */}
@@ -162,29 +168,33 @@ function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEdita
         </div>
 
         {/* Col 4: Ações */}
-        <div className="md:col-span-2 flex justify-start md:justify-end gap-1.5">
-          <BotaoIcone icon="add" label="Entrada" critico={critico} onClick={() => onEntrada(item)} />
-          <BotaoIcone icon="remove" label="Saída" cor="saida" critico={critico} onClick={() => onSaida(item)} />
-          <BotaoIcone icon="description" label="Ver ficha do material (PDF)" critico={critico} onClick={() => onFichaPdf(item)} />
-          <div className="relative" ref={btnRef}>
-            <BotaoIcone icon="more_vert" label="Mais opções" critico={critico} onClick={abrirMenu} />
-            {menuPos &&
-              createPortal(
-                <div
-                  ref={menuRef}
-                  role="menu"
-                  className="fixed z-[90] w-44 obsidian-glass rounded-xl border overflow-hidden animate-scale-in shadow-xl"
-                  style={{ top: menuPos.top, right: menuPos.right }}
-                >
-                  <MenuItem icon="shopping_cart" label="Pedido ao fornecedor" onClick={() => { fecharMenu(); onPedido(item); }} />
-                  <MenuItem icon="lock" label="Reservas" onClick={() => { fecharMenu(); onReservas(item); }} />
-                  <MenuItem icon="edit" label="Editar" onClick={() => { fecharMenu(); onEditar(item); }} />
-                  <MenuItem icon="print" label="Ficha PDF" onClick={() => { fecharMenu(); onFichaPdf(item); }} />
-                  <div className="border-t border-outline-variant/40 px-4 py-1.5 text-[10px] font-mono text-on-surface-variant">{formatKz(item.preco_venda)}</div>
-                </div>,
-                document.body
-              )}
+        <div className="md:col-span-2 flex items-center justify-between md:justify-end gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-outline-variant/30">
+          <div className="flex gap-1.5">
+            <BotaoIcone icon="add" label="Entrada" critico={critico} onClick={() => onEntrada(item)} />
+            <BotaoIcone icon="remove" label="Saída" cor="saida" critico={critico} onClick={() => onSaida(item)} />
+            <BotaoIcone icon="description" label="Ver ficha do material (PDF)" critico={critico} onClick={() => onFichaPdf(item)} />
+            <div className="relative" ref={btnRef}>
+              <BotaoIcone icon="more_vert" label="Mais opções" critico={critico} onClick={abrirMenu} />
+              {menuPos &&
+                createPortal(
+                  <div
+                    ref={menuRef}
+                    role="menu"
+                    className="fixed z-[90] w-44 obsidian-glass rounded-xl border overflow-hidden animate-scale-in shadow-xl"
+                    style={{ top: menuPos.top, right: menuPos.right }}
+                  >
+                    <MenuItem icon="shopping_cart" label="Pedido ao fornecedor" onClick={() => { fecharMenu(); onPedido(item); }} />
+                    <MenuItem icon="lock" label="Reservas" onClick={() => { fecharMenu(); onReservas(item); }} />
+                    <MenuItem icon="edit" label="Editar" onClick={() => { fecharMenu(); onEditar(item); }} />
+                    <MenuItem icon="print" label="Ficha PDF" onClick={() => { fecharMenu(); onFichaPdf(item); }} />
+                    {onEliminar && <MenuItem icon="delete" label="Remover" onClick={() => { fecharMenu(); onEliminar(item); }} />}
+                    <div className="border-t border-outline-variant/40 px-4 py-1.5 text-[10px] font-mono text-on-surface-variant">{formatKz(item.preco_venda)}</div>
+                  </div>,
+                  document.body
+                )}
+            </div>
           </div>
+          <span className="text-[11px] font-mono font-bold text-primary md:hidden">{formatKz(item.preco_venda)}</span>
         </div>
       </div>
     </article>

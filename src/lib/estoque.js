@@ -21,6 +21,18 @@ export const familias = {
   consumiveis: { label: "Consumíveis", icon: "local_fire_department", classe: "text-orange-500 bg-orange-500/10" },
 };
 
+export const familiasServico = {
+  impressao: { label: "Impressão", icon: "print", classe: "text-blue-500 bg-blue-500/10" },
+  acabamento: { label: "Acabamento", icon: "palette", classe: "text-purple-500 bg-purple-500/10" },
+  pre_impressao: { label: "Pré-Impressão", icon: "settings", classe: "text-amber-500 bg-amber-500/10" },
+  design: { label: "Design / Arte", icon: "brush", classe: "text-pink-500 bg-pink-500/10" },
+  montagem: { label: "Montagem", icon: "build", classe: "text-indigo-500 bg-indigo-500/10" },
+  logistica: { label: "Logística / Entrega", icon: "local_shipping", classe: "text-emerald-500 bg-emerald-500/10" },
+  consultoria: { label: "Consultoria", icon: "support_agent", classe: "text-cyan-500 bg-cyan-500/10" },
+  manutencao: { label: "Manutenção", icon: "handyman", classe: "text-orange-500 bg-orange-500/10" },
+  servicos_gerais: { label: "Serviços Gerais", icon: "home_repair_service", classe: "text-gray-500 bg-gray-500/10" },
+};
+
 export const tiposItem = {
   materia_prima: { label: "Matéria-Prima", classe: "text-blue-500" },
   produto_acabado: { label: "Produto Acabado", classe: "text-emerald-500" },
@@ -28,7 +40,9 @@ export const tiposItem = {
 };
 
 export function normalizarFamilia(f) {
-  return f && familias[f] ? f : "papeis";
+  if (f && familias[f]) return f;
+  if (f && familiasServico[f]) return f;
+  return "papeis";
 }
 
 export const FAMILIA_PREFIXO = {
@@ -204,7 +218,7 @@ export const blankItem = {
   codigo: "", nome: "", nome_tecnico: "", categoria_id: "", fornecedor: "",
   unidade: "un", formato: "", gramagem: "", tipo_estoque: "unidade",
   largura: "", altura: "", controla_lote: false, percentual_quebra: "",
-  estoque_min: "", estoque_max: "", ponto_ressuprimento: "", custo_unit: "", margem: "",
+  estoque_min: "", estoque_max: "", ponto_ressuprimento: "", custo_unit: "", lucro: "",
   descricao: "", especificidade: "", condicao_armazenagem: "", localizacao: "", especificacoes: {},
 };
 

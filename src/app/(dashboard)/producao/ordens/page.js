@@ -1,17 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Modal from "@/components/Modal";
 import Icon from "@/components/Icon";
 import { Card, CardContent } from "@/components/ui/Card";
 import KpiCard from "@/components/ui/KpiCard";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
+import FilterBar, { useFilter } from "@/components/ui/FilterBar";
 import { inputCls } from "@/lib/estoque";
 import NumeroInput from "@/components/ui/NumeroInput";
-import { listarOrdens, criarOrdem, libertarMateriais } from "@/services/producao";
+import { listarOrdens, criarOrdem, libertarMateriais, removerOrdem } from "@/services/producao";
 import { getUsuario } from "@/services/auth";
 import SaidaMateriaisModal from "@/components/producao/SaidaMateriaisModal";
 import { listar as listarClientes } from "@/services/clientes";
@@ -65,7 +67,6 @@ function normalizar(op) {
 
 export default function OrdensProducaoPage() {
   const [ops, setOps] = useState([]);
-  const [filter, setFilter] = useState("todos");
   const [selected, setSelected] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(initialForm);
@@ -79,6 +80,8 @@ export default function OrdensProducaoPage() {
   const [loteSel, setLoteSel] = useState("");
   const [libertarOp, setLibertarOp] = useState(null);
   const [libertando, setLibertando] = useState(false);
+  const [eliminarItem, setEliminarItem] = useState(null);
+  const [deletando, setDeletando] = useState(false);
   const { addToast } = useToast();
 
   const carregarDados = () => {
@@ -111,7 +114,21 @@ export default function OrdensProducaoPage() {
 
   const removerItem = (idx) => setItens(itens.filter((_, i) => i !== idx));
 
-  const filtered = filter === "todos" ? ops : ops.filter((o) => o.status === filter);
+  const filterConfig = useMemo(() => [
+    { value: "todos", label: "Todos", icon: "filter_list", count: ops.length },
+    ...Object.entries(statusConfig).map(([k, v]) => ({
+      value: k, label: v.label,
+      icon: k === "aguardando" ? "schedule" : k === "em_producao" ? "construction" : k === "finalizado" ? "check_circle" : "local_shipping",
+      field: "status",
+      count: ops.filter((o) => o.status === k).length,
+    })),
+  ], [ops]);
+
+  const { search, setSearch, activeFilter, setActiveFilter, filtered, total } = useFilter({
+    items: ops,
+    searchFields: ["cliente", "produto", "orcamento", "empresa"],
+    filterConfig,
+  });
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -220,13 +237,16 @@ export default function OrdensProducaoPage() {
         ))}
       </section>
 
-      <div className="flex gap-2 flex-wrap">
-        {["todos", ...Object.keys(statusConfig)].map((f) => (
-          <Button key={f} variant={filter === f ? "default" : "outline"} size="sm" onClick={() => setFilter(f)}>
-            {f === "todos" ? "Todos" : statusConfig[f]?.label || f}
-          </Button>
-        ))}
-      </div>
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="Pesquisar por cliente, produto, orçamento..."
+        filters={filterConfig}
+        activeFilter={activeFilter}
+        onFilterChange={setActiveFilter}
+        count={total}
+        countLabel="OPs"
+      />
 
       {loading ? <CardSkeleton lines={6} /> : (
         <div className="space-y-3">
@@ -297,7 +317,22 @@ export default function OrdensProducaoPage() {
                         <div className="space-y-1.5">
                           {op.reserva_estoques.map((r) => {
                             const rc = reservaEstado[r.estado] || { label: r.estado, variant: "secondary" };
-                            return (
+  const confirmarEliminacao = async () => {
+    if (!eliminarItem) return;
+    setDeletando(true);
+    try {
+      await removerOrdem(eliminarItem.id);
+      setOps((prev) => prev.filter((o) => o.id !== eliminarItem.id));
+      addToast("Ordem de produção removida com sucesso", "success");
+      setEliminarItem(null);
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao remover ordem", "error");
+    } finally {
+      setDeletando(false);
+    }
+  };
+
+  return (
                               <div key={r.id} className="flex items-center justify-between gap-2 bg-muted/40 rounded-lg px-3 py-2 text-xs">
                                 <div className="flex items-center gap-2 min-w-0">
                                   <span className="font-medium text-foreground truncate">{matPorId[r.material_id]?.nome || `Material #${r.material_id}`}</span>
@@ -340,6 +375,11 @@ export default function OrdensProducaoPage() {
                         </div>
                       </div>
                     )}
+                    <div className="flex items-center gap-2 mt-4 pt-4 border-t">
+                      <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); setEliminarItem(op); }}>
+                        <Icon name="delete" className="text-[16px]" /> Remover OP
+                      </Button>
+                    </div>
                     </>
                   )}
                 </CardContent>
@@ -438,6 +478,15 @@ export default function OrdensProducaoPage() {
         onClose={() => setLibertarOp(null)}
         onConfirm={handleLibertar}
         nomeUsuario={getUsuario()?.nome || ""}
+      />
+
+      <ConfirmDialog
+        open={Boolean(eliminarItem)}
+        onClose={() => setEliminarItem(null)}
+        onConfirm={confirmarEliminacao}
+        loading={deletando}
+        title="Remover ordem de produção"
+        description={eliminarItem ? `Tem a certeza que deseja remover a OP #${eliminarItem.id}? Esta ação não pode ser desfeita.` : ""}
       />
 
       <footer className="p-6 text-center border-t bg-muted/30 rounded-2xl">

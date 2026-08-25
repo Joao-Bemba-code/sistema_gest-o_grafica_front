@@ -21,7 +21,7 @@ import { statusDe, toNum } from "@/lib/estoque";
 
 const camposNumericos = [
   "gramagem", "largura", "altura", "percentual_quebra",
-  "estoque_min", "estoque_max", "ponto_ressuprimento", "custo_unit", "margem", "lucro",
+  "estoque_min", "estoque_max", "ponto_ressuprimento", "custo_unit", "lucro",
 ];
 
 export default function useEstoque() {
@@ -52,7 +52,7 @@ export default function useEstoque() {
       return carregar(1);
     }
     setMateriais(m.status === "fulfilled" && Array.isArray(m.value) ? m.value : []);
-    setCategorias(c.status === "fulfilled" && Array.isArray(c.value) ? c.value : []);
+    setCategorias(c.status === "fulfilled" && Array.isArray(c.value) ? c.value.filter((cat) => cat.tipo !== "servico") : []);
     setFornecedores(f.status === "fulfilled" && Array.isArray(f.value) ? f.value : []);
     setClientes(cl.status === "fulfilled" && Array.isArray(cl.value) ? cl.value : []);
     setFormatos(fm.status === "fulfilled" && Array.isArray(fm.value) ? fm.value : []);

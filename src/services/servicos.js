@@ -10,6 +10,11 @@ export async function criar(dados) {
   return data;
 }
 
+export async function atualizar(id, dados) {
+  const { data } = await api.put(`/servicos/${id}`, dados);
+  return data;
+}
+
 export async function remover(id) {
   const { data } = await api.delete(`/servicos/${id}`);
   return data;

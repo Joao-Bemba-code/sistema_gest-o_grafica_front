@@ -9,9 +9,11 @@ import OrcamentoForm, {
   blankForm,
   blankItem,
   blankMaterial,
+  blankServico,
   SPEC_DEFAULT_LINES,
   custoUnitItem,
   recalcularItem,
+  recalcularServico,
 } from "@/components/orcamentos/OrcamentoForm";
 import { entradasEspecificacao } from "@/lib/estoque";
 import {
@@ -22,6 +24,7 @@ import {
 } from "@/services/orcamentos";
 import { listar as listarClientes } from "@/services/clientes";
 import { listar as listarMateriais } from "@/services/materiais";
+import { listar as listarServicos } from "@/services/servicos";
 
 function formatKz(v) {
   return `Kz ${Number(v || 0).toLocaleString("pt-AO")}`;
@@ -45,22 +48,25 @@ function NovoOrcamentoInner() {
 
   const [clientes, setClientes] = useState([]);
   const [materiais, setMateriais] = useState([]);
+  const [servicosCatalogo, setServicosCatalogo] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
-  const [form, setForm] = useState({ ...blankForm, itens: [{ ...blankItem, materiais: [{ ...blankMaterial }] }] });
+  const [form, setForm] = useState({ ...blankForm, itens: [{ ...blankItem, materiais: [{ ...blankMaterial }] }], servicos: [{ ...blankServico }] });
 
   useEffect(() => {
     let ativo = true;
     (async () => {
       setCarregando(true);
       try {
-        const [cliData, matData] = await Promise.all([
+        const [cliData, matData, srvData] = await Promise.all([
           listarClientes({ tipo: "cliente" }),
           listarMateriais().catch(() => []),
+          listarServicos().catch(() => []),
         ]);
         if (!ativo) return;
         setClientes(Array.isArray(cliData) ? cliData : cliData?.data ?? []);
         setMateriais(Array.isArray(matData) ? matData : matData?.data ?? []);
+        setServicosCatalogo(Array.isArray(srvData) ? srvData : srvData?.data ?? []);
         if (editandoId) {
           try {
             const o = await buscarPorId(editandoId);
@@ -83,11 +89,20 @@ function NovoOrcamentoInner() {
                   mover_estoque: Boolean(m.mover_estoque),
                 })),
               })),
+              servicos: (Array.isArray(o.servicos) && o.servicos.length ? o.servicos : [blankServico]).map((sv) => ({
+                servico_id: sv.servico_id || "",
+                descricao: sv.descricao || "",
+                mob: Number(sv.mob) || 1,
+                prazoExecucao: Number(sv.prazoExecucao || sv.prazo_execucao) || 1,
+                valorHora: Number(sv.valorHora || sv.valor_hora) || 0,
+                duracaoHoras: Number(sv.duracaoHoras || sv.duracao_horas) || 8,
+                total: Number(sv.total) || 0,
+              })),
               specLines: (() => {
                 const linhas = entradasEspecificacao(o.especificacao);
                 return linhas.length ? linhas.map((l) => ({ ...l })) : SPEC_DEFAULT_LINES.map((l) => ({ ...l }));
               })(),
-              iva: String(o.iva ?? ""), prazoExecucao: o.prazoExecucao || "",
+              iva: String(o.iva ?? ""), desconto: String(o.desconto ?? ""), prazoExecucao: o.prazoExecucao || "",
               condicoesPagamento: o.condicoesPagamento || "", observacoes: o.observacoes || "",
             });
           } catch {
@@ -128,9 +143,10 @@ function NovoOrcamentoInner() {
     }
   };
 
-  const subtotalCalc = form.itens.reduce((s, it) => s + (Number(it.total) || 0), 0);
+  const subtotalCalc = form.itens.reduce((s, it) => s + (Number(it.total) || 0), 0) + (form.servicos || []).reduce((s, sv) => s + (Number(sv.total) || 0), 0);
+  const descontoCalc = Number(form.desconto) || 0;
   const ivaCalc = Number(form.iva) || 0;
-  const totalCalc = subtotalCalc + ivaCalc;
+  const totalCalc = subtotalCalc - descontoCalc + ivaCalc;
 
   const aoSubmeter = async (e) => {
     e.preventDefault();
@@ -164,7 +180,20 @@ function NovoOrcamentoInner() {
           .filter((l) => l.rotulo?.trim() && l.valor?.trim())
           .map((l) => [l.rotulo.trim(), l.valor.trim()])
       ),
+      servicos: (form.servicos || []).map((sv) => {
+        const calc = recalcularServico(sv);
+        return {
+          servico_id: sv.servico_id || null,
+          descricao: sv.descricao,
+          mob: Number(sv.mob) || 1,
+          prazoExecucao: Number(sv.prazoExecucao) || 1,
+          duracaoHoras: calc.duracaoHoras,
+          valor_hora: Number(sv.valorHora) || 0,
+          total: calc.total,
+        };
+      }).filter((sv) => sv.descricao),
       subtotal: subtotalCalc,
+      desconto: descontoCalc,
       iva: ivaCalc,
       prazoExecucao: form.prazoExecucao,
       condicoesPagamento: form.condicoesPagamento,
@@ -234,6 +263,7 @@ function NovoOrcamentoInner() {
                   onClienteSelect={handleClienteSelect}
                   clientes={clientes}
                   materiais={materiais}
+                  servicosCatalogo={servicosCatalogo}
                 />
               )}
             </div>
@@ -267,10 +297,14 @@ function NovoOrcamentoInner() {
             {form.itens.map((it, i) => (
               <PreviewLinha key={i} label={`Item ${i + 1}`} valor={`${it.descricao || "—"} · ${it.quantidade || 0}× ${formatKz(it.total || 0)}`} />
             ))}
+            {(form.servicos || []).filter((sv) => sv.descricao).map((sv, i) => (
+              <PreviewLinha key={`sv-${i}`} label={`Serviço ${i + 1}`} valor={`${sv.descricao} · ${sv.mob || 1}×${sv.duracaoHoras || 8}h · ${formatKz(sv.total || 0)}`} />
+            ))}
             {specsPreenchidas.slice(0, 4).map((l) => (
               <PreviewLinha key={l.rotulo + l.valor} label={l.rotulo} valor={l.valor} />
             ))}
             <PreviewLinha label="Subtotal" valor={formatKz(subtotalCalc)} />
+            {descontoCalc > 0 && <PreviewLinha label="Desconto" valor={`-${formatKz(descontoCalc)}`} />}
             {ivaCalc > 0 && <PreviewLinha label="IVA" valor={formatKz(ivaCalc)} />}
             <PreviewLinha label="Total" valor={formatKz(totalCalc)} acento="text-primary" />
           </div>

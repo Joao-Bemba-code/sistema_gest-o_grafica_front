@@ -10,14 +10,13 @@ import { cn, getInitials } from "@/lib/utils";
 
 const rotas = [
   { icone: "dashboard", nome: "Painel", para: "/" },
-  { icone: "request_quote", nome: "Orçamentos", para: "/orcamentos" },
+  { icone: "point_of_sale", nome: "Vendas", para: "/vendas" },
   { icone: "precision_manufacturing", nome: "Ordens de Produção", para: "/producao/ordens" },
   { icone: "factory", nome: "Produção", para: "/producao" },
   { icone: "groups", nome: "Cadastros", para: "/clientes" },
   { icone: "inventory_2", nome: "Estoque", para: "/estoque" },
   { icone: "category", nome: "Categorias", para: "/categorias" },
   { icone: "analytics", nome: "Relatórios", para: "/relatorios" },
-  { icone: "paid", nome: "Faturação", para: "/faturacao" },
   { icone: "settings", nome: "Configurações", para: "/configuracoes" },
 ];
 

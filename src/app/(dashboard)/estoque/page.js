@@ -4,8 +4,10 @@ import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import useEstoque from "@/hooks/useEstoque";
 import useMovimentacoes from "@/hooks/useMovimentacoes";
+import FilterBar, { useFilter } from "@/components/ui/FilterBar";
 import KpiGrid from "@/components/estoque/KpiGrid";
 import MaterialCard, { MaterialCardSkeleton } from "@/components/estoque/MaterialCard";
 import MovimentacaoModal from "@/components/estoque/MovimentacaoModal";
@@ -20,6 +22,7 @@ import PedidoReceberModal from "@/components/estoque/PedidoReceberModal";
 import { familias, normalizarFamilia } from "@/lib/estoque";
 import { gerarFichaMaterialPDF, gerarPedidoPDF } from "@/lib/estoquePdf";
 import { listar as listarPedidos, criar as criarPedido, cancelar as cancelarPedido, receber as apiReceberPedido } from "@/services/pedidos";
+import { remover as removerMaterial } from "@/services/materiais";
 import { useToast } from "@/components/Toast";
 
 export default function EstoquePage() {
@@ -47,11 +50,21 @@ export default function EstoquePage() {
   const [convOpen, setConvOpen] = useState(false);
   const [convSessao, setConvSessao] = useState(0);
   const [res, setRes] = useState({ open: false, item: null, reservas: [], carregando: false });
+  const [eliminar, setEliminar] = useState(null);
+  const [deletando, setDeletando] = useState(false);
 
-  const filtrados = useMemo(
-    () => (filtro === "todos" ? materiais : materiais.filter((i) => normalizarFamilia(i.categoria?.familia) === filtro)),
-    [materiais, filtro]
-  );
+  const filterConfig = useMemo(() => [
+    { value: "todos", label: "Todos", icon: "filter_list" },
+    ...Object.entries(familias).map(([k, v]) => ({ value: k, label: v.label, icon: v.icon, field: "familia" })),
+  ], []);
+
+  const { search, setSearch, activeFilter, setActiveFilter, filtered, total } = useFilter({
+    items: materiais,
+    searchFields: ["nome", "codigo", "fornecedor", "categoria.nome"],
+    filterConfig,
+  });
+
+  const filtrados = filtered;
 
   const porFamilia = useMemo(() => {
     const mapa = {};
@@ -111,6 +124,21 @@ export default function EstoquePage() {
 
   const fichaPdf = useCallback((item) => gerarFichaMaterialPDF(item, org), [org]);
   const pedidoPdf = useCallback((pedido) => gerarPedidoPDF(pedido, org), [org]);
+
+  const eliminarMaterial = useCallback(async () => {
+    if (!eliminar) return;
+    setDeletando(true);
+    try {
+      await removerMaterial(eliminar.id);
+      await carregar();
+      addToast("Material removido com sucesso", "success");
+      setEliminar(null);
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao remover material", "error");
+    } finally {
+      setDeletando(false);
+    }
+  }, [eliminar, carregar, addToast]);
 
   const recarregarPedidos = useCallback(async () => {
     try {
@@ -262,24 +290,16 @@ export default function EstoquePage() {
 
       <KpiGrid totais={totais} alertas={alertas} materiais={materiais} />
 
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide border-b border-outline-variant/50" role="group" aria-label="Filtrar materiais por família">
-        {["todos", ...Object.keys(familias)].map((g) => {
-          const ativo = filtro === g;
-          return (
-            <button
-              key={g}
-              onClick={() => setFiltro(g)}
-              aria-pressed={ativo}
-              className={`px-3 py-1 font-mono text-[11px] uppercase tracking-wider whitespace-nowrap focus:outline-none flex items-center gap-1 transition-colors ${
-                ativo ? "bg-primary/10 text-primary border-b-2 border-primary" : "text-on-surface-variant hover:text-on-surface border-b-2 border-transparent hover:border-outline"
-              }`}
-            >
-              <Icon name={g === "todos" ? "filter_list" : familias[g].icon} className={`text-[14px] ${ativo ? "ms-fill" : ""}`} />
-              {g === "todos" ? "Todos" : familias[g].label}
-            </button>
-          );
-        })}
-      </div>
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="Pesquisar materiais por nome, SKU, fornecedor..."
+        filters={filterConfig}
+        activeFilter={activeFilter}
+        onFilterChange={setActiveFilter}
+        count={total}
+        countLabel="materiais"
+      />
 
       {!carregandoInicial && materiais.length === 0 && (
         <EmptyState categorias={categorias} fornecedores={fornecedores} />
@@ -313,6 +333,7 @@ export default function EstoquePage() {
                       onEditar={abrirEdicao}
                       onFichaPdf={fichaPdf}
                       onPedido={abrirNovoPedido}
+                      onEliminar={setEliminar}
                     />
                   ))}
                 </div>
@@ -408,6 +429,15 @@ export default function EstoquePage() {
         materiais={materiais}
         onClose={fecharEdicao}
         onSave={salvarEdicao}
+      />
+
+      <ConfirmDialog
+        open={Boolean(eliminar)}
+        onClose={() => setEliminar(null)}
+        onConfirm={eliminarMaterial}
+        loading={deletando}
+        title="Remover material"
+        description={eliminar ? `Tem a certeza que deseja remover o material "${eliminar.nome}"? Esta ação não pode ser desfeita.` : ""}
       />
 
       <footer className="p-6 text-center border-t bg-muted/30 rounded-2xl">

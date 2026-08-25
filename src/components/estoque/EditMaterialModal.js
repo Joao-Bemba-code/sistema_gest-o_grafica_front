@@ -25,7 +25,6 @@ function deItem(item) {
     estoque_max: item.estoque_max || "",
     ponto_ressuprimento: item.ponto_ressuprimento || "",
     custo_unit: toNum(item.custo_unitario) || item.custo_unit || "",
-    margem: item.margem || "",
     lucro: item.lucro || "",
     descricao: item.descricao || "",
     especificidade: item.especificidade || "",

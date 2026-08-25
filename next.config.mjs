@@ -3,6 +3,7 @@ import withPWA from "next-pwa";
 /** @type {import('next').NextConfig} */
 
 const nextConfig = {
+  turbopack: {},
   images: {
     unoptimized: true,
     remotePatterns: [
@@ -43,8 +44,10 @@ const withPWAConfig = withPWA({
   dest: "public",
   register: true,
   skipWaiting: true,
-  disable: process.env.NEXT_PUBLIC_DISABLE_PWA === "true",
+  disable: process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_DISABLE_PWA === "true",
   scope: "/",
 });
 
-export default withPWAConfig(nextConfig);
+const config = withPWAConfig(nextConfig);
+
+export default process.env.NODE_ENV === "development" ? nextConfig : config;
