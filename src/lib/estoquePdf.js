@@ -491,9 +491,9 @@ export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [
 
     doc.autoTable({
       startY: y,
-      head: [["Categoria", "Tipo", "Descrição", "Itens em Stock"]],
+      head: [["Categoria", "Tipo", "Descrição", "Validade", "Itens em Stock"]],
       body: cats.map((c) => [
-        c.nome || "—", c.tipo || "—", c.descricao || "—", String(materiaisPorCat[c.nome] || 0),
+        c.nome || "—", c.tipo || "—", c.descricao || "—", c.validade_dias ? `${c.validade_dias} dias` : "—", String(materiaisPorCat[c.nome] || 0),
       ]),
       theme: "grid",
       headStyles: { fillColor: [15, 118, 110], textColor: 255, fontStyle: "bold", fontSize: 8 },
