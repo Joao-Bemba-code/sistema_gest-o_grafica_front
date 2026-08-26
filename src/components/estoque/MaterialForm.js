@@ -153,7 +153,7 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
             <Campo label="Subfamília">
               <input
                 list={`${formId}-subfamilias`}
-                value={(form.especificacoes?.subfamilia || "").trim()}
+                value={form.especificacoes?.subfamilia || ""}
                 onChange={(e) => aoMudarEspec("subfamilia", e.target.value)}
                 className={inputCls}
                 placeholder="Ex: Couché, Offset, etc."
