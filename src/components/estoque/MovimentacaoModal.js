@@ -153,18 +153,20 @@ export default function MovimentacaoModal({ open, item, tipo, onClose, onConfirm
                   required
                 />
               ) : (
-                <select
+                <>
+                <input
+                  list="clientes-saida-list"
                   required
                   aria-required="true"
                   value={parte}
                   onChange={(e) => setForm((f) => ({ ...f, cliente: e.target.value }))}
                   className={inputCls}
-                >
-                  <option value="">Seleccionar cliente...</option>
-                  {clientes.map((p) => (
-                    <option key={p.id} value={p.nome}>{p.nome}</option>
-                  ))}
-                </select>
+                  placeholder="Procurar cliente ou escrever novo..."
+                />
+                <datalist id="clientes-saida-list">
+                  {clientes.map((p) => (<option key={p.id} value={p.nome} />))}
+                </datalist>
+                </>
               )}
             </Campo>
 

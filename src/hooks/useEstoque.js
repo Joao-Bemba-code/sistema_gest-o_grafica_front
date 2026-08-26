@@ -9,6 +9,7 @@ import {
   converter,
   listarReservas,
   cancelarReserva,
+  reservar,
   listarFormatos,
 } from "@/services/materiais";
 import { listar as listarCategorias } from "@/services/categorias";
@@ -99,29 +100,22 @@ export default function useEstoque() {
 
   const registrarMovimentacao = useCallback(async ({ item, tipo, dados }) => {
     const qtd = Number(dados.quantidade);
-    const ehEntrada = tipo === "entrada";
+    const isEntrada = tipo === "entrada";
+    const motivos = { entrada: "Entrada manual", saida: "Saída manual", perda: `Perda — ${dados.motivo || ""}`, desperdicio: `Desperdício — ${dados.motivo || ""}` };
     const payload = {
       material_id: item.id,
       tipo,
       quantidade: qtd,
-      lote: dados.lote || undefined,
-      validade: dados.validade || undefined,
-      motivo: ehEntrada ? "Entrada manual" : "Saída manual",
-      ...(ehEntrada ? { fornecedor_nome: dados.fornecedor } : { cliente_nome: dados.cliente }),
-      solicitado_por: dados.solicitado_por || undefined,
-      permitido_por: dados.permitido_por || undefined,
-      observacoes: dados.observacoes || undefined,
+      motivo: motivos[tipo] || tipo,
+      ...(isEntrada ? { fornecedor_nome: dados.fornecedor } : tipo === "saida" ? { cliente_nome: dados.cliente } : {}),
+      observacoes: dados.detalhes || dados.observacoes || undefined,
     };
     const antes = materiais;
     setMateriais((prev) =>
       prev.map((m) => {
         if (m.id !== item.id) return m;
-        const delta = ehEntrada ? qtd : -qtd;
-        const proximo = {
-          ...m,
-          quantidade: Math.max(0, toNum(m.quantidade) + delta),
-          estoque_disponivel: Math.max(0, toNum(m.estoque_disponivel) + delta),
-        };
+        const delta = isEntrada ? qtd : -qtd;
+        const proximo = { ...m, quantidade: Math.max(0, toNum(m.quantidade) + delta), estoque_disponivel: Math.max(0, toNum(m.estoque_disponivel) + delta) };
         return { ...proximo, status: statusDe(proximo) };
       })
     );
@@ -133,6 +127,38 @@ export default function useEstoque() {
     } catch (err) {
       setMateriais(antes);
       addToast(err.response?.data?.erro || "Erro na operação", "error");
+      return false;
+    }
+  }, [materiais, addToast, carregar]);
+
+  const registrarTransferencia = useCallback(async ({ material_origem_id, quantidade, armazem_externo, responsavel, autorizado_por, data, observacoes }) => {
+    const qtd = Number(quantidade);
+    const antes = materiais;
+    setMateriais((prev) =>
+      prev.map((m) => {
+        if (m.id === material_origem_id) {
+          const proximo = { ...m, quantidade: Math.max(0, toNum(m.quantidade) - qtd), estoque_disponivel: Math.max(0, toNum(m.estoque_disponivel) - qtd) };
+          return { ...proximo, status: statusDe(proximo) };
+        }
+        return m;
+      })
+    );
+    try {
+      await movimentar({
+        material_id: material_origem_id,
+        tipo: "transferencia",
+        quantidade: qtd,
+        motivo: `Saída para armazém externo: ${armazem_externo}`,
+        solicitado_por: responsavel,
+        permitido_por: autorizado_por,
+        observacoes: `Destino: ${armazem_externo}${data ? ` | Data: ${data}` : ""}${observacoes ? ` | ${observacoes}` : ""}`,
+      });
+      await carregar();
+      addToast("Transferência para armazém externo registada", "success");
+      return true;
+    } catch (err) {
+      setMateriais(antes);
+      addToast(err.response?.data?.erro || "Erro na transferência", "error");
       return false;
     }
   }, [materiais, addToast, carregar]);
@@ -168,6 +194,18 @@ export default function useEstoque() {
     }
   }, [addToast, carregar]);
 
+  const reservarMaterial = useCallback(async (dados) => {
+    try {
+      await reservar({ itens: [{ material_id: dados.material_id, quantidade: dados.quantidade, lote: dados.lote }] });
+      await carregar();
+      addToast("Material reservado com sucesso", "success");
+      return true;
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao reservar material", "error");
+      return false;
+    }
+  }, [addToast, carregar]);
+
   const alertas = useMemo(
     () => materiais.filter((i) => i.status === "repor" || i.status === "esgotado"),
     [materiais]
@@ -186,7 +224,7 @@ export default function useEstoque() {
   return {
     materiais, categorias, fornecedores, clientes, org, formatos,
     carregando, erro, carregar, nomeUsuario, totais, alertas,
-    salvarMaterial, registrarMovimentacao, converterFormatos,
-    carregarReservas, cancelarReservaDe,
+    salvarMaterial, registrarMovimentacao, registrarTransferencia, converterFormatos,
+    carregarReservas, cancelarReservaDe, reservarMaterial,
   };
 }

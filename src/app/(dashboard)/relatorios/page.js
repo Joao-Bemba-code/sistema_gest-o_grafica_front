@@ -11,6 +11,11 @@ import { CardSkeleton } from "@/components/Skeleton";
 import { listarOrdens } from "@/services/producao";
 import { listar } from "@/services/clientes";
 import { listar as listarFaturas } from "@/services/faturacao";
+import { listar as listarMateriais } from "@/services/materiais";
+import { listar as listarCategorias } from "@/services/categorias";
+import { gerarRelatorioStockPDF, gerarRelatorioCadastrosPDF, gerarRelatorioCategoriasPDF } from "@/lib/estoquePdf";
+import { toNum, familias, normalizarFamilia } from "@/lib/estoque";
+import { buscarOrganizacao } from "@/services/configuracoes";
 
 const nomesMeses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -45,6 +50,9 @@ export default function RelatoriosPage() {
   const [ordens, setOrdens] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [faturas, setFaturas] = useState([]);
+  const [materiais, setMateriais] = useState([]);
+  const [categorias, setCategorias] = useState([]);
+  const [org, setOrg] = useState({});
   const [periodo, setPeriodo] = useState(getUltimos6Meses()[5].labelCurto);
   const [aba, setAba] = useState("vendas");
   const [filtroTipo, setFiltroTipo] = useState("todos");
@@ -54,10 +62,13 @@ export default function RelatoriosPage() {
   const carregarDados = useCallback(async () => {
     setLoading(true);
     try {
-      const [ords, clis, fats] = await Promise.all([listarOrdens(), listar(), listarFaturas()]);
+      const [ords, clis, fats, mats, cats, o] = await Promise.all([listarOrdens(), listar(), listarFaturas(), listarMateriais(), listarCategorias(), buscarOrganizacao()]);
       setOrdens(Array.isArray(ords) ? ords : ords?.ordens || []);
       setClientes(Array.isArray(clis) ? clis : clis?.data || []);
       setFaturas(Array.isArray(fats) ? fats : fats?.data || []);
+      setMateriais(Array.isArray(mats) ? mats : []);
+      setCategorias(Array.isArray(cats) ? cats : []);
+      setOrg(o || {});
     } catch (err) {
       setError(err.message);
       addToast(err.response?.data?.erro || "Erro ao carregar relatórios", "error");
@@ -189,11 +200,17 @@ export default function RelatoriosPage() {
         </div>
       </div>
 
-      <div className="flex gap-2">
-        {["vendas", "producao", "clientes"].map((a) => (
-          <Button key={a} variant={aba === a ? "default" : "outline"} size="sm" onClick={() => setAba(a)}>
-            <Icon name={a === "vendas" ? "trending_up" : a === "producao" ? "precision_manufacturing" : "groups"} className="text-sm" />
-            {a === "vendas" ? "Vendas" : a === "producao" ? "Produção" : "Clientes"}
+      <div className="flex gap-2 flex-wrap">
+        {[
+          { key: "vendas", label: "Vendas", icon: "trending_up" },
+          { key: "producao", label: "Produção", icon: "precision_manufacturing" },
+          { key: "clientes", label: "Cadastros", icon: "groups" },
+          { key: "stock", label: "Stock", icon: "inventory_2" },
+          { key: "categorias", label: "Categorias", icon: "category" },
+        ].map((a) => (
+          <Button key={a.key} variant={aba === a.key ? "default" : "outline"} size="sm" onClick={() => setAba(a.key)}>
+            <Icon name={a.icon} className="text-sm" />
+            {a.label}
           </Button>
         ))}
       </div>
@@ -354,8 +371,11 @@ export default function RelatoriosPage() {
 
       {aba === "clientes" && (
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Cadastros (Clientes e Fornecedores)</CardTitle>
+            <Button size="sm" variant="outline" onClick={() => gerarRelatorioCadastrosPDF(clientes, org)}>
+              <Icon name="picture_as_pdf" className="text-sm" /> Gerar PDF
+            </Button>
           </CardHeader>
           <CardContent>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
@@ -420,6 +440,201 @@ export default function RelatoriosPage() {
           </CardContent>
         </Card>
       )}
+
+      {aba === "stock" && (() => {
+        const catMap = {};
+        materiais.forEach((m) => {
+          const cat = m.categoria?.nome || "Sem categoria";
+          const fam = normalizarFamilia(m.categoria?.familia);
+          if (!catMap[cat]) catMap[cat] = { qtd: 0, valorTotal: 0, disponivel: 0, itens: 0, familia: fam };
+          catMap[cat].itens += 1;
+          catMap[cat].qtd += toNum(m.quantidade);
+          catMap[cat].disponivel += toNum(m.estoque_disponivel);
+          catMap[cat].valorTotal += toNum(m.quantidade) * toNum(m.custo_unit);
+        });
+        const catSorted = Object.entries(catMap).sort((a, b) => b[1].valorTotal - a[1].valorTotal);
+        const totalItens = materiais.length;
+        const totalQtd = materiais.reduce((s, m) => s + toNum(m.quantidade), 0);
+        const totalValor = materiais.reduce((s, m) => s + toNum(m.quantidade) * toNum(m.custo_unit), 0);
+        const esgotados = materiais.filter((m) => m.status === "esgotado").length;
+        const abaixoMin = materiais.filter((m) => m.status === "repor").length;
+        const criticos = esgotados + abaixoMin;
+
+        return (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
+              <KpiCard icon="inventory_2" label="Total Materiais" value={totalItens} iconVariant="primary" />
+              <KpiCard icon="scale" label="Qtd. em Stock" value={totalQtd.toLocaleString("pt-AO")} iconVariant="info" />
+              <KpiCard icon="payments" label="Valor Estoque" value={`Kz ${totalValor.toLocaleString("pt-AO")}`} iconVariant="success" />
+              <KpiCard icon="warning" label="Críticos" value={`${criticos} (${esgotados} esgotados, ${abaixoMin} abaixo mín.)`} iconVariant={criticos > 0 ? "danger" : "success"} />
+            </div>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Resumo por Categoria</CardTitle>
+                <Button size="sm" variant="outline" onClick={() => gerarRelatorioStockPDF(materiais, categorias, org)}>
+                  <Icon name="picture_as_pdf" className="text-sm" /> Gerar PDF
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="text-left px-4 py-3 text-[10px] font-bold text-muted-foreground uppercase">Categoria</th>
+                        <th className="text-right px-4 py-3 text-[10px] font-bold text-muted-foreground uppercase">Itens</th>
+                        <th className="text-right px-4 py-3 text-[10px] font-bold text-muted-foreground uppercase">Qtd. Total</th>
+                        <th className="text-right px-4 py-3 text-[10px] font-bold text-muted-foreground uppercase">Disponível</th>
+                        <th className="text-right px-4 py-3 text-[10px] font-bold text-muted-foreground uppercase hidden sm:table-cell">Valor Estoque</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {catSorted.map(([nome, d]) => {
+                        const famCfg = familias[d.familia];
+                        return (
+                          <tr key={nome} className="border-b border-border/20 hover:bg-muted/30 transition-colors">
+                            <td className="px-4 py-3 flex items-center gap-2">
+                              {famCfg && <Icon name={famCfg.icon} className="text-sm text-primary" />}
+                              <span className="font-medium text-foreground">{nome}</span>
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono text-xs">{d.itens}</td>
+                            <td className="px-4 py-3 text-right font-mono text-xs">{d.qtd.toLocaleString("pt-AO")}</td>
+                            <td className="px-4 py-3 text-right font-mono text-xs">{d.disponivel.toLocaleString("pt-AO")}</td>
+                            <td className="px-4 py-3 text-right font-mono text-xs font-bold hidden sm:table-cell">Kz {d.valorTotal.toLocaleString("pt-AO")}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 border-border/40 bg-muted/30 font-bold">
+                        <td className="px-4 py-3 text-xs">TOTAL</td>
+                        <td className="px-4 py-3 text-right font-mono text-xs">{totalItens}</td>
+                        <td className="px-4 py-3 text-right font-mono text-xs">{totalQtd.toLocaleString("pt-AO")}</td>
+                        <td className="px-4 py-3 text-right font-mono text-xs">{totalQtd.toLocaleString("pt-AO")}</td>
+                        <td className="px-4 py-3 text-right font-mono text-xs hidden sm:table-cell">Kz {totalValor.toLocaleString("pt-AO")}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Estado do Stock</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                  <div className="rounded-xl border border-border/40 bg-background p-4 text-center">
+                    <p className="text-3xl font-extrabold text-green-500">{materiais.filter((m) => m.status === "ok").length}</p>
+                    <p className="text-[11px] text-muted-foreground mt-1">Saudáveis</p>
+                  </div>
+                  <div className="rounded-xl border border-border/40 bg-background p-4 text-center">
+                    <p className="text-3xl font-extrabold text-amber-500">{abaixoMin}</p>
+                    <p className="text-[11px] text-muted-foreground mt-1">Abaixo do Mínimo</p>
+                  </div>
+                  <div className="rounded-xl border border-border/40 bg-background p-4 text-center">
+                    <p className="text-3xl font-extrabold text-red-500">{esgotados}</p>
+                    <p className="text-[11px] text-muted-foreground mt-1">Esgotados</p>
+                  </div>
+                </div>
+                {criticos > 0 && (
+                  <div className="space-y-2">
+                    {materiais.filter((m) => m.status === "esgotado" || m.status === "repor").map((m) => (
+                      <div key={m.id} className="flex items-center justify-between px-4 py-2.5 rounded-lg border border-border/30 bg-muted/20">
+                        <div className="flex items-center gap-2">
+                          <Icon name={m.status === "esgotado" ? "error" : "warning"} className={`text-sm ${m.status === "esgotado" ? "text-red-500" : "text-amber-500"}`} />
+                          <span className="text-xs font-medium text-foreground">{m.nome}</span>
+                          <span className="text-[10px] text-muted-foreground">{m.categoria?.nome || ""}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className={`text-xs font-bold font-mono ${m.status === "esgotado" ? "text-red-500" : "text-amber-500"}`}>
+                            {toNum(m.estoque_disponivel).toLocaleString("pt-AO")} / {toNum(m.ponto_ressuprimento || m.estoque_min).toLocaleString("pt-AO")} {m.unidade}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </>
+        );
+      })()}
+
+      {aba === "categorias" && (() => {
+        const materiaisPorCat = {};
+        materiais.forEach((m) => {
+          const catNome = m.categoria?.nome || m.categoria_nome || "Sem categoria";
+          materiaisPorCat[catNome] = (materiaisPorCat[catNome] || 0) + 1;
+        });
+        const catMap = {};
+        categorias.forEach((c) => {
+          const fam = normalizarFamilia(c.familia);
+          if (!catMap[fam]) catMap[fam] = [];
+          catMap[fam].push(c);
+        });
+        return (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
+              <KpiCard icon="category" label="Categorias" value={categorias.length} iconVariant="primary" />
+              <KpiCard icon="folder_open" label="Famílias" value={Object.keys(catMap).length} iconVariant="info" />
+              <KpiCard icon="inventory_2" label="Materiais Cadastrados" value={materiais.length} iconVariant="success" />
+              <KpiCard icon="people" label="Cadastros" value={clientes.length} iconVariant="secondary" />
+            </div>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Categorias por Família</CardTitle>
+                <Button size="sm" variant="outline" onClick={() => gerarRelatorioCategoriasPDF(categorias, materiais, org)}>
+                  <Icon name="picture_as_pdf" className="text-sm" /> Gerar PDF
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  {Object.entries(catMap).sort((a, b) => a[0].localeCompare(b[0])).map(([fam, cats]) => {
+                    const famCfg = familias[fam];
+                    return (
+                      <div key={fam}>
+                        <div className="flex items-center gap-2 mb-3">
+                          {famCfg && <Icon name={famCfg.icon} className="text-sm text-primary" />}
+                          <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">{famCfg?.label || fam}</h3>
+                          <span className="text-[10px] text-muted-foreground">({cats.length} categorias)</span>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b bg-muted/50">
+                                <th className="text-left px-4 py-2 text-[10px] font-bold text-muted-foreground uppercase">Categoria</th>
+                                <th className="text-left px-4 py-2 text-[10px] font-bold text-muted-foreground uppercase hidden sm:table-cell">Tipo</th>
+                                <th className="text-left px-4 py-2 text-[10px] font-bold text-muted-foreground uppercase hidden sm:table-cell">Descrição</th>
+                                <th className="text-right px-4 py-2 text-[10px] font-bold text-muted-foreground uppercase">Itens</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {cats.sort((a, b) => a.nome.localeCompare(b.nome)).map((c) => (
+                                <tr key={c.id} className="border-b border-border/20 hover:bg-muted/30 transition-colors">
+                                  <td className="px-4 py-2.5 font-medium text-foreground">{c.nome}</td>
+                                  <td className="px-4 py-2.5 text-muted-foreground text-xs hidden sm:table-cell">{c.tipo || "—"}</td>
+                                  <td className="px-4 py-2.5 text-muted-foreground text-xs hidden sm:table-cell">{c.descricao || "—"}</td>
+                                  <td className="px-4 py-2.5 text-right font-mono text-xs font-bold text-primary">{materiaisPorCat[c.nome] || 0}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {categorias.length === 0 && (
+                    <p className="text-center p-8 text-muted-foreground">Nenhuma categoria cadastrada</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        );
+      })()}
 
       <footer className="p-6 text-center border-t bg-muted/30 rounded-2xl">
         <p className="text-sm text-muted-foreground">SIGRAF — Sistema de Gestão para Indústria Gráfica</p>

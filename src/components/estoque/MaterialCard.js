@@ -1,7 +1,6 @@
 "use client";
 
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import Icon from "@/components/Icon";
 import { especificacoesObjeto, formatKz, familias, normalizarFamilia, statusCfg, toNum } from "@/lib/estoque";
 
@@ -18,20 +17,8 @@ function RadialMini({ pct, status }) {
   return (
     <div className="relative w-8 h-8 shrink-0" role="img" aria-label={`Nível de disponibilidade: ${Math.round(clamped)}%`}>
       <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-        <path
-          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-          fill="none"
-          stroke={track}
-          strokeWidth="3"
-        />
-        <path
-          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-          fill="none"
-          stroke={cor}
-          strokeWidth="3"
-          strokeDasharray={`${clamped}, 100`}
-          strokeLinecap="round"
-        />
+        <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke={track} strokeWidth="3" />
+        <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke={cor} strokeWidth="3" strokeDasharray={`${clamped}, 100`} strokeLinecap="round" />
       </svg>
       <span className={`absolute inset-0 flex items-center justify-center text-[9px] font-mono font-bold ${status === "ok" ? "text-on-surface" : status === "repor" ? "text-warning" : "text-error"}`}>
         {Math.round(clamped)}%
@@ -59,54 +46,36 @@ function BotaoIcone({ icon, label, onClick, critico, cor }) {
   );
 }
 
-function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEditar, onFichaPdf, onPedido, onEliminar }) {
-  const [menuPos, setMenuPos] = useState(null);
-  const btnRef = useRef(null);
+function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEditar, onFichaPdf, onPedido, onEliminar, onTransferencia, onPerda, onDesperdicio }) {
+  const [menuAberto, setMenuAberto] = useState(false);
   const menuRef = useRef(null);
-  const st = statusCfg[item.status] || statusCfg.ok;
   const familiaCfg = familias[normalizarFamilia(item.categoria?.familia)];
   const pct = toNum(item.estoque_max) > 0 ? (toNum(item.estoque_disponivel) / toNum(item.estoque_max)) * 100 : 100;
   const critico = item.status === "repor" || item.status === "esgotado";
   const stText = textoStatus[item.status] || textoStatus.ok;
   const unidade = item.unidade?.toUpperCase() || "UN";
 
-  const fecharMenu = useCallback(() => setMenuPos(null), []);
-
-  const abrirMenu = () => {
-    if (menuPos) {
-      setMenuPos(null);
-      return;
-    }
-    const el = btnRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    setMenuPos({ top: r.bottom + 6, right: window.innerWidth - r.right });
-  };
-
   useEffect(() => {
-    if (!menuPos) return;
-    const fechar = () => setMenuPos(null);
-    const emClick = (e) => {
-      if (btnRef.current?.contains(e.target)) return;
-      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuPos(null);
+    if (!menuAberto) return;
+    const handler = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuAberto(false);
     };
-    window.addEventListener("scroll", fechar, true);
-    window.addEventListener("resize", fechar);
-    document.addEventListener("mousedown", emClick);
-    return () => {
-      window.removeEventListener("scroll", fechar, true);
-      window.removeEventListener("resize", fechar);
-      document.removeEventListener("mousedown", emClick);
-    };
-  }, [menuPos]);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuAberto]);
+
+  const executar = useCallback((fn, arg) => {
+    setMenuAberto(false);
+    if (fn) fn(arg);
+  }, []);
 
   return (
     <article
-      className={`relative obsidian-glass rounded-lg p-4 transition-all duration-300 group animate-card-in ${critico ? "border border-error/50 bg-error/5" : "cyber-border"}`}
+      className={`relative overflow-visible obsidian-glass rounded-lg p-4 transition-all duration-300 group animate-card-in ${critico ? "border border-error/50 bg-error/5" : "cyber-border"}`}
       style={{ "--stagger": `${Math.min(index, 14) * 60}ms` }}
     >
       {critico && <div className="absolute top-0 left-0 w-1 h-full bg-error" aria-hidden="true" />}
-      <div className={`grid grid-cols-1 md:grid-cols-12 gap-4 items-center relative z-10 ${critico ? "pl-2" : ""}`}>
+      <div className={`grid grid-cols-1 md:grid-cols-12 gap-4 items-center relative ${critico ? "pl-2" : ""}`}>
         {/* Col 1: Detalhes */}
         <div className="md:col-span-5 flex gap-4 items-center min-w-0">
           <div className={`w-10 h-10 rounded flex items-center justify-center shrink-0 border ${critico ? "bg-error/10 border-error/30 animate-pulse" : "bg-surface-variant border-outline-variant group-hover:border-primary/50"} transition-colors`}>
@@ -173,25 +142,18 @@ function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEdita
             <BotaoIcone icon="add" label="Entrada" critico={critico} onClick={() => onEntrada(item)} />
             <BotaoIcone icon="remove" label="Saída" cor="saida" critico={critico} onClick={() => onSaida(item)} />
             <BotaoIcone icon="description" label="Ver ficha do material (PDF)" critico={critico} onClick={() => onFichaPdf(item)} />
-            <div className="relative" ref={btnRef}>
-              <BotaoIcone icon="more_vert" label="Mais opções" critico={critico} onClick={abrirMenu} />
-              {menuPos &&
-                createPortal(
-                  <div
-                    ref={menuRef}
-                    role="menu"
-                    className="fixed z-[90] w-44 obsidian-glass rounded-xl border overflow-hidden animate-scale-in shadow-xl"
-                    style={{ top: menuPos.top, right: menuPos.right }}
-                  >
-                    <MenuItem icon="shopping_cart" label="Pedido ao fornecedor" onClick={() => { fecharMenu(); onPedido(item); }} />
-                    <MenuItem icon="lock" label="Reservas" onClick={() => { fecharMenu(); onReservas(item); }} />
-                    <MenuItem icon="edit" label="Editar" onClick={() => { fecharMenu(); onEditar(item); }} />
-                    <MenuItem icon="print" label="Ficha PDF" onClick={() => { fecharMenu(); onFichaPdf(item); }} />
-                    {onEliminar && <MenuItem icon="delete" label="Remover" onClick={() => { fecharMenu(); onEliminar(item); }} />}
-                    <div className="border-t border-outline-variant/40 px-4 py-1.5 text-[10px] font-mono text-on-surface-variant">{formatKz(item.preco_venda)}</div>
-                  </div>,
-                  document.body
-                )}
+            <div className="relative" ref={menuRef}>
+              <BotaoIcone icon="more_vert" label="Mais opções" critico={critico} onClick={() => setMenuAberto((v) => !v)} />
+              {menuAberto && (
+                <div className="absolute right-0 bottom-full mb-1 z-[60] w-48 bg-popover border border-border rounded-xl shadow-2xl overflow-y-auto max-h-[80vh]">
+                  <MenuItem icon="swap_horiz" label="Transferência" onClick={() => executar(onTransferencia, item)} />
+                  <MenuItem icon="warning" label="Registar perda" onClick={() => executar(onPerda, item)} />
+                  <MenuItem icon="delete_sweep" label="Registar desperdício" onClick={() => executar(onDesperdicio, item)} />
+                  <MenuItem icon="lock" label="Reservas" onClick={() => executar(onReservas, item)} />
+                  <MenuItem icon="edit" label="Editar" onClick={() => executar(onEditar, item)} />
+                  {onEliminar && <MenuItem icon="delete" label="Remover" onClick={() => executar(onEliminar, item)} />}
+                </div>
+              )}
             </div>
           </div>
           <span className="text-[11px] font-mono font-bold text-primary md:hidden">{formatKz(item.preco_venda)}</span>
@@ -206,7 +168,7 @@ function MenuItem({ icon, label, onClick }) {
     <button
       role="menuitem"
       onClick={onClick}
-      className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-semibold text-on-surface hover:bg-accent transition-colors text-left"
+      className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-semibold text-foreground hover:bg-accent transition-colors text-left"
     >
       <Icon name={icon} className="text-lg text-muted-foreground" />
       {label}

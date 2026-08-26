@@ -116,7 +116,24 @@ export const statusCfg = {
   esgotado: { label: "Esgotado", variant: "destructive" },
 };
 
-export const unidades = ["folha", "resma", "rolo", "metro", "m²", "litro", "kg", "un", "pacote", "caixa"];
+export const unidades = ["folha", "resma", "rolo", "metro", "m²", "litro", "kg", "un", "pacote", "caixa", "ml", "g", "mg"];
+
+export const unidadesPorFamilia = {
+  papeis: ["folha", "resma", "rolo", "metro", "m²", "kg", "un", "pacote", "caixa"],
+  tintas: ["litro", "ml", "kg", "g", "mg", "un", "caixa"],
+  chapas: ["folha", "metro", "m²", "kg", "un", "caixa"],
+  produto_quimico: ["litro", "ml", "kg", "g", "mg", "un", "caixa"],
+  equipamentos: ["un", "caixa"],
+  ferramentas: ["un", "caixa", "pacote"],
+  suporte_especial: ["folha", "rolo", "metro", "m²", "kg", "un"],
+  material_acabamento: ["folha", "rolo", "metro", "m²", "kg", "un", "caixa", "pacote"],
+  consumiveis: ["un", "caixa", "pacote", "folha"],
+};
+
+export function unidadesParaFamilia(familia) {
+  const fam = normalizarFamilia(familia);
+  return unidadesPorFamilia[fam] || unidades;
+}
 export const tiposEstoque = ["folha", "metro", "peso", "volume", "unidade"];
 
 export const tiposCampoEspecificacao = [

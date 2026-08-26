@@ -50,6 +50,11 @@ export async function cancelarReserva(id) {
   return data;
 }
 
+export async function reservar(dados) {
+  const { data } = await api.post("/materiais/reservar", dados);
+  return data;
+}
+
 export async function extrato() {
   const { data } = await api.get("/materiais/extrato");
   return data;

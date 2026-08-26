@@ -298,3 +298,214 @@ export async function gerarPedidoPDF(pedido, org = {}) {
   doc.text(`Documento gerado por SIGRAF — ${new Date().toLocaleDateString("pt-BR")}`, cx, 285, { align: "center" });
   doc.save(`Pedido_${numero.replace(/[^\w-]+/g, "_")}.pdf`);
 }
+
+export async function gerarRelatorioStockPDF(materiais = [], categorias = [], org = {}) {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const { linhaY: ly, pw } = await desenharCabecalho(doc, org, "Relatório de Stock e Categorias");
+
+  let y = ly + 8;
+
+  doc.setFontSize(11); doc.setFont("helvetica", "bold");
+  doc.setTextColor(24, 33, 48);
+  doc.text("Resumo por Categoria", 14, y);
+  y += 6;
+
+  const catMap = {};
+  materiais.forEach((m) => {
+    const cat = m.categoria?.nome || "Sem categoria";
+    if (!catMap[cat]) catMap[cat] = { qtd: 0, valorTotal: 0, disponivel: 0, itens: 0 };
+    catMap[cat].itens += 1;
+    catMap[cat].qtd += Number(m.quantidade) || 0;
+    catMap[cat].disponivel += Number(m.estoque_disponivel) || 0;
+    catMap[cat].valorTotal += (Number(m.quantidade) || 0) * (Number(m.custo_unit) || 0);
+  });
+
+  const catRows = Object.entries(catMap).sort((a, b) => b[1].valorTotal - a[1].valorTotal);
+
+  doc.autoTable({
+    startY: y,
+    head: [["Categoria", "Itens", "Qtd. Total", "Disponível", "Valor Estoque"]],
+    body: catRows.map(([nome, d]) => [
+      nome,
+      String(d.itens),
+      d.qtd.toLocaleString("pt-AO"),
+      d.disponivel.toLocaleString("pt-AO"),
+      formatKz(d.valorTotal),
+    ]),
+    theme: "grid",
+    headStyles: { fillColor: [15, 118, 110], textColor: 255, fontStyle: "bold", fontSize: 8 },
+    bodyStyles: { fontSize: 8, textColor: [30, 30, 30] },
+    alternateRowStyles: { fillColor: [240, 249, 248] },
+    columnStyles: {
+      0: { cellWidth: 50 },
+      1: { halign: "right", cellWidth: 20 },
+      2: { halign: "right", cellWidth: 30 },
+      3: { halign: "right", cellWidth: 30 },
+      4: { halign: "right", cellWidth: 40 },
+    },
+    margin: { left: 14, right: 14 },
+  });
+
+  const totais = catRows.reduce((s, [, d]) => ({
+    itens: s.itens + d.itens,
+    qtd: s.qtd + d.qtd,
+    disp: s.disp + d.disponivel,
+    val: s.val + d.valorTotal,
+  }), { itens: 0, qtd: 0, disp: 0, val: 0 });
+
+  const ty = doc.lastAutoTable.finalY + 5;
+  doc.setFontSize(8); doc.setFont("helvetica", "bold");
+  doc.text("TOTAL:", 14, ty);
+  doc.text(`${totais.itens} itens | Qtd: ${totais.qtd.toLocaleString("pt-AO")} | Disp: ${totais.disp.toLocaleString("pt-AO")} | Valor: ${formatKz(totais.val)}`, 30, ty);
+
+  y = ty + 12;
+  doc.setFontSize(11); doc.setFont("helvetica", "bold");
+  doc.setTextColor(24, 33, 48);
+  doc.text("Detalhe de Materiais", 14, y);
+  y += 2;
+
+  const materiaisSorted = [...materiais].sort((a, b) => {
+    const sa = a.status === "esgotado" ? 0 : a.status === "repor" ? 1 : 2;
+    const sb = b.status === "esgotado" ? 0 : b.status === "repor" ? 1 : 2;
+    return sa - sb;
+  });
+
+  doc.autoTable({
+    startY: y,
+    head: [["Material", "Categoria", "Qtd.", "Mín", "Máx", "Ponto", "Custo", "Estado"]],
+    body: materiaisSorted.map((m) => [
+      m.nome || "—",
+      m.categoria?.nome || "—",
+      `${Number(m.quantidade || 0).toLocaleString("pt-AO")} ${m.unidade || ""}`,
+      Number(m.estoque_min || 0).toLocaleString("pt-AO"),
+      Number(m.estoque_max || 0).toLocaleString("pt-AO"),
+      Number(m.ponto_ressuprimento || 0).toLocaleString("pt-AO"),
+      m.custo_unit > 0 ? formatKz(m.custo_unit) : "—",
+      m.status === "esgotado" ? "Esgotado" : m.status === "repor" ? "Repôr" : "Ok",
+    ]),
+    theme: "grid",
+    headStyles: { fillColor: [15, 118, 110], textColor: 255, fontStyle: "bold", fontSize: 7 },
+    bodyStyles: { fontSize: 7, textColor: [30, 30, 30] },
+    alternateRowStyles: { fillColor: [240, 249, 248] },
+    didParseCell(data) {
+      if (data.section === "body" && data.column.index === 7) {
+        const v = String(data.cell.raw);
+        if (v === "Esgotado") { data.cell.styles.textColor = [220, 38, 38]; data.cell.styles.fontStyle = "bold"; }
+        else if (v === "Repôr") { data.cell.styles.textColor = [234, 179, 8]; data.cell.styles.fontStyle = "bold"; }
+      }
+    },
+    margin: { left: 14, right: 14 },
+  });
+
+  const cx = pw / 2;
+  doc.setTextColor(180, 180, 180); doc.setFontSize(7);
+  doc.text(`Documento gerado por SIGRAF — ${new Date().toLocaleDateString("pt-BR")}`, cx, 285, { align: "center" });
+  doc.save(`Relatorio_Stock_${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
+export async function gerarRelatorioCadastrosPDF(clientes = [], org = {}) {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const { linhaY: ly, pw } = await desenharCabecalho(doc, org, "Relatório de Cadastros");
+
+  const totalClientes = clientes.filter((c) => c.tipo === "cliente").length;
+  const totalFornecedores = clientes.filter((c) => c.tipo === "fornecedor").length;
+
+  let y = ly + 8;
+  doc.setFontSize(11); doc.setFont("helvetica", "bold");
+  doc.setTextColor(24, 33, 48);
+  doc.text(`Total: ${clientes.length} cadastros (${totalClientes} clientes, ${totalFornecedores} fornecedores)`, 14, y);
+  y += 8;
+
+  const clientesLista = clientes.filter((c) => c.tipo === "cliente");
+  if (clientesLista.length > 0) {
+    doc.setFontSize(11); doc.setFont("helvetica", "bold");
+    doc.text("Clientes", 14, y);
+    y += 2;
+
+    doc.autoTable({
+      startY: y,
+      head: [["Código", "Nome", "Empresa", "NIF", "Telefone", "Email"]],
+      body: clientesLista.map((c) => [
+        c.codigo || "—", c.nome || "—", c.empresa || "—", c.nif || "—", c.telefone || "—", c.email || "—",
+      ]),
+      theme: "grid",
+      headStyles: { fillColor: [15, 118, 110], textColor: 255, fontStyle: "bold", fontSize: 8 },
+      bodyStyles: { fontSize: 8, textColor: [30, 30, 30] },
+      alternateRowStyles: { fillColor: [240, 249, 248] },
+      margin: { left: 14, right: 14 },
+    });
+    y = doc.lastAutoTable.finalY + 8;
+  }
+
+  const fornecedoresLista = clientes.filter((c) => c.tipo === "fornecedor");
+  if (fornecedoresLista.length > 0) {
+    doc.setFontSize(11); doc.setFont("helvetica", "bold");
+    doc.text("Fornecedores", 14, y);
+    y += 2;
+
+    doc.autoTable({
+      startY: y,
+      head: [["Código", "Nome", "Empresa", "NIF", "Telefone", "Email"]],
+      body: fornecedoresLista.map((c) => [
+        c.codigo || "—", c.nome || "—", c.empresa || "—", c.nif || "—", c.telefone || "—", c.email || "—",
+      ]),
+      theme: "grid",
+      headStyles: { fillColor: [5, 150, 105], textColor: 255, fontStyle: "bold", fontSize: 8 },
+      bodyStyles: { fontSize: 8, textColor: [30, 30, 30] },
+      alternateRowStyles: { fillColor: [236, 248, 245] },
+      margin: { left: 14, right: 14 },
+    });
+  }
+
+  const cx = pw / 2;
+  doc.setTextColor(180, 180, 180); doc.setFontSize(7);
+  doc.text(`Documento gerado por SIGRAF — ${new Date().toLocaleDateString("pt-BR")}`, cx, 285, { align: "center" });
+  doc.save(`Relatorio_Cadastros_${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
+export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [], org = {}) {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const { linhaY: ly, pw } = await desenharCabecalho(doc, org, "Relatório de Categorias e Famílias");
+
+  let y = ly + 8;
+
+  const catMap = {};
+  categorias.forEach((c) => {
+    const fam = normalizarFamilia(c.familia);
+    if (!catMap[fam]) catMap[fam] = [];
+    catMap[fam].push(c);
+  });
+
+  const materiaisPorCat = {};
+  materiais.forEach((m) => {
+    const catNome = m.categoria?.nome || m.categoria_nome || "Sem categoria";
+    materiaisPorCat[catNome] = (materiaisPorCat[catNome] || 0) + 1;
+  });
+
+  Object.entries(catMap).sort((a, b) => a[0].localeCompare(b[0])).forEach(([fam, cats]) => {
+    const famCfg = familias[fam];
+    doc.setFontSize(11); doc.setFont("helvetica", "bold");
+    doc.setTextColor(15, 118, 110);
+    doc.text(`${famCfg?.label || fam}`, 14, y);
+    y += 2;
+
+    doc.autoTable({
+      startY: y,
+      head: [["Categoria", "Tipo", "Descrição", "Itens em Stock"]],
+      body: cats.map((c) => [
+        c.nome || "—", c.tipo || "—", c.descricao || "—", String(materiaisPorCat[c.nome] || 0),
+      ]),
+      theme: "grid",
+      headStyles: { fillColor: [15, 118, 110], textColor: 255, fontStyle: "bold", fontSize: 8 },
+      bodyStyles: { fontSize: 8, textColor: [30, 30, 30] },
+      alternateRowStyles: { fillColor: [240, 249, 248] },
+      margin: { left: 14, right: 14 },
+    });
+    y = doc.lastAutoTable.finalY + 8;
+  });
+
+  const cx = pw / 2;
+  doc.setTextColor(180, 180, 180); doc.setFontSize(7);
+  doc.text(`Documento gerado por SIGRAF — ${new Date().toLocaleDateString("pt-BR")}`, cx, 285, { align: "center" });
+  doc.save(`Relatorio_Categorias_${new Date().toISOString().slice(0, 10)}.pdf`);
+}

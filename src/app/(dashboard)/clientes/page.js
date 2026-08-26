@@ -46,15 +46,17 @@ export default function CadastrosPage() {
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     carregar({});
-  }, [carregar]);
-
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const params = {};
-    if (filtroTipo !== "todos") params.tipo = filtroTipo;
-    if (searchTerm) params.busca = searchTerm;
-    carregar(params);
-  }, [searchTerm, filtroTipo, carregar]);
+    const timer = setTimeout(() => {
+      const params = {};
+      if (filtroTipo !== "todos") params.tipo = filtroTipo;
+      if (searchTerm) params.busca = searchTerm;
+      carregar(params);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm, filtroTipo]); // eslint-disable-line react-hooks/exhaustive-deps
 /* eslint-enable react-hooks/set-state-in-effect */
 
   const totalClientes = clientes.filter((c) => c.tipo === "cliente").length;
@@ -232,7 +234,7 @@ export default function CadastrosPage() {
         }
       />
 
-      {carregando ? <ListSkeleton count={5} /> : (
+      {carregando && clientes.length === 0 ? <ListSkeleton count={5} /> : (
         <Card>
           <div className="p-4 sm:p-5 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div className="flex gap-2">

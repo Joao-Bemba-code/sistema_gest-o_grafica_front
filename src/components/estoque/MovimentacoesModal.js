@@ -6,10 +6,21 @@ import { Badge } from "@/components/ui/Badge";
 import Icon from "@/components/Icon";
 import { formatHora, toNum } from "@/lib/estoque";
 
+const tipoCfg = {
+  entrada: { label: "Entrada", variant: "success", sinal: "+" },
+  saida: { label: "Saída", variant: "destructive", sinal: "−" },
+  transferencia: { label: "Transferência", variant: "default", sinal: "↔" },
+  perda: { label: "Perda", variant: "warning", sinal: "−" },
+  desperdicio: { label: "Desperdício", variant: "destructive", sinal: "−" },
+};
+
 const filtros = [
   ["todos", "Todas"],
   ["entrada", "Entradas"],
   ["saida", "Saídas"],
+  ["transferencia", "Transferências"],
+  ["perda", "Perdas"],
+  ["desperdicio", "Desperdício"],
 ];
 
 export default function MovimentacoesModal({ open, onClose, movimentos, filtrados, visiveis, temMais, carregarMais, carregando, filtro, setFiltro, busca, setBusca, gerarPDF, pdfId }) {
@@ -17,7 +28,7 @@ export default function MovimentacoesModal({ open, onClose, movimentos, filtrado
     <Modal
       open={open}
       onClose={onClose}
-      title="Movimentações — Entradas e Saídas"
+      title="Movimentações — Estoque"
       icon="swap_vert"
       size="lg"
       footer={<Button variant="outline" onClick={onClose}>Fechar</Button>}
@@ -56,16 +67,16 @@ export default function MovimentacoesModal({ open, onClose, movimentos, filtrado
         ) : (
           <div className="space-y-1.5 max-h-[50vh] overflow-y-auto pr-1 custom-scrollbar">
             {visiveis.map((m) => {
-              const ehEntrada = m.tipo === "entrada";
+              const cfg = tipoCfg[m.tipo] || tipoCfg.saida;
               return (
                 <div key={m.id} className="flex items-center justify-between gap-3 obsidian-glass rounded-lg px-3 py-2.5 border border-outline-variant/30">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <Badge variant={ehEntrada ? "success" : "destructive"} className="text-[9px]">{ehEntrada ? "Entrada" : "Saída"}</Badge>
+                      <Badge variant={cfg.variant} className="text-[9px]">{cfg.label}</Badge>
                       <span className="text-xs font-bold text-foreground truncate">{m.material?.nome || "—"}</span>
                     </div>
                     <p className="text-[10px] font-mono text-muted-foreground mt-0.5">
-                      {formatHora(m.createdAt)} • {ehEntrada ? `Fornecedor: ${m.fornecedor_nome || "—"}` : `Cliente: ${m.cliente_nome || "—"}`}
+                      {formatHora(m.createdAt)} • {m.tipo === "entrada" ? `Fornecedor: ${m.fornecedor_nome || "—"}` : m.tipo === "transferencia" ? `Destino: ${m.material_destino_id || "—"}` : m.tipo === "saida" ? `Cliente: ${m.cliente_nome || "—"}` : `Motivo: ${m.motivo || "—"}${m.material_destino_id ? ` → Material #${m.material_destino_id}` : ""}`}
                       {m.lote ? ` • Lote ${m.lote}` : ""}
                     </p>
                     <p className="text-[10px] text-muted-foreground">
@@ -73,8 +84,8 @@ export default function MovimentacoesModal({ open, onClose, movimentos, filtrado
                     </p>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
-                    <span className={`font-mono text-sm font-bold ${ehEntrada ? "text-success" : "text-destructive"}`}>
-                      {ehEntrada ? "+" : "−"}{toNum(m.quantidade)} {m.material?.unidade || "un"}
+                    <span className={`font-mono text-sm font-bold ${cfg.sinal === "+" ? "text-success" : cfg.sinal === "−" ? "text-destructive" : "text-primary"}`}>
+                      {cfg.sinal}{toNum(m.quantidade)} {m.material?.unidade || "un"}
                     </span>
                     <Button
                       variant="ghost"
@@ -82,7 +93,7 @@ export default function MovimentacoesModal({ open, onClose, movimentos, filtrado
                       className="text-[10px]"
                       loading={pdfId === m.id}
                       onClick={() => gerarPDF(m)}
-                      aria-label={`Gerar PDF da ${ehEntrada ? "entrada" : "saída"} de ${m.material?.nome || ""}`}
+                      aria-label={`Gerar PDF da ${cfg.label.toLowerCase()} de ${m.material?.nome || ""}`}
                     >
                       <Icon name="print" className="text-sm" /> PDF
                     </Button>

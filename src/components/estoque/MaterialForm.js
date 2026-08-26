@@ -3,8 +3,9 @@
 import { useState, useCallback } from "react";
 import Icon from "@/components/Icon";
 import FornecedorSelect from "./FornecedorSelect";
+import CategoriaSelect from "./CategoriaSelect";
 import NumeroInput from "@/components/ui/NumeroInput";
-import { inputCls, unidades, camposDeCategoria, familias, normalizarFamilia, normalizarUnidade, prefixoFamilia, especificacoesObjeto } from "@/lib/estoque";
+import { inputCls, unidades, unidadesParaFamilia, camposDeCategoria, familias, normalizarFamilia, normalizarUnidade, prefixoFamilia, especificacoesObjeto } from "@/lib/estoque";
 
 const tabs = [
   { key: "basicos", label: "Identificação do Material", icon: "badge" },
@@ -39,10 +40,16 @@ function CampoEspecificacao({ campo, valor, onChange }) {
   if (tipo === "selecao") {
     return (
       <Campo label={rotulo} obrigatorio={obrigatorio}>
-        <select value={valor || ""} onChange={(e) => onChange(chave, e.target.value)} className={inputCls}>
-          <option value="">Selecionar...</option>
-          {(opcoes || []).map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
+        <input
+          list={`esp-${chave}`}
+          value={valor || ""}
+          onChange={(e) => onChange(chave, e.target.value)}
+          className={inputCls}
+          placeholder="Selecionar ou escrever..."
+        />
+        <datalist id={`esp-${chave}`}>
+          {(opcoes || []).map((o) => <option key={o} value={o} />)}
+        </datalist>
       </Campo>
     );
   }
@@ -66,6 +73,7 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
   const categoria = categorias.find((c) => String(c.id) === String(form.categoria_id));
   const camposEspec = camposDeCategoria(categoria, form.unidade);
   const ePapel = ["folha", "resma"].includes(normalizarUnidade(form.unidade));
+  const unidadesDisponiveis = categoria ? unidadesParaFamilia(categoria.familia) : unidades;
 
   const subfamiliasSugeridas = (() => {
     if (!categoria) return [];
@@ -79,8 +87,7 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
     return [...vistas];
   })();
 
-  const aoMudarCategoria = useCallback((e) => {
-    const novaCatId = e.target.value;
+  const aoMudarCategoria = useCallback((novaCatId) => {
     onChange("categoria_id", novaCatId);
     const cat = categorias.find((c) => String(c.id) === String(novaCatId));
     if (cat) {
@@ -136,10 +143,11 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
               <input required aria-required="true" value={form.nome} onChange={(e) => onChange("nome", e.target.value)} className={inputCls} placeholder="Ex: Papel Couché 150g A3" />
             </Campo>
             <Campo label="Categoria" obrigatorio>
-              <select required aria-required="true" value={form.categoria_id} onChange={aoMudarCategoria} className={inputCls}>
-                <option value="" disabled>Selecionar...</option>
-                {categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-              </select>
+              <CategoriaSelect
+                value={form.categoria_id}
+                categorias={categorias}
+                onChange={(id) => aoMudarCategoria(id)}
+              />
             </Campo>
             <Campo label="Subfamília">
               <input
@@ -165,9 +173,18 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
               <input value={form.nome_tecnico} onChange={(e) => onChange("nome_tecnico", e.target.value)} className={inputCls} placeholder="Ex: C150-A3" />
             </Campo>
             <Campo label="Unidade" obrigatorio>
-              <select required aria-required="true" value={form.unidade} onChange={(e) => onChange("unidade", e.target.value)} className={inputCls}>
-                {unidades.map((u) => <option key={u} value={u}>{u}</option>)}
-              </select>
+              <input
+                list={`${formId}-unidades`}
+                required
+                aria-required="true"
+                value={form.unidade}
+                onChange={(e) => onChange("unidade", e.target.value)}
+                className={inputCls}
+                placeholder="Selecionar ou escrever unidade..."
+              />
+              <datalist id={`${formId}-unidades`}>
+                {unidadesDisponiveis.map((u) => <option key={u} value={u} />)}
+              </datalist>
             </Campo>
             <Campo label="Descrição" full>
               <textarea rows={2} value={form.descricao} onChange={(e) => onChange("descricao", e.target.value)} className={`${inputCls} resize-none`} placeholder="Descrição completa do material..." />
@@ -225,13 +242,13 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
         {tab === "estoque" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Campo label="Estoque Mínimo">
-              <NumeroInput inteiro value={form.estoque_min} onChange={(e) => onChange("estoque_min", e.target.value)} className={inputCls} placeholder="Ex: 500" />
+              <NumeroInput  value={form.estoque_min} onChange={(e) => onChange("estoque_min", e.target.value)} className={inputCls} placeholder="Ex: 500" />
             </Campo>
             <Campo label="Estoque Máximo">
-              <NumeroInput inteiro value={form.estoque_max} onChange={(e) => onChange("estoque_max", e.target.value)} className={inputCls} placeholder="Ex: 5000" />
+              <NumeroInput  value={form.estoque_max} onChange={(e) => onChange("estoque_max", e.target.value)} className={inputCls} placeholder="Ex: 5000" />
             </Campo>
             <Campo label="Ponto de Pedido">
-              <NumeroInput inteiro value={form.ponto_ressuprimento} onChange={(e) => onChange("ponto_ressuprimento", e.target.value)} className={inputCls} placeholder="Ex: 800" />
+              <NumeroInput value={form.ponto_ressuprimento} onChange={(e) => onChange("ponto_ressuprimento", e.target.value)} className={inputCls} placeholder="Ex: 800" />
             </Campo>
             <Campo label="Custo Unitário (Kz)">
               <NumeroInput value={form.custo_unit} onChange={(e) => onChange("custo_unit", e.target.value)} className={inputCls} placeholder="Ex: 45" />

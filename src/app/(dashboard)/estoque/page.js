@@ -15,6 +15,8 @@ import MovimentacoesModal from "@/components/estoque/MovimentacoesModal";
 import ConversorModal from "@/components/estoque/ConversorModal";
 import ReservasModal from "@/components/estoque/ReservasModal";
 import EditMaterialModal from "@/components/estoque/EditMaterialModal";
+import TransferModal from "@/components/estoque/TransferModal";
+import PerdasDesperdicioModal from "@/components/estoque/PerdasDesperdicioModal";
 import EmptyState from "@/components/estoque/EmptyState";
 import PedidosModal from "@/components/estoque/PedidosModal";
 import PedidoFormModal from "@/components/estoque/PedidoFormModal";
@@ -30,8 +32,8 @@ export default function EstoquePage() {
   const {
     materiais, categorias, fornecedores, clientes, org, formatos,
     carregando, erro, carregar, nomeUsuario, totais, alertas,
-    salvarMaterial, registrarMovimentacao, converterFormatos,
-    carregarReservas, cancelarReservaDe,
+    salvarMaterial, registrarMovimentacao, registrarTransferencia, converterFormatos,
+    carregarReservas, cancelarReservaDe, reservarMaterial,
   } = useEstoque();
   const movs = useMovimentacoes({ org });
 
@@ -52,10 +54,12 @@ export default function EstoquePage() {
   const [res, setRes] = useState({ open: false, item: null, reservas: [], carregando: false });
   const [eliminar, setEliminar] = useState(null);
   const [deletando, setDeletando] = useState(false);
+  const [transfer, setTransfer] = useState({ open: false, item: null });
+  const [pdModal, setPdModal] = useState({ open: false, item: null, tipo: "perda" });
 
   const filterConfig = useMemo(() => [
     { value: "todos", label: "Todos", icon: "filter_list" },
-    ...Object.entries(familias).map(([k, v]) => ({ value: k, label: v.label, icon: v.icon, field: "familia" })),
+    ...Object.entries(familias).map(([k, v]) => ({ value: k, label: v.label, icon: v.icon, predicate: (item) => normalizarFamilia(item.categoria?.familia) === k })),
   ], []);
 
   const { search, setSearch, activeFilter, setActiveFilter, filtered, total } = useFilter({
@@ -122,8 +126,31 @@ export default function EstoquePage() {
     [cancelarReservaDe]
   );
 
+  const confirmarReserva = useCallback(async (dados) => {
+    const ok = await reservarMaterial(dados);
+    if (ok) {
+      const r = await carregarReservas(dados.material_id);
+      setRes((prev) => ({ ...prev, reservas: r }));
+    }
+    return ok;
+  }, [reservarMaterial, carregarReservas]);
+
   const fichaPdf = useCallback((item) => gerarFichaMaterialPDF(item, org), [org]);
   const pedidoPdf = useCallback((pedido) => gerarPedidoPDF(pedido, org), [org]);
+
+  const abrirTransferencia = useCallback((item) => setTransfer({ open: true, item }), []);
+  const fecharTransferencia = useCallback(() => setTransfer({ open: false, item: null }), []);
+  const confirmarTransferencia = useCallback((dados) => registrarTransferencia(dados).then((ok) => { if (ok) fecharTransferencia(); return ok; }), [registrarTransferencia, fecharTransferencia]);
+
+  const abrirPerda = useCallback((item) => setPdModal({ open: true, item, tipo: "perda" }), []);
+  const abrirDesperdicio = useCallback((item) => setPdModal({ open: true, item, tipo: "desperdicio" }), []);
+  const fecharPdModal = useCallback(() => setPdModal({ open: false, item: null, tipo: "perda" }), []);
+  const confirmarPdModal = useCallback(async (dados) => {
+    if (!pdModal.item) return false;
+    const ok = await registrarMovimentacao({ item: pdModal.item, tipo: dados.tipo, dados });
+    if (ok) { setPdModal({ open: false, item: null, tipo: "perda" }); }
+    return ok;
+  }, [pdModal.item, registrarMovimentacao]);
 
   const eliminarMaterial = useCallback(async () => {
     if (!eliminar) return;
@@ -334,6 +361,9 @@ export default function EstoquePage() {
                       onFichaPdf={fichaPdf}
                       onPedido={abrirNovoPedido}
                       onEliminar={setEliminar}
+                      onTransferencia={abrirTransferencia}
+                      onPerda={abrirPerda}
+                      onDesperdicio={abrirDesperdicio}
                     />
                   ))}
                 </div>
@@ -417,6 +447,7 @@ export default function EstoquePage() {
         reservas={res.reservas}
         carregando={res.carregando}
         onCancelarReserva={cancelarReservaAtiva}
+        onNovaReserva={confirmarReserva}
       />
 
       <EditMaterialModal
@@ -429,6 +460,21 @@ export default function EstoquePage() {
         materiais={materiais}
         onClose={fecharEdicao}
         onSave={salvarEdicao}
+      />
+
+      <TransferModal
+        open={transfer.open}
+        item={transfer.item}
+        onClose={fecharTransferencia}
+        onConfirm={confirmarTransferencia}
+      />
+
+      <PerdasDesperdicioModal
+        open={pdModal.open}
+        item={pdModal.item}
+        tipo={pdModal.tipo}
+        onClose={fecharPdModal}
+        onConfirm={confirmarPdModal}
       />
 
       <ConfirmDialog
