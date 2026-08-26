@@ -79,7 +79,7 @@ export const camposPadraoPorUnidade = {
   ],
   rolo: [
     { chave: "largura", rotulo: "Largura do Rolo", tipo: "numero", unidade: "mm" },
-    { chave: "comprimento", rotulo: "Comprimento", tipo: "numero", unidade: "m" },
+    { chave: "comprimento", rotulo: "Comprimento", tipo: "numero", unidade: "mm" },
   ],
   metro: [
     { chave: "largura", rotulo: "Largura (bobina/fita)", tipo: "numero", unidade: "mm" },
