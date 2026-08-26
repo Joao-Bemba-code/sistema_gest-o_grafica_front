@@ -618,7 +618,7 @@ export default function RelatoriosPage() {
                                   <td className="px-4 py-2.5 font-medium text-foreground">{c.nome}</td>
                                   <td className="px-4 py-2.5 text-muted-foreground text-xs hidden sm:table-cell">{c.tipo || "—"}</td>
                                   <td className="px-4 py-2.5 text-muted-foreground text-xs hidden sm:table-cell">{c.descricao || "—"}</td>
-                                  <td className="px-4 py-2.5 text-muted-foreground text-xs hidden sm:table-cell">{c.validade_dias ? `${c.validade_dias} dias` : "—"}</td>
+                                  <td className="px-4 py-2.5 text-muted-foreground text-xs hidden sm:table-cell">{c.data_validade ? new Date(c.data_validade + "T00:00:00").toLocaleDateString("pt-BR") : "—"}</td>
                                   <td className="px-4 py-2.5 text-right font-mono text-xs font-bold text-primary">{materiaisPorCat[c.nome] || 0}</td>
                                 </tr>
                               ))}
