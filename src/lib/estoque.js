@@ -141,6 +141,7 @@ export const tiposCampoEspecificacao = [
   { valor: "area", label: "Texto longo" },
   { valor: "numero", label: "Número" },
   { valor: "selecao", label: "Lista de opções" },
+  { valor: "data", label: "Data" },
 ];
 
 export const camposPadraoPorFamilia = {
@@ -161,6 +162,7 @@ export const camposPadraoPorFamilia = {
   produto_quimico: [
     { chave: "composicao", rotulo: "Composição", tipo: "texto" },
     { chave: "perigo", rotulo: "Nível de Perigo", tipo: "selecao", opcoes: ["Baixo", "Médio", "Alto"] },
+    { chave: "data_validade", rotulo: "Data de Validade", tipo: "data" },
   ],
   equipamentos: [
     { chave: "marca", rotulo: "Marca", tipo: "texto" },
@@ -218,6 +220,21 @@ export function especificacoesObjeto(espec) {
   return espec && typeof espec === "object" ? espec : {};
 }
 
+const ROTULOS_ESPEC = {
+  subfamilia: "Subfamília",
+  composicao: "Composição",
+  perigo: "Nível de Perigo",
+  data_validade: "Data de Validade",
+  cor: "Cor",
+  tipo: "Tipo",
+  folhas_por_resma: "Folhas por Resma",
+  largura: "Largura",
+  comprimento: "Comprimento",
+  marca: "Marca",
+  modelo: "Modelo",
+  conteudo: "Conteúdo",
+};
+
 export function entradasEspecificacao(espec) {
   espec = especificacoesObjeto(espec);
   const keys = Object.keys(espec);
@@ -228,7 +245,7 @@ export function entradasEspecificacao(espec) {
       if (CHAVES_LEGADO.has(k) && keys.includes(CHAVES_BONITAS[k])) return false;
       return true;
     })
-    .map((k) => ({ rotulo: k, valor: String(espec[k]) }));
+    .map((k) => ({ rotulo: ROTULOS_ESPEC[k] || k, valor: String(espec[k]) }));
 }
 
 export const blankItem = {

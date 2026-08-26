@@ -93,12 +93,23 @@ function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEdita
               {(() => {
                 const espec = especificacoesObjeto(item.especificacoes);
                 const sub = String(espec.subfamilia || item.categoria?.subfamilia || "").trim();
-                return sub ? (
+                const validade = espec.data_validade;
+                return (
                   <>
-                    <span className="w-1 h-1 rounded-full bg-outline-variant" />
-                    <span>SUB: <span className={critico ? "text-error/80" : "text-primary/80"}>{sub}</span></span>
+                    {sub ? (
+                      <>
+                        <span className="w-1 h-1 rounded-full bg-outline-variant" />
+                        <span>SUB: <span className={critico ? "text-error/80" : "text-primary/80"}>{sub}</span></span>
+                      </>
+                    ) : null}
+                    {validade ? (
+                      <>
+                        <span className="w-1 h-1 rounded-full bg-outline-variant" />
+                        <span>VALIDADE: <span className="text-warning">{new Date(validade + "T00:00:00").toLocaleDateString("pt-BR")}</span></span>
+                      </>
+                    ) : null}
                   </>
-                ) : null;
+                );
               })()}
               {item.localizacao ? (
                 <>

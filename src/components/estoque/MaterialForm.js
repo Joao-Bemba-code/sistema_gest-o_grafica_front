@@ -61,6 +61,13 @@ function CampoEspecificacao({ campo, valor, onChange }) {
       </Campo>
     );
   }
+  if (tipo === "data") {
+    return (
+      <Campo label={rotulo} obrigatorio={obrigatorio}>
+        <input type="date" value={valor || ""} onChange={(e) => onChange(chave, e.target.value)} className={inputCls} />
+      </Campo>
+    );
+  }
   return (
     <Campo label={rotulo} obrigatorio={obrigatorio}>
       <input value={valor || ""} onChange={(e) => onChange(chave, e.target.value)} className={inputCls} placeholder={rotulo} />

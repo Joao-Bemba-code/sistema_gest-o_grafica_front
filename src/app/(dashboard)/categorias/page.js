@@ -13,7 +13,7 @@ import { inputCls, familias, tiposItem, normalizarTipoItem } from "@/lib/estoque
 import { listar, criar, atualizar, remover } from "@/services/categorias";
 import { listar as listarServicos, criar as criarServico, atualizar as atualizarServico, remover as removerServico } from "@/services/servicos";
 
-const blankForm = { nome: "", familia: "papeis", tipo: "materia_prima", validade_dias: "", data_validade: "" };
+const blankForm = { nome: "", familia: "papeis", tipo: "materia_prima" };
 
 export default function CategoriasPage() {
   const { addToast } = useToast();
@@ -74,7 +74,7 @@ export default function CategoriasPage() {
   const abrirNova = () => { setModal({ aberto: true, id: null }); setForm(blankForm); };
   const abrirEdicao = (categoria) => {
     setModal({ aberto: true, id: categoria.id });
-    setForm({ nome: categoria.nome || "", familia: categoria.familia || "papeis", tipo: categoria.tipo || "materia_prima", validade_dias: categoria.validade_dias || "", data_validade: categoria.data_validade || "" });
+    setForm({ nome: categoria.nome || "", familia: categoria.familia || "papeis", tipo: categoria.tipo || "materia_prima" });
   };
 
   const aoSubmeter = async (e) => {
@@ -83,7 +83,6 @@ export default function CategoriasPage() {
     setSalvando(true);
     try {
       const payload = { nome: form.nome.trim(), familia: form.familia, tipo: form.tipo };
-      if (form.familia === "produto_quimico" && form.data_validade) payload.data_validade = form.data_validade;
       if (modal.id) await atualizar(modal.id, payload);
       else await criar(payload);
       addToast?.(modal.id ? "Categoria atualizada" : "Categoria criada", "success");
@@ -222,7 +221,6 @@ export default function CategoriasPage() {
                     <span>Família: <strong className="text-foreground">{fam.label}</strong></span>
                     {c.subfamilia && <span>• Sub: <strong className="text-foreground">{c.subfamilia}</strong></span>}
                     {c.validade_dias && <span>• Validade: <strong className="text-foreground">{c.validade_dias} dias</strong></span>}
-                    {c.data_validade && <span>• Validade: <strong className="text-foreground">{new Date(c.data_validade + "T00:00:00").toLocaleDateString("pt-BR")}</strong></span>}
                   </div>
 
                   <div className="flex justify-end gap-2 pt-2 border-t border-outline-variant/30">
@@ -265,13 +263,6 @@ export default function CategoriasPage() {
                 <option value="produto_acabado">Produto Acabado</option>
               </select>
             </div>
-            {form.familia === "produto_quimico" && (
-              <div className="sm:col-span-2 flex flex-col gap-1.5">
-                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Data de Validade *</label>
-                <input type="date" required value={form.data_validade} onChange={(e) => setForm((p) => ({ ...p, data_validade: e.target.value }))} className={inputCls} />
-                <p className="text-[10px] text-muted-foreground">Data de validade do produto químico — o sistema avisa antes do vencimento</p>
-              </div>
-            )}
           </div>
         </form>
       </Modal>

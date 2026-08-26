@@ -608,7 +608,6 @@ export default function RelatoriosPage() {
                                 <th className="text-left px-4 py-2 text-[10px] font-bold text-muted-foreground uppercase">Categoria</th>
                                 <th className="text-left px-4 py-2 text-[10px] font-bold text-muted-foreground uppercase hidden sm:table-cell">Tipo</th>
                                 <th className="text-left px-4 py-2 text-[10px] font-bold text-muted-foreground uppercase hidden sm:table-cell">Descrição</th>
-                                <th className="text-left px-4 py-2 text-[10px] font-bold text-muted-foreground uppercase hidden sm:table-cell">Validade</th>
                                 <th className="text-right px-4 py-2 text-[10px] font-bold text-muted-foreground uppercase">Itens</th>
                               </tr>
                             </thead>
@@ -618,7 +617,6 @@ export default function RelatoriosPage() {
                                   <td className="px-4 py-2.5 font-medium text-foreground">{c.nome}</td>
                                   <td className="px-4 py-2.5 text-muted-foreground text-xs hidden sm:table-cell">{c.tipo || "—"}</td>
                                   <td className="px-4 py-2.5 text-muted-foreground text-xs hidden sm:table-cell">{c.descricao || "—"}</td>
-                                  <td className="px-4 py-2.5 text-muted-foreground text-xs hidden sm:table-cell">{c.data_validade ? new Date(c.data_validade + "T00:00:00").toLocaleDateString("pt-BR") : "—"}</td>
                                   <td className="px-4 py-2.5 text-right font-mono text-xs font-bold text-primary">{materiaisPorCat[c.nome] || 0}</td>
                                 </tr>
                               ))}
