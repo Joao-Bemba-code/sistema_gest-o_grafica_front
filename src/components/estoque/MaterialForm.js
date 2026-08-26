@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import Icon from "@/components/Icon";
 import FornecedorSelect from "./FornecedorSelect";
 import CategoriaSelect from "./CategoriaSelect";
+import UnidadeSelect from "./UnidadeSelect";
 import NumeroInput from "@/components/ui/NumeroInput";
 import { inputCls, unidades, unidadesParaFamilia, camposDeCategoria, familias, normalizarFamilia, normalizarUnidade, prefixoFamilia, especificacoesObjeto } from "@/lib/estoque";
 
@@ -173,18 +174,12 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
               <input value={form.nome_tecnico} onChange={(e) => onChange("nome_tecnico", e.target.value)} className={inputCls} placeholder="Ex: C150-A3" />
             </Campo>
             <Campo label="Unidade" obrigatorio>
-              <input
-                list={`${formId}-unidades`}
-                required
-                aria-required="true"
+              <UnidadeSelect
                 value={form.unidade}
-                onChange={(e) => onChange("unidade", e.target.value)}
-                className={inputCls}
-                placeholder="Selecionar ou escrever unidade..."
+                unidades={unidadesDisponiveis}
+                onChange={(v) => onChange("unidade", v)}
+                placeholder="Pesquisar unidade..."
               />
-              <datalist id={`${formId}-unidades`}>
-                {unidadesDisponiveis.map((u) => <option key={u} value={u} />)}
-              </datalist>
             </Campo>
             <Campo label="Descrição" full>
               <textarea rows={2} value={form.descricao} onChange={(e) => onChange("descricao", e.target.value)} className={`${inputCls} resize-none`} placeholder="Descrição completa do material..." />
