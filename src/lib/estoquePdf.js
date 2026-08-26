@@ -403,20 +403,25 @@ export async function gerarRelatorioStockPDF(materiais = [], categorias = [], or
   doc.save(`Relatorio_Stock_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
-export async function gerarRelatorioCadastrosPDF(clientes = [], org = {}) {
+export async function gerarRelatorioCadastrosPDF(clientes = [], org = {}, filtro = "todos") {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const { linhaY: ly, pw } = await desenharCabecalho(doc, org, "Relatório de Cadastros");
+  let titulo = "Relatório de Cadastros";
+  if (filtro === "cliente") titulo = "Relatório de Clientes";
+  else if (filtro === "fornecedor") titulo = "Relatório de Fornecedores";
+  const { linhaY: ly, pw } = await desenharCabecalho(doc, org, titulo);
 
-  const totalClientes = clientes.filter((c) => c.tipo === "cliente").length;
-  const totalFornecedores = clientes.filter((c) => c.tipo === "fornecedor").length;
+  const lista = filtro === "todos" ? clientes : clientes.filter((c) => c.tipo === filtro);
+  const totalClientes = lista.filter((c) => c.tipo === "cliente").length;
+  const totalFornecedores = lista.filter((c) => c.tipo === "fornecedor").length;
 
   let y = ly + 8;
   doc.setFontSize(11); doc.setFont("helvetica", "bold");
   doc.setTextColor(24, 33, 48);
-  doc.text(`Total: ${clientes.length} cadastros (${totalClientes} clientes, ${totalFornecedores} fornecedores)`, 14, y);
+  if (filtro === "todos") doc.text(`Total: ${lista.length} cadastros (${totalClientes} clientes, ${totalFornecedores} fornecedores)`, 14, y);
+  else doc.text(`Total: ${lista.length} ${filtro === "cliente" ? "clientes" : "fornecedores"}`, 14, y);
   y += 8;
 
-  const clientesLista = clientes.filter((c) => c.tipo === "cliente");
+  const clientesLista = filtro === "fornecedor" ? [] : lista.filter((c) => c.tipo === "cliente");
   if (clientesLista.length > 0) {
     doc.setFontSize(11); doc.setFont("helvetica", "bold");
     doc.text("Clientes", 14, y);
@@ -437,7 +442,7 @@ export async function gerarRelatorioCadastrosPDF(clientes = [], org = {}) {
     y = doc.lastAutoTable.finalY + 8;
   }
 
-  const fornecedoresLista = clientes.filter((c) => c.tipo === "fornecedor");
+  const fornecedoresLista = filtro === "cliente" ? [] : lista.filter((c) => c.tipo === "fornecedor");
   if (fornecedoresLista.length > 0) {
     doc.setFontSize(11); doc.setFont("helvetica", "bold");
     doc.text("Fornecedores", 14, y);
@@ -460,7 +465,8 @@ export async function gerarRelatorioCadastrosPDF(clientes = [], org = {}) {
   const cx = pw / 2;
   doc.setTextColor(180, 180, 180); doc.setFontSize(7);
   doc.text(`Documento gerado por SIGRAF — ${new Date().toLocaleDateString("pt-BR")}`, cx, 285, { align: "center" });
-  doc.save(`Relatorio_Cadastros_${new Date().toISOString().slice(0, 10)}.pdf`);
+  const nomeFicheiro = filtro === "todos" ? "Relatorio_Cadastros" : filtro === "cliente" ? "Relatorio_Clientes" : "Relatorio_Fornecedores";
+  doc.save(`${nomeFicheiro}_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
 export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [], org = {}) {

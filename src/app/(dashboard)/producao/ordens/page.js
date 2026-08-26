@@ -212,6 +212,21 @@ export default function OrdensProducaoPage() {
     }
   };
 
+  const confirmarEliminacao = async () => {
+    if (!eliminarItem) return;
+    setDeletando(true);
+    try {
+      await removerOrdem(eliminarItem.id);
+      setOps((prev) => prev.filter((o) => o.id !== eliminarItem.id));
+      addToast("Ordem de produção removida com sucesso", "success");
+      setEliminarItem(null);
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao remover ordem", "error");
+    } finally {
+      setDeletando(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
       <div className="obsidian-glass rounded-lg p-5 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-l-4 border-l-primary">
@@ -317,22 +332,7 @@ export default function OrdensProducaoPage() {
                         <div className="space-y-1.5">
                           {op.reserva_estoques.map((r) => {
                             const rc = reservaEstado[r.estado] || { label: r.estado, variant: "secondary" };
-  const confirmarEliminacao = async () => {
-    if (!eliminarItem) return;
-    setDeletando(true);
-    try {
-      await removerOrdem(eliminarItem.id);
-      setOps((prev) => prev.filter((o) => o.id !== eliminarItem.id));
-      addToast("Ordem de produção removida com sucesso", "success");
-      setEliminarItem(null);
-    } catch (err) {
-      addToast(err.response?.data?.erro || "Erro ao remover ordem", "error");
-    } finally {
-      setDeletando(false);
-    }
-  };
-
-  return (
+                            return (
                               <div key={r.id} className="flex items-center justify-between gap-2 bg-muted/40 rounded-lg px-3 py-2 text-xs">
                                 <div className="flex items-center gap-2 min-w-0">
                                   <span className="font-medium text-foreground truncate">{matPorId[r.material_id]?.nome || `Material #${r.material_id}`}</span>

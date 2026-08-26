@@ -373,9 +373,17 @@ export default function RelatoriosPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Cadastros (Clientes e Fornecedores)</CardTitle>
-            <Button size="sm" variant="outline" onClick={() => gerarRelatorioCadastrosPDF(clientes, org)}>
-              <Icon name="picture_as_pdf" className="text-sm" /> Gerar PDF
-            </Button>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => gerarRelatorioCadastrosPDF(clientes, org, "todos")}>
+                <Icon name="picture_as_pdf" className="text-sm" /> Todos
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => gerarRelatorioCadastrosPDF(clientes, org, "cliente")}>
+                <Icon name="picture_as_pdf" className="text-sm" /> Clientes
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => gerarRelatorioCadastrosPDF(clientes, org, "fornecedor")}>
+                <Icon name="picture_as_pdf" className="text-sm" /> Fornecedores
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
