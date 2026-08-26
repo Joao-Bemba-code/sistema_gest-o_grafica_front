@@ -78,11 +78,11 @@ export const camposPadraoPorUnidade = {
     { chave: "tipo", rotulo: "Tipo de Papel", tipo: "selecao", opcoes: ["Couché", "Offset", "Autocopiativo", "Cartolina", "Etiqueta"] },
   ],
   rolo: [
-    { chave: "largura", rotulo: "Largura do Rolo", tipo: "numero", unidade: "cm" },
+    { chave: "largura", rotulo: "Largura do Rolo", tipo: "numero", unidade: "mm" },
     { chave: "comprimento", rotulo: "Comprimento", tipo: "numero", unidade: "m" },
   ],
   metro: [
-    { chave: "largura", rotulo: "Largura (bobina/fita)", tipo: "numero", unidade: "cm" },
+    { chave: "largura", rotulo: "Largura (bobina/fita)", tipo: "numero", unidade: "mm" },
   ],
   "m²": [
     { chave: "tipo", rotulo: "Tipo de Material", tipo: "selecao", opcoes: ["Lona", "Vinil", "Adesivo", "Tela"] },
@@ -147,8 +147,8 @@ export const camposPadraoPorFamilia = {
   papeis: [
     { chave: "cor", rotulo: "Cor", tipo: "selecao", opcoes: ["Branco", "Creme", "Off-white", "Colorido"] },
     { chave: "tipo", rotulo: "Tipo", tipo: "selecao", opcoes: ["Couché", "Offset", "Autocopiativo", "Cartolina", "Etiqueta"] },
-    { chave: "largura", rotulo: "Largura", tipo: "numero", unidade: "cm" },
-    { chave: "altura", rotulo: "Altura", tipo: "numero", unidade: "cm" },
+    { chave: "largura", rotulo: "Largura", tipo: "numero", unidade: "mm" },
+    { chave: "altura", rotulo: "Altura", tipo: "numero", unidade: "mm" },
   ],
   tintas: [
     { chave: "cor", rotulo: "Cor", tipo: "texto" },

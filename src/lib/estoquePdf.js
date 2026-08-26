@@ -184,7 +184,7 @@ export async function gerarFichaMaterialPDF(mat, org = {}) {
     ...entradasEspecificacao(mat.especificacoes).map((e) => [e.rotulo, e.valor]),
     ["Formato", mat.formato || "—"],
     ["Gramagem", mat.gramagem ? `${mat.gramagem} g/m²` : "—"],
-    ["Dimensões", mat.largura || mat.altura ? `${mat.largura || "—"} x ${mat.altura || "—"} cm` : "—"],
+    ["Dimensões", mat.largura || mat.altura ? `${mat.largura || "—"} x ${mat.altura || "—"} mm` : "—"],
     ["Quebra técnica", mat.percentual_quebra ? `${mat.percentual_quebra}%` : "—"],
     ["Rastreabilidade por lote", mat.controla_lote ? "Sim" : "Não"],
     ["Localização na prateleira", mat.localizacao || "—"],
