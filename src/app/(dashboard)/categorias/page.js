@@ -9,13 +9,25 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import { ListSkeleton } from "@/components/Skeleton";
 import { inputCls, familias, familiasServico, tiposItem, normalizarFamilia, normalizarTipoItem, tipoRecursoOptions } from "@/lib/estoque";
+import CreatableSelect from "@/components/ui/CreatableSelect";
 import { listar, criar, atualizar, remover } from "@/services/categorias";
 import { listar as listarServicos, criar as criarServico, atualizar as atualizarServico, remover as removerServico } from "@/services/servicos";
 import { useFilter } from "@/components/ui/FilterBar";
 
-const blankForm = { nome: "", familia: "papeis", tipo: "artigo", descricao: "", subfamilia: "" };
+const blankForm = { nome: "", familia: "Papéis", tipo: "artigo", descricao: "", subfamilia: "" };
 
 const todosFamilias = { ...familias, ...familiasServico };
+
+// Devolve a chave interna se o texto corresponder a uma família existente,
+// caso contrário devolve o próprio texto (nova família criada pelo utilizador).
+function familiaParaSalvar(texto) {
+  const t = String(texto || "").trim();
+  if (!t) return "papeis";
+  const entrada = Object.entries(todosFamilias).find(
+    ([, cfg]) => cfg.label.toLowerCase() === t.toLowerCase()
+  );
+  return entrada ? entrada[0] : t;
+}
 
 const CATEGORIAS_FILTRO = [
   { value: "todos", label: "Todos", icon: "apps" },
@@ -91,7 +103,7 @@ export default function CategoriasPage() {
     setModal({ aberto: true, id: categoria.id });
     setForm({
       nome: categoria.nome || "",
-      familia: normalizarFamilia(categoria.familia),
+      familia: todosFamilias[normalizarFamilia(categoria.familia)]?.label || categoria.familia || "",
       tipo: String(categoria.tipo || "artigo"),
       descricao: categoria.descricao || "",
       subfamilia: categoria.subfamilia || "",
@@ -103,7 +115,7 @@ export default function CategoriasPage() {
     if (!form.nome.trim()) return addToast?.("Informe o nome", "error");
     setSalvando(true);
     try {
-      const payload = { nome: form.nome.trim(), familia: form.familia, tipo: form.tipo, descricao: form.descricao.trim(), subfamilia: form.subfamilia.trim() };
+      const payload = { nome: form.nome.trim(), familia: familiaParaSalvar(form.familia), tipo: form.tipo, descricao: form.descricao.trim(), subfamilia: form.subfamilia.trim() };
       if (modal.id) await atualizar(modal.id, payload);
       else await criar(payload);
       addToast?.(modal.id ? "Recurso atualizado" : "Recurso criado", "success");
@@ -293,9 +305,15 @@ export default function CategoriasPage() {
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Família *</label>
-              <select required value={form.familia} onChange={(e) => setForm((p) => ({ ...p, familia: e.target.value }))} className={inputCls}>
-                {Object.keys(todosFamilias).map((f) => <option key={f} value={f}>{todosFamilias[f].label}</option>)}
-              </select>
+              <CreatableSelect
+                required
+                value={form.familia}
+                options={Object.entries(todosFamilias).map(([key, cfg]) => ({ id: cfg.label, label: cfg.label }))}
+                placeholder="Escolher uma família..."
+                createLabel="Criar nova família"
+                onChange={(label) => setForm((p) => ({ ...p, familia: label }))}
+                className={inputCls}
+              />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Sub-família</label>
