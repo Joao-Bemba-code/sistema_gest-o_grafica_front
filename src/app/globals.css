@@ -88,7 +88,7 @@
   --popover-foreground: #0f172a;
   --primary: #0f766e;
   --primary-foreground: #ffffff;
-  --secondary: #7c3aed;
+  --secondary: #475569;
   --secondary-foreground: #ffffff;
   --muted: #f1f5f9;
   --muted-foreground: #64748b;
@@ -102,9 +102,9 @@
   --success: #16a34a;
   --warning: #d97706;
   --error: #dc2626;
-  --info: #7c3aed;
+  --info: #475569;
   --info-foreground: #fafaf9;
-  --tertiary: #7bd0ff;
+  --tertiary: #0f766e;
   --tertiary-foreground: #052e16;
   --surface-variant: #e6e8ee;
 }
@@ -117,10 +117,10 @@
   --card-foreground: #e2e8f0;
   --popover: #0a1122;
   --popover-foreground: #e2e8f0;
-  --primary: #80d5cb;
-  --primary-foreground: #052e16;
-  --secondary: #d2bbff;
-  --secondary-foreground: #082f49;
+  --primary: #2f9e8f;
+  --primary-foreground: #0b1f1c;
+  --secondary: #9aa4b2;
+  --secondary-foreground: #0b1f1c;
   --muted: #141c2f;
   --muted-foreground: #94a3b8;
   --accent: #141c2f;
@@ -129,13 +129,13 @@
   --destructive-foreground: #690005;
   --border: #2a364a;
   --input: #2a364a;
-  --ring: #80d5cb;
+  --ring: #2f9e8f;
   --success: #4ade80;
   --warning: #fbbf24;
   --error: #ffb4ab;
-  --info: #d2bbff;
-  --info-foreground: #082f49;
-  --tertiary: #7bd0ff;
+  --info: #9aa4b2;
+  --info-foreground: #0b1f1c;
+  --tertiary: #2f9e8f;
   --tertiary-foreground: #052e16;
   --surface-variant: #141c2f;
 }
@@ -569,12 +569,12 @@ input[type="radio"] {
   box-shadow: var(--shadow-lift);
 }
 
-/* Gradiente de marca (teal -> roxo) */
+/* Gradiente de marca (teal) */
 .gradient-brand {
-  background-image: linear-gradient(135deg, #0f766e 0%, #7c3aed 100%);
+  background-image: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
 }
 .gradient-soft {
-  background-image: linear-gradient(135deg, color-mix(in srgb, #0f766e 14%, transparent), color-mix(in srgb, #7c3aed 12%, transparent));
+  background-image: linear-gradient(135deg, color-mix(in srgb, #0f766e 14%, transparent), color-mix(in srgb, #0d9488 12%, transparent));
 }
 
 /* ==========================================================================
@@ -606,13 +606,17 @@ body {
 }
 .dark .scanlines { display: block; }
 
-/* Painel de vidro obsidiana */
+/* Painel de vidro (sobrio) */
 .obsidian-glass {
-  background: rgba(10, 17, 34, 0.72);
-  -webkit-backdrop-filter: blur(16px);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(128, 213, 203, 0.12);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 8px 32px rgba(0, 0, 0, 0.4);
+  background: color-mix(in srgb, var(--card) 90%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
+}
+.dark .obsidian-glass {
+  background: rgba(10, 17, 34, 0.8);
+  border-color: rgba(255, 255, 255, 0.06);
 }
 
 /* Glass panel do protótipo Conversor */
@@ -647,7 +651,7 @@ body {
   display: none;
 }
 
-/* Borda cyber (gradiente animado no hover) */
+/* Borda cyber (subtle no hover) */
 .cyber-border {
   position: relative;
 }
@@ -657,17 +661,17 @@ body {
   top: 0; left: 0; right: 0; bottom: 0;
   border-radius: inherit;
   padding: 1px;
-  background: linear-gradient(45deg, rgba(128, 213, 203, 0.5), rgba(96, 1, 209, 0.5), rgba(128, 213, 203, 0.1));
+  background: linear-gradient(45deg, rgba(47, 158, 143, 0.35), rgba(47, 158, 143, 0.05));
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;
-  opacity: 0.3;
+  opacity: 0.25;
   transition: opacity 0.3s;
 }
 .cyber-border:hover::before {
-  opacity: 0.8;
-  background: linear-gradient(45deg, #80d5cb, #6001d1, #80d5cb);
+  opacity: 0.5;
+  background: linear-gradient(45deg, #2f9e8f, #2f9e8f);
 }
 
 /* Telemetry sparklines (KPIs) */
@@ -753,23 +757,23 @@ body {
 .ms-fill { font-variation-settings: 'FILL' 1; }
 .ms-strong { font-variation-settings: 'FILL' 1, 'wght' 600; }
 
-/* ---- Gradiente de marca (teal -> roxo) para fundos ---- */
+/* ---- Gradiente de marca (teal) para fundos ---- */
 .bg-brand {
-  background-image: linear-gradient(135deg, #0f766e 0%, #0d9488 45%, #7c3aed 100%);
+  background-image: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
 }
 .bg-brand-soft {
-  background-image: linear-gradient(135deg, color-mix(in srgb, #0d9488 12%, transparent), color-mix(in srgb, #7c3aed 10%, transparent));
+  background-image: linear-gradient(135deg, color-mix(in srgb, #0d9488 12%, transparent), color-mix(in srgb, #0d9488 8%, transparent));
 }
 
-/* Texto com gradiente de marca (já existe .text-gradient-brand) — alias */
+/* Texto com gradiente de marca — alias (sobrio, primario) */
 .text-gradient {
-  background-image: linear-gradient(120deg, #0f766e, #7c3aed);
+  background-image: linear-gradient(120deg, #0f766e, #2f9e8f);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 .dark .text-gradient {
-  background-image: linear-gradient(120deg, #80d5cb, #d2bbff);
+  background-image: linear-gradient(120deg, #5bbfb1, #2f9e8f);
 }
 
 /* ---- Borda com gradiente (glass premium) ---- */
@@ -798,17 +802,17 @@ body {
   border: 1px solid rgba(128, 213, 203, 0.15);
 }
 
-/* ---- Nav item ativo (pill com gradiente) ---- */
+/* ---- Nav item ativo (pill sobrio) ---- */
 .nav-pill {
   border-radius: 0.75rem;
-  background-image: linear-gradient(135deg, #0f766e 0%, #7c3aed 100%);
-  color: #fff;
-  box-shadow: 0 8px 20px -8px color-mix(in srgb, #0d9488 55%, transparent);
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--primary) 45%, transparent);
 }
 .dark .nav-pill {
-  background-image: linear-gradient(135deg, rgba(128, 213, 203, 0.16), rgba(210, 187, 255, 0.12));
-  color: #80d5cb;
-  box-shadow: inset 0 0 0 1px rgba(128, 213, 203, 0.25), 0 8px 20px -8px rgba(128, 213, 203, 0.25);
+  background-color: color-mix(in srgb, var(--primary) 22%, transparent);
+  color: var(--primary);
+  box-shadow: inset 0 0 0 1px rgba(47, 158, 143, 0.3);
 }
 
 /* ---- Fundo aurora (login / hero) ---- */

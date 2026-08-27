@@ -20,12 +20,13 @@ const breadcrumbs = {
   "/impressao": ["Impressão"],
   "/acabamento": ["Acabamento"],
   "/clientes": ["Cadastros"],
-  "/estoque": ["Estoque"],
+  "/estoque": ["Provisionamento"],
   "/faturacao": ["Vendas", "Facturas"],
   "/qualidade": ["Qualidade"],
   "/relatorios": ["Relatórios"],
   "/configuracoes": ["Configurações"],
   "/login": ["Login"],
+  "/categorias": ["Recursos"],
 };
 
 const COR_NIVEL = {

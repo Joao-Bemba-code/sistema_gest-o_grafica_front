@@ -267,23 +267,23 @@ export default function EstoquePage() {
         </div>
       )}
 
-      <div className="obsidian-glass rounded-lg p-5 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-l-4 border-l-primary">
+      <div className="bg-card border border-border rounded-xl p-5 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="font-sans text-3xl font-bold text-foreground tracking-tight">Stock</h1>
-          <p className="text-primary mt-1 font-mono text-xs uppercase tracking-widest">Visão geral e gestão de inventário // {org?.sigla || org?.nome || "T-001"}</p>
+          <h1 className="font-sans text-2xl font-semibold text-foreground tracking-tight">Provisionamento</h1>
+          <p className="text-muted-foreground mt-0.5 text-xs">Gestão e controlo de stock e inventário</p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <button onClick={abrirPedidos} className="bg-surface-variant text-on-surface border border-outline-variant px-4 py-2 rounded font-mono flex items-center gap-2 hover:border-primary hover:text-primary transition-all text-[11px] uppercase tracking-wider">
+        <div className="flex flex-wrap gap-2">
+          <button onClick={abrirPedidos} className="bg-muted text-muted-foreground border border-border px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-accent hover:text-foreground transition-all text-xs font-semibold">
             <Icon name="shopping_cart" className="text-[16px]" /> Pedidos
           </button>
-          <button onClick={movs.abrir} className="bg-surface-variant text-on-surface border border-outline-variant px-4 py-2 rounded font-mono flex items-center gap-2 hover:border-primary hover:text-primary transition-all text-[11px] uppercase tracking-wider">
+          <button onClick={movs.abrir} className="bg-muted text-muted-foreground border border-border px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-accent hover:text-foreground transition-all text-xs font-semibold">
             <Icon name="sync_alt" className="text-[16px]" /> Movimentações
           </button>
-          <button onClick={abrirConversor} className="bg-surface-variant text-on-surface border border-outline-variant px-4 py-2 rounded font-mono flex items-center gap-2 hover:border-primary hover:text-primary transition-all text-[11px] uppercase tracking-wider">
+          <button onClick={abrirConversor} className="bg-muted text-muted-foreground border border-border px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-accent hover:text-foreground transition-all text-xs font-semibold">
             <Icon name="calculate" className="text-[16px]" /> Conversor
           </button>
           <Link href="/estoque/novo">
-            <button className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold shadow-[0_0_15px_rgba(128,213,203,0.2)] hover:shadow-[0_0_25px_rgba(128,213,203,0.4)]">
+            <button className="bg-primary text-primary-foreground px-5 py-2 rounded-lg flex items-center gap-2 hover:opacity-90 transition-all text-xs font-semibold">
               <Icon name="add" className="text-[16px]" /> Novo Material
             </button>
           </Link>

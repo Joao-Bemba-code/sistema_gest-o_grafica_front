@@ -9,9 +9,9 @@ import NumeroInput from "@/components/ui/NumeroInput";
 import { inputCls, unidades, unidadesParaFamilia, camposDeCategoria, familias, normalizarFamilia, normalizarUnidade, prefixoFamilia, especificacoesObjeto } from "@/lib/estoque";
 
 const tabs = [
-  { key: "basicos", label: "Identificação do Material", icon: "badge" },
-  { key: "especificacoes", label: "Especificações", icon: "straighten" },
-  { key: "estoque", label: "Estoque", icon: "inventory" },
+  { key: "identificacao", label: "Identificação", icon: "badge" },
+  { key: "especificacao", label: "Especificação", icon: "straighten" },
+  { key: "estoque", label: "Stock", icon: "inventory" },
 ];
 
 function Campo({ label, children, obrigatorio, full }) {
@@ -76,7 +76,7 @@ function CampoEspecificacao({ campo, valor, onChange }) {
 }
 
 export default function MaterialForm({ formId = "form-material", form, onChange, onSubmit, categorias, fornecedores, materiais = [] }) {
-  const [tab, setTab] = useState("basicos");
+  const [tab, setTab] = useState("identificacao");
   const id = (sufixo) => `${formId}-${sufixo}`;
   const categoria = categorias.find((c) => String(c.id) === String(form.categoria_id));
   const camposEspec = camposDeCategoria(categoria, form.unidade);
@@ -139,7 +139,7 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
       </div>
 
       <div role="tabpanel" id={`${formId}-painel-${tab}`} aria-labelledby={id(`tab-${tab}`)} className="animate-scale-in">
-        {tab === "basicos" && (
+        {tab === "identificacao" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Campo label="Código" obrigatorio>
               <div className="flex items-center gap-2">
@@ -194,7 +194,7 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
           </div>
         )}
 
-        {tab === "especificacoes" && (
+        {tab === "especificacao" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {ePapel && (
               <>
@@ -228,38 +228,38 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
             <Campo label="Quebra técnica (%)">
               <NumeroInput value={form.percentual_quebra} onChange={(e) => onChange("percentual_quebra", e.target.value)} className={inputCls} placeholder="Ex: 5" />
             </Campo>
-            <label className="flex items-center gap-3 p-3 bg-muted/50 rounded-xl self-end cursor-pointer sm:col-span-2">
+            <label className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg self-end cursor-pointer sm:col-span-2">
               <input type="checkbox" checked={!!form.controla_lote} onChange={(e) => onChange("controla_lote", e.target.checked)} className="w-4 h-4 rounded accent-primary" />
               <span className="text-xs text-foreground">Rastreabilidade por lote</span>
             </label>
-            <Campo label="Especificidade" full>
-              <textarea rows={2} value={form.especificidade} onChange={(e) => onChange("especificidade", e.target.value)} className={`${inputCls} resize-none`} placeholder="Características técnicas específicas..." />
+            <Campo label="Marca" full>
+              <input value={form.especificacoes?.marca || ""} onChange={(e) => aoMudarEspec("marca", e.target.value)} className={inputCls} placeholder="Ex: Canon, Roland..." />
             </Campo>
-            <Campo label="Condição de Armazenagem" full>
-              <textarea rows={2} value={form.condicao_armazenagem} onChange={(e) => onChange("condicao_armazenagem", e.target.value)} className={`${inputCls} resize-none`} placeholder="Condições necessárias para armazenamento..." />
+            <Campo label="Modelo" full>
+              <input value={form.especificacoes?.modelo || ""} onChange={(e) => aoMudarEspec("modelo", e.target.value)} className={inputCls} placeholder="Ex: X-100, Pro 200..." />
             </Campo>
           </div>
         )}
 
         {tab === "estoque" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Campo label="Estoque Mínimo">
+            <Campo label="Stock Mínimo">
               <NumeroInput  value={form.estoque_min} onChange={(e) => onChange("estoque_min", e.target.value)} className={inputCls} placeholder="Ex: 500" />
             </Campo>
-            <Campo label="Estoque Máximo">
+            <Campo label="Stock Máximo">
               <NumeroInput  value={form.estoque_max} onChange={(e) => onChange("estoque_max", e.target.value)} className={inputCls} placeholder="Ex: 5000" />
-            </Campo>
-            <Campo label="Ponto de Pedido">
-              <NumeroInput value={form.ponto_ressuprimento} onChange={(e) => onChange("ponto_ressuprimento", e.target.value)} className={inputCls} placeholder="Ex: 800" />
             </Campo>
             <Campo label="Custo Unitário (Kz)">
               <NumeroInput value={form.custo_unit} onChange={(e) => onChange("custo_unit", e.target.value)} className={inputCls} placeholder="Ex: 45" />
             </Campo>
-            <Campo label="Lucro (%)">
+            <Campo label="Margem (%)">
               <NumeroInput value={form.lucro} onChange={(e) => onChange("lucro", e.target.value)} className={inputCls} placeholder="Ex: 25" />
             </Campo>
-            <Campo label="Localização na Prateleira" full>
+            <Campo label="Localização">
               <input value={form.localizacao} onChange={(e) => onChange("localizacao", e.target.value)} className={inputCls} placeholder="Ex: Prateleira A3, seção 2" />
+            </Campo>
+            <Campo label="Armazém">
+              <input value={form.armazem || form.especificacoes?.armazem || ""} onChange={(e) => { onChange("armazem", e.target.value); aoMudarEspec("armazem", e.target.value); }} className={inputCls} placeholder="Ex: Armazém Central" />
             </Campo>
           </div>
         )}

@@ -8,12 +8,22 @@ import Modal from "@/components/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import { ListSkeleton } from "@/components/Skeleton";
-import FilterBar, { useFilter } from "@/components/ui/FilterBar";
-import { inputCls, familias, tiposItem, normalizarTipoItem } from "@/lib/estoque";
+import { inputCls, familias, familiasServico, tiposItem, normalizarFamilia, normalizarTipoItem, tipoRecursoOptions } from "@/lib/estoque";
 import { listar, criar, atualizar, remover } from "@/services/categorias";
 import { listar as listarServicos, criar as criarServico, atualizar as atualizarServico, remover as removerServico } from "@/services/servicos";
+import { useFilter } from "@/components/ui/FilterBar";
 
-const blankForm = { nome: "", familia: "papeis", tipo: "materia_prima" };
+const blankForm = { nome: "", familia: "papeis", tipo: "artigo", descricao: "", subfamilia: "" };
+
+const todosFamilias = { ...familias, ...familiasServico };
+
+const CATEGORIAS_FILTRO = [
+  { value: "todos", label: "Todos", icon: "apps" },
+  { value: "servico", label: "Serviços", icon: "home_repair_service" },
+  { value: "artigo", label: "Artigos / Produtos", icon: "inventory_2" },
+  { value: "maquina", label: "Maquinaria", icon: "precision_manufacturing" },
+  { value: "funcionario", label: "Funcionários", icon: "groups" },
+];
 
 export default function CategoriasPage() {
   const { addToast } = useToast();
@@ -33,24 +43,29 @@ export default function CategoriasPage() {
   const [salvandoServico, setSalvandoServico] = useState(false);
   const [eliminarServico, setEliminarServico] = useState(null);
 
-  const filterConfig = useMemo(() => [
-    { value: "todos", label: "Todos", icon: "apps" },
-    ...Object.entries(familias).map(([k, v]) => ({ value: k, label: v.label, icon: v.icon, field: "familia" })),
-  ], []);
+  const [abaTipo, setAbaTipo] = useState("todos");
 
-  const categoriasMateriais = useMemo(() => categorias.filter((c) => c.tipo !== "servico"), [categorias]);
+  const categoriasMateriais = useMemo(() => {
+    const servicosTipois = new Set(["servico", "servicos"]);
+    return categorias.filter((c) => {
+      if (!c.tipo) return true;
+      if (abaTipo === "todos") return true;
+      const t = String(c.tipo).trim().toLowerCase();
+      if (abaTipo === "servico") return servicosTipois.has(t);
+      return t === abaTipo;
+    });
+  }, [categorias, abaTipo]);
 
-  const { search, setSearch, activeFilter, setActiveFilter, filtered, total } = useFilter({
+  const { search, setSearch, filtered, total } = useFilter({
     items: categoriasMateriais,
-    searchFields: ["nome", "subfamilia"],
-    filterConfig,
+    searchFields: ["nome", "subfamilia", "descricao"],
   });
 
   const carregar = useCallback(async () => {
     try {
       setCategorias(await listar());
     } catch {
-      addToast?.("Erro ao carregar categorias", "error");
+      addToast?.("Erro ao carregar recursos", "error");
     } finally {
       setCarregando(false);
     }
@@ -63,7 +78,7 @@ export default function CategoriasPage() {
         const dados = await listar();
         if (ativo) setCategorias(dados);
       } catch {
-        if (ativo) addToast?.("Erro ao carregar categorias", "error");
+        if (ativo) addToast?.("Erro ao carregar recursos", "error");
       } finally {
         if (ativo) setCarregando(false);
       }
@@ -71,21 +86,27 @@ export default function CategoriasPage() {
     return () => { ativo = false; };
   }, [addToast]);
 
-  const abrirNova = () => { setModal({ aberto: true, id: null }); setForm(blankForm); };
+  const abrirNova = (tipoInicial) => { setModal({ aberto: true, id: null }); setForm({ ...blankForm, tipo: tipoInicial || "artigo" }); };
   const abrirEdicao = (categoria) => {
     setModal({ aberto: true, id: categoria.id });
-    setForm({ nome: categoria.nome || "", familia: categoria.familia || "papeis", tipo: categoria.tipo || "materia_prima" });
+    setForm({
+      nome: categoria.nome || "",
+      familia: normalizarFamilia(categoria.familia),
+      tipo: String(categoria.tipo || "artigo"),
+      descricao: categoria.descricao || "",
+      subfamilia: categoria.subfamilia || "",
+    });
   };
 
   const aoSubmeter = async (e) => {
     e.preventDefault();
-    if (!form.nome.trim()) return addToast?.("Informe o nome da categoria", "error");
+    if (!form.nome.trim()) return addToast?.("Informe o nome", "error");
     setSalvando(true);
     try {
-      const payload = { nome: form.nome.trim(), familia: form.familia, tipo: form.tipo };
+      const payload = { nome: form.nome.trim(), familia: form.familia, tipo: form.tipo, descricao: form.descricao.trim(), subfamilia: form.subfamilia.trim() };
       if (modal.id) await atualizar(modal.id, payload);
       else await criar(payload);
-      addToast?.(modal.id ? "Categoria atualizada" : "Categoria criada", "success");
+      addToast?.(modal.id ? "Recurso atualizado" : "Recurso criado", "success");
       setModal({ aberto: false, id: null });
       await carregar();
     } catch (err) {
@@ -101,7 +122,7 @@ export default function CategoriasPage() {
     try {
       await remover(eliminar.id);
       setCategorias((prev) => prev.filter((c) => c.id !== eliminar.id));
-      addToast?.("Categoria removida", "success");
+      addToast?.("Recurso removido", "success");
       setEliminar(null);
     } catch (err) {
       addToast?.(err.response?.data?.erro || "Erro ao remover", "error");
@@ -165,69 +186,89 @@ export default function CategoriasPage() {
 
   return (
     <div className="space-y-6">
-      <div className="obsidian-glass rounded-lg p-5 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-l-4 border-l-primary">
+      <div className="bg-card border border-border rounded-xl p-5 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="font-sans text-3xl font-bold text-foreground tracking-tight">Categorias</h1>
-          <p className="text-primary mt-1 font-mono text-xs uppercase tracking-widest">Classificação: Família, Subfamília, Tipo // CAT</p>
+          <h1 className="font-sans text-2xl font-semibold text-foreground tracking-tight">Recursos</h1>
+          <p className="text-muted-foreground mt-0.5 text-xs">Classificação por categoria, família, sub-família, tipo e descrição</p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <Button variant="outline" onClick={abrirGerirServicos}>
-            <Icon name="home_repair_service" className="text-lg" /> Serviços
-          </Button>
-          <Button onClick={abrirNova}>
-            <Icon name="add" className="text-lg" /> Nova Categoria
-          </Button>
+        <Button variant="outline" onClick={abrirGerirServicos}>
+          <Icon name="home_repair_service" className="text-lg" /> Serviços
+        </Button>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {CATEGORIAS_FILTRO.map((f) => (
+          <button
+            key={f.value}
+            onClick={() => setAbaTipo(f.value)}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${abaTipo === f.value ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-accent"}`}
+          >
+            <Icon name={f.icon} className="text-sm mr-1.5 align-[-2px]" />
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-lg" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Pesquisar por nome, sub-família..."
+            className={`${inputCls} pl-10`}
+          />
         </div>
+        <Button onClick={() => abrirNova()}>
+          <Icon name="add" className="text-lg" /> Novo
+        </Button>
       </div>
 
       {!carregando && categoriasMateriais.length === 0 && (
-        <div className="obsidian-glass rounded-2xl p-10 text-center">
+        <div className="bg-card border border-border rounded-xl p-10 text-center">
           <Icon name="category" className="text-4xl text-muted-foreground mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">Ainda não existem categorias.</p>
+          <p className="text-sm text-muted-foreground">Ainda não existem recursos desta categoria.</p>
         </div>
       )}
 
       {!carregando && categoriasMateriais.length > 0 && (
         <>
-          <FilterBar search={search} onSearchChange={setSearch} placeholder="Pesquisar categorias..." filters={filterConfig} activeFilter={activeFilter} onFilterChange={setActiveFilter} count={total} countLabel="categorias" />
-
           {filtered.length === 0 && (
-            <div className="obsidian-glass rounded-2xl p-10 text-center">
+            <div className="bg-card border border-border rounded-xl p-10 text-center">
               <Icon name="search_off" className="text-4xl text-muted-foreground mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">Nenhuma categoria encontrada.</p>
+              <p className="text-sm text-muted-foreground">Nenhum recurso encontrado.</p>
             </div>
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filtered.map((c) => {
-              const fam = familias[c.familia] || { label: c.familia, icon: "label", classe: "text-muted-foreground" };
+              const fam = todosFamilias[normalizarFamilia(c.familia)] || { label: c.familia || "—", icon: "label", classe: "text-muted-foreground" };
               const tipo = tiposItem[normalizarTipoItem(c.tipo)];
               return (
-                <div key={c.id} className="obsidian-glass cyber-border rounded-2xl p-5 space-y-3">
+                <div key={c.id} className="bg-card border border-border rounded-xl p-5 space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
-                      <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${fam.classe}`}>
-                        <Icon name={fam.icon} className="text-xl" />
+                      <span className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        <Icon name={fam.icon} className="text-lg text-muted-foreground" />
                       </span>
                       <div className="min-w-0">
-                        <h3 className="font-bold text-foreground truncate">{c.nome}</h3>
-                        <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">{fam.label}</p>
+                        <h3 className="font-semibold text-foreground truncate">{c.nome}</h3>
+                        {c.descricao && <p className="text-[11px] text-muted-foreground truncate">{c.descricao}</p>}
                       </div>
                     </div>
-                    <Badge variant="outline">{tipo.label}</Badge>
+                    <Badge variant="outline" className="shrink-0">{tipo.label}</Badge>
                   </div>
 
-                  <div className="flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground border-t border-outline-variant/30 pt-3">
-                    <span>Família: <strong className="text-foreground">{fam.label}</strong></span>
-                    {c.subfamilia && <span>• Sub: <strong className="text-foreground">{c.subfamilia}</strong></span>}
-                    {c.validade_dias && <span>• Validade: <strong className="text-foreground">{c.validade_dias} dias</strong></span>}
+                  <div className="flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground border-t border-border pt-3">
+                    <span>Família: <strong className="text-foreground font-medium">{fam.label}</strong></span>
+                    {c.subfamilia && <span>• Sub: <strong className="text-foreground font-medium">{c.subfamilia}</strong></span>}
                   </div>
 
-                  <div className="flex justify-end gap-2 pt-2 border-t border-outline-variant/30">
+                  <div className="flex justify-end gap-2 pt-2 border-t border-border">
                     <Button variant="outline" size="sm" onClick={() => abrirEdicao(c)}>
                       <Icon name="edit" className="text-sm" /> Editar
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setEliminar(c)} className="text-error">
+                    <Button variant="ghost" size="sm" onClick={() => setEliminar(c)} className="text-destructive">
                       <Icon name="delete" className="text-sm" /> Remover
                     </Button>
                   </div>
@@ -238,7 +279,7 @@ export default function CategoriasPage() {
         </>
       )}
 
-      <Modal open={modal.aberto} onClose={() => setModal({ aberto: false, id: null })} title={modal.id ? "Editar Categoria" : "Nova Categoria"} icon="category" size="lg"
+      <Modal open={modal.aberto} onClose={() => setModal({ aberto: false, id: null })} title={modal.id ? "Editar Recurso" : "Novo Recurso"} icon="category" size="lg"
         footer={<>
           <Button type="button" variant="outline" onClick={() => setModal({ aberto: false, id: null })}>Cancelar</Button>
           <Button type="submit" form="form-categoria" loading={salvando}><Icon name="save" className="text-lg" /> Guardar</Button>
@@ -253,21 +294,28 @@ export default function CategoriasPage() {
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Família *</label>
               <select required value={form.familia} onChange={(e) => setForm((p) => ({ ...p, familia: e.target.value }))} className={inputCls}>
-                {Object.keys(familias).map((f) => <option key={f} value={f}>{familias[f].label}</option>)}
+                {Object.keys(todosFamilias).map((f) => <option key={f} value={f}>{todosFamilias[f].label}</option>)}
               </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Sub-família</label>
+              <input value={form.subfamilia} onChange={(e) => setForm((p) => ({ ...p, subfamilia: e.target.value }))} className={inputCls} placeholder="Ex: Couché, Impressão Digital" />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Tipo *</label>
               <select required value={form.tipo} onChange={(e) => setForm((p) => ({ ...p, tipo: e.target.value }))} className={inputCls}>
-                <option value="materia_prima">Matéria-Prima</option>
-                <option value="produto_acabado">Produto Acabado</option>
+                {tipoRecursoOptions.map((t) => <option key={t.valor} value={t.valor}>{t.label}</option>)}
               </select>
+            </div>
+            <div className="flex flex-col gap-1.5 sm:col-span-2">
+              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Descrição</label>
+              <textarea rows={2} value={form.descricao} onChange={(e) => setForm((p) => ({ ...p, descricao: e.target.value }))} className={`${inputCls} resize-none`} placeholder="Descrição do recurso..." />
             </div>
           </div>
         </form>
       </Modal>
 
-      <ConfirmDialog open={Boolean(eliminar)} onClose={() => setEliminar(null)} onConfirm={confirmarEliminacao} loading={deletando} title="Remover categoria"
+      <ConfirmDialog open={Boolean(eliminar)} onClose={() => setEliminar(null)} onConfirm={confirmarEliminacao} loading={deletando} title="Remover recurso"
         description={eliminar ? `Remover "${eliminar.nome}"?` : ""} />
 
       <Modal open={modalServicos} onClose={() => setModalServicos(false)} title="Gerir Serviços" icon="home_repair_service" size="lg"
@@ -286,16 +334,16 @@ export default function CategoriasPage() {
           ) : (
             <div className="space-y-2">
               {servicos.map((s) => (
-                  <div key={s.id} className="flex items-center justify-between gap-3 bg-muted/50 rounded-xl px-4 py-3">
-                    <div className="min-w-0">
-                      <p className="font-bold text-sm text-foreground truncate">{s.nome}</p>
-                      {s.descricao && <p className="text-xs text-muted-foreground truncate">{s.descricao}</p>}
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Button variant="ghost" size="icon" onClick={() => abrirEditarServico(s)} title="Editar"><Icon name="edit" className="text-sm" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => setEliminarServico(s)} title="Remover"><Icon name="delete" className="text-sm text-destructive" /></Button>
-                    </div>
+                <div key={s.id} className="flex items-center justify-between gap-3 bg-muted/50 rounded-xl px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-sm text-foreground truncate">{s.nome}</p>
+                    {s.descricao && <p className="text-xs text-muted-foreground truncate">{s.descricao}</p>}
                   </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button variant="ghost" size="icon" onClick={() => abrirEditarServico(s)} title="Editar"><Icon name="edit" className="text-sm" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => setEliminarServico(s)} title="Remover"><Icon name="delete" className="text-sm text-destructive" /></Button>
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -323,7 +371,7 @@ export default function CategoriasPage() {
       <ConfirmDialog open={Boolean(eliminarServico)} onClose={() => setEliminarServico(null)} onConfirm={confirmarEliminarServico} title="Remover serviço"
         description={eliminarServico ? `Remover "${eliminarServico.nome}"?` : ""} />
 
-      <footer className="p-6 text-center border-t bg-muted/30 rounded-2xl">
+      <footer className="p-6 text-center border-t bg-muted/30 rounded-xl">
         <p className="text-sm text-muted-foreground">SIGRAF — Sistema de Gestão para Indústria Gráfica</p>
       </footer>
     </div>

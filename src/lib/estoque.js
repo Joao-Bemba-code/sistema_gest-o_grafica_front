@@ -35,9 +35,22 @@ export const familiasServico = {
 
 export const tiposItem = {
   materia_prima: { label: "Matéria-Prima", classe: "text-blue-500" },
+  artigo: { label: "Artigo / Produto", classe: "text-emerald-500" },
   produto_acabado: { label: "Produto Acabado", classe: "text-emerald-500" },
   servico: { label: "Serviço", classe: "text-violet-500" },
+  servicos: { label: "Serviço", classe: "text-violet-500" },
+  maquina: { label: "Maquinaria", classe: "text-slate-500" },
+  funcionario: { label: "Funcionário", classe: "text-amber-500" },
+  colaborador: { label: "Colaborador", classe: "text-cyan-500" },
 };
+
+export const tipoRecursoOptions = [
+  { valor: "servico", label: "Serviço" },
+  { valor: "artigo", label: "Artigo / Produto" },
+  { valor: "maquina", label: "Maquinaria" },
+  { valor: "funcionario", label: "Funcionário" },
+  { valor: "colaborador", label: "Colaborador" },
+];
 
 export function normalizarFamilia(f) {
   if (f && familias[f]) return f;
@@ -60,7 +73,12 @@ export function normalizarCategoriaTipo(t) {
 }
 
 export function normalizarTipoItem(t) {
-  return t && tiposItem[t] ? t : "materia_prima";
+  if (!t) return "materia_prima";
+  const v = String(t).trim();
+  if (tiposItem[v]) return v;
+  if (v === "servicos") return "servico";
+  if (v === "materia_prima" || v === "produto_acabado") return v;
+  return "materia_prima";
 }
 
 export function normalizarUnidade(u) {

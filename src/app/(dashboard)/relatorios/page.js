@@ -14,7 +14,7 @@ import { listar as listarFaturas } from "@/services/faturacao";
 import { listar as listarMateriais } from "@/services/materiais";
 import { listar as listarCategorias } from "@/services/categorias";
 import { gerarRelatorioStockPDF, gerarRelatorioCadastrosPDF, gerarRelatorioCategoriasPDF } from "@/lib/estoquePdf";
-import { toNum, familias, normalizarFamilia } from "@/lib/estoque";
+import { toNum, familias, normalizarFamilia, tiposItem, normalizarTipoItem } from "@/lib/estoque";
 import { buscarOrganizacao } from "@/services/configuracoes";
 
 const nomesMeses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -206,7 +206,7 @@ export default function RelatoriosPage() {
           { key: "producao", label: "Produção", icon: "precision_manufacturing" },
           { key: "clientes", label: "Cadastros", icon: "groups" },
           { key: "stock", label: "Stock", icon: "inventory_2" },
-          { key: "categorias", label: "Categorias", icon: "category" },
+          { key: "categorias", label: "Recursos", icon: "category" },
         ].map((a) => (
           <Button key={a.key} variant={aba === a.key ? "default" : "outline"} size="sm" onClick={() => setAba(a.key)}>
             <Icon name={a.icon} className="text-sm" />
@@ -585,7 +585,7 @@ export default function RelatoriosPage() {
         return (
           <>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
-              <KpiCard icon="category" label="Categorias" value={categorias.length} iconVariant="primary" />
+              <KpiCard icon="category" label="Recursos" value={categorias.length} iconVariant="primary" />
               <KpiCard icon="folder_open" label="Famílias" value={Object.keys(catMap).length} iconVariant="info" />
               <KpiCard icon="inventory_2" label="Materiais Cadastrados" value={materiais.length} iconVariant="success" />
               <KpiCard icon="people" label="Cadastros" value={clientes.length} iconVariant="secondary" />
@@ -623,7 +623,7 @@ export default function RelatoriosPage() {
                               {cats.sort((a, b) => a.nome.localeCompare(b.nome)).map((c) => (
                                 <tr key={c.id} className="border-b border-border/20 hover:bg-muted/30 transition-colors">
                                   <td className="px-4 py-2.5 font-medium text-foreground">{c.nome}</td>
-                                  <td className="px-4 py-2.5 text-muted-foreground text-xs hidden sm:table-cell">{c.tipo || "—"}</td>
+                                  <td className="px-4 py-2.5 text-muted-foreground text-xs hidden sm:table-cell">{tiposItem[normalizarTipoItem(c.tipo)]?.label || "—"}</td>
                                   <td className="px-4 py-2.5 text-muted-foreground text-xs hidden sm:table-cell">{c.descricao || "—"}</td>
                                   <td className="px-4 py-2.5 text-right font-mono text-xs font-bold text-primary">{materiaisPorCat[c.nome] || 0}</td>
                                 </tr>

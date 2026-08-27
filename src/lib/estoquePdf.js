@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
 import { applyPlugin } from "jspdf-autotable";
-import { formatKz, familias, normalizarFamilia, tiposItem, entradasEspecificacao } from "./estoque";
+import { formatKz, familias, normalizarFamilia, tiposItem, normalizarTipoItem, entradasEspecificacao } from "./estoque";
 
 applyPlugin(jsPDF);
 
@@ -178,7 +178,7 @@ export async function gerarFichaMaterialPDF(mat, org = {}) {
     ["Categoria", categoria],
     ["Família", familias[normalizarFamilia(mat.categoria?.familia)]?.label || "—"],
     ["Subfamília", mat.categoria?.subfamilia || "—"],
-    ["Tipo", tiposItem[mat.categoria?.tipo]?.label || "—"],
+    ["Tipo", tiposItem[normalizarTipoItem(mat.categoria?.tipo)]?.label || "—"],
     ["Fornecedor", mat.fornecedor || "—"],
     ["Unidade", mat.unidade || "—"],
     ...entradasEspecificacao(mat.especificacoes).map((e) => [e.rotulo, e.valor]),
@@ -499,7 +499,7 @@ export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [
       startY: y,
       head: [["Categoria", "Tipo", "Descrição", "Itens em Stock"]],
       body: cats.map((c) => [
-        c.nome || "—", c.tipo || "—", c.descricao || "—", String(materiaisPorCat[c.nome] || 0),
+        c.nome || "—", (tiposItem[normalizarTipoItem(c.tipo)]?.label) || "—", c.descricao || "—", String(materiaisPorCat[c.nome] || 0),
       ]),
       theme: "grid",
       headStyles: { fillColor: [15, 118, 110], textColor: 255, fontStyle: "bold", fontSize: 8 },
