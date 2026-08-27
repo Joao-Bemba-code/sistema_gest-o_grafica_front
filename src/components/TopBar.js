@@ -21,12 +21,15 @@ const breadcrumbs = {
   "/acabamento": ["Acabamento"],
   "/clientes": ["Cadastros"],
   "/estoque": ["Provisionamento"],
+  "/estoque/novo": ["Provisionamento", "Novo Material"],
   "/faturacao": ["Vendas", "Facturas"],
   "/qualidade": ["Qualidade"],
   "/relatorios": ["Relatórios"],
   "/configuracoes": ["Configurações"],
   "/login": ["Login"],
   "/categorias": ["Recursos"],
+  "/maquinas": ["Maquinária"],
+  "/maquinas/novo": ["Maquinária", "Nova Máquina"],
 };
 
 const COR_NIVEL = {
@@ -162,7 +165,11 @@ export default function TopBar() {
 
 export function Breadcrumbs() {
   const pathname = usePathname();
-  const crumbs = breadcrumbs[pathname] || ["Painel"];
+  const crumbs =
+    breadcrumbs[pathname] ||
+    (pathname.startsWith("/maquinas/") && !pathname.endsWith("/novo")
+      ? ["Maquinária", "Editar Máquina"]
+      : ["Painel"]);
 
   return (
     <nav className="flex items-center gap-2 text-xs text-muted-foreground">

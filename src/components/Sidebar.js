@@ -16,6 +16,7 @@ const rotas = [
   { icone: "groups", nome: "Cadastros", para: "/clientes" },
   { icone: "inventory_2", nome: "Provisionamento", para: "/estoque" },
   { icone: "category", nome: "Recursos", para: "/categorias" },
+  { icone: "precision_manufacturing", nome: "Maquinária", para: "/maquinas" },
   { icone: "analytics", nome: "Relatórios", para: "/relatorios" },
   { icone: "settings", nome: "Configurações", para: "/configuracoes" },
 ];
