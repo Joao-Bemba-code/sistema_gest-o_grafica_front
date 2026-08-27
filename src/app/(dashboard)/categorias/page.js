@@ -14,7 +14,7 @@ import { listar, criar, atualizar, remover } from "@/services/categorias";
 import { listar as listarServicos, criar as criarServico, atualizar as atualizarServico, remover as removerServico } from "@/services/servicos";
 import { useFilter } from "@/components/ui/FilterBar";
 
-const blankForm = { nome: "", familia: "", tipo: "Artigo / Produto", descricao: "", subfamilia: "" };
+const blankForm = { nome: "", familia: "", tipo: "Artigo / Produto", descricao: "" };
 
 const todosFamilias = { ...familias, ...familiasServico };
 
@@ -80,7 +80,7 @@ export default function CategoriasPage() {
 
   const { search, setSearch, filtered, total } = useFilter({
     items: categoriasMateriais,
-    searchFields: ["nome", "subfamilia", "descricao"],
+    searchFields: ["nome", "descricao"],
   });
 
   const carregar = useCallback(async () => {
@@ -120,7 +120,6 @@ export default function CategoriasPage() {
       familia: todosFamilias[normalizarFamilia(categoria.familia)]?.label || categoria.familia || "",
       tipo: tipoRecursoOptions.find((o) => o.valor === categoria.tipo)?.label || String(categoria.tipo || "Artigo / Produto"),
       descricao: categoria.descricao || "",
-      subfamilia: categoria.subfamilia || "",
     });
   };
 
@@ -130,7 +129,7 @@ export default function CategoriasPage() {
     if (!form.familia.trim()) return addToast?.("Escolha ou crie uma família", "error");
     setSalvando(true);
     try {
-      const payload = { nome: form.nome.trim(), familia: familiaParaSalvar(form.familia), tipo: tipoParaSalvar(form.tipo), descricao: form.descricao.trim(), subfamilia: form.subfamilia.trim() };
+      const payload = { nome: form.nome.trim(), familia: familiaParaSalvar(form.familia), tipo: tipoParaSalvar(form.tipo), descricao: form.descricao.trim() };
       if (modal.id) await atualizar(modal.id, payload);
       else await criar(payload);
       addToast?.(modal.id ? "Recurso atualizado" : "Recurso criado", "success");
@@ -288,7 +287,6 @@ export default function CategoriasPage() {
 
                   <div className="flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground border-t border-border pt-3">
                     <span>Família: <strong className="text-foreground font-medium">{fam.label}</strong></span>
-                    {c.subfamilia && <span>• Sub: <strong className="text-foreground font-medium">{c.subfamilia}</strong></span>}
                   </div>
 
                   <div className="flex justify-end gap-2 pt-2 border-t border-border">
@@ -329,10 +327,6 @@ export default function CategoriasPage() {
                 onChange={(label) => setForm((p) => ({ ...p, familia: label }))}
                 className={inputCls}
               />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Sub-família</label>
-              <input value={form.subfamilia} onChange={(e) => setForm((p) => ({ ...p, subfamilia: e.target.value }))} className={inputCls} placeholder="Ex: Couché, Impressão Digital" />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Tipo *</label>

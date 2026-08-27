@@ -55,7 +55,7 @@ export const tipoRecursoOptions = [
 export function normalizarFamilia(f) {
   if (f && familias[f]) return f;
   if (f && familiasServico[f]) return f;
-  return "papeis";
+  return f || "";
 }
 
 export const FAMILIA_PREFIXO = {

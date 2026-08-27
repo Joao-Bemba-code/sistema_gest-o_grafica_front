@@ -49,7 +49,8 @@ function BotaoIcone({ icon, label, onClick, critico, cor }) {
 function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEditar, onFichaPdf, onPedido, onEliminar, onTransferencia, onPerda, onDesperdicio }) {
   const [menuAberto, setMenuAberto] = useState(false);
   const menuRef = useRef(null);
-  const familiaCfg = familias[normalizarFamilia(item.categoria?.familia)];
+  const famTexto = item.categoria?.familia || "";
+  const familiaCfg = familias[normalizarFamilia(famTexto)] || { icon: "label", label: famTexto || "—" };
   const pct = toNum(item.estoque_max) > 0 ? (toNum(item.estoque_disponivel) / toNum(item.estoque_max)) * 100 : 100;
   const critico = item.status === "repor" || item.status === "esgotado";
   const stText = textoStatus[item.status] || textoStatus.ok;

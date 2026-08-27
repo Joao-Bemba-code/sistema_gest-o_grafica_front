@@ -32,7 +32,9 @@ export default function NovoMaterialPage() {
   };
 
   const categoria = categorias.find((c) => String(c.id) === String(form.categoria_id));
-  const catFamilia = normalizarFamilia(categoria?.familia);
+  const catFamiliaTexto = categoria?.familia || "";
+  const catFamilia = normalizarFamilia(catFamiliaTexto);
+  const catFamiliaCfg = familias[catFamilia] || { icon: "label", label: catFamiliaTexto || "" };
   const custoTotal = toNum(form.custo_unit) * toNum(form.estoque_max);
 
   return (
@@ -94,7 +96,7 @@ export default function NovoMaterialPage() {
           </div>
 
           <div className="relative w-24 h-24 rounded-2xl obsidian-glass cyber-border flex items-center justify-center mx-auto">
-            <Icon name={familias[catFamilia]?.icon || "category"} className="text-4xl text-primary" />
+            <Icon name={catFamiliaCfg.icon || "category"} className="text-4xl text-primary" />
             <span className="absolute -top-2 -right-2 w-6 h-6 rounded-lg bg-success flex items-center justify-center">
               <Icon name="check" className="text-sm text-on-success" />
             </span>
@@ -107,7 +109,7 @@ export default function NovoMaterialPage() {
 
           <div>
             <PreviewLinha label="Categoria" valor={categoria?.nome} />
-            <PreviewLinha label="Família" valor={familias[catFamilia]?.label} />
+            <PreviewLinha label="Família" valor={catFamiliaCfg.label} />
             <PreviewLinha label="Subfamília" valor={(form.especificacoes?.subfamilia || categoria?.subfamilia || "").trim()} />
             <PreviewLinha label="Tipo" valor={tiposItem[categoria?.tipo]?.label} />
             <PreviewLinha label="Unidade" valor={form.unidade} />

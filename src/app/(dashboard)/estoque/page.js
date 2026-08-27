@@ -21,7 +21,7 @@ import EmptyState from "@/components/estoque/EmptyState";
 import PedidosModal from "@/components/estoque/PedidosModal";
 import PedidoFormModal from "@/components/estoque/PedidoFormModal";
 import PedidoReceberModal from "@/components/estoque/PedidoReceberModal";
-import { familias, normalizarFamilia } from "@/lib/estoque";
+import { familias, familiasServico, normalizarFamilia } from "@/lib/estoque";
 import { gerarFichaMaterialPDF, gerarPedidoPDF } from "@/lib/estoquePdf";
 import { listar as listarPedidos, criar as criarPedido, cancelar as cancelarPedido, receber as apiReceberPedido } from "@/services/pedidos";
 import { remover as removerMaterial } from "@/services/materiais";
@@ -74,6 +74,10 @@ export default function EstoquePage() {
     const mapa = {};
     Object.keys(familias).forEach((g) => {
       mapa[g] = filtrados.filter((i) => normalizarFamilia(i.categoria?.familia) === g);
+    });
+    mapa._outras = filtrados.filter((i) => {
+      const f = normalizarFamilia(i.categoria?.familia);
+      return !(f in familias) && !(f in familiasServico);
     });
     return mapa;
   }, [filtrados]);
@@ -370,6 +374,38 @@ export default function EstoquePage() {
               </section>
             );
           })}
+          {porFamilia._outras.length > 0 && (
+            <section className="space-y-3">
+              <div className="flex items-center gap-3">
+                <span className="w-10 h-10 rounded-lg flex items-center justify-center bg-surface-variant border border-outline-variant/30">
+                  <Icon name="label" className="text-xl" />
+                </span>
+                <h2 className="font-mono text-xs font-bold uppercase tracking-widest text-foreground">Outras famílias</h2>
+                <span className="text-[10px] font-mono text-on-surface-variant">
+                  {porFamilia._outras.length} {porFamilia._outras.length === 1 ? "material" : "materiais"}
+                </span>
+              </div>
+              <div className="space-y-3">
+                {porFamilia._outras.map((item, i) => (
+                  <MaterialCard
+                    key={item.id}
+                    item={item}
+                    index={i}
+                    onEntrada={abrirEntrada}
+                    onSaida={abrirSaida}
+                    onReservas={abrirReservas}
+                    onEditar={abrirEdicao}
+                    onFichaPdf={fichaPdf}
+                    onPedido={abrirNovoPedido}
+                    onEliminar={setEliminar}
+                    onTransferencia={abrirTransferencia}
+                    onPerda={abrirPerda}
+                    onDesperdicio={abrirDesperdicio}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
         </>
       )}
 

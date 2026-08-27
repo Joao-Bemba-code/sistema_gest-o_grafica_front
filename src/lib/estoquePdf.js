@@ -176,7 +176,7 @@ export async function gerarFichaMaterialPDF(mat, org = {}) {
     ["Nome", mat.nome || "—"],
     ["Nome Técnico", mat.nome_tecnico || "—"],
     ["Categoria", categoria],
-    ["Família", familias[normalizarFamilia(mat.categoria?.familia)]?.label || "—"],
+    ["Família", familias[normalizarFamilia(mat.categoria?.familia)]?.label || mat.categoria?.familia || "—"],
     ["Subfamília", mat.categoria?.subfamilia || "—"],
     ["Tipo", tiposItem[normalizarTipoItem(mat.categoria?.tipo)]?.label || "—"],
     ["Fornecedor", mat.fornecedor || "—"],
