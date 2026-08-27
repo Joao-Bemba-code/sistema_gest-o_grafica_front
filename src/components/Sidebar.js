@@ -51,20 +51,20 @@ export default function Sidebar() {
       )}>
         <div className="px-5 pt-6 pb-5 border-b border-border/40">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl obsidian-glass cyber-border flex items-center justify-center text-primary shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
               <Icon name="precision_manufacturing" className="text-xl ms-fill" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-lg font-black leading-none tracking-tight">
+              <h1 className="text-lg font-bold leading-none tracking-tight">
                 <span className="text-gradient">SIGRAF</span>
               </h1>
-              <p className="text-[9px] text-muted-foreground uppercase tracking-[0.22em] font-mono mt-1 truncate">Gestão de Gráfica</p>
+              <p className="text-[11px] text-muted-foreground mt-1 truncate">Gestão de Gráfica</p>
             </div>
           </div>
         </div>
 
         <nav className="flex-1 px-3 py-3 overflow-y-auto custom-scrollbar space-y-0.5">
-          <p className="px-3 pb-2 text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/70">Menu</p>
+          <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/70">Menu</p>
           {rotas.map((rota) => {
             const ativa = rota.para === "/" ? caminho === "/" : caminho.startsWith(rota.para);
             return (
@@ -73,17 +73,14 @@ export default function Sidebar() {
                 href={rota.para}
                 onClick={() => setAberto(false)}
                 className={cn(
-                  "relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 text-xs",
+                  "relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 text-sm",
                   ativa
                     ? "nav-pill font-semibold"
                     : "font-medium text-muted-foreground hover:text-foreground hover:bg-accent"
                 )}
               >
-                {ativa && (
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full bg-gradient-to-b from-primary to-secondary" aria-hidden="true" />
-                )}
                 <Icon name={rota.icone} className={cn("text-lg shrink-0", ativa && "ms-fill")} />
-                <span className="font-semibold uppercase tracking-wider text-[11px]">{rota.nome}</span>
+                <span className="font-medium">{rota.nome}</span>
               </Link>
             );
           })}
@@ -98,7 +95,7 @@ export default function Sidebar() {
               <p className="text-xs font-bold text-foreground truncate">{usuario?.nome || "Utilizador"}</p>
               <div className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-                <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest truncate">
+                <p className="text-[11px] text-muted-foreground truncate">
                   {usuario?.funcao || "Online"}
                 </p>
               </div>

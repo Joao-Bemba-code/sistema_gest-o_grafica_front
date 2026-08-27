@@ -49,8 +49,8 @@ export default function TopBar() {
   return (
     <header className="w-full sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-primary/10 flex justify-between items-center pl-14 pr-3 sm:pr-6 md:pl-6 h-14 sm:h-16">
       <div className="flex items-center gap-5 flex-1 max-w-xl">
-        <h2 className="font-headline-md text-headline-md font-extrabold tracking-tight hidden sm:block">
-          <span className="text-gradient">Console de Pedidos</span>
+        <h2 className="text-lg font-bold tracking-tight hidden sm:block">
+          <span className="text-foreground">SIGRAF</span>
         </h2>
         <div className="relative w-full group hidden sm:block">
           <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors text-sm" />
@@ -63,8 +63,8 @@ export default function TopBar() {
       </div>
       <div className="flex items-center gap-2 sm:gap-5">
         <nav className="hidden md:flex gap-5">
-          <Link href="/vendas" className="text-primary font-bold border-b-2 border-primary pb-1 text-xs uppercase tracking-widest transition-all">Vendas</Link>
-          <Link href="/producao" className="text-muted-foreground hover:text-primary transition-all text-xs font-bold uppercase tracking-widest">Produção</Link>
+          <Link href="/vendas" className="text-primary font-semibold border-b-2 border-primary pb-1 text-sm transition-all">Vendas</Link>
+          <Link href="/producao" className="text-muted-foreground hover:text-primary transition-all text-sm font-medium">Produção</Link>
         </nav>
         <div className="flex items-center gap-3">
           <div className="relative">
@@ -147,12 +147,12 @@ export default function TopBar() {
           </button>
           <div className="h-6 w-px bg-border hidden sm:block" />
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl obsidian-glass cyber-border text-primary flex items-center justify-center font-black text-xs">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center font-bold text-xs">
               {getInitials(usuario?.nome)}
             </div>
             <div className="hidden sm:block">
               <p className="text-xs font-bold text-foreground leading-tight">{usuario?.nome || "Utilizador"}</p>
-              <p className="text-[10px] text-primary uppercase font-bold tracking-widest truncate max-w-[10rem]">
+              <p className="text-[11px] text-muted-foreground truncate max-w-[10rem]">
                 {usuario?.organizacao?.nome || usuario?.funcao || "Online"}
               </p>
             </div>
@@ -173,11 +173,11 @@ export function Breadcrumbs() {
 
   return (
     <nav className="flex items-center gap-2 text-xs text-muted-foreground">
-      <Link href="/" className="hover:text-primary transition-colors font-bold uppercase tracking-widest">Início</Link>
+      <Link href="/" className="hover:text-primary transition-colors font-medium uppercase tracking-wide">Início</Link>
       {crumbs.map((crumb, i) => (
         <span key={i} className="flex items-center gap-1.5">
           <Icon name="chevron_right" className="text-[12px]" />
-          <span className={`font-bold uppercase tracking-widest ${i === crumbs.length - 1 ? "text-primary" : ""}`}>{crumb}</span>
+          <span className={`font-medium uppercase tracking-wide ${i === crumbs.length - 1 ? "text-primary" : ""}`}>{crumb}</span>
         </span>
       ))}
     </nav>

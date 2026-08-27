@@ -74,7 +74,7 @@
   --shadow-modal: 0 24px 48px -12px rgba(0, 0, 0, 0.12);
   --shadow-lift: 0 12px 40px -12px rgba(0, 0, 0, 0.18), 0 6px 16px -8px rgba(0, 0, 0, 0.1);
 
-  --font-sans: var(--font-space), var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: var(--font-jbmono), ui-monospace, "Cascadia Code", "Consolas", monospace;
 }
 
@@ -159,9 +159,7 @@ body::before {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background-image:
-    radial-gradient(52rem 52rem at 88% -12%, color-mix(in srgb, var(--secondary) 6%, transparent), transparent 62%),
-    radial-gradient(44rem 44rem at -8% 108%, color-mix(in srgb, var(--primary) 6%, transparent), transparent 62%);
+  background-color: var(--background);
 }
 
 /* ===== Typography ===== */
@@ -237,7 +235,7 @@ body::before {
 
 .form-label {
   display: block;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -255,7 +253,7 @@ body::before {
   background-color: var(--background);
   border: 1px solid var(--input);
   border-radius: 0.75rem;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   color: var(--foreground);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
@@ -594,23 +592,12 @@ body {
 
 /* Scanlines overlay */
 .scanlines {
-  position: fixed;
-  inset: 0;
-  height: 100vh;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0) 50%, rgba(0, 0, 0, 0.12) 50%);
-  background-size: 100% 4px;
-  pointer-events: none;
-  z-index: 45;
-  opacity: 0.25;
   display: none;
 }
-.dark .scanlines { display: block; }
 
-/* Painel de vidro (sobrio) */
+/* Painel (surface clean) */
 .obsidian-glass {
-  background: color-mix(in srgb, var(--card) 90%, transparent);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
+  background: var(--card);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-card);
 }
@@ -619,20 +606,20 @@ body {
   border-color: rgba(255, 255, 255, 0.06);
 }
 
-/* Glass panel do protótipo Conversor */
+/* Glass panel (clean surface, kept name for compatibility) */
 .glass-panel {
-  background: linear-gradient(135deg, rgba(25, 31, 49, 0.6) 0%, rgba(12, 19, 36, 0.8) 100%);
-  -webkit-backdrop-filter: blur(20px);
-  backdrop-filter: blur(20px);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 25px 50px -12px rgba(128, 213, 203, 0.05);
+  background: var(--card);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
 }
 
-/* Input glow do protótipo Conversor */
+/* Input glow (clean focus, kept name for compatibility) */
 .input-glow:focus-within {
-  box-shadow: 0 10px 25px -5px rgba(128, 213, 203, 0.2);
-  border-bottom-color: #80d5cb;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent);
+  border-color: var(--primary);
 }
 
 /* Padrão de grelha do diagrama */
@@ -651,7 +638,7 @@ body {
   display: none;
 }
 
-/* Borda cyber (subtle no hover) */
+/* Borda (clean, kept name for compatibility) */
 .cyber-border {
   position: relative;
 }
@@ -661,17 +648,12 @@ body {
   top: 0; left: 0; right: 0; bottom: 0;
   border-radius: inherit;
   padding: 1px;
-  background: linear-gradient(45deg, rgba(47, 158, 143, 0.35), rgba(47, 158, 143, 0.05));
+  background: color-mix(in srgb, var(--border) 80%, transparent);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;
-  opacity: 0.25;
-  transition: opacity 0.3s;
-}
-.cyber-border:hover::before {
-  opacity: 0.5;
-  background: linear-gradient(45deg, #2f9e8f, #2f9e8f);
+  opacity: 1;
 }
 
 /* Telemetry sparklines (KPIs) */
@@ -697,12 +679,12 @@ body {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 20'%3E%3Cpath d='M0 15 Q 10 5, 20 10 T 40 15 T 60 5' fill='none' stroke='%237bd0ff' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 
-/* Rótulos mono uppercase (cyber) */
+/* Rótulos label (clean) */
 .cyber-label {
-  font-family: var(--font-mono);
   font-size: 0.625rem;
   text-transform: uppercase;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.08em;
+  font-weight: 600;
   color: var(--muted-foreground);
 }
 
@@ -712,17 +694,17 @@ body {
 
 /* Input glass cyber */
 .glass-input {
-  background: rgba(10, 17, 34, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--background);
+  border: 1px solid var(--input);
   transition: all 0.3s ease;
 }
 .glass-input:focus {
-  border-color: #80d5cb;
-  box-shadow: 0 0 0 3px rgba(128, 213, 203, 0.25);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent);
   outline: none;
 }
 
-/* Tab cyber (underline animada) */
+/* Tab (underline animada) */
 .tab-btn {
   position: relative;
 }
@@ -733,19 +715,19 @@ body {
   left: 0;
   width: 100%;
   height: 2px;
-  background-color: #80d5cb;
+  background-color: var(--primary);
   transform: scaleX(0);
   transition: transform 0.3s ease;
 }
-.tab-btn.active { color: #80d5cb; }
+.tab-btn.active { color: var(--primary); }
 .tab-btn.active::after { transform: scaleX(1); }
 
-/* Texto com gradiente */
+/* Texto com cor primária (sem gradiente cyber) */
 .text-gradient-brand {
-  background-image: linear-gradient(120deg, #0f766e, #7c3aed);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--primary);
+  background: none;
+  -webkit-background-clip: unset;
+  background-clip: unset;
 }
 
 /* ==========================================================================
@@ -765,41 +747,37 @@ body {
   background-image: linear-gradient(135deg, color-mix(in srgb, #0d9488 12%, transparent), color-mix(in srgb, #0d9488 8%, transparent));
 }
 
-/* Texto com gradiente de marca — alias (sobrio, primario) */
+/* Texto de marca — cor primária sólida (sem gradiente cyber) */
 .text-gradient {
-  background-image: linear-gradient(120deg, #0f766e, #2f9e8f);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--primary);
+  background: none;
+  -webkit-background-clip: unset;
+  background-clip: unset;
 }
 .dark .text-gradient {
-  background-image: linear-gradient(120deg, #5bbfb1, #2f9e8f);
+  color: #5bbfb1;
 }
 
-/* ---- Borda com gradiente (glass premium) ---- */
+/* ---- Borda fina primária (glass premium) ---- */
 .border-gradient {
-  border: 1px solid transparent;
-  background:
-    linear-gradient(var(--card), var(--card)) padding-box,
-    linear-gradient(135deg, color-mix(in srgb, #0d9488 45%, transparent), color-mix(in srgb, #7c3aed 45%, transparent)) border-box;
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border));
+  background: var(--card);
 }
 
-/* ---- Glow (sombras de marca) ---- */
-.glow-primary { box-shadow: 0 10px 30px -10px color-mix(in srgb, #80d5cb 40%, transparent); }
-.glow-purple { box-shadow: 0 10px 30px -10px color-mix(in srgb, #d2bbff 40%, transparent); }
-.glow-brand {
-  box-shadow: 0 12px 34px -12px rgba(128, 213, 203, 0.3),
-              0 8px 22px -12px rgba(210, 187, 255, 0.25);
-}
+/* ---- Glow (sombras de marca) — reduzido a sombra neutra ---- */
+.glow-primary { box-shadow: 0 4px 16px -6px color-mix(in srgb, var(--primary) 30%, transparent); }
+.glow-purple { box-shadow: 0 4px 16px -6px color-mix(in srgb, var(--secondary) 25%, transparent); }
+.glow-brand { box-shadow: 0 6px 20px -8px color-mix(in srgb, var(--primary) 30%, transparent); }
 
-/* ---- Chip de ícone gradiente (KPIs / cabeçalhos) ---- */
+/* ---- Chip de ícone (headers) ---- */
 .icon-chip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 0.9rem;
-  background: rgba(10, 17, 34, 0.6);
-  border: 1px solid rgba(128, 213, 203, 0.15);
+  background: var(--muted);
+  border: 1px solid var(--border);
+  color: var(--primary);
 }
 
 /* ---- Nav item ativo (pill sobrio) ---- */
@@ -815,13 +793,9 @@ body {
   box-shadow: inset 0 0 0 1px rgba(47, 158, 143, 0.3);
 }
 
-/* ---- Fundo aurora (login / hero) ---- */
+/* ---- Fundo (login / hero) — plano clean ---- */
 .bg-aurora {
   background-color: var(--background);
-  background-image:
-    radial-gradient(60rem 60rem at 10% -10%, rgba(128, 213, 203, 0.14), transparent 60%),
-    radial-gradient(50rem 50rem at 110% 10%, rgba(210, 187, 255, 0.12), transparent 55%),
-    radial-gradient(40rem 40rem at 50% 120%, rgba(128, 213, 203, 0.08), transparent 60%);
 }
 
 /* ---- Responsividade segura ---- */
