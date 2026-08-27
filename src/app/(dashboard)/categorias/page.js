@@ -14,7 +14,7 @@ import { listar, criar, atualizar, remover } from "@/services/categorias";
 import { listar as listarServicos, criar as criarServico, atualizar as atualizarServico, remover as removerServico } from "@/services/servicos";
 import { useFilter } from "@/components/ui/FilterBar";
 
-const blankForm = { nome: "", familia: "Papéis", tipo: "Artigo / Produto", descricao: "", subfamilia: "" };
+const blankForm = { nome: "", familia: "", tipo: "Artigo / Produto", descricao: "", subfamilia: "" };
 
 const todosFamilias = { ...familias, ...familiasServico };
 
@@ -127,6 +127,7 @@ export default function CategoriasPage() {
   const aoSubmeter = async (e) => {
     e.preventDefault();
     if (!form.nome.trim()) return addToast?.("Informe o nome", "error");
+    if (!form.familia.trim()) return addToast?.("Escolha ou crie uma família", "error");
     setSalvando(true);
     try {
       const payload = { nome: form.nome.trim(), familia: familiaParaSalvar(form.familia), tipo: tipoParaSalvar(form.tipo), descricao: form.descricao.trim(), subfamilia: form.subfamilia.trim() };
