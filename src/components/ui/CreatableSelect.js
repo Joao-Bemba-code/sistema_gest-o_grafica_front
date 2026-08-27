@@ -62,17 +62,14 @@ export default function CreatableSelect({
 
   return (
     <div ref={rootRef} className="relative">
-      <div className="relative">
-        <input
-          value={value}
-          onChange={(e) => { onChange(e.target.value); setAberto(true); }}
-          onFocus={() => setAberto(true)}
-          onKeyDown={teclaDown}
-          placeholder={placeholder}
-          className={`${className} pr-9`}
-        />
-        <Icon name="arrow_drop_down" className="absolute right-3 top-1/2 -translate-y-1/2 text-lg text-muted-foreground pointer-events-none" />
-      </div>
+      <input
+        value={value}
+        onChange={(e) => { onChange(e.target.value); setAberto(true); }}
+        onFocus={() => setAberto(true)}
+        onKeyDown={teclaDown}
+        placeholder={placeholder}
+        className={className}
+      />
 
       {mostrarLista && (
         <ul className="absolute z-50 mt-1 w-full obsidian-glass cyber-border rounded-xl shadow-xl overflow-hidden py-1 custom-scrollbar max-h-52 overflow-y-auto animate-scale-in" role="listbox">

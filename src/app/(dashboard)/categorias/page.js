@@ -14,7 +14,7 @@ import { listar, criar, atualizar, remover } from "@/services/categorias";
 import { listar as listarServicos, criar as criarServico, atualizar as atualizarServico, remover as removerServico } from "@/services/servicos";
 import { useFilter } from "@/components/ui/FilterBar";
 
-const blankForm = { nome: "", familia: "Papéis", tipo: "artigo", descricao: "", subfamilia: "" };
+const blankForm = { nome: "", familia: "Papéis", tipo: "Artigo / Produto", descricao: "", subfamilia: "" };
 
 const todosFamilias = { ...familias, ...familiasServico };
 
@@ -27,6 +27,16 @@ function familiaParaSalvar(texto) {
     ([, cfg]) => cfg.label.toLowerCase() === t.toLowerCase()
   );
   return entrada ? entrada[0] : t;
+}
+
+// Devolve o valor/chave se o texto corresponder a um tipo existente, caso
+// contrário devolve o próprio texto (novo tipo criado pelo utilizador).
+function tipoParaSalvar(texto) {
+  const t = String(texto || "").trim();
+  const entrada = tipoRecursoOptions.find(
+    (o) => o.label.toLowerCase() === t.toLowerCase()
+  );
+  return entrada ? entrada.valor : t;
 }
 
 const CATEGORIAS_FILTRO = [
@@ -98,13 +108,17 @@ export default function CategoriasPage() {
     return () => { ativo = false; };
   }, [addToast]);
 
-  const abrirNova = (tipoInicial) => { setModal({ aberto: true, id: null }); setForm({ ...blankForm, tipo: tipoInicial || "artigo" }); };
+  const abrirNova = (tipoChave) => {
+    const label = tipoRecursoOptions.find((o) => o.valor === tipoChave)?.label;
+    setModal({ aberto: true, id: null });
+    setForm({ ...blankForm, tipo: label || blankForm.tipo });
+  };
   const abrirEdicao = (categoria) => {
     setModal({ aberto: true, id: categoria.id });
     setForm({
       nome: categoria.nome || "",
       familia: todosFamilias[normalizarFamilia(categoria.familia)]?.label || categoria.familia || "",
-      tipo: String(categoria.tipo || "artigo"),
+      tipo: tipoRecursoOptions.find((o) => o.valor === categoria.tipo)?.label || String(categoria.tipo || "Artigo / Produto"),
       descricao: categoria.descricao || "",
       subfamilia: categoria.subfamilia || "",
     });
@@ -115,7 +129,7 @@ export default function CategoriasPage() {
     if (!form.nome.trim()) return addToast?.("Informe o nome", "error");
     setSalvando(true);
     try {
-      const payload = { nome: form.nome.trim(), familia: familiaParaSalvar(form.familia), tipo: form.tipo, descricao: form.descricao.trim(), subfamilia: form.subfamilia.trim() };
+      const payload = { nome: form.nome.trim(), familia: familiaParaSalvar(form.familia), tipo: tipoParaSalvar(form.tipo), descricao: form.descricao.trim(), subfamilia: form.subfamilia.trim() };
       if (modal.id) await atualizar(modal.id, payload);
       else await criar(payload);
       addToast?.(modal.id ? "Recurso atualizado" : "Recurso criado", "success");
@@ -321,9 +335,15 @@ export default function CategoriasPage() {
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Tipo *</label>
-              <select required value={form.tipo} onChange={(e) => setForm((p) => ({ ...p, tipo: e.target.value }))} className={inputCls}>
-                {tipoRecursoOptions.map((t) => <option key={t.valor} value={t.valor}>{t.label}</option>)}
-              </select>
+              <CreatableSelect
+                required
+                value={form.tipo}
+                options={tipoRecursoOptions.map((t) => ({ id: t.label, label: t.label }))}
+                placeholder="Escolher um tipo..."
+                createLabel="Criar novo tipo"
+                onChange={(label) => setForm((p) => ({ ...p, tipo: label }))}
+                className={inputCls}
+              />
             </div>
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Descrição</label>
