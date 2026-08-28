@@ -6,7 +6,7 @@ import FornecedorSelect from "./FornecedorSelect";
 import CategoriaSelect from "./CategoriaSelect";
 import UnidadeSelect from "./UnidadeSelect";
 import NumeroInput from "@/components/ui/NumeroInput";
-import { inputCls, unidades, unidadesParaFamilia, camposDeCategoria, familias, normalizarFamilia, normalizarUnidade, prefixoFamilia, especificacoesObjeto } from "@/lib/estoque";
+import { inputCls, unidades, unidadesParaFamilia, camposDeCategoria, familias, normalizarFamilia, normalizarUnidade, prefixoFamilia, especificacoesObjeto, tiposItem, normalizarTipoItem } from "@/lib/estoque";
 
 const tabs = [
   { key: "identificacao", label: "Identificação", icon: "badge" },
@@ -79,6 +79,7 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
   const [tab, setTab] = useState("identificacao");
   const id = (sufixo) => `${formId}-${sufixo}`;
   const categoria = categorias.find((c) => String(c.id) === String(form.categoria_id));
+  const tipoLabel = categoria ? (tiposItem[normalizarTipoItem(categoria.tipo)]?.label || String(categoria.tipo || "")) : "";
   const camposEspec = camposDeCategoria(categoria, form.unidade);
   const ePapel = ["folha", "resma"].includes(normalizarUnidade(form.unidade));
   const unidadesDisponiveis = categoria ? unidadesParaFamilia(categoria.familia) : unidades;
@@ -155,6 +156,16 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
                 value={form.categoria_id}
                 categorias={categorias}
                 onChange={(id) => aoMudarCategoria(id)}
+              />
+            </Campo>
+            <Campo label="Tipo" obrigatorio>
+              <input
+                required
+                aria-required="true"
+                value={tipoLabel}
+                readOnly
+                className={`${inputCls} bg-muted/50 cursor-not-allowed`}
+                placeholder={form.categoria_id ? "Carregando tipo..." : "Escolha a categoria"}
               />
             </Campo>
             <Campo label="Subfamília">

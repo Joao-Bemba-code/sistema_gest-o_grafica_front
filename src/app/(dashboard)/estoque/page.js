@@ -22,11 +22,38 @@ import EmptyState from "@/components/estoque/EmptyState";
 import PedidosModal from "@/components/estoque/PedidosModal";
 import PedidoFormModal from "@/components/estoque/PedidoFormModal";
 import PedidoReceberModal from "@/components/estoque/PedidoReceberModal";
-import { familias, familiasServico, normalizarFamilia } from "@/lib/estoque";
+import { normalizarTipoItem } from "@/lib/estoque";
 import { gerarFichaMaterialPDF, gerarPedidoPDF } from "@/lib/estoquePdf";
 import { listar as listarPedidos, criar as criarPedido, cancelar as cancelarPedido, receber as apiReceberPedido } from "@/services/pedidos";
 import { remover as removerMaterial } from "@/services/materiais";
 import { useToast } from "@/components/Toast";
+
+const TIPO_META = {
+  materia_prima: { label: "Matéria-Prima", icon: "inventory", classe: "text-blue-500 bg-blue-500/10" },
+  artigo: { label: "Artigo / Produto", icon: "inventory_2", classe: "text-emerald-500 bg-emerald-500/10" },
+  produto_acabado: { label: "Produto Acabado", icon: "inventory_2", classe: "text-emerald-500 bg-emerald-500/10" },
+  servico: { label: "Serviço", icon: "home_repair_service", classe: "text-violet-500 bg-violet-500/10" },
+  maquina: { label: "Maquinaria", icon: "precision_manufacturing", classe: "text-slate-500 bg-slate-500/10" },
+  funcionario: { label: "Funcionário", icon: "groups", classe: "text-amber-500 bg-amber-500/10" },
+  colaborador: { label: "Colaborador", icon: "group", classe: "text-cyan-500 bg-cyan-500/10" },
+  consumiveis: { label: "Consumíveis", icon: "local_fire_department", classe: "text-orange-500 bg-orange-500/10" },
+  materiais: { label: "Materiais", icon: "inventory", classe: "text-blue-500 bg-blue-500/10" },
+  ferramentas: { label: "Ferramentas", icon: "handyman", classe: "text-gray-500 bg-gray-500/10" },
+  equipamentos: { label: "Equipamentos", icon: "precision_manufacturing", classe: "text-indigo-500 bg-indigo-500/10" },
+};
+
+// Agrupa o tipo de uma categoria/material num identificador canónico:
+// variantes do mesmo tipo (ex.: "matéria prima" vs "materia_prima") colapsam
+// num único grupo. Tipos desconhecidos mantêm-se separados.
+function tipoGrupo(v) {
+  const chave = String(v || "").trim();
+  if (!chave) return "";
+  const txt = chave.toLowerCase();
+  if (TIPO_META[txt]) return txt;
+  const n = normalizarTipoItem(chave);
+  if (TIPO_META[n]) return n;
+  return `custom:${txt}`;
+}
 
 export default function EstoquePage() {
   const { addToast } = useToast();
@@ -58,10 +85,31 @@ export default function EstoquePage() {
   const [transfer, setTransfer] = useState({ open: false, item: null });
   const [pdModal, setPdModal] = useState({ open: false, item: null, tipo: "perda" });
 
+  const tiposRegistados = useMemo(() => {
+    const mapa = new Map();
+    categorias.forEach((c) => {
+      const g = tipoGrupo(c.tipo);
+      if (!g || mapa.has(g)) return;
+      const meta = TIPO_META[g] || {};
+      mapa.set(g, {
+        value: g,
+        label: meta.label || c.tipo,
+        icon: meta.icon || "label",
+        classe: meta.classe || "bg-surface-variant",
+      });
+    });
+    return [...mapa.values()];
+  }, [categorias]);
+
   const filterConfig = useMemo(() => [
     { value: "todos", label: "Todos", icon: "filter_list" },
-    ...Object.entries(familias).map(([k, v]) => ({ value: k, label: v.label, icon: v.icon, predicate: (item) => normalizarFamilia(item.categoria?.familia) === k })),
-  ], []);
+    ...tiposRegistados.map((f) => ({
+      value: f.value,
+      label: f.label,
+      icon: f.icon,
+      predicate: (item) => tipoGrupo(item.categoria?.tipo) === f.value,
+    })),
+  ], [tiposRegistados]);
 
   const { search, setSearch, activeFilter, setActiveFilter, filtered, total } = useFilter({
     items: materiais,
@@ -71,17 +119,19 @@ export default function EstoquePage() {
 
   const filtrados = filtered;
 
-  const porFamilia = useMemo(() => {
-    const mapa = {};
-    Object.keys(familias).forEach((g) => {
-      mapa[g] = filtrados.filter((i) => normalizarFamilia(i.categoria?.familia) === g);
-    });
-    mapa._outras = filtrados.filter((i) => {
-      const f = normalizarFamilia(i.categoria?.familia);
-      return !(f in familias) && !(f in familiasServico);
+  const porTipo = useMemo(() => {
+    const chaves = new Set(tiposRegistados.map((t) => t.value));
+    const mapa = { _outras: [] };
+    filtrados.forEach((i) => {
+      const t = tipoGrupo(i.categoria?.tipo);
+      if (chaves.has(t)) {
+        (mapa[t] || (mapa[t] = [])).push(i);
+      } else {
+        mapa._outras.push(i);
+      }
     });
     return mapa;
-  }, [filtrados]);
+  }, [filtrados, tiposRegistados]);
 
   const abrirEntrada = useCallback((item) => {
     setMovSessao((s) => s + 1);
@@ -339,16 +389,16 @@ export default function EstoquePage() {
 
       {!carregandoInicial && materiais.length > 0 && (
         <>
-          {Object.keys(familias).map((g) => {
-            const itens = porFamilia[g];
+          {tiposRegistados.map((g) => {
+            const itens = porTipo[g.value] || [];
             if (itens.length === 0) return null;
             return (
-              <section key={g} className="space-y-3">
+              <section key={g.value} className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <span className={`w-10 h-10 rounded-lg flex items-center justify-center ${familias[g].classe} border border-outline-variant/30`}>
-                    <Icon name={familias[g].icon} className="text-xl" />
+                  <span className={`w-10 h-10 rounded-lg flex items-center justify-center ${g.classe} border border-outline-variant/30`}>
+                    <Icon name={g.icon} className="text-xl" />
                   </span>
-                  <h2 className="font-mono text-xs font-bold uppercase tracking-widest text-foreground">{familias[g].label}</h2>
+                  <h2 className="font-mono text-xs font-bold uppercase tracking-widest text-foreground">{g.label}</h2>
                   <span className="text-[10px] font-mono text-on-surface-variant">
                     {itens.length} {itens.length === 1 ? "material" : "materiais"}
                   </span>
@@ -375,19 +425,19 @@ export default function EstoquePage() {
               </section>
             );
           })}
-          {porFamilia._outras.length > 0 && (
+          {porTipo._outras.length > 0 && (
             <section className="space-y-3">
               <div className="flex items-center gap-3">
                 <span className="w-10 h-10 rounded-lg flex items-center justify-center bg-surface-variant border border-outline-variant/30">
                   <Icon name="label" className="text-xl" />
                 </span>
-                <h2 className="font-mono text-xs font-bold uppercase tracking-widest text-foreground">Outras famílias</h2>
+                <h2 className="font-mono text-xs font-bold uppercase tracking-widest text-foreground">Outros tipos</h2>
                 <span className="text-[10px] font-mono text-on-surface-variant">
-                  {porFamilia._outras.length} {porFamilia._outras.length === 1 ? "material" : "materiais"}
+                  {porTipo._outras.length} {porTipo._outras.length === 1 ? "material" : "materiais"}
                 </span>
               </div>
               <div className="space-y-3">
-                {porFamilia._outras.map((item, i) => (
+                {porTipo._outras.map((item, i) => (
                   <MaterialCard
                     key={item.id}
                     item={item}

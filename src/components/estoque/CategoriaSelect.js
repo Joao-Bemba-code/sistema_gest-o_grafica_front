@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Icon from "@/components/Icon";
-import { inputCls, familias, normalizarFamilia } from "@/lib/estoque";
+import { inputCls, familias, normalizarFamilia, tiposItem, normalizarTipoItem } from "@/lib/estoque";
 
 export default function CategoriaSelect({ value, categorias = [], onChange, placeholder = "Pesquisar categoria..." }) {
   const [aberto, setAberto] = useState(false);
@@ -17,7 +17,8 @@ export default function CategoriaSelect({ value, categorias = [], onChange, plac
     const t = busca.toLowerCase();
     if (!t) return true;
     const familia = (() => { const f = normalizarFamilia(c.familia); return familias[f]?.label || ""; })().toLowerCase();
-    return c.nome.toLowerCase().includes(t) || familia.includes(t);
+    const tipo = (() => tiposItem[normalizarTipoItem(c.tipo)]?.label || String(c.tipo || "")).toLowerCase();
+    return c.nome.toLowerCase().includes(t) || familia.includes(t) || tipo.includes(t);
   });
 
   const total = filtrados.length;
@@ -83,6 +84,7 @@ export default function CategoriaSelect({ value, categorias = [], onChange, plac
           {filtrados.map((cat, i) => {
             const fam = normalizarFamilia(cat.familia);
             const famCfg = familias[fam];
+            const tipoLabel = tiposItem[normalizarTipoItem(cat.tipo)]?.label || String(cat.tipo || "");
             return (
               <li key={cat.id} role="option" aria-selected={String(cat.id) === String(value)}>
                 <button
@@ -93,7 +95,7 @@ export default function CategoriaSelect({ value, categorias = [], onChange, plac
                 >
                   {famCfg && <Icon name={famCfg.icon} className="text-sm text-primary shrink-0" />}
                   <span className="flex-1 truncate">{cat.nome}</span>
-                  {famCfg && <span className="text-[9px] font-mono text-muted-foreground border border-border/60 rounded px-1.5 py-0.5 shrink-0">{famCfg.label}</span>}
+                  {tipoLabel && <span className="text-[9px] font-mono text-primary border border-primary/30 rounded px-1.5 py-0.5 shrink-0 bg-primary/5">{tipoLabel}</span>}
                 </button>
               </li>
             );
