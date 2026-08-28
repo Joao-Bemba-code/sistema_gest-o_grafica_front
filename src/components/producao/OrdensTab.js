@@ -203,7 +203,7 @@ export default function OrdensTab() {
                           <span className="font-bold text-sm text-foreground">{op.id}</span>
                           <Badge variant={sc.variant || "info"} className="text-[10px]">{sc.label}</Badge>
                           {op.requisicao_estado === "pendente" && (
-                            <Badge variant="destructive" className="text-[10px]">Aguardando saída de materiais</Badge>
+                            <Badge variant="destructive" className="text-[10px]">Aguardando requisição material</Badge>
                           )}
                           {op.maquina && (
                             <Badge variant="outline" className="text-[10px]"><Icon name="print" className="text-[12px]" /> {op.maquina}</Badge>
@@ -281,10 +281,10 @@ export default function OrdensTab() {
                         )}
                         <div className="flex items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3">
                           <p className="text-xs text-amber-700 dark:text-amber-400">
-                            Saída de materiais pendente — só depois de libertada a OP pode avançar para produção.
+                            Requisição de material pendente — só depois de libertada a OP pode avançar para produção.
                           </p>
                           <Button size="sm" onClick={(e) => { e.stopPropagation(); setLibertarOp(op); }}>
-                            <Icon name="inventory" className="text-lg" /> Dar saída de materiais
+                            <Icon name="inventory" className="text-lg" /> Requisição material
                           </Button>
                         </div>
                       </div>

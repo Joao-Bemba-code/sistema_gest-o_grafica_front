@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Icon from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -12,7 +12,7 @@ import { inputCls, familias, familiasServico, tiposItem, normalizarFamilia, norm
 import CreatableSelect from "@/components/ui/CreatableSelect";
 import { listar, criar, atualizar, remover } from "@/services/categorias";
 import { listar as listarServicos, criar as criarServico, atualizar as atualizarServico, remover as removerServico } from "@/services/servicos";
-import { useFilter } from "@/components/ui/FilterBar";
+import FilterBar, { useFilter } from "@/components/ui/FilterBar";
 
 const blankForm = { nome: "", familia: "", tipo: "Artigo / Produto", descricao: "" };
 
@@ -39,6 +39,26 @@ function tipoParaSalvar(texto) {
   return entrada ? entrada.valor : t;
 }
 
+const RECURSO_META = {
+  materia_prima: { label: "Matéria-Prima", icon: "inventory", classe: "text-blue-500 bg-blue-500/10" },
+  artigo: { label: "Artigo / Produto", icon: "inventory_2", classe: "text-emerald-500 bg-emerald-500/10" },
+  produto_acabado: { label: "Produto Acabado", icon: "inventory_2", classe: "text-emerald-500 bg-emerald-500/10" },
+  servico: { label: "Serviço", icon: "home_repair_service", classe: "text-violet-500 bg-violet-500/10" },
+  servicos: { label: "Serviço", icon: "home_repair_service", classe: "text-violet-500 bg-violet-500/10" },
+  maquina: { label: "Maquinaria", icon: "precision_manufacturing", classe: "text-slate-500 bg-slate-500/10" },
+  funcionario: { label: "Funcionário", icon: "groups", classe: "text-amber-500 bg-amber-500/10" },
+  colaborador: { label: "Colaborador", icon: "group", classe: "text-cyan-500 bg-cyan-500/10" },
+};
+
+function tipoChave(v) {
+  const txt = String(v || "").trim().toLowerCase();
+  if (!txt) return "";
+  if (RECURSO_META[txt]) return txt;
+  const n = normalizarTipoItem(v);
+  if (RECURSO_META[n]) return n;
+  return `custom:${txt}`;
+}
+
 export default function CategoriasPage() {
   const { addToast } = useToast();
   const [categorias, setCategorias] = useState([]);
@@ -57,9 +77,36 @@ export default function CategoriasPage() {
   const [salvandoServico, setSalvandoServico] = useState(false);
   const [eliminarServico, setEliminarServico] = useState(null);
 
-  const { search, setSearch, filtered, total } = useFilter({
+  const tiposRegistados = useMemo(() => {
+    const mapa = new Map();
+    categorias.forEach((c) => {
+      const k = tipoChave(c.tipo);
+      if (!k || mapa.has(k)) return;
+      const meta = RECURSO_META[k] || {};
+      mapa.set(k, {
+        value: k,
+        label: meta.label || c.tipo,
+        icon: meta.icon || "label",
+        classe: meta.classe || "bg-surface-variant",
+      });
+    });
+    return [...mapa.values()];
+  }, [categorias]);
+
+  const filterConfig = useMemo(() => [
+    { value: "todos", label: "Todos", icon: "filter_list" },
+    ...tiposRegistados.map((f) => ({
+      value: f.value,
+      label: f.label,
+      icon: f.icon,
+      predicate: (item) => tipoChave(item.tipo) === f.value,
+    })),
+  ], [tiposRegistados]);
+
+  const { search, setSearch, activeFilter, setActiveFilter, filtered, total } = useFilter({
     items: categorias,
     searchFields: ["nome", "descricao"],
+    filterConfig,
   });
 
   const carregar = useCallback(async () => {
@@ -195,25 +242,26 @@ export default function CategoriasPage() {
         <div>
           <h1 className="font-sans text-2xl font-semibold text-foreground tracking-tight">Categorias</h1>
         </div>
-        <Button variant="outline" onClick={abrirGerirServicos}>
-          <Icon name="home_repair_service" className="text-lg" /> Serviços
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" onClick={abrirGerirServicos}>
+            <Icon name="home_repair_service" className="text-lg" /> Serviços
+          </Button>
+          <Button onClick={() => abrirNova()}>
+            <Icon name="add" className="text-lg" /> Novo
+          </Button>
+        </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-lg" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Pesquisar por nome, sub-família..."
-            className={`${inputCls} pl-10`}
-          />
-        </div>
-        <Button onClick={() => abrirNova()}>
-          <Icon name="add" className="text-lg" /> Novo
-        </Button>
-      </div>
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="Pesquisar por nome, descrição..."
+        filters={filterConfig}
+        activeFilter={activeFilter}
+        onFilterChange={setActiveFilter}
+        count={total}
+        countLabel="categorias"
+      />
 
       {!carregando && categorias.length === 0 && (
         <div className="bg-card border border-border rounded-xl p-10 text-center">

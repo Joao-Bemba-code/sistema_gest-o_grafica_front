@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import Link from "next/link";
 import { listar as listarOrcamentos } from "@/services/orcamentos";
 import { listar as listarClientes } from "@/services/clientes";
 import { listar as listarMateriais, extrato, movimentar } from "@/services/materiais";
@@ -387,18 +386,6 @@ export default function DashboardPage() {
         <div>
           <h1 className="font-sans text-3xl font-bold text-foreground tracking-tight">Painel de Controlo</h1>
           <p className="text-primary mt-1 font-mono text-xs uppercase tracking-widest">Painel de controlo // DASH · Visão geral · {mesLabel}</p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <Link href="/estoque">
-            <button className="bg-surface-variant text-on-surface border border-outline-variant px-4 py-2 rounded font-mono flex items-center gap-2 hover:border-primary hover:text-primary transition-all text-[11px] uppercase tracking-wider">
-              <Icon name="inventory_2" className="text-[16px]" /> Estoque
-            </button>
-          </Link>
-          <Link href="/orcamentos">
-            <button className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold shadow-[0_0_15px_rgba(128,213,203,0.2)] hover:shadow-[0_0_25px_rgba(128,213,203,0.4)]">
-              <Icon name="request_quote" className="text-[16px]" /> Orçamentos
-            </button>
-          </Link>
         </div>
       </div>
 

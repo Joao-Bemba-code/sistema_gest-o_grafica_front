@@ -82,7 +82,7 @@ export default function SaidaMateriaisModal({ open, op, matPorId, materiais, onC
 
   const validaPasso1 = () => {
     if (linhas.length === 0) {
-      setErro("Adicione pelo menos um material para dar saída no estoque");
+      setErro("Adicione pelo menos um material para fazer a requisição no estoque");
       return false;
     }
     if (!form.permitido_por.trim()) {
@@ -127,7 +127,7 @@ export default function SaidaMateriaisModal({ open, op, matPorId, materiais, onC
     <Modal
       open={open}
       onClose={onClose}
-      title="Dar saída de materiais"
+      title="Requisição material"
       icon="inventory"
       size="lg"
       footer={

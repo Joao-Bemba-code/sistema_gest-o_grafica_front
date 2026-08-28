@@ -204,7 +204,7 @@ export default function EtapasTab() {
                     <div>
                       <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Aguardando libertação de materiais</p>
                       <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-0.5">
-                        Esta OP ainda não teve a saída de materiais confirmada pelo armazém. Só depois da libertação é que pode avançar para produção. Vá à aba &quot;Ordens&quot; → &quot;Dar saída de materiais&quot;.
+                        Esta OP ainda não teve a requisição de material confirmada pelo armazém. Só depois da libertação é que pode avançar para produção. Vá à aba &quot;Ordens&quot; → &quot;Requisição material&quot;.
                       </p>
                     </div>
                   </div>

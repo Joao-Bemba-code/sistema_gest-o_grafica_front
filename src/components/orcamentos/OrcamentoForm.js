@@ -278,14 +278,8 @@ return (
                       <div className="col-span-3 sm:col-span-2 flex flex-col gap-1.5">
                         <div className="px-2.5 py-2 bg-muted border border-input rounded-lg text-xs font-mono text-muted-foreground truncate">{`Kz ${Number(m.preco_venda || 0).toLocaleString("pt-AO")}`}</div>
                       </div>
-                      <div className="col-span-3 sm:col-span-2 flex flex-col gap-1.5">
+                      <div className="col-span-3 sm:col-span-3 flex flex-col gap-1.5">
                         <div className="px-2.5 py-2 bg-muted border border-input rounded-lg text-xs font-bold font-mono text-foreground truncate">{`Kz ${Number(m.custo_total || 0).toLocaleString("pt-AO")}`}</div>
-                      </div>
-                      <div className="col-span-1 flex justify-center">
-                        <label className="flex items-center gap-1 cursor-pointer" title="Marcar para mover o estoque ao faturar/produzir">
-                          <input type="checkbox" checked={!!m.mover_estoque} onChange={(e) => setItemMaterial(idx, mi, "mover_estoque", e.target.checked)} className="w-4 h-4 accent-emerald-600" />
-                          <span className="text-[9px] font-bold text-muted-foreground uppercase hidden sm:inline">Mover</span>
-                        </label>
                       </div>
                       <div className="col-span-1 flex justify-center">
                         {it.materiais.length > 1 && (
