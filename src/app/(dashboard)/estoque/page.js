@@ -22,7 +22,7 @@ import EmptyState from "@/components/estoque/EmptyState";
 import PedidosModal from "@/components/estoque/PedidosModal";
 import PedidoFormModal from "@/components/estoque/PedidoFormModal";
 import PedidoReceberModal from "@/components/estoque/PedidoReceberModal";
-import { normalizarTipoItem } from "@/lib/estoque";
+import { familias, normalizarFamilia, normalizarTipoItem } from "@/lib/estoque";
 import { gerarFichaMaterialPDF, gerarPedidoPDF } from "@/lib/estoquePdf";
 import { listar as listarPedidos, criar as criarPedido, cancelar as cancelarPedido, receber as apiReceberPedido } from "@/services/pedidos";
 import { remover as removerMaterial } from "@/services/materiais";
@@ -84,6 +84,7 @@ export default function EstoquePage() {
   const [deletando, setDeletando] = useState(false);
   const [transfer, setTransfer] = useState({ open: false, item: null });
   const [pdModal, setPdModal] = useState({ open: false, item: null, tipo: "perda" });
+  const [subFiltro, setSubFiltro] = useState("todas");
 
   const tiposRegistados = useMemo(() => {
     const mapa = new Map();
@@ -119,10 +120,37 @@ export default function EstoquePage() {
 
   const filtrados = filtered;
 
+  const aoMudarFiltro = (v) => {
+    setActiveFilter(v);
+    setSubFiltro("todas");
+  };
+
+  const subFiltros = useMemo(() => {
+    if (activeFilter === "todos") return [];
+    const metas = new Map();
+    categorias.forEach((c) => {
+      if (tipoGrupo(c.tipo) !== activeFilter) return;
+      const chave = normalizarFamilia(c.familia);
+      if (!chave || metas.has(chave)) return;
+      const cfg = familias[chave] || {};
+      metas.set(chave, {
+        value: chave,
+        label: cfg.label || c.familia || chave,
+        icon: cfg.icon || "label",
+      });
+    });
+    return [...metas.values()];
+  }, [categorias, activeFilter]);
+
+  const visiveis = useMemo(() => {
+    if (!subFiltro || subFiltro === "todas") return filtrados;
+    return filtrados.filter((i) => normalizarFamilia(i.categoria?.familia) === subFiltro);
+  }, [filtrados, subFiltro]);
+
   const porTipo = useMemo(() => {
     const chaves = new Set(tiposRegistados.map((t) => t.value));
     const mapa = { _outras: [] };
-    filtrados.forEach((i) => {
+    visiveis.forEach((i) => {
       const t = tipoGrupo(i.categoria?.tipo);
       if (chaves.has(t)) {
         (mapa[t] || (mapa[t] = [])).push(i);
@@ -131,7 +159,7 @@ export default function EstoquePage() {
       }
     });
     return mapa;
-  }, [filtrados, tiposRegistados]);
+  }, [visiveis, tiposRegistados]);
 
   const abrirEntrada = useCallback((item) => {
     setMovSessao((s) => s + 1);
@@ -378,16 +406,46 @@ export default function EstoquePage() {
         placeholder="Pesquisar materiais por nome, SKU, fornecedor..."
         filters={filterConfig}
         activeFilter={activeFilter}
-        onFilterChange={setActiveFilter}
+        onFilterChange={aoMudarFiltro}
         count={total}
         countLabel="materiais"
       />
+
+      {subFiltros.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setSubFiltro("todas")}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${subFiltro === "todas" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-accent"}`}
+          >
+            Todas famílias
+          </button>
+          {subFiltros.map((f) => (
+            <button
+              key={f.value}
+              type="button"
+              onClick={() => setSubFiltro(f.value)}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${subFiltro === f.value ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-accent"}`}
+            >
+              <Icon name={f.icon} className="text-sm mr-1.5 align-[-2px]" />
+              {f.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {!carregandoInicial && materiais.length === 0 && (
         <EmptyState categorias={categorias} fornecedores={fornecedores} />
       )}
 
-      {!carregandoInicial && materiais.length > 0 && (
+      {!carregandoInicial && materiais.length > 0 && visiveis.length === 0 && (
+        <div className="bg-card border border-border rounded-xl p-10 text-center">
+          <Icon name="search_off" className="text-4xl text-muted-foreground mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">Nenhum material nesta família.</p>
+        </div>
+      )}
+
+      {!carregandoInicial && materiais.length > 0 && visiveis.length > 0 && (
         <>
           {tiposRegistados.map((g) => {
             const itens = porTipo[g.value] || [];
