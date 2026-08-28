@@ -206,7 +206,7 @@ export default function RelatoriosPage() {
           { key: "producao", label: "Produção", icon: "precision_manufacturing" },
           { key: "clientes", label: "Cadastros", icon: "groups" },
           { key: "stock", label: "Stock", icon: "inventory_2" },
-          { key: "categorias", label: "Recursos", icon: "category" },
+          { key: "categorias", label: "Categorias", icon: "category" },
         ].map((a) => (
           <Button key={a.key} variant={aba === a.key ? "default" : "outline"} size="sm" onClick={() => setAba(a.key)}>
             <Icon name={a.icon} className="text-sm" />
@@ -585,7 +585,7 @@ export default function RelatoriosPage() {
         return (
           <>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
-              <KpiCard icon="category" label="Recursos" value={categorias.length} iconVariant="primary" />
+              <KpiCard icon="category" label="Categorias" value={categorias.length} iconVariant="primary" />
               <KpiCard icon="folder_open" label="Famílias" value={Object.keys(catMap).length} iconVariant="info" />
               <KpiCard icon="inventory_2" label="Materiais Cadastrados" value={materiais.length} iconVariant="success" />
               <KpiCard icon="people" label="Cadastros" value={clientes.length} iconVariant="secondary" />

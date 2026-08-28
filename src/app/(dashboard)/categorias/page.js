@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Icon from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -39,14 +39,6 @@ function tipoParaSalvar(texto) {
   return entrada ? entrada.valor : t;
 }
 
-const CATEGORIAS_FILTRO = [
-  { value: "todos", label: "Todos", icon: "apps" },
-  { value: "servico", label: "Serviços", icon: "home_repair_service" },
-  { value: "artigo", label: "Artigos / Produtos", icon: "inventory_2" },
-  { value: "maquina", label: "Maquinaria", icon: "precision_manufacturing" },
-  { value: "funcionario", label: "Funcionários", icon: "groups" },
-];
-
 export default function CategoriasPage() {
   const { addToast } = useToast();
   const [categorias, setCategorias] = useState([]);
@@ -65,21 +57,8 @@ export default function CategoriasPage() {
   const [salvandoServico, setSalvandoServico] = useState(false);
   const [eliminarServico, setEliminarServico] = useState(null);
 
-  const [abaTipo, setAbaTipo] = useState("todos");
-
-  const categoriasMateriais = useMemo(() => {
-    const servicosTipois = new Set(["servico", "servicos"]);
-    return categorias.filter((c) => {
-      if (!c.tipo) return true;
-      if (abaTipo === "todos") return true;
-      const t = String(c.tipo).trim().toLowerCase();
-      if (abaTipo === "servico") return servicosTipois.has(t);
-      return t === abaTipo;
-    });
-  }, [categorias, abaTipo]);
-
   const { search, setSearch, filtered, total } = useFilter({
-    items: categoriasMateriais,
+    items: categorias,
     searchFields: ["nome", "descricao"],
   });
 
@@ -87,7 +66,7 @@ export default function CategoriasPage() {
     try {
       setCategorias(await listar());
     } catch {
-      addToast?.("Erro ao carregar recursos", "error");
+      addToast?.("Erro ao carregar categorias", "error");
     } finally {
       setCarregando(false);
     }
@@ -100,7 +79,7 @@ export default function CategoriasPage() {
         const dados = await listar();
         if (ativo) setCategorias(dados);
       } catch {
-        if (ativo) addToast?.("Erro ao carregar recursos", "error");
+        if (ativo) addToast?.("Erro ao carregar categorias", "error");
       } finally {
         if (ativo) setCarregando(false);
       }
@@ -132,7 +111,7 @@ export default function CategoriasPage() {
       const payload = { nome: form.nome.trim(), familia: familiaParaSalvar(form.familia), tipo: tipoParaSalvar(form.tipo), descricao: form.descricao.trim() };
       if (modal.id) await atualizar(modal.id, payload);
       else await criar(payload);
-      addToast?.(modal.id ? "Recurso atualizado" : "Recurso criado", "success");
+      addToast?.(modal.id ? "Categoria atualizada" : "Categoria criada", "success");
       setModal({ aberto: false, id: null });
       await carregar();
     } catch (err) {
@@ -148,7 +127,7 @@ export default function CategoriasPage() {
     try {
       await remover(eliminar.id);
       setCategorias((prev) => prev.filter((c) => c.id !== eliminar.id));
-      addToast?.("Recurso removido", "success");
+      addToast?.("Categoria removida", "success");
       setEliminar(null);
     } catch (err) {
       addToast?.(err.response?.data?.erro || "Erro ao remover", "error");
@@ -214,25 +193,11 @@ export default function CategoriasPage() {
     <div className="space-y-6">
       <div className="bg-card border border-border rounded-xl p-5 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="font-sans text-2xl font-semibold text-foreground tracking-tight">Recursos</h1>
-          <p className="text-muted-foreground mt-0.5 text-xs">Classificação por categoria, família, sub-família, tipo e descrição</p>
+          <h1 className="font-sans text-2xl font-semibold text-foreground tracking-tight">Categorias</h1>
         </div>
         <Button variant="outline" onClick={abrirGerirServicos}>
           <Icon name="home_repair_service" className="text-lg" /> Serviços
         </Button>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {CATEGORIAS_FILTRO.map((f) => (
-          <button
-            key={f.value}
-            onClick={() => setAbaTipo(f.value)}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${abaTipo === f.value ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-accent"}`}
-          >
-            <Icon name={f.icon} className="text-sm mr-1.5 align-[-2px]" />
-            {f.label}
-          </button>
-        ))}
       </div>
 
       <div className="flex items-center gap-3">
@@ -250,19 +215,19 @@ export default function CategoriasPage() {
         </Button>
       </div>
 
-      {!carregando && categoriasMateriais.length === 0 && (
+      {!carregando && categorias.length === 0 && (
         <div className="bg-card border border-border rounded-xl p-10 text-center">
           <Icon name="category" className="text-4xl text-muted-foreground mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">Ainda não existem recursos desta categoria.</p>
+          <p className="text-sm text-muted-foreground">Ainda não existem categorias deste tipo.</p>
         </div>
       )}
 
-      {!carregando && categoriasMateriais.length > 0 && (
+      {!carregando && categorias.length > 0 && (
         <>
           {filtered.length === 0 && (
             <div className="bg-card border border-border rounded-xl p-10 text-center">
               <Icon name="search_off" className="text-4xl text-muted-foreground mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">Nenhum recurso encontrado.</p>
+              <p className="text-sm text-muted-foreground">Nenhuma categoria encontrada.</p>
             </div>
           )}
 
@@ -304,7 +269,7 @@ export default function CategoriasPage() {
         </>
       )}
 
-      <Modal open={modal.aberto} onClose={() => setModal({ aberto: false, id: null })} title={modal.id ? "Editar Recurso" : "Novo Recurso"} icon="category" size="lg"
+      <Modal open={modal.aberto} onClose={() => setModal({ aberto: false, id: null })} title={modal.id ? "Editar Categoria" : "Nova Categoria"} icon="category" size="lg"
         footer={<>
           <Button type="button" variant="outline" onClick={() => setModal({ aberto: false, id: null })}>Cancelar</Button>
           <Button type="submit" form="form-categoria" loading={salvando}><Icon name="save" className="text-lg" /> Guardar</Button>
@@ -342,13 +307,13 @@ export default function CategoriasPage() {
             </div>
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Descrição</label>
-              <textarea rows={2} value={form.descricao} onChange={(e) => setForm((p) => ({ ...p, descricao: e.target.value }))} className={`${inputCls} resize-none`} placeholder="Descrição do recurso..." />
+              <textarea rows={2} value={form.descricao} onChange={(e) => setForm((p) => ({ ...p, descricao: e.target.value }))} className={`${inputCls} resize-none`} placeholder="Descrição da categoria..." />
             </div>
           </div>
         </form>
       </Modal>
 
-      <ConfirmDialog open={Boolean(eliminar)} onClose={() => setEliminar(null)} onConfirm={confirmarEliminacao} loading={deletando} title="Remover recurso"
+      <ConfirmDialog open={Boolean(eliminar)} onClose={() => setEliminar(null)} onConfirm={confirmarEliminacao} loading={deletando} title="Remover categoria"
         description={eliminar ? `Remover "${eliminar.nome}"?` : ""} />
 
       <Modal open={modalServicos} onClose={() => setModalServicos(false)} title="Gerir Serviços" icon="home_repair_service" size="lg"

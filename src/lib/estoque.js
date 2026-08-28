@@ -14,7 +14,6 @@ export const familias = {
   tintas: { label: "Tintas", icon: "water_drop", classe: "text-amber-500 bg-amber-500/10" },
   chapas: { label: "Chapas", icon: "square_foot", classe: "text-slate-500 bg-slate-500/10" },
   produto_quimico: { label: "Produto Químico", icon: "science", classe: "text-yellow-600 bg-yellow-600/10" },
-  equipamentos: { label: "Equipamentos", icon: "precision_manufacturing", classe: "text-indigo-500 bg-indigo-500/10" },
   ferramentas: { label: "Ferramentas", icon: "construction", classe: "text-gray-500 bg-gray-500/10" },
   suporte_especial: { label: "Suporte Especial", icon: "view_carousel", classe: "text-pink-500 bg-pink-500/10" },
   material_acabamento: { label: "Material de Acabamento", icon: "palette", classe: "text-purple-500 bg-purple-500/10" },

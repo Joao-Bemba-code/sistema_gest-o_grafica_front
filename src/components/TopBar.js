@@ -12,17 +12,17 @@ import Modal from "./Modal";
 
 const breadcrumbs = {
   "/": ["Painel"],
-  "/vendas": ["Vendas"],
-  "/orcamentos": ["Vendas", "Orçamentos"],
+  "/vendas": ["Área Comercial"],
+  "/orcamentos": ["Área Comercial", "Orçamentos"],
   "/producao/ordens": ["Produção", "Ordens"],
   "/producao": ["Produção"],
   "/pre-impressao": ["Pré-Impressão"],
   "/impressao": ["Impressão"],
   "/acabamento": ["Acabamento"],
-  "/clientes": ["Cadastros"],
+  "/clientes": ["Área Comercial", "Cadastros"],
   "/estoque": ["Provisionamento"],
   "/estoque/novo": ["Provisionamento", "Novo Material"],
-  "/faturacao": ["Vendas", "Facturas"],
+  "/faturacao": ["Área Comercial", "Facturas"],
   "/qualidade": ["Qualidade"],
   "/relatorios": ["Relatórios"],
   "/configuracoes": ["Configurações"],
@@ -63,7 +63,7 @@ export default function TopBar() {
       </div>
       <div className="flex items-center gap-2 sm:gap-5">
         <nav className="hidden md:flex gap-5">
-          <Link href="/vendas" className="text-primary font-semibold border-b-2 border-primary pb-1 text-sm transition-all">Vendas</Link>
+          <Link href="/vendas" className="text-primary font-semibold border-b-2 border-primary pb-1 text-sm transition-all">Área Comercial</Link>
           <Link href="/producao" className="text-muted-foreground hover:text-primary transition-all text-sm font-medium">Produção</Link>
         </nav>
         <div className="flex items-center gap-3">

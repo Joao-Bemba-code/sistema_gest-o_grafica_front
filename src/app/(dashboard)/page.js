@@ -12,7 +12,7 @@ import { getUsuario } from "@/services/auth";
 import Icon from "@/components/Icon";
 import Modal from "@/components/Modal";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
-import KpiCard from "@/components/ui/KpiCard";
+import ComboKpiCard from "@/components/ui/ComboKpiCard";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/Toast";
@@ -184,14 +184,58 @@ export default function DashboardPage() {
     return d && d < hoje;
   }).length;
 
+  const faturacaoHoje = faturas.filter((f) => {
+    const d = new Date(f.data_emissao);
+    return !isNaN(d.getTime()) && d.toDateString() === hoje.toDateString();
+  });
+  const totalFaturamentoDia = faturacaoHoje.reduce((s, f) => s + parseFloat(f.total || f.valor || 0), 0);
+
+  const clientesDoDia = clientes.filter((c) => {
+    const d = c.dataCadastro ? new Date(c.dataCadastro) : null;
+    return d && !isNaN(d.getTime()) && d.toDateString() === hoje.toDateString();
+  });
+
   const kpis = [
-    { icon: "request_quote", label: "Orçamento do Dia", value: `Kz ${totalDia.toLocaleString()}`, badge: `${orcamentosHoje.length} hoje`, barPct: Math.min((orcamentosHoje.length / 10) * 100, 100), iconVariant: "primary" },
-    { icon: "check_circle", label: "Orçamentos Aprovados", value: aprovados, unit: "total", badge: `${orcamentos.length} total`, barPct: orcamentos.length ? Math.round((aprovados / orcamentos.length) * 100) : 0, iconVariant: "success" },
-    { icon: "precision_manufacturing", label: "Trabalhos em Produção", value: producao, unit: "ativos", badge: "Em andamento", barPct: ordens.length ? Math.round((producao / ordens.length) * 100) : 0, iconVariant: "info" },
-    { icon: "task_alt", label: "Trabalhos Concluídos", value: concluidos, unit: "total", badge: `${ordens.length} ordens`, barPct: ordens.length ? Math.round((concluidos / ordens.length) * 100) : 0, iconVariant: "success" },
-    { icon: "paid", label: "Faturação Mensal", value: `Kz ${totalFaturacao.toLocaleString()}`, badge: `${faturacaoMes.length} faturas`, barPct: faturacaoMes.length ? 72 : 0, iconVariant: "primary" },
-    { icon: "groups", label: "Clientes Ativos", value: clientes.length, badge: "cadastrados", barPct: clientes.length ? 68 : 0, iconVariant: "secondary" },
-    { icon: "warning", label: "Trabalhos em Atraso", value: atrasados, unit: "pendentes", badge: atrasados > 0 ? "Atenção" : "OK", barPct: ordens.length ? Math.round((atrasados / ordens.length) * 100) : 0, iconVariant: atrasados > 0 ? "error" : "success" },
+    {
+      icon: "request_quote",
+      title: "Orçamentos",
+      subtitle: "Área Comercial",
+      stats: [
+        { label: "Orçamentos do Dia", value: orcamentosHoje.length, sublabel: `Kz ${totalDia.toLocaleString()}` },
+        { label: "Aprovados", value: aprovados, sublabel: `${orcamentos.length} total` },
+      ],
+      iconVariant: "primary",
+    },
+    {
+      icon: "task_alt",
+      title: "Trabalhos",
+      subtitle: "Produção",
+      stats: [
+        { label: "Concluídos", value: concluidos, sublabel: `${ordens.length} ordens` },
+        { label: "Em Atraso", value: atrasados, sublabel: atrasados > 0 ? "Atenção" : "OK", iconVariant: atrasados > 0 ? "error" : "success" },
+      ],
+      iconVariant: atrasados > 0 ? "error" : "success",
+    },
+    {
+      icon: "paid",
+      title: "Faturação",
+      subtitle: "Comercial",
+      stats: [
+        { label: "Mensal", value: `Kz ${totalFaturacao.toLocaleString()}`, sublabel: `${faturacaoMes.length} faturas` },
+        { label: "do Dia", value: `Kz ${totalFaturamentoDia.toLocaleString()}`, sublabel: `${faturacaoHoje.length} faturas` },
+      ],
+      iconVariant: "primary",
+    },
+    {
+      icon: "groups",
+      title: "Clientes",
+      subtitle: "Cadastros",
+      stats: [
+        { label: "Ativos", value: clientes.length, sublabel: "cadastrados" },
+        { label: "do Dia", value: clientesDoDia.length, sublabel: "novos hoje" },
+      ],
+      iconVariant: "secondary",
+    },
   ];
 
   const [now, setNow] = useState(() => Date.now());
@@ -360,14 +404,12 @@ export default function DashboardPage() {
 
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 md:gap-6">
         {kpis.map((kpi) => (
-          <KpiCard
-            key={kpi.label}
+          <ComboKpiCard
+            key={kpi.title}
             icon={kpi.icon}
-            label={kpi.label}
-            value={kpi.value}
-            unit={kpi.unit}
-            badge={kpi.badge}
-            barPct={kpi.barPct}
+            title={kpi.title}
+            subtitle={kpi.subtitle}
+            stats={kpi.stats}
             iconVariant={kpi.iconVariant}
             className="group relative overflow-hidden"
           />

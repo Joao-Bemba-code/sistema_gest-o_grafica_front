@@ -6,14 +6,20 @@ import Icon from "@/components/Icon";
 import KpiCard from "@/components/ui/KpiCard";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import FloatButton from "@/components/ui/FloatButton";
 import { Badge } from "@/components/ui/Badge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import { ListSkeleton } from "@/components/Skeleton";
 import FilterBar, { useFilter } from "@/components/ui/FilterBar";
-import { listar as listarOrcamentos, remover as removerOrcamento } from "@/services/orcamentos";
-import { listarFaturas, removerFatura, marcarPaga } from "@/services/faturacao";
+import { listar as listarOrcamentos, remover as removerOrcamento, mudarEstado } from "@/services/orcamentos";
+import { listarFaturas, removerFatura, buscarFatura } from "@/services/faturacao";
 import { buscarOrganizacao } from "@/services/configuracoes";
+import CadastrosTab from "@/components/vendas/CadastrosTab";
+import OrcamentoModal from "@/components/vendas/OrcamentoModal";
+import OrcamentoDetalhesModal from "@/components/vendas/OrcamentoDetalhesModal";
+import FaturaModal from "@/components/vendas/FaturaModal";
+import FaturaDetalhesModal from "@/components/vendas/FaturaDetalhesModal";
 import gerarOrcamentoPdf from "@/lib/orcamentoPdf";
 import gerarFaturaPdf from "@/lib/faturacaoPdf";
 
@@ -41,16 +47,31 @@ function formatData(v) {
   return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("pt-BR");
 }
 
-export default function VendasPage() {
+export default function AreaComercialPage() {
   const router = useRouter();
-  const [tab, setTab] = useState("orcamentos");
+  const [tab, setTab] = useState(() => {
+    if (typeof window !== "undefined") {
+      const q = new URLSearchParams(window.location.search).get("tab");
+      if (q && ["orcamentos", "faturas", "cadastros"].includes(q)) return q;
+    }
+    return "orcamentos";
+  });
   const [orcamentos, setOrcamentos] = useState([]);
   const [faturas, setFaturas] = useState([]);
   const [empresa, setEmpresa] = useState({ nome: "", nif: "", endereco: "", telefone: "", email: "" });
   const [loading, setLoading] = useState(true);
   const [eliminarItem, setEliminarItem] = useState(null);
   const [deletando, setDeletando] = useState(false);
+  const [orcForm, setOrcForm] = useState({ open: false, id: null });
+  const [orcDetalhe, setOrcDetalhe] = useState(null);
+  const [fatFormOpen, setFatFormOpen] = useState(false);
+  const [fatDetalhe, setFatDetalhe] = useState(null);
   const { addToast } = useToast();
+
+  const trocarTab = (t) => {
+    setTab(t);
+    router.replace(`/vendas${t === "orcamentos" ? "" : `?tab=${t}`}`, { scroll: false });
+  };
 
   useEffect(() => {
     let ativo = true;
@@ -74,6 +95,50 @@ export default function VendasPage() {
     })();
     return () => { ativo = false; };
   }, [addToast]);
+
+  const atualizarOrcamentos = async () => {
+    const d = await listarOrcamentos().catch(() => []);
+    setOrcamentos(Array.isArray(d) ? d : d?.data ?? []);
+  };
+
+  const atualizarFaturas = async () => {
+    const d = await listarFaturas().catch(() => []);
+    setFaturas(Array.isArray(d) ? d : d?.data ?? []);
+  };
+
+  const abrirOrcDetalhe = (o) => {
+    setOrcDetalhe(o);
+    setOrcForm({ open: false, id: null });
+  };
+
+  const abrirEdicaoOrc = (o) => {
+    setOrcDetalhe(null);
+    setOrcForm({ open: true, id: o.id });
+  };
+
+  const fecharOrcForm = () => setOrcForm({ open: false, id: null });
+
+  const mudarEstadoOrc = async (o, novoEstado) => {
+    if (!novoEstado || novoEstado === o.estado) return;
+    try {
+      const atualizado = await mudarEstado(o.id, novoEstado);
+      setOrcamentos((prev) => prev.map((x) => (x.id === o.id ? { ...x, ...atualizado } : x)));
+      setOrcDetalhe((prev) => (prev && prev.id === o.id ? { ...prev, ...atualizado } : prev));
+      addToast(`Orçamento ${o.numero || o.id} marcado como ${novoEstado}`, "success");
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao mudar o estado", "error");
+    }
+  };
+
+  const abrirFaturaDetalhe = async (f) => {
+    setFatDetalhe(f);
+    try {
+      const fresca = await buscarFatura(f.id);
+      if (fresca && fresca.id) setFatDetalhe(fresca);
+    } catch {
+      // mantém os dados já carregados da lista
+    }
+  };
 
   const orcFiltro = useMemo(() => [
     { value: "todos", label: "Todos", icon: "apps", count: orcamentos.length },
@@ -141,39 +206,50 @@ export default function VendasPage() {
     <div className="space-y-5">
       <div className="obsidian-glass rounded-lg p-5 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-l-4 border-l-primary">
         <div>
-          <h1 className="font-sans text-3xl font-bold text-foreground tracking-tight">Vendas</h1>
+          <h1 className="font-sans text-3xl font-bold text-foreground tracking-tight">Área Comercial</h1>
           <p className="text-primary mt-1 font-mono text-xs uppercase tracking-widest">
-            Orçamentos e facturas // VENDAS
+            Orçamentos · facturas · cadastros // COMERCIAL
           </p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <button onClick={() => router.push("/orcamentos/novo")} className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold shadow-[0_0_15px_rgba(128,213,203,0.2)] hover:shadow-[0_0_25px_rgba(128,213,203,0.4)]">
-            <Icon name="add" className="text-[16px]" /> Novo Orçamento
-          </button>
         </div>
       </div>
 
+      {tab !== "cadastros" && (
       <section className="grid grid-cols-2 sm:grid-cols-4 gap-5">
         <KpiCard icon="request_quote" label="Orçamentos" value={orcamentos.length} iconVariant="info" />
         <KpiCard icon="pending" label="Pendentes" value={pendentes} iconVariant="warning" />
         <KpiCard icon="paid" label="Total Facturado" value={formatKz(totalFat)} iconVariant="success" />
         <KpiCard icon="account_balance" label="A Receber" value={formatKz(totalReceber)} iconVariant="error" />
       </section>
+      )}
 
       <div className="flex gap-1.5 flex-wrap obsidian-glass cyber-border p-1.5 rounded-xl">
-        {["orcamentos", "faturas"].map((t) => (
-          <button key={t} type="button" onClick={() => setTab(t)}
+        {["orcamentos", "faturas", "cadastros"].map((t) => (
+          <button key={t} type="button" onClick={() => trocarTab(t)}
             className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all ${
               tab === t ? "nav-pill shadow-none text-primary" : "text-muted-foreground hover:text-foreground"
             }`}>
-            <Icon name={t === "orcamentos" ? "request_quote" : "receipt_long"} className="text-lg" />
-            {t === "orcamentos" ? "Orçamentos" : "Facturas"}
+            <Icon name={t === "orcamentos" ? "request_quote" : t === "faturas" ? "receipt_long" : "groups"} className="text-lg" />
+            {t === "orcamentos" ? "Orçamentos" : t === "faturas" ? "Facturas" : "Cadastros"}
           </button>
         ))}
       </div>
 
       {tab === "orcamentos" && (
         <>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+              <h2 className="font-sans text-xl font-bold text-foreground tracking-tight flex items-center gap-2">
+                <Icon name="request_quote" className="text-primary text-[22px]" /> Orçamentos
+              </h2>
+              <p className="text-primary mt-0.5 font-mono text-[10px] uppercase tracking-widest">
+                {orcamentos.length} orçamentos · {pendentes} pendentes // {formatKz(totalOrc)}
+              </p>
+            </div>
+            <button onClick={() => setOrcForm({ open: true, id: null })} className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold shadow-[0_0_15px_rgba(128,213,203,0.2)] hover:shadow-[0_0_25px_rgba(128,213,203,0.4)]">
+              <Icon name="add" className="text-[16px]" /> Novo Orçamento
+            </button>
+          </div>
+
           <FilterBar
             search={orcFilter.search}
             onSearchChange={orcFilter.setSearch}
@@ -190,7 +266,7 @@ export default function VendasPage() {
 
           <div className="space-y-3">
             {orcFilter.filtered.map((o) => (
-              <Card key={o.id} className="hover-lift cursor-pointer" onClick={() => router.push(`/orcamentos?id=${o.id}`)}>
+              <Card key={o.id} className="hover-lift cursor-pointer" onClick={() => abrirOrcDetalhe(o)}>
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4 min-w-0">
@@ -212,6 +288,7 @@ export default function VendasPage() {
                         <p className="text-lg font-bold text-foreground">{formatKz(o.total)}</p>
                         <p className="text-[10px] text-muted-foreground">{formatData(o.data)}</p>
                       </div>
+                      <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); abrirEdicaoOrc(o); }} title="Editar"><Icon name="edit" className="text-[16px]" /></Button>
                       <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); gerarOrcamentoPdf(o, empresa); }} title="Baixar PDF"><Icon name="download" className="text-[16px]" /></Button>
                       <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setEliminarItem({ ...o, _tipo: "orcamento" }); }} title="Remover"><Icon name="delete" className="text-[16px] text-destructive" /></Button>
                     </div>
@@ -231,6 +308,20 @@ export default function VendasPage() {
 
       {tab === "faturas" && (
         <>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+              <h2 className="font-sans text-xl font-bold text-foreground tracking-tight flex items-center gap-2">
+                <Icon name="receipt_long" className="text-primary text-[22px]" /> Facturas
+              </h2>
+              <p className="text-primary mt-0.5 font-mono text-[10px] uppercase tracking-widest">
+                {faturas.length} facturas · {totalReceber > 0 ? `${formatKz(totalReceber)} a receber` : formatKz(totalFat)}
+              </p>
+            </div>
+            <button onClick={() => setFatFormOpen(true)} className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold shadow-[0_0_15px_rgba(128,213,203,0.2)] hover:shadow-[0_0_25px_rgba(128,213,203,0.4)]">
+              <Icon name="add" className="text-[16px]" /> Nova Fatura
+            </button>
+          </div>
+
           <FilterBar
             search={fatFilter.search}
             onSearchChange={fatFilter.setSearch}
@@ -244,7 +335,7 @@ export default function VendasPage() {
 
           <div className="space-y-3">
             {fatFilter.filtered.map((f) => (
-              <Card key={f.id} className="hover-lift cursor-pointer" onClick={() => router.push(`/faturacao`)}>
+              <Card key={f.id} className="hover-lift cursor-pointer" onClick={() => abrirFaturaDetalhe(f)}>
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4 min-w-0">
@@ -282,6 +373,41 @@ export default function VendasPage() {
         </>
       )}
 
+      {tab === "cadastros" && <CadastrosTab />}
+
+      <OrcamentoModal
+        open={orcForm.open}
+        editingId={orcForm.id}
+        onClose={fecharOrcForm}
+        onSaved={() => atualizarOrcamentos()}
+      />
+
+      <OrcamentoDetalhesModal
+        orcamento={orcDetalhe}
+        empresa={empresa}
+        onClose={() => setOrcDetalhe(null)}
+        onEditar={abrirEdicaoOrc}
+        onEliminar={(o) => { setOrcDetalhe(null); setEliminarItem({ ...o, _tipo: "orcamento" }); }}
+        onEstado={mudarEstadoOrc}
+      />
+
+      <FaturaModal
+        open={fatFormOpen}
+        onClose={() => setFatFormOpen(false)}
+        onSaved={() => atualizarFaturas()}
+      />
+
+      <FaturaDetalhesModal
+        fatura={fatDetalhe}
+        empresa={empresa}
+        onClose={() => setFatDetalhe(null)}
+        onChanged={(atual) => {
+          setFatDetalhe(atual);
+          setFaturas((prev) => prev.map((x) => (x.id === atual.id ? atual : x)));
+        }}
+        onEliminar={(f) => { setFatDetalhe(null); setEliminarItem({ ...f, _tipo: "fatura" }); }}
+      />
+
       <ConfirmDialog
         open={Boolean(eliminarItem)}
         onClose={() => setEliminarItem(null)}
@@ -294,6 +420,14 @@ export default function VendasPage() {
       <footer className="p-6 text-center border-t bg-muted/30 rounded-2xl">
         <p className="text-sm text-muted-foreground">SIGRAF — Sistema de Gestão para Indústria Gráfica</p>
       </footer>
+
+      {tab !== "cadastros" && (
+        <FloatButton
+          onClick={tab === "orcamentos" ? () => setOrcForm({ open: true, id: null }) : () => setFatFormOpen(true)}
+          label={tab === "orcamentos" ? "Novo Orçamento" : "Nova Fatura"}
+          icon={tab === "orcamentos" ? "request_quote" : "receipt_long"}
+        />
+      )}
     </div>
   );
 }

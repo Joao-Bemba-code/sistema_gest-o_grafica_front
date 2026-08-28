@@ -1,10 +1,10 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import Icon from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/Toast";
+import Modal from "@/components/Modal";
 import OrcamentoForm, {
   blankForm,
   blankItem,
@@ -14,12 +14,7 @@ import OrcamentoForm, {
   recalcularItem,
   recalcularServico,
 } from "@/components/orcamentos/OrcamentoForm";
-import {
-  listar as listarOrcamentos,
-  buscarPorId,
-  criar,
-  atualizar,
-} from "@/services/orcamentos";
+import { buscarPorId, criar, atualizar } from "@/services/orcamentos";
 import { listar as listarClientes } from "@/services/clientes";
 import { listar as listarMateriais } from "@/services/materiais";
 import { listar as listarServicos } from "@/services/servicos";
@@ -37,11 +32,7 @@ function PreviewLinha({ label, valor, acento }) {
   );
 }
 
-function NovoOrcamentoInner() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const idParam = searchParams.get("id");
-  const editandoId = idParam ? String(idParam) : null;
+export default function OrcamentoModal({ open, editingId, onClose, onSaved }) {
   const { addToast } = useToast();
 
   const [clientes, setClientes] = useState([]);
@@ -52,9 +43,11 @@ function NovoOrcamentoInner() {
   const [form, setForm] = useState({ ...blankForm, itens: [{ ...blankItem, materiais: [{ ...blankMaterial }] }], servicos: [{ ...blankServico }] });
 
   useEffect(() => {
+    if (!open) return;
     let ativo = true;
     (async () => {
       setCarregando(true);
+      setForm({ ...blankForm, itens: [{ ...blankItem, materiais: [{ ...blankMaterial }] }], servicos: [{ ...blankServico }] });
       try {
         const [cliData, matData, srvData] = await Promise.all([
           listarClientes({ tipo: "cliente" }),
@@ -65,9 +58,9 @@ function NovoOrcamentoInner() {
         setClientes(Array.isArray(cliData) ? cliData : cliData?.data ?? []);
         setMateriais(Array.isArray(matData) ? matData : matData?.data ?? []);
         setServicosCatalogo(Array.isArray(srvData) ? srvData : srvData?.data ?? []);
-        if (editandoId) {
+        if (editingId) {
           try {
-            const o = await buscarPorId(editandoId);
+            const o = await buscarPorId(editingId);
             if (!ativo || !o) return;
             setForm({
               cliente_id: o.cliente_id ? String(o.cliente_id) : "",
@@ -113,7 +106,7 @@ function NovoOrcamentoInner() {
       ativo = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editandoId]);
+  }, [open, editingId]);
 
   const setField = (name, val) => setForm((p) => ({ ...p, [name]: val }));
 
@@ -189,14 +182,15 @@ function NovoOrcamentoInner() {
       observacoes: form.observacoes,
     };
     try {
-      if (editandoId) {
-        await atualizar(editandoId, dados);
+      if (editingId) {
+        await atualizar(editingId, dados);
         addToast("Orçamento atualizado com sucesso", "success");
       } else {
         await criar(dados);
         addToast("Orçamento criado com sucesso", "success");
       }
-      router.push("/orcamentos");
+      onSaved?.();
+      onClose();
     } catch (err) {
       addToast(err.response?.data?.erro || "Erro na operação", "error");
       setSalvando(false);
@@ -206,110 +200,80 @@ function NovoOrcamentoInner() {
   const primeiroItem = form.itens[0];
 
   return (
-    <div className="space-y-5">
-      <div className="obsidian-glass rounded-lg p-5 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-l-4 border-l-primary">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => router.push("/orcamentos")}
-            aria-label="Voltar aos orçamentos"
-            className="w-10 h-10 rounded bg-surface-variant border border-outline-variant flex items-center justify-center text-on-surface hover:border-primary hover:text-primary transition-colors shrink-0"
-          >
-            <Icon name="arrow_back" className="text-xl" />
-          </button>
-          <div>
-            <h1 className="font-sans text-3xl font-bold text-foreground tracking-tight">{editandoId ? "Editar Orçamento" : "Novo Orçamento"}</h1>
-            <p className="text-primary mt-1 font-mono text-xs uppercase tracking-widest">
-              {editandoId ? `Atualizar orçamento #${editandoId}` : "Criar orçamento para cliente // ORC"}
-            </p>
+    <Modal open={open} onClose={onClose} title={editingId ? "Editar Orçamento" : "Novo Orçamento"} icon="request_quote" size="full"
+      footer={<>
+        <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+        <Button type="submit" form="form-orcamento" loading={salvando}>
+          <Icon name="save" className="text-lg" /> Guardar Orçamento
+        </Button>
+      </>}>
+      {carregando ? (
+        <div className="space-y-3" aria-label="A carregar formulário">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-10 bg-muted rounded-xl animate-pulse" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
+          <div className="lg:col-span-2">
+            <OrcamentoForm
+              formId="form-orcamento"
+              form={form}
+              setField={setField}
+              setForm={setForm}
+              onSubmit={aoSubmeter}
+              onClienteSelect={handleClienteSelect}
+              clientes={clientes}
+              materiais={materiais}
+              servicosCatalogo={servicosCatalogo}
+            />
           </div>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => router.push("/orcamentos")}>Cancelar</Button>
-          <Button type="submit" form="form-orcamento" loading={salvando}>
-            <Icon name="save" className="text-lg" /> Guardar Orçamento
-          </Button>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
-        <div className="lg:col-span-2">
-          <div className="glass-panel rounded-xl overflow-hidden">
-            <div className="px-5 sm:px-6 py-5">
-              {carregando ? (
-                <div className="space-y-3" aria-label="A carregar formulário">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="h-10 bg-muted rounded-xl animate-pulse" />
-                  ))}
-                </div>
-              ) : (
-                <OrcamentoForm
-                  formId="form-orcamento"
-                  form={form}
-                  setField={setField}
-                  setForm={setForm}
-                  onSubmit={aoSubmeter}
-                  onClienteSelect={handleClienteSelect}
-                  clientes={clientes}
-                  materiais={materiais}
-                  servicosCatalogo={servicosCatalogo}
-                />
-              )}
+          <aside className="lg:col-span-1 obsidian-glass cyber-border rounded-xl p-5 lg:sticky lg:top-0 space-y-4" aria-label="Pré-visualização do orçamento">
+            <div className="flex items-center justify-between">
+              <p className="cyber-label flex items-center gap-1.5">
+                <Icon name="visibility" className="text-sm text-primary" /> Pré-visualização
+              </p>
+              <span className="w-2 h-2 rounded-full bg-success animate-pulse" aria-hidden="true" />
             </div>
-          </div>
+
+            <div className="relative w-24 h-24 rounded-2xl obsidian-glass cyber-border flex items-center justify-center mx-auto">
+              <Icon name="request_quote" className="text-4xl text-primary" />
+              <span className="absolute -top-2 -right-2 w-6 h-6 rounded-lg bg-success flex items-center justify-center">
+                <Icon name="check" className="text-sm text-on-success" />
+              </span>
+            </div>
+
+            <div className="text-center">
+              <p className="text-lg font-extrabold text-foreground truncate">{primeiroItem?.descricao || "Novo Orçamento"}</p>
+              <p className="text-xs font-mono text-primary">{form.cliente || "SEM CLIENTE"}</p>
+            </div>
+
+            <div>
+              <PreviewLinha label="Empresa" valor={form.empresa} />
+              <PreviewLinha label="NIF" valor={form.nif} />
+              <PreviewLinha label="Telefone" valor={form.telefone} />
+              {form.itens.map((it, i) => (
+                <PreviewLinha key={i} label={`Item ${i + 1}`} valor={`${it.descricao || "—"} · ${it.quantidade || 0}× ${formatKz(it.total || 0)}`} />
+              ))}
+              {(form.servicos || []).filter((sv) => sv.descricao).map((sv, i) => (
+                <PreviewLinha key={`sv-${i}`} label={`Serviço ${i + 1}`} valor={`${sv.descricao} · ${sv.mob || 1}×${sv.duracaoHoras || 8}h · ${formatKz(sv.total || 0)}`} />
+              ))}
+              <PreviewLinha label="Subtotal" valor={formatKz(subtotalCalc)} />
+              {descontoCalc > 0 && <PreviewLinha label="Desconto" valor={`-${formatKz(descontoCalc)}`} />}
+              {ivaCalc > 0 && <PreviewLinha label="IVA" valor={formatKz(ivaCalc)} />}
+              <PreviewLinha label="Total" valor={formatKz(totalCalc)} acento="text-primary" />
+            </div>
+
+            <div className="flex items-center gap-2 text-[10px] text-muted-foreground pt-2 border-t border-border/40 flex-wrap">
+              <Icon name="bolt" className="text-sm text-warning" />
+              {form.prazoExecucao ? `Prazo: ${form.prazoExecucao}` : "Sem prazo definido"}
+              {" • "}
+              Custo mat.: {formatKz(form.itens.reduce((s, it) => s + custoUnitItem(it), 0))}
+            </div>
+          </aside>
         </div>
-
-        <aside className="lg:col-span-1 obsidian-glass cyber-border rounded-xl p-5 lg:sticky lg:top-24 space-y-4" aria-label="Pré-visualização do orçamento">
-          <div className="flex items-center justify-between">
-            <p className="cyber-label flex items-center gap-1.5">
-              <Icon name="visibility" className="text-sm text-primary" /> Pré-visualização
-            </p>
-            <span className="w-2 h-2 rounded-full bg-success animate-pulse" aria-hidden="true" />
-          </div>
-
-          <div className="relative w-24 h-24 rounded-2xl obsidian-glass cyber-border flex items-center justify-center mx-auto">
-            <Icon name="request_quote" className="text-4xl text-primary" />
-            <span className="absolute -top-2 -right-2 w-6 h-6 rounded-lg bg-success flex items-center justify-center">
-              <Icon name="check" className="text-sm text-on-success" />
-            </span>
-          </div>
-
-          <div className="text-center">
-            <p className="text-lg font-extrabold text-foreground truncate">{primeiroItem?.descricao || "Novo Orçamento"}</p>
-            <p className="text-xs font-mono text-primary">{form.cliente || "SEM CLIENTE"}</p>
-          </div>
-
-          <div>
-            <PreviewLinha label="Empresa" valor={form.empresa} />
-            <PreviewLinha label="NIF" valor={form.nif} />
-            <PreviewLinha label="Telefone" valor={form.telefone} />
-            {form.itens.map((it, i) => (
-              <PreviewLinha key={i} label={`Item ${i + 1}`} valor={`${it.descricao || "—"} · ${it.quantidade || 0}× ${formatKz(it.total || 0)}`} />
-            ))}
-            {(form.servicos || []).filter((sv) => sv.descricao).map((sv, i) => (
-              <PreviewLinha key={`sv-${i}`} label={`Serviço ${i + 1}`} valor={`${sv.descricao} · ${sv.mob || 1}×${sv.duracaoHoras || 8}h · ${formatKz(sv.total || 0)}`} />
-            ))}
-            <PreviewLinha label="Subtotal" valor={formatKz(subtotalCalc)} />
-            {descontoCalc > 0 && <PreviewLinha label="Desconto" valor={`-${formatKz(descontoCalc)}`} />}
-            {ivaCalc > 0 && <PreviewLinha label="IVA" valor={formatKz(ivaCalc)} />}
-            <PreviewLinha label="Total" valor={formatKz(totalCalc)} acento="text-primary" />
-          </div>
-
-          <div className="flex items-center gap-2 text-[10px] text-muted-foreground pt-2 border-t border-border/40 flex-wrap">
-            <Icon name="bolt" className="text-sm text-warning" />
-            {form.prazoExecucao ? `Prazo: ${form.prazoExecucao}` : "Sem prazo definido"}
-            {" • "}
-            Custo mat.: {formatKz(form.itens.reduce((s, it) => s + custoUnitItem(it), 0))}
-          </div>
-        </aside>
-      </div>
-    </div>
-  );
-}
-
-export default function NovoOrcamentoPage() {
-  return (
-    <Suspense fallback={<div className="space-y-3" aria-label="A carregar">{Array.from({ length: 6 }).map((_, i) => (<div key={i} className="h-10 bg-muted rounded-xl animate-pulse" />))}</div>}>
-      <NovoOrcamentoInner />
-    </Suspense>
+      )}
+    </Modal>
   );
 }

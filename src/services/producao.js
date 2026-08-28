@@ -30,6 +30,11 @@ export async function libertarMateriais(id, dados = {}) {
   return data;
 }
 
+export async function libertarParaMaquina(id, dados = {}) {
+  const { data } = await api.post(`/producao/ordens/${id}/libertar-maquina`, dados);
+  return data;
+}
+
 export async function salvarPreImpressao(ordemProducaoId, dados) {
   const { data } = await api.put(`/producao/pre-impressao/${ordemProducaoId}`, dados);
   return data;

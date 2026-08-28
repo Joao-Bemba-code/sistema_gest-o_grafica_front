@@ -8,6 +8,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import { inputCls } from "@/lib/estoque";
 import NumeroInput from "@/components/ui/NumeroInput";
 import { Button } from "@/components/ui/Button";
+import FloatButton from "@/components/ui/FloatButton";
 import { Badge } from "@/components/ui/Badge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
@@ -668,6 +669,8 @@ export default function FaturacaoPage() {
       <footer className="p-6 text-center border-t bg-muted/30 rounded-2xl">
         <p className="text-sm text-muted-foreground">SIGRAF — Sistema de Gestão para Indústria Gráfica</p>
       </footer>
+
+      <FloatButton onClick={() => setFatModalOpen(true)} label="Nova Fatura" icon="receipt_long" />
     </div>
   );
 }

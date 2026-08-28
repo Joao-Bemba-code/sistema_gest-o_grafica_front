@@ -10,13 +10,10 @@ import { cn, getInitials } from "@/lib/utils";
 
 const rotas = [
   { icone: "dashboard", nome: "Painel", para: "/" },
-  { icone: "point_of_sale", nome: "Vendas", para: "/vendas" },
-  { icone: "precision_manufacturing", nome: "Ordens de Produção", para: "/producao/ordens" },
+  { icone: "storefront", nome: "Área Comercial", para: "/vendas" },
   { icone: "factory", nome: "Produção", para: "/producao" },
-  { icone: "groups", nome: "Cadastros", para: "/clientes" },
   { icone: "inventory_2", nome: "Provisionamento", para: "/estoque" },
   { icone: "category", nome: "Recursos", para: "/categorias" },
-  { icone: "precision_manufacturing", nome: "Maquinária", para: "/maquinas" },
   { icone: "analytics", nome: "Relatórios", para: "/relatorios" },
   { icone: "settings", nome: "Configurações", para: "/configuracoes" },
 ];

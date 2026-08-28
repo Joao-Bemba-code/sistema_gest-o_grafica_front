@@ -16,32 +16,13 @@ export const blankMaterial = { material_id: "", descricao: "", unidade: "un", qu
 export const blankItem = { descricao: "", quantidade: "", materiais: [{ ...blankMaterial }] };
 export const blankServico = { servico_id: "", descricao: "", mob: 1, prazoExecucao: 1, valorHora: 0, duracaoHoras: 8, total: 0 };
 
-export const SPEC_DEFAULT_LINES = [
-  { rotulo: "Produto", valor: "" },
-  { rotulo: "Formato", valor: "" },
-  { rotulo: "Papel/Material", valor: "" },
-  { rotulo: "Impressão", valor: "" },
-  { rotulo: "Acabamento", valor: "" },
-];
-
 export const blankForm = {
   cliente_id: "",
   cliente: "", empresa: "", nif: "", telefone: "", email: "",
   itens: [{ ...blankItem, materiais: [{ ...blankMaterial }] }],
   servicos: [{ ...blankServico }],
-  specLines: SPEC_DEFAULT_LINES.map((l) => ({ ...l })),
   iva: "", desconto: "", prazoExecucao: "", condicoesPagamento: "100% antecipado", observacoes: "",
 };
-
-export function placeholderSpec(rotulo) {
-  const chave = String(rotulo || "").toLowerCase();
-  if (chave.includes("produto")) return "Ex: Caderno Escolar A5";
-  if (chave.includes("formato")) return "Ex: A5 (148×210 mm)";
-  if (chave.includes("papel") || chave.includes("material")) return "Ex: Papel Couché 150g";
-  if (chave.includes("impress")) return "Ex: Offset, 4 cores";
-  if (chave.includes("acabamento")) return "Ex: Brochura com lombada";
-  return "Ex: Offset, 4 cores...";
-}
 
 export function custoUnitItem(it) {
   return (it.materiais || []).reduce((s, m) => s + (Number(m.quantidade) || 0) * (Number(m.preco_venda) || 0), 0);
@@ -175,16 +156,6 @@ export default function OrcamentoForm({ formId = "form-orcamento", form, setFiel
       return { ...p, servicos };
     });
   };
-
-  const setSpecLine = (idx, key, val) => {
-    setForm((p) => {
-      const specLines = [...p.specLines];
-      specLines[idx] = { ...specLines[idx], [key]: val };
-      return { ...p, specLines };
-    });
-  };
-  const addSpecLine = () => setForm((p) => ({ ...p, specLines: [...p.specLines, { rotulo: "", valor: "" }] }));
-  const removeSpecLine = (idx) => setForm((p) => (p.specLines.length <= 1 ? p : { ...p, specLines: p.specLines.filter((_, i) => i !== idx) }));
 
   const subtotalCalc = form.itens.reduce((s, it) => s + (Number(it.total) || 0), 0) + (form.servicos || []).reduce((s, sv) => s + (Number(sv.total) || 0), 0);
   const descontoCalc = Number(form.desconto) || 0;
@@ -384,47 +355,6 @@ return (
                 </div>
               </div>
             ))}
-
-            <div className="flex items-center justify-between pt-1">
-              <span className="cyber-label">Especificação Técnica</span>
-              <Button type="button" variant="ghost" size="sm" onClick={addSpecLine}><Icon name="add_circle" className="text-sm" /> Adicionar campo</Button>
-            </div>
-            <p className="text-[10px] text-muted-foreground -mt-2">
-              Detalhes do produto que ficam visíveis no orçamento (formato, papel, impressão, acabamento, etc.). Opcional.
-            </p>
-            <div className="rounded-xl border bg-background overflow-hidden">
-              <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-muted/50 border-b items-center">
-                <span className="col-span-5 cyber-label">Campo</span>
-                <span className="col-span-6 cyber-label">Valor</span>
-                <span className="col-span-1" />
-              </div>
-              {form.specLines.map((line, idx) => {
-                const ehImpressao = String(line.rotulo || "").toLowerCase().includes("impress");
-                return (
-                  <div key={idx} className="grid grid-cols-12 gap-2 px-3 py-2.5 border-b border-border/30 last:border-0 items-center">
-                    <div className="col-span-5">
-                      <input required aria-required="true" value={line.rotulo} onChange={(e) => setSpecLine(idx, "rotulo", e.target.value)} list={`${formId}-spec-campo-list`} className={`${inputCls} w-full`} placeholder="Ex: Formato" />
-                    </div>
-                    <div className="col-span-6">
-                      <input required aria-required="true" value={line.valor} onChange={(e) => setSpecLine(idx, "valor", e.target.value)} list={ehImpressao ? `${formId}-spec-impressao-list` : undefined} className={`${inputCls} w-full`} placeholder={placeholderSpec(line.rotulo)} />
-                    </div>
-                    <div className="col-span-1 flex justify-center">
-                      {form.specLines.length > 1 && (
-                        <Button type="button" variant="ghost" size="icon" onClick={() => removeSpecLine(idx)} title="Remover campo" className="text-error">
-                          <Icon name="close" className="text-sm" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <datalist id={`${formId}-spec-campo-list`}>
-              <option value="Produto" /><option value="Formato" /><option value="Papel/Material" /><option value="Impressão" /><option value="Acabamento" /><option value="Tiragem" /><option value="Nº de Cores" /><option value="Gramagem" />
-            </datalist>
-            <datalist id={`${formId}-spec-impressao-list`}>
-              <option value="Offset" /><option value="Digital" /><option value="Serigrafia" /><option value="Flexografia" />
-            </datalist>
           </div>
         )}
 

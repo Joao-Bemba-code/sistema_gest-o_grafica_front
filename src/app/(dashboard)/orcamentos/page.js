@@ -7,6 +7,7 @@ import Icon from "@/components/Icon";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import KpiCard from "@/components/ui/KpiCard";
 import { Button } from "@/components/ui/Button";
+import FloatButton from "@/components/ui/FloatButton";
 import { Badge } from "@/components/ui/Badge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
@@ -593,6 +594,8 @@ export default function OrcamentosPage() {
       <footer className="p-6 text-center border-t bg-muted/30 rounded-2xl">
         <p className="text-sm text-muted-foreground">SIGRAF — Sistema de Gestão para Indústria Gráfica</p>
       </footer>
+
+      <FloatButton href="/orcamentos/novo" label="Novo Orçamento" icon="request_quote" />
     </div>
   );
 }

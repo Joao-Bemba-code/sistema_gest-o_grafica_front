@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
+import FloatButton from "@/components/ui/FloatButton";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import useEstoque from "@/hooks/useEstoque";
 import useMovimentacoes from "@/hooks/useMovimentacoes";
@@ -294,6 +295,8 @@ export default function EstoquePage() {
         </div>
       </div>
 
+      <KpiGrid totais={totais} alertas={alertas} materiais={materiais} />
+
       {alertas.length > 0 && (
         <div className="rounded-lg border border-error/30 bg-error/5 p-4 flex items-start gap-3 mb-8">
           <span className="w-10 h-10 shrink-0 rounded bg-error/10 flex items-center justify-center">
@@ -318,8 +321,6 @@ export default function EstoquePage() {
           </div>
         </div>
       )}
-
-      <KpiGrid totais={totais} alertas={alertas} materiais={materiais} />
 
       <FilterBar
         search={search}
@@ -525,6 +526,8 @@ export default function EstoquePage() {
       <footer className="p-6 text-center border-t bg-muted/30 rounded-2xl">
         <p className="text-sm text-muted-foreground">SIGRAF — Sistema de Gestão para Indústria Gráfica</p>
       </footer>
+
+      <FloatButton href="/estoque/novo" label="Novo Material" icon="inventory_2" />
     </div>
   );
 }
