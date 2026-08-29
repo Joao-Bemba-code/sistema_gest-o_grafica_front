@@ -20,6 +20,7 @@ function deItem(item) {
     largura: item.largura || "",
     altura: item.altura || "",
     controla_lote: !!item.controla_lote,
+    mover_estoque: item.mover_estoque === undefined ? undefined : !!item.mover_estoque,
     percentual_quebra: item.percentual_quebra || "",
     estoque_min: item.estoque_min || "",
     estoque_max: item.estoque_max || "",

@@ -131,6 +131,7 @@ export const statusCfg = {
   ok: { label: "OK", variant: "success" },
   repor: { label: "Repor", variant: "warning" },
   esgotado: { label: "Esgotado", variant: "destructive" },
+  imobilizado: { label: "Sem stock", variant: "outline" },
 };
 
 export const unidades = ["folha", "resma", "rolo", "metro", "m²", "litro", "kg", "un", "pacote", "caixa", "ml", "g", "mg"];
@@ -152,6 +153,97 @@ export function unidadesParaFamilia(familia) {
   return unidadesPorFamilia[fam] || unidades;
 }
 export const tiposEstoque = ["folha", "metro", "peso", "volume", "unidade"];
+
+export const formatoPadraoMM = {
+  A0: { largura: 841, altura: 1189 },
+  A1: { largura: 594, altura: 841 },
+  A2: { largura: 420, altura: 594 },
+  A3: { largura: 297, altura: 420 },
+  A4: { largura: 210, altura: 297 },
+  A5: { largura: 148, altura: 210 },
+  A6: { largura: 105, altura: 148 },
+  A7: { largura: 74, altura: 105 },
+  A8: { largura: 52, altura: 74 },
+  A9: { largura: 37, altura: 52 },
+  A10: { largura: 26, altura: 37 },
+  B4: { largura: 250, altura: 353 },
+  B5: { largura: 176, altura: 250 },
+  "66x96": { largura: 660, altura: 960 },
+  "70x100": { largura: 700, altura: 1000 },
+  "76x112": { largura: 760, altura: 1120 },
+  "64x90": { largura: 640, altura: 900 },
+};
+
+export function dimensaoPadrao(formato, largura, altura) {
+  const l = Number(largura);
+  const a = Number(altura);
+  if (l > 0 && a > 0) return { largura: l, altura: a };
+  if (!formato) return null;
+  const normalizado = String(formato).toLowerCase().replace(/\s/g, "");
+  const chave = Object.keys(formatoPadraoMM).find(
+    (k) => k.toLowerCase().replace(/\s/g, "") === normalizado
+  );
+  return chave ? { ...formatoPadraoMM[chave] } : null;
+}
+
+export function encaixeGuilhotina(folhaL, folhaA, pecaL, pecaA) {
+  const fl = Number(folhaL);
+  const fa = Number(folhaA);
+  const pl = Number(pecaL);
+  const pa = Number(pecaA);
+  if (!(fl > 0 && fa > 0 && pl > 0 && pa > 0)) return null;
+  if (pl > fl || pa > fa) return null;
+  const orientacoes = [
+    [Math.floor(fl / pl) * Math.floor(fa / pa), pl, pa],
+    [Math.floor(fl / pa) * Math.floor(fa / pl), pa, pl],
+  ];
+  orientacoes.sort((a, b) => b[0] - a[0]);
+  const [pecas, pl_uso, pa_uso] = orientacoes[0];
+  if (pecas <= 0) return null;
+  return {
+    pecas_por_folha: pecas,
+    largura_uso: pl_uso,
+    altura_uso: pa_uso,
+    folhas_por_1000: Math.ceil(1000 / pecas),
+  };
+}
+
+export function dimensoesFolhaMaterial(m) {
+  if (!m) return null;
+  const esp = especificacoesObjeto(m?.especificacoes);
+  const mmL = Number(m?.largura_mm) || Number(m?.largura) || Number(esp.largura) || 0;
+  const mmA = Number(m?.altura_mm) || Number(m?.altura) || Number(esp.altura) || 0;
+  const dims = dimensaoPadrao(m?.formato, mmL, mmA);
+  if (dims) return { largura: dims.largura, altura: dims.altura };
+  return null;
+}
+
+export function dimensoesFormatoFinal(formato, largura, altura) {
+  if (formato) {
+    const dims = dimensaoPadrao(formato, 0, 0);
+    if (dims) return dims;
+  }
+  const l = Number(largura);
+  const a = Number(altura);
+  if (l > 0 && a > 0) return { largura: l, altura: a };
+  return null;
+}
+
+export function calcCustoParcialFolha(m, formatoFinal, larguraFinal, alturaFinal) {
+  const folhaDims = dimensoesFolhaMaterial(m);
+  const pecaDims = dimensoesFormatoFinal(formatoFinal, larguraFinal, alturaFinal);
+  if (!folhaDims || !pecaDims) return null;
+  const encaixe = encaixeGuilhotina(folhaDims.largura, folhaDims.altura, pecaDims.largura, pecaDims.altura);
+  if (!encaixe || encaixe.pecas_por_folha <= 1) return null;
+  const precoFolha = Number(m.preco_venda) || Number(m.custo_unit) || 0;
+  const precoPeca = precoFolha / encaixe.pecas_por_folha;
+  return {
+    ...encaixe,
+    preco_folha: Number(precoFolha.toFixed(2)),
+    preco_peca: Number(precoPeca.toFixed(4)),
+    formato_original: m.formato || "",
+  };
+}
 
 export const tiposCampoEspecificacao = [
   { valor: "texto", label: "Texto" },
@@ -278,6 +370,17 @@ export function toNum(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
+export function ehEquipamento(categoria) {
+  if (!categoria) return false;
+  const tipo = String(categoria.tipo || "").toLowerCase();
+  const familia = String(categoria.familia || "").toLowerCase();
+  return tipo === "equipamentos" || familia === "equipamentos";
+}
+
+export function moverEstoqueDe(categoria) {
+  return ehEquipamento(categoria) ? false : true;
+}
+
 export function formatKz(v) {
   return `Kz ${Number(v || 0).toLocaleString("pt-AO")}`;
 }
@@ -289,6 +392,7 @@ export function formatHora(v) {
 }
 
 export function statusDe(item) {
+  if (item.mover_estoque === false) return "imobilizado";
   const disp = toNum(item.estoque_disponivel);
   if (disp <= 0) return "esgotado";
   const ponto = toNum(item.ponto_ressuprimento) || toNum(item.estoque_min);

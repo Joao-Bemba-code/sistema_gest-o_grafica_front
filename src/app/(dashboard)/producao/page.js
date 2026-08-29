@@ -3,13 +3,13 @@
 import { useState } from "react";
 import Icon from "@/components/Icon";
 import OrdensTab from "@/components/producao/OrdensTab";
-import EtapasTab from "@/components/producao/EtapasTab";
-import MaquinasTab from "@/components/producao/MaquinasTab";
+import OperacionalTab from "@/components/producao/OperacionalTab";
+import ProcessosTab from "@/components/producao/ProcessosTab";
 
 const abas = [
   { id: "ordens", label: "Ordens", icon: "construction" },
-  { id: "maquinas", label: "Máquinas", icon: "precision_manufacturing" },
-  { id: "etapas", label: "Etapas", icon: "verified" },
+  { id: "operacional", label: "Operacional", icon: "precision_manufacturing" },
+  { id: "processos", label: "Processos", icon: "verified" },
 ];
 
 export default function ProducaoPage() {
@@ -21,7 +21,7 @@ export default function ProducaoPage() {
         <div>
           <h1 className="font-sans text-3xl font-bold text-foreground tracking-tight">Produção</h1>
           <p className="text-primary mt-1 font-mono text-xs uppercase tracking-widest">
-            Ordens · máquinas · etapas de produção // PROD
+            Ordens · operacional · processos de produção // PROD
           </p>
         </div>
       </div>
@@ -43,8 +43,8 @@ export default function ProducaoPage() {
       </div>
 
       {tab === "ordens" && <OrdensTab />}
-      {tab === "maquinas" && <MaquinasTab />}
-      {tab === "etapas" && <EtapasTab />}
+      {tab === "operacional" && <OperacionalTab />}
+      {tab === "processos" && <ProcessosTab />}
     </div>
   );
 }

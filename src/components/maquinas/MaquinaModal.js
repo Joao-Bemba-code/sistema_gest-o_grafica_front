@@ -7,13 +7,15 @@ import Icon from "@/components/Icon";
 import MaquinaForm from "@/components/maquinas/MaquinaForm";
 import useEstoque from "@/hooks/useEstoque";
 import { buscarPorId, criar, atualizar } from "@/services/maquinas";
-import { blankMaquina, camposNumericosMaquina } from "@/lib/maquinas";
+import { blankMaquina, camposNumericosMaquina, estadoMaquinaCfg } from "@/lib/maquinas";
 import { useToast } from "@/components/Toast";
 
 export default function MaquinaModal({ open, maquinaId, onClose, onSaved }) {
   const { addToast } = useToast();
   const { categorias, fornecedores, carregando: carregandoBase } = useEstoque();
   const [form, setForm] = useState(() => ({ ...blankMaquina }));
+  const [estadoOriginal, setEstadoOriginal] = useState("");
+  const [motivoEstado, setMotivoEstado] = useState("");
   const [carregando, setCarregando] = useState(false);
   const [salvando, setSalvando] = useState(false);
 
@@ -25,6 +27,8 @@ export default function MaquinaModal({ open, maquinaId, onClose, onSaved }) {
       try {
         const m = await buscarPorId(maquinaId);
         if (!ativo) return;
+        setEstadoOriginal(m.estado || "operacional");
+        setMotivoEstado("");
         setForm({
           codigo: m.codigo || "", nome_comum: m.nome_comum || "", nome_tecnico: m.nome_tecnico || "",
           descricao: m.descricao || "", categoria_id: m.categoria_id || "", subfamilia: m.subfamilia || "",
@@ -58,6 +62,9 @@ export default function MaquinaModal({ open, maquinaId, onClose, onSaved }) {
       const dadosNum = { ...form, categoria_id: Number(form.categoria_id) || null };
       camposNumericosMaquina.forEach((k) => { dadosNum[k] = Number(dadosNum[k]) || 0; });
       if (maquinaId) {
+        if (form.estado !== estadoOriginal && motivoEstado.trim()) {
+          dadosNum.motivo_estado = motivoEstado.trim();
+        }
         await atualizar(maquinaId, dadosNum);
         addToast("Máquina atualizada com sucesso", "success");
       } else {
@@ -102,7 +109,22 @@ export default function MaquinaModal({ open, maquinaId, onClose, onSaved }) {
             ))}
           </div>
         ) : (
-          <MaquinaForm
+          <>
+            {maquinaId && estadoOriginal && form.estado !== estadoOriginal && (
+              <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 space-y-2">
+                <p className="text-[11px] font-semibold text-warning flex items-center gap-1.5">
+                  <Icon name="swap_horiz" className="text-sm" />
+                  Mudança de estado: {estadoMaquinaCfg[estadoOriginal]?.label || estadoOriginal} → {estadoMaquinaCfg[form.estado]?.label || form.estado}
+                </p>
+                <input
+                  className="w-full px-3 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                  placeholder="Motivo da mudança de estado (opcional)"
+                  value={motivoEstado}
+                  onChange={(e) => setMotivoEstado(e.target.value)}
+                />
+              </div>
+            )}
+            <MaquinaForm
             formId="form-maquina"
             form={form}
             onChange={(campo, valor) => setForm((f) => ({ ...f, [campo]: valor }))}
@@ -110,6 +132,7 @@ export default function MaquinaModal({ open, maquinaId, onClose, onSaved }) {
             categorias={categorias}
             fornecedores={fornecedores}
           />
+          </>
         )}
       </div>
     </Modal>

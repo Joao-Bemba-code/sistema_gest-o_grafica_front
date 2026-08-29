@@ -9,7 +9,7 @@ import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
 import { listarOrdens, salvarPreImpressao, salvarImpressao, salvarAcabamento, salvarQualidade, atualizarOrdem } from "@/services/producao";
 
-const etapas = [
+const processos = [
   { id: "pre_impressao", label: "Pré-Impressão", icon: "rule" },
   { id: "impressao", label: "Impressão", icon: "print" },
   { id: "acabamento", label: "Acabamento", icon: "handyman" },
@@ -19,11 +19,11 @@ const etapas = [
 
 const statusColors = { aguardando: "warning", em_producao: "info", finalizado: "success", entregue: "secondary" };
 const statusLabels = { aguardando: "Aguardando", em_producao: "Em Produção", finalizado: "Finalizado", entregue: "Entregue" };
-const etapaStatusOptions = ["pendente", "em_execucao", "concluido"];
-const etapaStatusLabels = { pendente: "Pendente", em_execucao: "Em Execução", concluido: "Concluído" };
-const etapaStatusVariants = { pendente: "outline", em_execucao: "warning", concluido: "success" };
+const processoStatusOptions = ["pendente", "em_execucao", "concluido"];
+const processoStatusLabels = { pendente: "Pendente", em_execucao: "Em Execução", concluido: "Concluído" };
+const processoStatusVariants = { pendente: "outline", em_execucao: "warning", concluido: "success" };
 
-function derivarEtapa(j) {
+function derivarProcesso(j) {
   if (j.estado === "entregue" || j.entrega_ok) return "entrega";
   if (j.qualidade_ok) return "qualidade";
   if (j.acabamento_ok) return "acabamento";
@@ -32,7 +32,12 @@ function derivarEtapa(j) {
   return "pre_impressao";
 }
 
-const etapaLabels = Object.fromEntries(etapas.map((e) => [e.id, e.label]));
+const processoLabels = Object.fromEntries(processos.map((e) => [e.id, e.label]));
+
+function rotuloCampo(f) {
+  if (f === "maquina") return "Operacional";
+  return f.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
+}
 
 function normalizar(j) {
   const preRow = Array.isArray(j.pre_impressaos) ? j.pre_impressaos[0] : j.preImpressao;
@@ -64,7 +69,7 @@ function normalizar(j) {
   return {
     ...j,
     status: j.estado || j.status || "aguardando",
-    etapaAtual: derivarEtapa(j),
+    processoAtual: derivarProcesso(j),
     cliente: j.cliente?.nome || j.cliente || "—",
     preImpressao: pre,
     impressao: imp,
@@ -73,9 +78,9 @@ function normalizar(j) {
   };
 }
 
-export default function EtapasTab() {
+export default function ProcessosTab() {
   const [jobs, setJobs] = useState([]);
-  const [activeTab, setActiveTab] = useState("pre_impressao");
+  const [activeProcesso, setActiveProcesso] = useState("pre_impressao");
   const [selectedJob, setSelectedJob] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -120,24 +125,24 @@ export default function EtapasTab() {
     const job = jobs.find(j => j.id === jobId);
     if (!job) return;
     const atual = job.acabamento[proc] || "pendente";
-    const idx = etapaStatusOptions.indexOf(atual);
-    const next = etapaStatusOptions[(idx + 1) % etapaStatusOptions.length];
+    const idx = processoStatusOptions.indexOf(atual);
+    const next = processoStatusOptions[(idx + 1) % processoStatusOptions.length];
     setJobs(jobs.map(j => j.id === jobId ? { ...j, acabamento: { ...j.acabamento, [proc]: next } } : j));
   };
 
   const handleSave = async (jobId) => {
     const job = jobs.find(j => j.id === jobId);
     if (!job) return;
-    if (job.requisicao_estado === "pendente" && job.status === "aguardando" && activeTab !== "entrega") {
+    if (job.requisicao_estado === "pendente" && job.status === "aguardando" && activeProcesso !== "entrega") {
       addToast("Primeiro liberte os materiais da OP (saída de stock) para avançar", "error");
       return;
     }
     try {
-      if (activeTab === "pre_impressao") await salvarPreImpressao(jobId, job.preImpressao);
-      else if (activeTab === "impressao") await salvarImpressao(jobId, job.impressao);
-      else if (activeTab === "acabamento") await salvarAcabamento(jobId, job.acabamento);
-      else if (activeTab === "qualidade") await salvarQualidade(jobId, job.qualidade);
-      else if (activeTab === "entrega") await atualizarOrdem(jobId, { status: "entregue" });
+      if (activeProcesso === "pre_impressao") await salvarPreImpressao(jobId, job.preImpressao);
+      else if (activeProcesso === "impressao") await salvarImpressao(jobId, job.impressao);
+      else if (activeProcesso === "acabamento") await salvarAcabamento(jobId, job.acabamento);
+      else if (activeProcesso === "qualidade") await salvarQualidade(jobId, job.qualidade);
+      else if (activeProcesso === "entrega") await atualizarOrdem(jobId, { status: "entregue" });
       addToast("Operação realizada com sucesso", "success");
     } catch (err) {
       addToast(err.response?.data?.erro || "Erro na operação", "error");
@@ -149,8 +154,8 @@ export default function EtapasTab() {
   return (
     <div className="space-y-5">
       <div className="flex gap-2 overflow-x-auto pb-2">
-        {etapas.map((e) => (
-          <Button key={e.id} variant={activeTab === e.id ? "default" : "outline"} size="sm" onClick={() => { setActiveTab(e.id); if (selectedJob == null && jobs.length) setSelectedJob(jobs[0].id); }}>
+        {processos.map((e) => (
+          <Button key={e.id} variant={activeProcesso === e.id ? "default" : "outline"} size="sm" onClick={() => { setActiveProcesso(e.id); if (selectedJob == null && jobs.length) setSelectedJob(jobs[0].id); }}>
             <Icon name={e.icon} className="text-[16px]" />
             {e.label}
           </Button>
@@ -185,7 +190,7 @@ export default function EtapasTab() {
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-sm text-foreground">{job.id}</span>
                     <Badge variant={statusColors[job.status] || "outline"} className="text-[10px]">{statusLabels[job.status] || job.status}</Badge>
-                    <Badge variant="outline" className="text-[10px]">{etapaLabels[job.etapaAtual]}</Badge>
+                    <Badge variant="outline" className="text-[10px]">{processoLabels[job.processoAtual]}</Badge>
                     {job.requisicao_estado === "pendente" && (
                       <Badge variant="destructive" className="text-[10px]">Aguardando saída de materiais</Badge>
                     )}
@@ -209,7 +214,7 @@ export default function EtapasTab() {
                     </div>
                   </div>
                 )}
-                {activeTab === "pre_impressao" && (
+                {activeProcesso === "pre_impressao" && (
                   <div className="space-y-4">
                     <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Icon name="rule" className="text-[18px] text-primary" /> Checklist Pré-Impressão</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -228,14 +233,14 @@ export default function EtapasTab() {
                   </div>
                 )}
 
-                {activeTab === "impressao" && (
+                {activeProcesso === "impressao" && (
                   <div className="space-y-4">
                     <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Icon name="print" className="text-[18px] text-primary" /> Dados de Impressão</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {["maquina", "operador", "horaInicio", "horaFim", "quantidadeProduzida", "quantidadeRejeitada"].map((f) => (
                         <div key={f} className="flex flex-col gap-1">
-                          <label className="text-[10px] font-bold text-muted-foreground uppercase">{f.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase())}</label>
-                          <input type={f.includes("hora") ? "time" : f.includes("quantidade") ? "number" : "text"} value={job.impressao[f] || ""} onChange={(e) => updateImpressao(job.id, f, f.includes("quantidade") ? Number(e.target.value) : e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder={f.replace(/([A-Z])/g, " $1")} />
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase">{rotuloCampo(f)}</label>
+                          <input type={f.includes("hora") ? "time" : f.includes("quantidade") ? "number" : "text"} value={job.impressao[f] || ""} onChange={(e) => updateImpressao(job.id, f, f.includes("quantidade") ? Number(e.target.value) : e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder={rotuloCampo(f)} />
                         </div>
                       ))}
                       <div className="flex flex-col gap-1 sm:col-span-2 lg:col-span-3">
@@ -247,7 +252,7 @@ export default function EtapasTab() {
                   </div>
                 )}
 
-                {activeTab === "acabamento" && (
+                {activeProcesso === "acabamento" && (
                   <div className="space-y-4">
                     <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Icon name="handyman" className="text-[18px] text-primary" /> Acabamento</h3>
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -262,7 +267,7 @@ export default function EtapasTab() {
                           }`}>
                             <Icon name={icons[proc]} className="text-[20px] block mb-1" />
                             <p className="text-xs font-bold capitalize">{proc === "hotStamping" ? "Hot Stamping" : proc}</p>
-                            <p className="text-[10px] mt-1">{etapaStatusLabels[val]}</p>
+                            <p className="text-[10px] mt-1">{processoStatusLabels[val]}</p>
                           </button>
                         );
                       })}
@@ -271,7 +276,7 @@ export default function EtapasTab() {
                   </div>
                 )}
 
-                {activeTab === "qualidade" && (
+                {activeProcesso === "qualidade" && (
                   <div className="space-y-4">
                     <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Icon name="verified" className="text-[18px] text-primary" /> Controlo de Qualidade</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -298,7 +303,7 @@ export default function EtapasTab() {
                   </div>
                 )}
 
-                {activeTab === "entrega" && (
+                {activeProcesso === "entrega" && (
                   <div className="space-y-4">
                     <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Icon name="local_shipping" className="text-[18px] text-primary" /> Entrega</h3>
                     <div className="p-6 bg-muted/50 rounded-xl text-center">

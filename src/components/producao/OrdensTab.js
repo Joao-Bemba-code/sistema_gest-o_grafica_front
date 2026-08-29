@@ -24,7 +24,7 @@ const statusConfig = {
   entregue: { label: "Entregue", variant: "secondary" },
 };
 
-const etapaLabels = { pre_impressao: "Pré-Impressão", impressao: "Impressão", acabamento: "Acabamento", qualidade: "Qualidade", entrega: "Entrega" };
+const processoLabels = { pre_impressao: "Pré-Impressão", impressao: "Impressão", acabamento: "Acabamento", qualidade: "Qualidade", entrega: "Entrega" };
 
 function formatData(v) {
   if (!v) return "—";
@@ -39,7 +39,7 @@ const reservaEstado = {
   cancelada: { label: "Cancelada", variant: "secondary" },
 };
 
-function derivarEtapa(op) {
+function derivarProcesso(op) {
   if (op.estado === "entregue" || op.entrega_ok) return "entrega";
   if (op.qualidade_ok) return "qualidade";
   if (op.acabamento_ok) return "acabamento";
@@ -56,7 +56,7 @@ function normalizar(op) {
     orcamento: op.orcamento?.numero || op.orcamento || "—",
     dataEntrada: op.data_entrada || op.dataEntrada || "",
     dataEntrega: op.data_entrega || op.dataEntrega || "",
-    etapaAtual: op.etapa_atual || op.etapaAtual || derivarEtapa(op),
+    processoAtual: op.etapa_atual || op.etapaAtual || derivarProcesso(op),
     maquina: Array.isArray(op.impressaos) ? op.impressaos[0]?.maquina || "" : op.impressao?.maquina || "",
   };
 }
@@ -127,10 +127,10 @@ export default function OrdensTab() {
     try {
       const atualizada = await libertarParaMaquina(libertarMaqOp.id, dados);
       setOps((prev) => prev.map((o) => (o.id === libertarMaqOp.id ? normalizar(atualizada) : o)));
-      addToast(`OP ${libertarMaqOp.id} libertada para a máquina`, "success");
+      addToast(`OP ${libertarMaqOp.id} libertada para o operacional`, "success");
       return true;
     } catch (err) {
-      addToast(err.response?.data?.erro || "Erro ao libertar para a máquina", "error");
+      addToast(err.response?.data?.erro || "Erro ao libertar para o operacional", "error");
       return false;
     }
   };
@@ -157,7 +157,7 @@ export default function OrdensTab() {
         <div>
           <p className="text-sm font-semibold text-foreground">Ordens geradas automaticamente</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            As OPs são criadas ao aprovar um orçamento na Área Comercial. Aqui apenas faz a saída de materiais e atribui a máquina de produção.
+            As OPs são criadas ao aprovar um orçamento na Área Comercial. Aqui apenas faz a saída de materiais e atribui o operacional de produção.
           </p>
         </div>
       </div>
@@ -188,8 +188,8 @@ export default function OrdensTab() {
         <div className="space-y-3">
           {filtered.map((op) => {
             const sc = statusConfig[op.status];
-            const etapas = Object.keys(etapaLabels);
-            const etapaIdx = etapas.indexOf(op.etapaAtual);
+            const processos = Object.keys(processoLabels);
+            const processoIdx = processos.indexOf(op.processoAtual);
             return (
               <Card key={op.id} className="cursor-pointer hover-lift" onClick={() => setSelected(selected === op.id ? null : op.id)}>
                 <CardContent className="p-5">
@@ -219,15 +219,15 @@ export default function OrdensTab() {
                   </div>
 
                   <div className="mt-4 flex items-center gap-1">
-                    {etapas.map((et, i) => (
+                    {processos.map((et, i) => (
                       <div key={et} className="flex-1 flex items-center gap-1">
-                        <div className={`h-2 flex-1 rounded-full ${i <= etapaIdx ? "bg-primary" : "bg-muted"}`} />
+                        <div className={`h-2 flex-1 rounded-full ${i <= processoIdx ? "bg-primary" : "bg-muted"}`} />
                       </div>
                     ))}
                   </div>
                   <div className="flex justify-between mt-1">
-                    {etapas.map((et) => (
-                      <span key={et} className={`text-[9px] ${et === op.etapaAtual ? "text-primary font-bold" : "text-muted-foreground"}`}>{etapaLabels[et]}</span>
+                    {processos.map((et) => (
+                      <span key={et} className={`text-[9px] ${et === op.processoAtual ? "text-primary font-bold" : "text-muted-foreground"}`}>{processoLabels[et]}</span>
                     ))}
                   </div>
 
@@ -294,13 +294,13 @@ export default function OrdensTab() {
                         <div className="flex items-center justify-between gap-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 py-3">
                           <p className="text-xs text-emerald-700 dark:text-emerald-400">
                             Materiais libertados — saída de stock registada.
-                            {op.maquina ? ` Atribuída à máquina ${op.maquina}.` : " Atribua a máquina para iniciar a produção."}
+                            {op.maquina ? ` Operacional atribuído: ${op.maquina}.` : " Atribua o operacional para iniciar a produção."}
                           </p>
                           {op.maquina ? (
                             <Badge variant="success" className="text-[10px]">Em produção</Badge>
                           ) : (
                             <Button size="sm" onClick={(e) => { e.stopPropagation(); setLibertarMaqOp(op); }}>
-                              <Icon name="print" className="text-lg" /> Atribuir máquina
+                              <Icon name="print" className="text-lg" /> Atribuir operacional
                             </Button>
                           )}
                         </div>

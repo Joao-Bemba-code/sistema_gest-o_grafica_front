@@ -13,7 +13,7 @@ import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
 import { listarOrdens, salvarImpressao } from "@/services/producao";
 
-const maquinas = ["Heidelberg Speedmaster 52", "Heidelberg CD 102", "Kompac Hydra 66", "ManRoland 700"];
+const operacionais = ["Heidelberg Speedmaster 52", "Heidelberg CD 102", "Kompac Hydra 66", "ManRoland 700"];
 
 const initialForm = { op: "", maquina: "", operador: "", inicio: "", fim: "", produzido: "", rejeitado: "", observacoes: "" };
 
@@ -104,7 +104,7 @@ export default function ImpressaoPage() {
           { label: "Total Produzido", value: totalProduzido?.toLocaleString() ?? "0", icon: "print", iconVariant: "primary" },
           { label: "Total Rejeitado", value: totalRejeitado?.toLocaleString() ?? "0", icon: "block", iconVariant: "error" },
           { label: "Taxa de Aproveitamento", value: totalProduzido ? `${(((totalProduzido - totalRejeitado) / totalProduzido) * 100).toFixed(1)}%` : "0%", icon: "check_circle", iconVariant: "success" },
-          { label: "Máquinas", value: maquinas.length, icon: "precision_manufacturing", iconVariant: "secondary" },
+          { label: "Operacionais", value: operacionais.length, icon: "precision_manufacturing", iconVariant: "secondary" },
         ].map((kpi) => (
           <KpiCard key={kpi.label} icon={kpi.icon} label={kpi.label} value={kpi.value} iconVariant={kpi.iconVariant} />
         ))}
@@ -116,7 +116,7 @@ export default function ImpressaoPage() {
             <CardContent className="p-5">
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 text-sm">
                 <div><span className="text-[10px] text-muted-foreground block">OP</span><span className="font-semibold text-foreground">{r.op}</span></div>
-                <div><span className="text-[10px] text-muted-foreground block">Máquina</span><span className="text-foreground">{r.maquina}</span></div>
+                <div><span className="text-[10px] text-muted-foreground block">Operacional</span><span className="text-foreground">{r.maquina}</span></div>
                 <div><span className="text-[10px] text-muted-foreground block">Operador</span><span className="text-foreground">{r.operador}</span></div>
                 <div><span className="text-[10px] text-muted-foreground block">Início</span><span className="text-foreground">{r.inicio}</span></div>
                 <div><span className="text-[10px] text-muted-foreground block">Fim</span><span className="text-foreground">{r.fim}</span></div>
@@ -150,10 +150,10 @@ export default function ImpressaoPage() {
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Máquina *</label>
+              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Operacional *</label>
               <select required value={form.maquina} onChange={(e) => setForm({ ...form, maquina: e.target.value })} className={inputCls}>
                 <option value="">Seleccionar...</option>
-                {maquinas.map(m => <option key={m}>{m}</option>)}
+                {operacionais.map(m => <option key={m}>{m}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">

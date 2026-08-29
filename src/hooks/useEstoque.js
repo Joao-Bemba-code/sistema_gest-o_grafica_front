@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   listar,
-  criar,
-  atualizar,
+  criar as criarMaterial,
+  atualizar as atualizarMaterial,
   movimentar,
   converter,
   listarReservas,
@@ -12,18 +12,47 @@ import {
   reservar,
   listarFormatos,
 } from "@/services/materiais";
+import { criar as criarMaquina, atualizar as atualizarMaquina, listar as listarMaquinas } from "@/services/maquinas";
 import { listar as listarCategorias } from "@/services/categorias";
 import { listar as listarFornecedores } from "@/services/fornecedores";
 import { listar as listarClientes } from "@/services/clientes";
 import { buscarOrganizacao } from "@/services/configuracoes";
 import { getUsuario } from "@/services/auth";
 import { useToast } from "@/components/Toast";
-import { statusDe, toNum } from "@/lib/estoque";
+import { statusDe, toNum, especificacoesObjeto, ehEquipamento, moverEstoqueDe } from "@/lib/estoque";
 
 const camposNumericos = [
   "gramagem", "largura", "altura", "percentual_quebra",
   "estoque_min", "estoque_max", "ponto_ressuprimento", "custo_unit", "lucro",
 ];
+
+async function sincronizarMaquina(dados, id) {
+  const esp = especificacoesObjeto(dados.especificacoes);
+  const maquinaDados = {
+    codigo: dados.codigo || "",
+    nome_comum: dados.nome || "",
+    nome_tecnico: dados.nome_tecnico || "",
+    descricao: dados.descricao || "",
+    categoria_id: dados.categoria_id || null,
+    subfamilia: esp.subfamilia || "",
+    fornecedor: dados.fornecedor || "",
+    unidade: dados.unidade || "un",
+    marca: esp.marca || "",
+    modelo: esp.modelo || "",
+    numero_serie: esp.numero_serie || "",
+    localizacao: dados.localizacao || "",
+    custo_unit: toNum(dados.custo_unit),
+    estoque_min: toNum(dados.estoque_min),
+    estoque_max: toNum(dados.estoque_max),
+  };
+  const maquinas = await listarMaquinas();
+  const arr = Array.isArray(maquinas) ? maquinas : maquinas?.data || [];
+  const alvo =
+    arr.find((m) => m.codigo && m.codigo === maquinaDados.codigo) ||
+    arr.find((m) => m.nome_comum === maquinaDados.nome_comum);
+  if (alvo) await atualizarMaquina(alvo.id, maquinaDados);
+  else await criarMaquina({ ...maquinaDados, estado: "operacional" });
+}
 
 export default function useEstoque() {
   const { addToast } = useToast();
@@ -85,8 +114,19 @@ export default function useEstoque() {
       camposNumericos.forEach((k) => {
         dadosNum[k] = Number(dados[k]) || 0;
       });
-      if (id) await atualizar(id, dadosNum);
-      else await criar(dadosNum);
+      const categoria = categorias.find((c) => String(c.id) === String(dadosNum.categoria_id));
+      if (dadosNum.mover_estoque === undefined) {
+        dadosNum.mover_estoque = moverEstoqueDe(categoria);
+      }
+      if (id) await atualizarMaterial(id, dadosNum);
+      else await criarMaterial(dadosNum);
+      if (ehEquipamento(categoria)) {
+        try {
+          await sincronizarMaquina(dadosNum, id);
+        } catch (err) {
+          addToast(err.response?.data?.erro || "Material guardado, mas houve erro ao registar a máquina", "warning");
+        }
+      }
       await carregar();
       addToast(id ? "Material atualizado com sucesso" : "Material cadastrado com sucesso", "success");
       return true;
@@ -96,7 +136,7 @@ export default function useEstoque() {
     } finally {
       setCarregando(false);
     }
-  }, [addToast, carregar]);
+  }, [addToast, carregar, categorias]);
 
   const registrarMovimentacao = useCallback(async ({ item, tipo, dados }) => {
     const qtd = Number(dados.quantidade);
@@ -207,19 +247,19 @@ export default function useEstoque() {
   }, [addToast, carregar]);
 
   const alertas = useMemo(
-    () => materiais.filter((i) => i.status === "repor" || i.status === "esgotado"),
+    () => materiais.filter((i) => i.mover_estoque !== false && (i.status === "repor" || i.status === "esgotado")),
     [materiais]
   );
 
-  const totais = useMemo(
-    () => ({
-      itens: materiais.length,
-      stock: materiais.reduce((s, i) => s + toNum(i.quantidade), 0),
-      reservado: materiais.reduce((s, i) => s + toNum(i.estoque_reservado), 0),
-      disponivel: materiais.reduce((s, i) => s + toNum(i.estoque_disponivel), 0),
-    }),
-    [materiais]
-  );
+  const totais = useMemo(() => {
+    const movem = materiais.filter((i) => i.mover_estoque !== false);
+    return {
+      itens: movem.length,
+      stock: movem.reduce((s, i) => s + toNum(i.quantidade), 0),
+      reservado: movem.reduce((s, i) => s + toNum(i.estoque_reservado), 0),
+      disponivel: movem.reduce((s, i) => s + toNum(i.estoque_disponivel), 0),
+    };
+  }, [materiais]);
 
   return {
     materiais, categorias, fornecedores, clientes, org, formatos,

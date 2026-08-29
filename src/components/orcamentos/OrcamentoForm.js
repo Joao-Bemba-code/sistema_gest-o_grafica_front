@@ -4,7 +4,9 @@ import { useState } from "react";
 import Icon from "@/components/Icon";
 import NumeroInput from "@/components/ui/NumeroInput";
 import { Button } from "@/components/ui/Button";
-import { inputCls } from "@/lib/estoque";
+import { inputCls, especificacoesObjeto, normalizarFamilia, dimensaoPadrao, dimensoesFolhaMaterial, dimensoesFormatoFinal, encaixeGuilhotina, calcCustoParcialFolha } from "@/lib/estoque";
+
+export const formatosSugeridos = ["A3", "A4", "A5", "A6", "A7", "A8", "A9", "B4", "B5", "66x96", "70x100"];
 
 const tabs = [
   { key: "cliente", label: "Dados do Cliente", icon: "person" },
@@ -12,7 +14,7 @@ const tabs = [
   { key: "valores", label: "Valores e Condições", icon: "payments" },
 ];
 
-export const blankMaterial = { material_id: "", descricao: "", unidade: "un", quantidade: "", preco_venda: 0, custo_total: 0, mover_estoque: true };
+export const blankMaterial = { material_id: "", descricao: "", unidade: "un", quantidade: "", preco_venda: 0, custo_total: 0, mover_estoque: true, usar_parcial: false, formato_final: "", largura_final: "", altura_final: "", pecas_por_folha: 1, preco_folha: 0 };
 export const blankItem = { descricao: "", quantidade: "", materiais: [{ ...blankMaterial }] };
 export const blankServico = { servico_id: "", descricao: "", mob: 1, prazoExecucao: 1, valorHora: 0, duracaoHoras: 8, total: 0 };
 
@@ -24,14 +26,26 @@ export const blankForm = {
   iva: "", desconto: "", prazoExecucao: "", condicoesPagamento: "100% antecipado", observacoes: "",
 };
 
+export function precoUnitMaterial(m) {
+  return Number(m.preco_venda) || 0;
+}
+
+export function custoParcialDoMaterial(m) {
+  if (!m.usar_parcial || !ehFolhaMaterial(m)) return null;
+  return calcCustoParcialFolha(m, m.formato_final, m.largura_final, m.altura_final);
+}
+
+export function custoTotalMaterial(m) {
+  return (Number(m.quantidade) || 0) * (Number(m.preco_venda) || 0);
+}
+
 export function custoUnitItem(it) {
-  return (it.materiais || []).reduce((s, m) => s + (Number(m.quantidade) || 0) * (Number(m.preco_venda) || 0), 0);
+  return (it.materiais || []).reduce((s, m) => s + custoTotalMaterial(m), 0);
 }
 
 export function recalcularItem(it) {
   const custoTotal = custoUnitItem(it);
-  const q = Number(it.quantidade) || 1;
-  const valorUnitario = Number((custoTotal / q).toFixed(2));
+  const valorUnitario = Number(custoTotal.toFixed(2));
   return { valorUnitario, total: Number(custoTotal.toFixed(2)) };
 }
 
@@ -45,6 +59,73 @@ export function recalcularServico(sv) {
 }
 
 const CONDICOES = ["100% antecipado", "50% de sinal + 50% na entrega", "Outro"];
+
+function ehPapel(m) {
+  return !!m && normalizarFamilia(m.categoria?.familia) === "papeis";
+}
+
+function ehFolhaMaterial(m) {
+  if (!m) return false;
+  const unidade = String(m.unidade || "").toLowerCase();
+  const tipoEstoque = String(m.tipo_estoque || "").toLowerCase();
+  if (tipoEstoque === "folha" || unidade === "folha" || unidade === "resma") return true;
+  return !!dimensionaveisFolha(m);
+}
+
+function ehMaterialImpressao(m) {
+  if (!m) return false;
+  const nome = String(m.nome || m.nome_tecnico || m.descricao || "").toLowerCase();
+  if (nome.includes("toner") || nome.includes("tinta")) return true;
+  const unidade = String(m.unidade || "").toLowerCase();
+  return unidade === "g" || unidade === "kg";
+}
+
+function folhasDeMaterial(m) {
+  if (!m) return 0;
+  const qtd = Number(m.quantidade) || 0;
+  const unidade = String(m.unidade || "").toLowerCase();
+  const tipoEstoque = String(m.tipo_estoque || "").toLowerCase();
+  if (unidade === "resma") return qtd * 500;
+  if (unidade === "folha" || tipoEstoque === "folha") return qtd;
+  return 0;
+}
+
+export function gramasTonerParaFolhas(folhas) {
+  const n = Number(folhas) || 0;
+  if (n <= 0) return 0;
+  return Number((n / 25).toFixed(2));
+}
+
+function dimensionaveisFolha(m) {
+  const dims = dimensoesFolhaMaterial(m);
+  return dims && dims.largura > 0 && dims.altura > 0 ? dims : null;
+}
+
+function dimensionaveld(m) {
+  return !!dimensionaveisFolha(m);
+}
+
+function dimensoesFolha(m) {
+  const esp = especificacoesObjeto(m?.especificacoes);
+  const dims = dimensaoPadrao(
+    m?.formato,
+    Number(m?.largura) || Number(esp.largura) || 0,
+    Number(m?.altura) || Number(esp.altura) || 0
+  );
+  if (dims) return `${dims.largura}×${dims.altura} mm`;
+  return "";
+}
+
+export function resumoFolha(m) {
+  if (!m) return "";
+  const partes = [];
+  if (m.formato) partes.push(String(m.formato).toUpperCase());
+  const dims = dimensoesFolha(m);
+  if (dims) partes.push(dims);
+  const gram = Number(m.gramagem) || 0;
+  if (gram > 0) partes.push(`${gram} g/m²`);
+  return partes.join(" · ");
+}
 
 function Campo({ label, children, obrigatorio, full }) {
   return (
@@ -85,19 +166,30 @@ export default function OrcamentoForm({ formId = "form-orcamento", form, setFiel
       if (key === "material_id") {
         const matEstoque = materiais.find((m) => String(m.id) === String(val));
         if (matEstoque) {
+          const dims = dimensoesFolhaMaterial(matEstoque);
           mat[mi].descricao = matEstoque.nome || matEstoque.nome_tecnico || "";
           mat[mi].unidade = matEstoque.unidade || "un";
+          mat[mi].tipo_estoque = matEstoque.tipo_estoque || "";
+          mat[mi].formato = matEstoque.formato || "";
+          mat[mi].largura_mm = dims?.largura ?? (matEstoque.largura || 0);
+          mat[mi].altura_mm = dims?.altura ?? (matEstoque.altura || 0);
+          mat[mi].especificacoes = matEstoque.especificacoes || {};
+          mat[mi].categoria = matEstoque.categoria || null;
           mat[mi].preco_venda = Number(matEstoque.preco_venda) || Number(matEstoque.custo_unit) || 0;
+          mat[mi].preco_folha = mat[mi].preco_venda;
+          mat[mi].usar_parcial = false;
+          mat[mi].formato_final = "";
+          mat[mi].largura_final = "";
+          mat[mi].altura_final = "";
+          mat[mi].pecas_por_folha = 1;
         } else {
           mat[mi].descricao = "";
           mat[mi].preco_venda = 0;
         }
       }
-      if (key === "quantidade" || key === "preco_venda" || key === "material_id") {
-        const q = Number(mat[mi].quantidade) || 0;
-        const pv = Number(mat[mi].preco_venda) || 0;
-        mat[mi].custo_total = Number((q * pv).toFixed(2));
-      }
+      mat[mi].custo_total = Number(custoTotalMaterial(mat[mi]).toFixed(2));
+      const calcParcial = custoParcialDoMaterial(mat[mi]);
+      mat[mi].pecas_por_folha = calcParcial ? calcParcial.pecas_por_folha : 1;
       itens[idx] = { ...itens[idx], materiais: mat };
       const calc = recalcularItem(itens[idx]);
       itens[idx].valorUnitario = calc.valorUnitario;
@@ -264,7 +356,9 @@ return (
                           <option value="">Selecionar material...</option>
                           {materiais.map((mat) => (
                             <option key={mat.id} value={mat.id}>
-                              {mat.nome || mat.nome_tecnico} — {mat.unidade || "un"}{Number(mat.quantidade) > 0 ? ` (${Number(mat.quantidade).toLocaleString("pt-AO")} disp.)` : ""}
+                              {mat.nome || mat.nome_tecnico} — {mat.unidade || "un"}
+                              {ehPapel(mat) && resumoFolha(mat) ? ` · ${resumoFolha(mat)}` : ""}
+                              {Number(mat.quantidade) > 0 ? ` (${Number(mat.quantidade).toLocaleString("pt-AO")} disp.)` : ""}
                             </option>
                           ))}
                         </select>
@@ -286,6 +380,93 @@ return (
                           <Button type="button" variant="ghost" size="icon" onClick={() => removeMaterial(idx, mi)} title="Remover material" className="text-error"><Icon name="close" className="text-sm" /></Button>
                         )}
                       </div>
+                      {(() => {
+                        const sel = materiais.find((mt) => String(mt.id) === String(m.material_id));
+                        const resumo = ehPapel(sel) ? resumoFolha(sel) : "";
+                        return resumo ? (
+                          <div className="col-span-12 flex items-center gap-1.5 text-[10px] text-primary">
+                            <Icon name="straighten" className="text-[13px] text-primary" />
+                            <span className="font-mono">Formato: <strong>{resumo}</strong></span>
+                          </div>
+                        ) : null;
+                      })()}
+                      {(() => {
+                        const sel = materiais.find((mt) => String(mt.id) === String(m.material_id));
+                        if (!ehMaterialImpressao(sel)) return null;
+                        const totalFolhas = (it.materiais || []).reduce((s, mm) => s + folhasDeMaterial(mm), 0);
+                        if (totalFolhas <= 0) return null;
+                        const gramas = gramasTonerParaFolhas(totalFolhas);
+                        const unidade = String(sel.unidade || "").toLowerCase();
+                        const pv = Number(sel.preco_venda) || Number(sel.custo_unit) || 0;
+                        const precoPorG = unidade === "kg" ? pv / 1000 : pv;
+                        const custo = gramas * precoPorG;
+                        const nome = sel.nome || sel.nome_tecnico || "toner/tinta";
+                        return (
+                          <div className="col-span-12 text-[10px] text-muted-foreground">
+                            ≈ {gramas} g de {nome} p/ imprimir {totalFolhas.toLocaleString("pt-AO")} folha{totalFolhas !== 1 ? "s" : ""}
+                            {custo > 0 && <> · Kz {custo.toLocaleString("pt-AO")}</>}
+                          </div>
+                        );
+                      })()}
+                      {(() => {
+                        const sel = materiais.find((mt) => String(mt.id) === String(m.material_id));
+                        const dims = dimensionaveisFolha(m);
+                        if (!dims) return null;
+                        const calc = calcCustoParcialFolha(m, m.formato_final, m.largura_final, m.altura_final);
+                        return (
+                          <div className="col-span-12 flex flex-col gap-2 border border-primary/20 bg-primary/5 rounded-xl p-3">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={!!m.usar_parcial}
+                                onChange={(e) => setItemMaterial(idx, mi, "usar_parcial", e.target.checked)}
+                                className="w-4 h-4 rounded accent-primary"
+                              />
+                              <span className="text-[11px] font-semibold text-foreground">Usar apenas parte da folha (formato menor)</span>
+                              <span className="ml-auto text-[10px] font-mono text-muted-foreground">{dims.largura}×{dims.altura} mm</span>
+                            </label>
+                            {m.usar_parcial && (
+                              <>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                  <div className="flex flex-col gap-1">
+                                    <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Formato final da peça</span>
+                                    <input
+                                      list={`${formId}-formatos-finais`}
+                                      value={m.formato_final || ""}
+                                      onChange={(e) => setItemMaterial(idx, mi, "formato_final", e.target.value)}
+                                      className={inputCls}
+                                      placeholder="Ex: A7"
+                                    />
+                                    <datalist id={`${formId}-formatos-finais`}>
+                                      {formatosSugeridos.map((f) => <option key={f} value={f} />)}
+                                    </datalist>
+                                  </div>
+                                  <div className="flex flex-col gap-1">
+                                    <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Largura (mm) opcional</span>
+                                    <NumeroInput value={m.largura_final} onChange={(e) => setItemMaterial(idx, mi, "largura_final", e.target.value)} className={inputCls} placeholder="—" />
+                                  </div>
+                                  <div className="flex flex-col gap-1">
+                                    <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Altura (mm) opcional</span>
+                                    <NumeroInput value={m.altura_final} onChange={(e) => setItemMaterial(idx, mi, "altura_final", e.target.value)} className={inputCls} placeholder="—" />
+                                  </div>
+                                </div>
+                                {calc && calc.pecas_por_folha > 1 && (
+                                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] font-mono">
+                                    <span className="text-primary"><Icon name="grid_view" className="inline text-[12px] mr-1" />{calc.pecas_por_folha} peças / folha</span>
+                                    <span className="text-foreground">{Number(m.quantidade) || 0} folha{Number(m.quantidade) !== 1 ? "s" : ""} = <strong>{((Number(m.quantidade) || 0) * calc.pecas_por_folha).toLocaleString("pt-AO")} peças</strong></span>
+                                    <span className="text-muted-foreground">Preço por folha: {`Kz ${Number(m.preco_venda || 0).toLocaleString("pt-AO")}`} · peça: {`Kz ${calc.preco_peca.toLocaleString("pt-AO")}`}</span>
+                                  </div>
+                                )}
+                                {m.usar_parcial && (!calc || calc.pecas_por_folha <= 1) && (
+                                  <p className="text-[10px] text-destructive">
+                                    Informe o formato final da peça (ou largura/altura) menor que {dims.largura}×{dims.altura} mm. A quantidade acima conta em folhas.
+                                  </p>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   ))}
 

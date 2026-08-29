@@ -21,9 +21,9 @@ const servicos = [
   { id: "ilhos", label: "Ilhós", icon: "circle" },
 ];
 
-const etapaOptions = ["pendente", "em_execucao", "concluido"];
-const etapaLabels = { pendente: "Pendente", em_execucao: "Em Execução", concluido: "Concluído" };
-const etapaVariants = { pendente: "outline", em_execucao: "warning", concluido: "success" };
+const processoOptions = ["pendente", "em_execucao", "concluido"];
+const processoLabels = { pendente: "Pendente", em_execucao: "Em Execução", concluido: "Concluído" };
+const processoVariants = { pendente: "outline", em_execucao: "warning", concluido: "success" };
 const initialForm = { op: "", cliente: "", produto: "", prazo: "", responsavel: "" };
 const initialServicos = Object.fromEntries(servicos.map(s => [s.id, "pendente"]));
 
@@ -55,8 +55,8 @@ export default function AcabamentoPage() {
     setOrdens(prev => prev.map(o => {
       if (o.id !== opId) return o;
       const atual = o.servicos[servId];
-      const idx = etapaOptions.indexOf(atual);
-      const next = etapaOptions[(idx + 1) % etapaOptions.length];
+      const idx = processoOptions.indexOf(atual);
+      const next = processoOptions[(idx + 1) % processoOptions.length];
       return { ...o, servicos: { ...o.servicos, [servId]: next } };
     }));
   };
@@ -142,7 +142,7 @@ export default function AcabamentoPage() {
                             }`}>
                             <Icon name={s.icon} className="text-lg block mb-1 mx-auto" />
                             <span className="block">{s.label}</span>
-                            <span className="block text-[9px] mt-0.5 opacity-70">{etapaLabels[val]}</span>
+                            <span className="block text-[9px] mt-0.5 opacity-70">{processoLabels[val]}</span>
                           </button>
                         );
                       })}
@@ -183,8 +183,8 @@ export default function AcabamentoPage() {
               const val = servicosForm[s.id];
               return (
                 <button key={s.id} type="button" onClick={() => {
-                  const idx = etapaOptions.indexOf(val);
-                  const next = etapaOptions[(idx + 1) % etapaOptions.length];
+                  const idx = processoOptions.indexOf(val);
+                  const next = processoOptions[(idx + 1) % processoOptions.length];
                   setServicosForm(prev => ({ ...prev, [s.id]: next }));
                 }}
                   className={`p-3 rounded-xl border-2 text-center transition-all text-xs font-bold ${
@@ -194,7 +194,7 @@ export default function AcabamentoPage() {
                   }`}>
                   <Icon name={s.icon} className="text-lg block mb-1 mx-auto" />
                   <span>{s.label}</span>
-                  <Badge variant={etapaVariants[val]} className="block mt-1 text-[9px]">{etapaLabels[val]}</Badge>
+                  <Badge variant={processoVariants[val]} className="block mt-1 text-[9px]">{processoLabels[val]}</Badge>
                 </button>
               );
             })}

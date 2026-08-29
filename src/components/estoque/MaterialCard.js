@@ -51,8 +51,9 @@ function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEdita
   const menuRef = useRef(null);
   const famTexto = item.categoria?.familia || "";
   const familiaCfg = familias[normalizarFamilia(famTexto)] || { icon: "label", label: famTexto || "—" };
-  const pct = toNum(item.estoque_max) > 0 ? (toNum(item.estoque_disponivel) / toNum(item.estoque_max)) * 100 : 100;
-  const critico = item.status === "repor" || item.status === "esgotado";
+  const mover = item.mover_estoque !== false;
+  const pct = mover && toNum(item.estoque_max) > 0 ? (toNum(item.estoque_disponivel) / toNum(item.estoque_max)) * 100 : 100;
+  const critico = mover && (item.status === "repor" || item.status === "esgotado");
   const stText = textoStatus[item.status] || textoStatus.ok;
   const unidade = item.unidade?.toUpperCase() || "UN";
 
@@ -126,11 +127,20 @@ function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEdita
 
         {/* Col 2: Stock */}
         <div className="md:col-span-3 flex flex-col md:border-l md:border-outline-variant/30 md:pl-4">
-          <p className={`text-[10px] font-mono uppercase tracking-widest mb-1 ${critico ? "text-error/80" : "text-on-surface-variant"}`}>Qtd. Disponível</p>
-          <div className="flex items-baseline gap-1">
-            <p className={`font-mono text-xl font-bold ${critico ? "text-error" : "text-on-surface"}`}>{toNum(item.estoque_disponivel).toLocaleString("pt-AO")}</p>
-            <span className={`text-[10px] font-mono uppercase ${critico ? "text-error" : "text-primary"}`}>{unidade}</span>
-          </div>
+          <p className={`text-[10px] font-mono uppercase tracking-widest mb-1 ${critico ? "text-error/80" : "text-on-surface-variant"}`}>
+            {mover ? "Qtd. Disponível" : "Mover Estoque"}
+          </p>
+          {mover ? (
+            <div className="flex items-baseline gap-1">
+              <p className={`font-mono text-xl font-bold ${critico ? "text-error" : "text-on-surface"}`}>{toNum(item.estoque_disponivel).toLocaleString("pt-AO")}</p>
+              <span className={`text-[10px] font-mono uppercase ${critico ? "text-error" : "text-primary"}`}>{unidade}</span>
+            </div>
+          ) : (
+            <div className="flex items-baseline gap-1">
+              <p className="font-mono text-xl font-bold text-muted-foreground">—</p>
+              <span className="text-[10px] font-mono uppercase text-muted-foreground">sem stock</span>
+            </div>
+          )}
           {item.preco_venda > 0 && (
             <div className="flex items-baseline gap-1 mt-1">
               <span className="text-[10px] font-mono text-muted-foreground">Venda:</span>
@@ -141,27 +151,41 @@ function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEdita
 
         {/* Col 3: Progresso */}
         <div className="md:col-span-2 flex items-center gap-3 md:border-l md:border-outline-variant/30 md:pl-4">
-          <RadialMini pct={pct} status={item.status} />
-          <div>
-            <p className={`text-[9px] font-mono uppercase tracking-widest ${critico ? "text-error/80" : "text-on-surface-variant"}`}>Pt. Encomenda</p>
-            <p className={`text-[11px] font-mono font-bold ${stText.cor}`}>{stText.label}</p>
-          </div>
+          {mover ? (
+            <>
+              <RadialMini pct={pct} status={item.status} />
+              <div>
+                <p className={`text-[9px] font-mono uppercase tracking-widest ${critico ? "text-error/80" : "text-on-surface-variant"}`}>Pt. Encomenda</p>
+                <p className={`text-[11px] font-mono font-bold ${stText.cor}`}>{stText.label}</p>
+              </div>
+            </>
+          ) : (
+            <>
+              <span className="w-8 h-8 rounded border border-outline-variant/40 bg-surface-variant flex items-center justify-center shrink-0">
+                <Icon name="label_off" className="text-[16px] text-on-surface-variant" />
+              </span>
+              <div>
+                <p className="text-[9px] font-mono uppercase tracking-widest text-on-surface-variant">Stock</p>
+                <p className="text-[11px] font-mono font-bold text-on-surface-variant">Não controlado</p>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Col 4: Ações */}
         <div className="md:col-span-2 flex items-center justify-between md:justify-end gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-outline-variant/30">
           <div className="flex gap-1.5">
-            <BotaoIcone icon="add" label="Entrada" critico={critico} onClick={() => onEntrada(item)} />
-            <BotaoIcone icon="remove" label="Saída" cor="saida" critico={critico} onClick={() => onSaida(item)} />
+            {mover && <BotaoIcone icon="add" label="Entrada" critico={critico} onClick={() => onEntrada(item)} />}
+            {mover && <BotaoIcone icon="remove" label="Saída" cor="saida" critico={critico} onClick={() => onSaida(item)} />}
             <BotaoIcone icon="description" label="Ver ficha do material (PDF)" critico={critico} onClick={() => onFichaPdf(item)} />
             <div className="relative" ref={menuRef}>
               <BotaoIcone icon="more_vert" label="Mais opções" critico={critico} onClick={() => setMenuAberto((v) => !v)} />
               {menuAberto && (
                 <div className="absolute right-0 bottom-full mb-1 z-[60] w-48 bg-popover border border-border rounded-xl shadow-2xl overflow-y-auto max-h-[80vh]">
-                  <MenuItem icon="swap_horiz" label="Transferência" onClick={() => executar(onTransferencia, item)} />
-                  <MenuItem icon="warning" label="Registar perda" onClick={() => executar(onPerda, item)} />
-                  <MenuItem icon="delete_sweep" label="Registar desperdício" onClick={() => executar(onDesperdicio, item)} />
-                  <MenuItem icon="lock" label="Reservas" onClick={() => executar(onReservas, item)} />
+                  {mover && <MenuItem icon="swap_horiz" label="Transferência" onClick={() => executar(onTransferencia, item)} />}
+                  {mover && <MenuItem icon="warning" label="Registar perda" onClick={() => executar(onPerda, item)} />}
+                  {mover && <MenuItem icon="delete_sweep" label="Registar desperdício" onClick={() => executar(onDesperdicio, item)} />}
+                  {mover && <MenuItem icon="lock" label="Reservas" onClick={() => executar(onReservas, item)} />}
                   <MenuItem icon="edit" label="Editar" onClick={() => executar(onEditar, item)} />
                   {onEliminar && <MenuItem icon="delete" label="Remover" onClick={() => executar(onEliminar, item)} />}
                 </div>

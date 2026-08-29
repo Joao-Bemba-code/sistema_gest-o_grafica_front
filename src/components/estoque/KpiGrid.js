@@ -73,7 +73,9 @@ function KpiCard({ card, valor, barra }) {
 
 function KpiGrid({ totais, alertas, materiais }) {
   const stock = totais.stock || 1;
-  const valorTotal = (materiais || []).reduce((s, i) => s + toNum(i.custo_unit) * toNum(i.quantidade), 0);
+  const valorTotal = (materiais || [])
+    .filter((i) => i.mover_estoque !== false)
+    .reduce((s, i) => s + toNum(i.custo_unit) * toNum(i.quantidade), 0);
   const itens = totais.itens || 0;
 
   const data = {

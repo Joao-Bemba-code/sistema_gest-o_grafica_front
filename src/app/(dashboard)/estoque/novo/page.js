@@ -6,7 +6,7 @@ import Icon from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
 import MaterialForm from "@/components/estoque/MaterialForm";
 import useEstoque from "@/hooks/useEstoque";
-import { blankItem, entradasEspecificacao, formatKz, toNum, familias, tiposItem, normalizarFamilia, normalizarUnidade } from "@/lib/estoque";
+import { blankItem, entradasEspecificacao, formatKz, toNum, familias, tiposItem, normalizarFamilia, normalizarUnidade, moverEstoqueDe } from "@/lib/estoque";
 
 function PreviewLinha({ label, valor, acento }) {
   return (
@@ -36,6 +36,7 @@ export default function NovoMaterialPage() {
   const catFamilia = normalizarFamilia(catFamiliaTexto);
   const catFamiliaCfg = familias[catFamilia] || { icon: "label", label: catFamiliaTexto || "" };
   const custoTotal = toNum(form.custo_unit) * toNum(form.estoque_max);
+  const mover = form.mover_estoque === undefined ? moverEstoqueDe(categoria) : !!form.mover_estoque;
 
   return (
     <div className="space-y-5">
@@ -113,6 +114,7 @@ export default function NovoMaterialPage() {
             <PreviewLinha label="Subfamília" valor={(form.especificacoes?.subfamilia || categoria?.subfamilia || "").trim()} />
             <PreviewLinha label="Tipo" valor={tiposItem[categoria?.tipo]?.label} />
             <PreviewLinha label="Unidade" valor={form.unidade} />
+            <PreviewLinha label="Mover Estoque" valor={mover ? "Sim" : "Não"} acento={mover ? "text-success" : "text-warning"} />
             {entradasEspecificacao(form.especificacoes)
               .filter((e) => !["subfamilia", "formato", "gramagem"].includes(e.rotulo.toLowerCase().replace(/[^a-z]/g, "")))
               .map((e) => (

@@ -33,7 +33,7 @@ export default function LibertarMaquinaModal({ open, op, maquinas, onClose, onCo
 
   const confirmar = async () => {
     if (!maquinaId) {
-      setErro("Selecione a máquina para a produção");
+      setErro("Selecione o operacional para a produção");
       return;
     }
     setErro("");
@@ -56,7 +56,7 @@ export default function LibertarMaquinaModal({ open, op, maquinas, onClose, onCo
     <Modal
       open={open}
       onClose={onClose}
-      title="Libertar para a máquina"
+      title="Libertar para o operacional"
       icon="print"
       size="md"
       footer={
@@ -80,16 +80,16 @@ export default function LibertarMaquinaModal({ open, op, maquinas, onClose, onCo
           </p>
         </div>
 
-        <Campo label="Máquina">
+        <Campo label="Operacional">
           <select value={maquinaId} onChange={(e) => setMaquinaId(e.target.value)} className={inputCls}>
-            <option value="">Seleccionar máquina operacional...</option>
+            <option value="">Seleccionar operacional disponível...</option>
             {operacionais.map((m) => (
               <option key={m.id} value={m.id}>{m.nome_comum}{m.localizacao ? ` — ${m.localizacao}` : ""}</option>
             ))}
           </select>
           {operacionais.length === 0 && (
             <p className="text-[10px] text-amber-600">
-              Nenhuma máquina operacional disponível. Registe a máquina na aba &quot;Máquinas&quot;.
+              Nenhum operacional disponível. Registe a máquina no parque de máquinas.
             </p>
           )}
         </Campo>

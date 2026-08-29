@@ -81,10 +81,20 @@ function NovoOrcamentoInner() {
                   material_id: m.material_id ? String(m.material_id) : "",
                   descricao: m.descricao || "",
                   unidade: m.unidade || "un",
-                  quantidade: String(m.quantidade ?? ""),
-                  preco_venda: Number(m.custo_unit) || 0,
+                  quantidade: String(m.usar_parcial ? (Number(m.quantidade_folhas) || Number(m.quantidade) || "") : (m.quantidade ?? "")),
+                  preco_venda: Number(m.preco_folha) || Number(m.custo_unit) || 0,
                   custo_total: Number(m.custo_total) || 0,
                   mover_estoque: Boolean(m.mover_estoque),
+                  usar_parcial: Boolean(m.usar_parcial),
+                  formato_final: m.formato_final || "",
+                  largura_final: m.largura_final != null ? String(m.largura_final) : "",
+                  altura_final: m.altura_final != null ? String(m.altura_final) : "",
+                  pecas_por_folha: Number(m.pecas_por_folha) || 1,
+                  preco_folha: Number(m.preco_folha) || Number(m.custo_unit) || 0,
+                  formato: m.formato || "",
+                  largura_mm: m.largura_mm != null ? m.largura_mm : "",
+                  altura_mm: m.altura_mm != null ? m.altura_mm : "",
+                  especificacoes: m.especificacoes || {},
                 })),
               })),
               servicos: (Array.isArray(o.servicos) && o.servicos.length ? o.servicos : [blankServico]).map((sv) => ({
@@ -157,16 +167,31 @@ function NovoOrcamentoInner() {
           total: calc.total,
           composto: (it.materiais || []).filter((m) => m.material_id).length > 0,
           margem: 0,
-          materiais: (it.materiais || [])
-            .map((m) => ({
-              material_id: m.material_id,
-              descricao: m.descricao,
-              unidade: m.unidade || "un",
-              quantidade: Number(m.quantidade) || 0,
-              custo_unit: Number(m.preco_venda) || 0,
-              mover_estoque: Boolean(m.mover_estoque),
-            }))
-            .filter((m) => m.material_id),
+          materiais: [
+            ...(it.materiais || [])
+              .map((m) => {
+                return {
+                  material_id: m.material_id,
+                  descricao: m.descricao,
+                  unidade: m.unidade || "un",
+                  quantidade: Number(m.quantidade) || 0,
+                  custo_unit: Number(m.preco_venda) || 0,
+                  custo_total: Number(m.custo_total) || 0,
+                  mover_estoque: Boolean(m.mover_estoque),
+                  usar_parcial: Boolean(m.usar_parcial),
+                  formato_final: m.formato_final || "",
+                  largura_final: m.largura_final || "",
+                  altura_final: m.altura_final || "",
+                  pecas_por_folha: Number(m.pecas_por_folha) || 1,
+                  preco_folha: Number(m.preco_folha) || Number(m.preco_venda) || 0,
+                  formato: m.formato || "",
+                  largura_mm: m.largura_mm || "",
+                  altura_mm: m.altura_mm || "",
+                  quantidade_folhas: Number(m.quantidade) || 0,
+                };
+              })
+              .filter((m) => m.material_id),
+          ],
         };
       }),
       servicos: (form.servicos || []).map((sv) => {

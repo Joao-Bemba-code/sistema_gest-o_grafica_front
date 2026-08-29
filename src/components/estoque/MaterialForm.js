@@ -6,7 +6,7 @@ import FornecedorSelect from "./FornecedorSelect";
 import CategoriaSelect from "./CategoriaSelect";
 import UnidadeSelect from "./UnidadeSelect";
 import NumeroInput from "@/components/ui/NumeroInput";
-import { inputCls, unidades, unidadesParaFamilia, camposDeCategoria, familias, normalizarFamilia, normalizarUnidade, prefixoFamilia, especificacoesObjeto, tiposItem, normalizarTipoItem } from "@/lib/estoque";
+import { inputCls, unidades, unidadesParaFamilia, camposDeCategoria, familias, normalizarFamilia, normalizarUnidade, prefixoFamilia, especificacoesObjeto, tiposItem, normalizarTipoItem, moverEstoqueDe } from "@/lib/estoque";
 
 const tabs = [
   { key: "identificacao", label: "Identificação", icon: "badge" },
@@ -83,6 +83,7 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
   const camposEspec = camposDeCategoria(categoria, form.unidade);
   const ePapel = ["folha", "resma"].includes(normalizarUnidade(form.unidade));
   const unidadesDisponiveis = categoria ? unidadesParaFamilia(categoria.familia) : unidades;
+  const mover = form.mover_estoque === undefined ? moverEstoqueDe(categoria) : !!form.mover_estoque;
 
   const subfamiliasSugeridas = (() => {
     if (!categoria) return [];
@@ -218,6 +219,12 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
                     <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap">g/m²</span>
                   </div>
                 </Campo>
+                <Campo label="Largura (mm)">
+                  <NumeroInput value={form.largura || ""} onChange={(e) => onChange("largura", e.target.value)} className={inputCls} placeholder="Ex: 297" />
+                </Campo>
+                <Campo label="Altura (mm)">
+                  <NumeroInput value={form.altura || ""} onChange={(e) => onChange("altura", e.target.value)} className={inputCls} placeholder="Ex: 420" />
+                </Campo>
               </>
             )}
 
@@ -254,6 +261,22 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
 
         {tab === "estoque" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg cursor-pointer sm:col-span-2">
+              <input
+                type="checkbox"
+                checked={mover}
+                onChange={(e) => onChange("mover_estoque", e.target.checked)}
+                className="w-4 h-4 rounded accent-primary shrink-0"
+              />
+              <span>
+                <span className="block text-sm font-semibold text-foreground">Mover estoque</span>
+                <span className="block text-[11px] text-muted-foreground mt-0.5">
+                  {mover
+                    ? "Este item conta no Qtd. Disponível e pode ter entradas, saídas e reservas."
+                    : "Este item não movimenta estoque (registo apenas) — ex.: equipamentos usados na produção."}
+                </span>
+              </span>
+            </label>
             <Campo label="Stock Mínimo">
               <NumeroInput  value={form.estoque_min} onChange={(e) => onChange("estoque_min", e.target.value)} className={inputCls} placeholder="Ex: 500" />
             </Campo>
