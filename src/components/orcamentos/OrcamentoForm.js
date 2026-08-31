@@ -36,6 +36,12 @@ export function custoParcialDoMaterial(m) {
 }
 
 export function custoTotalMaterial(m) {
+  if (m.usar_parcial) {
+    const calc = calcCustoParcialFolha(m, m.formato_final, m.largura_final, m.altura_final);
+    if (calc && calc.pecas_por_folha > 1) {
+      return (Number(m.quantidade) || 0) * (calc.preco_peca || 0);
+    }
+  }
   return (Number(m.quantidade) || 0) * (Number(m.preco_venda) || 0);
 }
 
@@ -365,8 +371,11 @@ return (
                       </div>
                       <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
                         <div className="flex items-center gap-1.5">
-                          <NumeroInput value={m.quantidade} onChange={(e) => setItemMaterial(idx, mi, "quantidade", e.target.value)} className={inputCls} placeholder="Qtd/un." aria-label="Quantidade por unidade" />
-                          {m.unidade && <span className="text-[10px] font-mono text-primary font-bold shrink-0">{m.unidade}</span>}
+                          <NumeroInput value={m.quantidade} onChange={(e) => setItemMaterial(idx, mi, "quantidade", e.target.value)} className={inputCls} placeholder={m.usar_parcial && m.pecas_por_folha > 1 ? "Peças" : "Qtd/un."} aria-label="Quantidade por unidade" />
+                          {(() => {
+                            if (m.usar_parcial && m.pecas_por_folha > 1) return <span className="text-[10px] font-mono text-primary font-bold shrink-0">peça{Number(m.quantidade) !== 1 ? "s" : ""}</span>;
+                            return m.unidade ? <span className="text-[10px] font-mono text-primary font-bold shrink-0">{m.unidade}</span> : null;
+                          })()}
                         </div>
                       </div>
                       <div className="col-span-3 sm:col-span-2 flex flex-col gap-1.5">
@@ -453,7 +462,7 @@ return (
                                 {calc && calc.pecas_por_folha > 1 && (
                                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] font-mono">
                                     <span className="text-primary"><Icon name="grid_view" className="inline text-[12px] mr-1" />{calc.pecas_por_folha} peças / folha</span>
-                                    <span className="text-foreground">{Number(m.quantidade) || 0} folha{Number(m.quantidade) !== 1 ? "s" : ""} = <strong>{((Number(m.quantidade) || 0) * calc.pecas_por_folha).toLocaleString("pt-AO")} peças</strong></span>
+                                    <span className="text-foreground">{Number(m.quantidade) || 0} peça{Number(m.quantidade) !== 1 ? "s" : ""} = <strong>{Math.ceil((Number(m.quantidade) || 0) / calc.pecas_por_folha).toLocaleString("pt-AO")} folha{Math.ceil((Number(m.quantidade) || 0) / calc.pecas_por_folha) !== 1 ? "s" : ""}</strong></span>
                                     <span className="text-muted-foreground">Preço por folha: {`Kz ${Number(m.preco_venda || 0).toLocaleString("pt-AO")}`} · peça: {`Kz ${calc.preco_peca.toLocaleString("pt-AO")}`}</span>
                                   </div>
                                 )}

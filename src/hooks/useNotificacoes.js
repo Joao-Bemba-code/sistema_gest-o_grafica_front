@@ -5,6 +5,7 @@ import { listar as listarMateriais } from "@/services/materiais";
 import { listarOrdens } from "@/services/producao";
 import { listarFaturas } from "@/services/faturacao";
 import { getUsuario } from "@/services/auth";
+import { podeAtual } from "@/lib/permissoes";
 
 const CHAVE_LIDAS = "sigraf-notif-lidas";
 
@@ -40,76 +41,92 @@ export default function useNotificacoes() {
   });
 
   const carregar = useCallback(() => {
-    Promise.allSettled([listarMateriais(), listarOrdens(), listarFaturas()])
-      .then(([m, o, f]) => {
-        const mats = m.status === "fulfilled" && Array.isArray(m.value) ? m.value : [];
-        const ordens = o.status === "fulfilled" && Array.isArray(o.value) ? o.value : [];
-        const faturas = f.status === "fulfilled" && Array.isArray(f.value) ? f.value : [];
+    const verEstoque = podeAtual("estoque", "ver");
+    const verProducao = podeAtual("producao", "ver");
+    const verComercial = podeAtual("comercial", "ver");
+
+    const promessas = [];
+    if (verEstoque) promessas.push(listarMateriais());
+    if (verProducao) promessas.push(listarOrdens());
+    if (verComercial) promessas.push(listarFaturas());
+
+    Promise.allSettled(promessas)
+      .then((resultados) => {
+        const mats = verEstoque && resultados[0]?.status === "fulfilled" && Array.isArray(resultados[0].value) ? resultados[0].value : [];
+        const ordens = verProducao && resultados[verEstoque ? 1 : 0]?.status === "fulfilled" && Array.isArray(resultados[verEstoque ? 1 : 0].value) ? resultados[verEstoque ? 1 : 0].value : [];
+        const idxFaturas = (verEstoque ? 1 : 0) + (verProducao ? 1 : 0);
+        const faturas = verComercial && resultados[idxFaturas]?.status === "fulfilled" && Array.isArray(resultados[idxFaturas].value) ? resultados[idxFaturas].value : [];
         const hoje = new Date();
         const nova = [];
 
-        mats
-          .filter((x) => x.status === "esgotado" || x.status === "repor")
-          .forEach((x) => {
-            const esgotado = x.status === "esgotado";
-            nova.push({
-              id: `stock-${x.id}`,
-              nivel: esgotado ? "error" : "warning",
-              icon: esgotado ? "error" : "warning",
-              titulo: `Estoque ${esgotado ? "esgotado" : "baixo"}: ${x.nome}`,
-              desc: `${x.estoque_disponivel ?? 0}/${x.ponto_ressuprimento || x.estoque_min} ${x.unidade || "un"} disponíveis`,
-              tempo: hoje.toISOString(),
-              link: "/estoque",
+        if (verEstoque) {
+          mats
+            .filter((x) => x.status === "esgotado" || x.status === "repor")
+            .forEach((x) => {
+              const esgotado = x.status === "esgotado";
+              nova.push({
+                id: `stock-${x.id}`,
+                nivel: esgotado ? "error" : "warning",
+                icon: esgotado ? "error" : "warning",
+                titulo: `Estoque ${esgotado ? "esgotado" : "baixo"}: ${x.nome}`,
+                desc: `${x.estoque_disponivel ?? 0}/${x.ponto_ressuprimento || x.estoque_min} ${x.unidade || "un"} disponíveis`,
+                tempo: hoje.toISOString(),
+                link: "/estoque",
+              });
             });
-          });
+        }
 
-        ordens
-          .filter((x) => ["finalizado", "entregue"].includes(x.estado))
-          .slice(-5)
-          .forEach((x) => {
-            nova.push({
-              id: `ordem-ok-${x.id}`,
-              nivel: "success",
-              icon: "check_circle",
-              titulo: `Ordem #${x.numero || x.id} concluída`,
-              desc: x.produto || "Produção",
-              tempo: x.createdAt || hoje.toISOString(),
-              link: "/producao/ordens",
+        if (verProducao) {
+          ordens
+            .filter((x) => ["finalizado", "entregue"].includes(x.estado))
+            .slice(-5)
+            .forEach((x) => {
+              nova.push({
+                id: `ordem-ok-${x.id}`,
+                nivel: "success",
+                icon: "check_circle",
+                titulo: `Ordem #${x.numero || x.id} concluída`,
+                desc: x.produto || "Produção",
+                tempo: x.createdAt || hoje.toISOString(),
+                link: "/producao/ordens",
+              });
             });
-          });
 
-        ordens
-          .filter(
-            (x) =>
-              x.data_entrega &&
-              !["entregue", "finalizado", "cancelado"].includes(x.estado) &&
-              new Date(x.data_entrega) < hoje
-          )
-          .forEach((x) => {
-            nova.push({
-              id: `ordem-atraso-${x.id}`,
-              nivel: "error",
-              icon: "schedule",
-              titulo: `Ordem #${x.numero || x.id} em atraso`,
-              desc: `${x.produto || "Produção"} — entrega ${formatHora(x.data_entrega)}`,
-              tempo: x.createdAt || hoje.toISOString(),
-              link: "/producao/ordens",
+          ordens
+            .filter(
+              (x) =>
+                x.data_entrega &&
+                !["entregue", "finalizado", "cancelado"].includes(x.estado) &&
+                new Date(x.data_entrega) < hoje
+            )
+            .forEach((x) => {
+              nova.push({
+                id: `ordem-atraso-${x.id}`,
+                nivel: "error",
+                icon: "schedule",
+                titulo: `Ordem #${x.numero || x.id} em atraso`,
+                desc: `${x.produto || "Produção"} — entrega ${formatHora(x.data_entrega)}`,
+                tempo: x.createdAt || hoje.toISOString(),
+                link: "/producao/ordens",
+              });
             });
-          });
+        }
 
-        faturas
-          .filter((x) => x.estado === "vencida")
-          .forEach((x) => {
-            nova.push({
-              id: `fatura-${x.id}`,
-              nivel: "error",
-              icon: "payments",
-              titulo: `Fatura #${x.numero || x.id} vencida`,
-              desc: `Kz ${Number(x.total || x.valor || 0).toLocaleString("pt-AO")} — ${x.cliente?.nome || "sem cliente"}`,
-              tempo: x.data_vencimento || hoje.toISOString(),
-              link: "/faturacao",
+        if (verComercial) {
+          faturas
+            .filter((x) => x.estado === "vencida")
+            .forEach((x) => {
+              nova.push({
+                id: `fatura-${x.id}`,
+                nivel: "error",
+                icon: "payments",
+                titulo: `Fatura #${x.numero || x.id} vencida`,
+                desc: `Kz ${Number(x.total || x.valor || 0).toLocaleString("pt-AO")} — ${x.cliente?.nome || "sem cliente"}`,
+                tempo: x.data_vencimento || hoje.toISOString(),
+                link: "/faturacao",
+              });
             });
-          });
+        }
 
         nova.sort((a, b) => {
           const pa = prioridade[a.nivel] ?? 9;

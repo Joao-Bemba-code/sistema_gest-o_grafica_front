@@ -158,6 +158,23 @@ export default function gerarPDF(fatura, empresa = {}) {
     y += 6;
   }
 
+  // ===== Dados Bancários =====
+  const temBanco = empresa.banco_nome || empresa.banco_iban || empresa.banco_conta;
+  if (temBanco) {
+    doc.setFillColor(...COR_SUAVE);
+    doc.roundedRect(14, y, pw - 28, 24, 2, 2, "F");
+    doc.setFontSize(8); doc.setFont("helvetica", "bold");
+    doc.text("DADOS PARA PAGAMENTO", 18, y + 6);
+    doc.setFontSize(8); doc.setFont("helvetica", "normal");
+    const linhasBanco = [];
+    if (empresa.banco_nome) linhasBanco.push(`Banco: ${empresa.banco_nome}`);
+    if (empresa.banco_conta) linhasBanco.push(`Conta: ${empresa.banco_conta}`);
+    if (empresa.banco_iban) linhasBanco.push(`IBAN: ${empresa.banco_iban}`);
+    doc.text(linhasBanco.join("   |   "), 18, y + 13);
+    doc.text("Transferência BIM, Multicaixa ou outro meio de pagamento.", 18, y + 19);
+    y += 24;
+  }
+
   // ===== Assinaturas =====
   y = Math.max(y + 12, ph - 40);
   doc.setDrawColor(180, 190, 200);

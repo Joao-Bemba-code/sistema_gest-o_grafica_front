@@ -21,7 +21,9 @@ export default function LoginPage() {
     try {
       const data = await login(email, senha);
       setUsuario(data.usuario);
-      router.push("/");
+      const destino =
+        data.usuario?.perfil === "producao" ? "/producao" : data.usuario?.perfil === "gestao" ? "/vendas" : "/";
+      router.push(destino);
     } catch (err) {
       setError(err.response?.data?.erro || "Credenciais inválidas");
     } finally {

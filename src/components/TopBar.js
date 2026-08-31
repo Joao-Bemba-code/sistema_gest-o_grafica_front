@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { logout } from "@/services/auth";
 import { getInitials } from "@/lib/utils";
+import { podeAtual } from "@/lib/permissoes";
 import useNotificacoes from "@/hooks/useNotificacoes";
 import Icon from "./Icon";
 import Modal from "./Modal";
@@ -63,8 +64,12 @@ export default function TopBar() {
       </div>
       <div className="flex items-center gap-2 sm:gap-5">
         <nav className="hidden md:flex gap-5">
-          <Link href="/vendas" className="text-primary font-semibold border-b-2 border-primary pb-1 text-sm transition-all">Área Comercial</Link>
-          <Link href="/producao" className="text-muted-foreground hover:text-primary transition-all text-sm font-medium">Produção</Link>
+          {podeAtual("comercial", "ver") && (
+            <Link href="/vendas" className="text-primary font-semibold border-b-2 border-primary pb-1 text-sm transition-all">Área Comercial</Link>
+          )}
+          {podeAtual("producao", "ver") && (
+            <Link href="/producao" className="text-muted-foreground hover:text-primary transition-all text-sm font-medium">Produção</Link>
+          )}
         </nav>
         <div className="flex items-center gap-3">
           <div className="relative">
@@ -72,7 +77,7 @@ export default function TopBar() {
               ref={bellRef}
               onClick={() => setNotifAberto(!notifAberto)}
               aria-label={naoLidas.length > 0 ? `Notificações (${naoLidas.length} por ler)` : "Notificações"}
-              className="p-2 hover:text-primary hover:bg-accent rounded-full transition-all duration-200 relative hover-scale"
+              className="relative p-2 rounded-full hover:text-primary hover:bg-accent transition-all duration-200 hover-scale"
             >
               <Icon name="notifications" className="text-muted-foreground" />
               {naoLidas.length > 0 && (
@@ -136,12 +141,14 @@ export default function TopBar() {
               )}
             </Modal>
           </div>
-          <Link
-            href="/configuracoes"
-            className="p-2 hover:text-primary hover:bg-accent rounded-full transition-all hidden sm:block hover-scale"
-          >
-            <Icon name="settings" className="text-muted-foreground" />
-          </Link>
+          {podeAtual("configuracao", "ver") && (
+            <Link
+              href="/configuracoes"
+              className="p-2 hover:text-primary hover:bg-accent rounded-full transition-all hidden sm:block hover-scale"
+            >
+              <Icon name="settings" className="text-muted-foreground" />
+            </Link>
+          )}
           <button onClick={logout} className="p-2 hover:text-destructive hover:bg-destructive/10 rounded-full transition-all duration-200 hover-scale" title="Sair">
             <Icon name="logout" className="text-muted-foreground" />
           </button>

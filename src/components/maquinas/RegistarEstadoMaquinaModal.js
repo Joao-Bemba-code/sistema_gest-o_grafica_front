@@ -18,6 +18,8 @@ export default function RegistrarEstadoMaquinaModal({ open, maquinas, maquinaIni
   const [maquinaId, setMaquinaId] = useState("");
   const [estado, setEstado] = useState("operacional");
   const [motivo, setMotivo] = useState("");
+  const [tempo, setTempo] = useState("");
+  const [tecnico, setTecnico] = useState("");
   const [salvando, setSalvando] = useState(false);
 
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -26,6 +28,8 @@ export default function RegistrarEstadoMaquinaModal({ open, maquinas, maquinaIni
       setMaquinaId(maquinaInicialId ? String(maquinaInicialId) : "");
       setEstado("operacional");
       setMotivo("");
+      setTempo("");
+      setTecnico("");
     }
   }, [open, maquinaInicialId]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -43,6 +47,8 @@ export default function RegistrarEstadoMaquinaModal({ open, maquinas, maquinaIni
       const dados = { estado };
       if (estado !== maquina?.estado) {
         if (motivo.trim()) dados.motivo_estado = motivo.trim();
+        if ((estado === "manutencao" || estado === "avariada") && tempo.trim()) dados.tempo_manutencao = tempo.trim();
+        if ((estado === "manutencao" || estado === "avariada") && tecnico.trim()) dados.tecnico_manutencao = tecnico.trim();
       } else {
         addToast("A máquina já está nesse estado", "warning");
         return;
@@ -137,6 +143,35 @@ export default function RegistrarEstadoMaquinaModal({ open, maquinas, maquinaIni
             onChange={(e) => setMotivo(e.target.value)}
           />
         </div>
+
+        {(estado === "manutencao" || estado === "avariada") && (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-4">
+            <p className="flex items-center gap-2 text-xs font-bold text-amber-700 dark:text-amber-400">
+              <Icon name="build" className="text-base" />
+              {estado === "manutencao" ? "Manutenção / Intervenção" : "Avaria"}
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase">Tempo previsto para reparação</label>
+                <input
+                  className={inputCls}
+                  placeholder="Ex.: 2h30, 1 dia..."
+                  value={tempo}
+                  onChange={(e) => setTempo(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase">Técnico responsável</label>
+                <input
+                  className={inputCls}
+                  placeholder="Nome do técnico..."
+                  value={tecnico}
+                  onChange={(e) => setTecnico(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </form>
     </Modal>
   );

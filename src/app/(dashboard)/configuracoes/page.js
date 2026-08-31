@@ -91,7 +91,7 @@ export default function ConfiguracoesPage() {
   const logoRef = useRef();
 
   const [carregando, setCarregando] = useState(true);
-  const [org, setOrg] = useState({ nome: "", sigla: "", endereco: "", telefone: "", email: "", nif: "", website: "", logo_url: "", template_contrato: CONTRATO_TEMPLATE });
+  const [org, setOrg] = useState({ nome: "", sigla: "", endereco: "", telefone: "", email: "", nif: "", website: "", logo_url: "", template_contrato: CONTRATO_TEMPLATE, banco_nome: "", banco_iban: "", banco_conta: "" });
   const [sis, setSis] = useState({ idioma: "Português", formato_data: "DD/MM/AAAA", moeda: "Kwanza (AOA)", fuso_horario: "Africa/Luanda (GMT+1)", dias_aviso_ferias: 30, limite_ficheiros: 10 });
   const [seg, setSeg] = useState({ tfa_ativo: true, forcar_senha: true, bloqueio_bruta: true, sessao_inativa: false });
   const [userAtual, setUserAtual] = useState({});
@@ -228,6 +228,22 @@ export default function ConfiguracoesPage() {
               <FormField label="Website">
                 <Input value={org.website || ""} onChange={(e) => setOrg((p) => ({ ...p, website: e.target.value }))} />
               </FormField>
+
+              <div className="flex items-center gap-2 pt-2">
+                <Icon name="account_balance" className="text-primary text-sm" />
+                <p className="text-sm font-semibold text-foreground">Dados Bancários</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <FormField label="Banco">
+                  <Input value={org.banco_nome || ""} onChange={(e) => setOrg((p) => ({ ...p, banco_nome: e.target.value }))} placeholder="Ex: BFA" />
+                </FormField>
+                <FormField label="Nº de Conta">
+                  <Input value={org.banco_conta || ""} onChange={(e) => setOrg((p) => ({ ...p, banco_conta: e.target.value }))} placeholder="Nº da conta" />
+                </FormField>
+                <FormField label="IBAN">
+                  <Input value={org.banco_iban || ""} onChange={(e) => setOrg((p) => ({ ...p, banco_iban: e.target.value }))} placeholder="AO06 0000 0000 0000 0000 00000 000" />
+                </FormField>
+              </div>
 
               <div className="space-y-2">
                 <FormField label="Modelo de Contrato de Trabalho">

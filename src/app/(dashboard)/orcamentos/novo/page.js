@@ -77,25 +77,33 @@ function NovoOrcamentoInner() {
                 descricao: it.descricao || "",
                 quantidade: String(it.quantidade ?? ""),
                 valorUnitario: String(it.valorUnitario ?? ""),
-                materiais: (it.materiais || []).map((m) => ({
-                  material_id: m.material_id ? String(m.material_id) : "",
-                  descricao: m.descricao || "",
-                  unidade: m.unidade || "un",
-                  quantidade: String(m.usar_parcial ? (Number(m.quantidade_folhas) || Number(m.quantidade) || "") : (m.quantidade ?? "")),
-                  preco_venda: Number(m.preco_folha) || Number(m.custo_unit) || 0,
-                  custo_total: Number(m.custo_total) || 0,
-                  mover_estoque: Boolean(m.mover_estoque),
-                  usar_parcial: Boolean(m.usar_parcial),
-                  formato_final: m.formato_final || "",
-                  largura_final: m.largura_final != null ? String(m.largura_final) : "",
-                  altura_final: m.altura_final != null ? String(m.altura_final) : "",
-                  pecas_por_folha: Number(m.pecas_por_folha) || 1,
-                  preco_folha: Number(m.preco_folha) || Number(m.custo_unit) || 0,
-                  formato: m.formato || "",
-                  largura_mm: m.largura_mm != null ? m.largura_mm : "",
-                  altura_mm: m.altura_mm != null ? m.altura_mm : "",
-                  especificacoes: m.especificacoes || {},
-                })),
+                materiais: (it.materiais || []).map((m) => {
+                  const pecasPorFolha = Number(m.pecas_por_folha) || 1;
+                  const usar_parcial = Boolean(m.usar_parcial);
+                  const qtdFolhas = Number(m.quantidade_folhas) || Number(m.quantidade) || 0;
+                  const qtdDisplay = usar_parcial && pecasPorFolha > 1
+                    ? (Number(m.quantidade_pecas) || (qtdFolhas * pecasPorFolha))
+                    : qtdFolhas;
+                  return {
+                    material_id: m.material_id ? String(m.material_id) : "",
+                    descricao: m.descricao || "",
+                    unidade: m.unidade || "un",
+                    quantidade: String(qtdDisplay || ""),
+                    preco_venda: Number(m.preco_folha) || Number(m.custo_unit) || 0,
+                    custo_total: Number(m.custo_total) || 0,
+                    mover_estoque: Boolean(m.mover_estoque),
+                    usar_parcial: usar_parcial,
+                    formato_final: m.formato_final || "",
+                    largura_final: m.largura_final != null ? String(m.largura_final) : "",
+                    altura_final: m.altura_final != null ? String(m.altura_final) : "",
+                    pecas_por_folha: pecasPorFolha,
+                    preco_folha: Number(m.preco_folha) || Number(m.custo_unit) || 0,
+                    formato: m.formato || "",
+                    largura_mm: m.largura_mm != null ? m.largura_mm : "",
+                    altura_mm: m.altura_mm != null ? m.altura_mm : "",
+                    especificacoes: m.especificacoes || {},
+                  };
+                }),
               })),
               servicos: (Array.isArray(o.servicos) && o.servicos.length ? o.servicos : [blankServico]).map((sv) => ({
                 servico_id: sv.servico_id || "",
@@ -170,11 +178,16 @@ function NovoOrcamentoInner() {
           materiais: [
             ...(it.materiais || [])
               .map((m) => {
+                const pecasPorFolha = Number(m.pecas_por_folha) || 1;
+                const qtdPecas = Number(m.quantidade) || 0;
+                const qtdFolhas = m.usar_parcial && pecasPorFolha > 1
+                  ? Math.ceil(qtdPecas / pecasPorFolha)
+                  : qtdPecas;
                 return {
                   material_id: m.material_id,
                   descricao: m.descricao,
                   unidade: m.unidade || "un",
-                  quantidade: Number(m.quantidade) || 0,
+                  quantidade: qtdFolhas,
                   custo_unit: Number(m.preco_venda) || 0,
                   custo_total: Number(m.custo_total) || 0,
                   mover_estoque: Boolean(m.mover_estoque),
@@ -182,12 +195,13 @@ function NovoOrcamentoInner() {
                   formato_final: m.formato_final || "",
                   largura_final: m.largura_final || "",
                   altura_final: m.altura_final || "",
-                  pecas_por_folha: Number(m.pecas_por_folha) || 1,
+                  pecas_por_folha: pecasPorFolha,
                   preco_folha: Number(m.preco_folha) || Number(m.preco_venda) || 0,
                   formato: m.formato || "",
                   largura_mm: m.largura_mm || "",
                   altura_mm: m.altura_mm || "",
-                  quantidade_folhas: Number(m.quantidade) || 0,
+                  quantidade_folhas: qtdFolhas,
+                  quantidade_pecas: m.usar_parcial && pecasPorFolha > 1 ? qtdPecas : 0,
                 };
               })
               .filter((m) => m.material_id),

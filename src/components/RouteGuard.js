@@ -1,17 +1,46 @@
 "use client";
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { podeAtual } from "@/lib/permissoes";
+
+// Mapeia os caminhos da aplicação para (módulo, ação) exigidos.
+// O primeiro prefixo que corresponder define a permissão necessária.
+const rotasProtegidas = [
+  { prefixo: "/vendas", perm: ["comercial", "ver"] },
+  { prefixo: "/orcamentos", perm: ["comercial", "ver"] },
+  { prefixo: "/clientes", perm: ["comercial", "ver"] },
+  { prefixo: "/faturacao", perm: ["faturacao", "ver"] },
+  { prefixo: "/producao", perm: ["producao", "ver"] },
+  { prefixo: "/pre-impressao", perm: ["producao", "ver"] },
+  { prefixo: "/impressao", perm: ["producao", "ver"] },
+  { prefixo: "/acabamento", perm: ["producao", "ver"] },
+  { prefixo: "/qualidade", perm: ["producao", "ver"] },
+  { prefixo: "/estoque", perm: ["estoque", "ver"] },
+  { prefixo: "/categorias", perm: ["categorias", "ver"] },
+  { prefixo: "/maquinas", perm: ["maquinas", "ver"] },
+  { prefixo: "/relatorios", perm: ["relatorios", "ver"] },
+  { prefixo: "/configuracoes", perm: ["configuracao", "ver"] },
+  { prefixo: "/utilizadores", perm: ["utilizadores", "ver"] },
+];
 
 export default function RouteGuard({ children }) {
   const { autenticado, carregando } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
-    if (!carregando && !autenticado) {
+    if (carregando) return;
+    if (!autenticado) {
       router.replace("/login");
+      return;
     }
-  }, [autenticado, carregando, router]);
+    if (pathname === "/") return;
+    const regra = rotasProtegidas.find((r) => pathname.startsWith(r.prefixo));
+    if (regra && !podeAtual(...regra.perm)) {
+      router.replace("/");
+    }
+  }, [autenticado, carregando, router, pathname]);
 
   if (carregando) {
     return (
@@ -25,6 +54,11 @@ export default function RouteGuard({ children }) {
   }
 
   if (!autenticado) return null;
+
+  if (pathname !== "/") {
+    const regra = rotasProtegidas.find((r) => pathname.startsWith(r.prefixo));
+    if (regra && !podeAtual(...regra.perm)) return null;
+  }
 
   return children;
 }

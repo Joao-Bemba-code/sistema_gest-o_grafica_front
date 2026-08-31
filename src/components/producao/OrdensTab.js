@@ -10,12 +10,10 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
 import FilterBar, { useFilter } from "@/components/ui/FilterBar";
-import { listarOrdens, libertarMateriais, libertarParaMaquina, removerOrdem } from "@/services/producao";
+import { listarOrdens, libertarMateriais, removerOrdem } from "@/services/producao";
 import { getUsuario } from "@/services/auth";
 import SaidaMateriaisModal from "@/components/producao/SaidaMateriaisModal";
-import LibertarMaquinaModal from "@/components/producao/LibertarMaquinaModal";
 import { listar as listarMateriais } from "@/services/materiais";
-import { listar as listarMaquinas } from "@/services/maquinas";
 
 const statusConfig = {
   aguardando: { label: "Aguardando", variant: "warning" },
@@ -66,18 +64,15 @@ export default function OrdensTab() {
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
   const [materiais, setMateriais] = useState([]);
-  const [maquinas, setMaquinas] = useState([]);
   const [libertarOp, setLibertarOp] = useState(null);
-  const [libertarMaqOp, setLibertarMaqOp] = useState(null);
   const [eliminarItem, setEliminarItem] = useState(null);
   const [deletando, setDeletando] = useState(false);
   const { addToast } = useToast();
 
   const carregarDados = () => {
-    Promise.all([listarOrdens(), listarMateriais(), listarMaquinas()]).then(([ordensData, materiaisData, maquinasData]) => {
+    Promise.all([listarOrdens(), listarMateriais()]).then(([ordensData, materiaisData]) => {
       setOps((Array.isArray(ordensData) ? ordensData : ordensData?.ordens || []).map(normalizar));
       setMateriais(Array.isArray(materiaisData) ? materiaisData : materiaisData?.materiais || []);
-      setMaquinas(Array.isArray(maquinasData) ? maquinasData : maquinasData?.data || []);
     }).catch(() => addToast("Erro ao carregar ordens de produção", "error")).finally(() => setLoading(false));
   };
 
@@ -118,19 +113,6 @@ export default function OrdensTab() {
       return true;
     } catch (err) {
       addToast(err.response?.data?.erro || "Erro ao libertar materiais", "error");
-      return false;
-    }
-  };
-
-  const handleLibertarMaquina = async (dados = {}) => {
-    if (!libertarMaqOp) return false;
-    try {
-      const atualizada = await libertarParaMaquina(libertarMaqOp.id, dados);
-      setOps((prev) => prev.map((o) => (o.id === libertarMaqOp.id ? normalizar(atualizada) : o)));
-      addToast(`OP ${libertarMaqOp.id} libertada para o operacional`, "success");
-      return true;
-    } catch (err) {
-      addToast(err.response?.data?.erro || "Erro ao libertar para o operacional", "error");
       return false;
     }
   };
@@ -293,16 +275,9 @@ export default function OrdensTab() {
                       <div className="mt-4 pt-4 border-t">
                         <div className="flex items-center justify-between gap-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 py-3">
                           <p className="text-xs text-emerald-700 dark:text-emerald-400">
-                            Materiais libertados — saída de stock registada.
-                            {op.maquina ? ` Operacional atribuído: ${op.maquina}.` : " Atribua o operacional para iniciar a produção."}
+                            Materiais libertados — saída de stock registada. A atribuição da máquina é feita na aba <strong>Processos</strong> (Impressão ou Acabamento).
                           </p>
-                          {op.maquina ? (
-                            <Badge variant="success" className="text-[10px]">Em produção</Badge>
-                          ) : (
-                            <Button size="sm" onClick={(e) => { e.stopPropagation(); setLibertarMaqOp(op); }}>
-                              <Icon name="print" className="text-lg" /> Atribuir operacional
-                            </Button>
-                          )}
+                          <Badge variant="success" className="text-[10px]">Pronto para produção</Badge>
                         </div>
                       </div>
                     )}
@@ -336,16 +311,6 @@ export default function OrdensTab() {
         materiais={materiais}
         onClose={() => setLibertarOp(null)}
         onConfirm={handleLibertar}
-        nomeUsuario={getUsuario()?.nome || ""}
-      />
-
-      <LibertarMaquinaModal
-        key={libertarMaqOp?.id ?? "nenhum-maquina"}
-        open={!!libertarMaqOp}
-        op={libertarMaqOp}
-        maquinas={maquinas}
-        onClose={() => setLibertarMaqOp(null)}
-        onConfirm={handleLibertarMaquina}
         nomeUsuario={getUsuario()?.nome || ""}
       />
 

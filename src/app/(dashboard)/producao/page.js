@@ -8,8 +8,8 @@ import ProcessosTab from "@/components/producao/ProcessosTab";
 
 const abas = [
   { id: "ordens", label: "Ordens", icon: "construction" },
-  { id: "operacional", label: "Operacional", icon: "precision_manufacturing" },
   { id: "processos", label: "Processos", icon: "verified" },
+  { id: "operacional", label: "Operacional", icon: "precision_manufacturing" },
 ];
 
 export default function ProducaoPage() {
@@ -21,7 +21,7 @@ export default function ProducaoPage() {
         <div>
           <h1 className="font-sans text-3xl font-bold text-foreground tracking-tight">Produção</h1>
           <p className="text-primary mt-1 font-mono text-xs uppercase tracking-widest">
-            Ordens · operacional · processos de produção // PROD
+            Ordens de produção · processos · operacional // PROD
           </p>
         </div>
       </div>

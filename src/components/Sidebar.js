@@ -7,15 +7,17 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import Icon from "./Icon";
 import { cn, getInitials } from "@/lib/utils";
+import { podeAtual } from "@/lib/permissoes";
 
 const rotas = [
-  { icone: "dashboard", nome: "Painel", para: "/" },
-  { icone: "storefront", nome: "Área Comercial", para: "/vendas" },
-  { icone: "factory", nome: "Produção", para: "/producao" },
-  { icone: "inventory_2", nome: "Provisionamento", para: "/estoque" },
-  { icone: "category", nome: "Recursos", para: "/categorias" },
-  { icone: "analytics", nome: "Relatórios", para: "/relatorios" },
-  { icone: "settings", nome: "Configurações", para: "/configuracoes" },
+  { icone: "dashboard", nome: "Painel", para: "/", perm: ["comercial", "ver"] },
+  { icone: "storefront", nome: "Área Comercial", para: "/vendas", perm: ["comercial", "ver"] },
+  { icone: "factory", nome: "Produção", para: "/producao", perm: ["producao", "ver"] },
+  { icone: "inventory_2", nome: "Provisionamento", para: "/estoque", perm: ["estoque", "ver"] },
+  { icone: "category", nome: "Recursos", para: "/categorias", perm: ["categorias", "ver"] },
+  { icone: "analytics", nome: "Relatórios", para: "/relatorios", perm: ["relatorios", "ver"] },
+  { icone: "settings", nome: "Configurações", para: "/configuracoes", perm: ["configuracao", "ver"] },
+  { icone: "manage_accounts", nome: "Utilizadores", para: "/utilizadores", perm: ["utilizadores", "ver"] },
 ];
 
 export default function Sidebar() {
@@ -62,7 +64,7 @@ export default function Sidebar() {
 
         <nav className="flex-1 px-3 py-3 overflow-y-auto custom-scrollbar space-y-0.5">
           <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/70">Menu</p>
-          {rotas.map((rota) => {
+          {rotas.filter((rota) => podeAtual(...rota.perm)).map((rota) => {
             const ativa = rota.para === "/" ? caminho === "/" : caminho.startsWith(rota.para);
             return (
               <Link

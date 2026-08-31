@@ -13,7 +13,9 @@ import MaquinaModal from "@/components/maquinas/MaquinaModal";
 import RegistarEstadoModal from "@/components/maquinas/RegistarEstadoMaquinaModal";
 import { listar, remover } from "@/services/maquinas";
 import { listarOrdens } from "@/services/producao";
+import { buscarOrganizacao } from "@/services/configuracoes";
 import { estadoMaquinaCfg, toNumMaq } from "@/lib/maquinas";
+import gerarRelatorioMaquinas from "@/lib/machinesPdf";
 
 function fmtData(v) {
   if (!v) return "—";
@@ -98,6 +100,10 @@ function HistoricoMaquina({ maquina, ordens }) {
     titulo: estadoMaquinaCfg[e.estado]?.label || e.estado || "Estado",
     data: fmtData(e.data),
     obs: e.motivo ? `Motivo: ${e.motivo}` : "",
+    detalhes: [
+      e.tempo_estimado ? `Tempo previsto: ${e.tempo_estimado}` : "",
+      e.tecnico ? `Técnico: ${e.tecnico}` : "",
+    ].filter(Boolean),
   }));
 
   const itensManut = manutencoes.map((x) => ({
@@ -161,13 +167,15 @@ export default function MaquinasTab({ showHeader = false, registarEstado = false
   const [formMaq, setFormMaq] = useState({ aberto: false, id: null });
   const [expansoes, setExpansoes] = useState({});
   const [estadoModal, setEstadoModal] = useState({ aberto: false, id: null });
+  const [empresa, setEmpresa] = useState({});
 
   const carregar = useCallback(async () => {
     setCarregando(true);
     try {
-      const [data, ordensData] = await Promise.all([listar(), listarOrdens()]);
+      const [data, ordensData, org] = await Promise.all([listar(), listarOrdens(), buscarOrganizacao().catch(() => null)]);
       setMaquinas(Array.isArray(data) ? data : data?.data ?? []);
       setOrdens(Array.isArray(ordensData) ? ordensData : ordensData?.ordens || []);
+      setEmpresa(org || {});
     } catch (err) {
       addToast(err.response?.data?.erro || "Erro ao carregar maquinaria", "error");
       setMaquinas([]);
@@ -234,6 +242,12 @@ export default function MaquinasTab({ showHeader = false, registarEstado = false
         <KpiCard icon="check_circle" label="Operacionais" value={totalOperacionais} iconVariant="success" />
         <KpiCard icon="handyman" label="Manutenção / Avaria" value={totalManutencao} iconVariant="warning" />
       </section>
+
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={() => gerarRelatorioMaquinas(filtrados, ordens, empresa)} className="gap-1.5">
+          <Icon name="picture_as_pdf" className="text-lg" /> Relatório em PDF
+        </Button>
+      </div>
 
       <Card>
         <div className="p-4 sm:p-5 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
