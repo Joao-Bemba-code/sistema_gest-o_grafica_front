@@ -132,7 +132,7 @@ export default function CadastrosTab() {
             Clientes e fornecedores // CLT · {clientes.length} registos ({totalClientes} clientes, {totalFornecedores} fornecedores)
           </p>
         </div>
-        <button onClick={abrirNovo} className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold shadow-[0_0_15px_rgba(128,213,203,0.2)] hover:shadow-[0_0_25px_rgba(128,213,203,0.4)]">
+        <button onClick={abrirNovo} className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold ">
           <Icon name="add" className="text-[16px]" /> Novo Cadastro
         </button>
       </div>

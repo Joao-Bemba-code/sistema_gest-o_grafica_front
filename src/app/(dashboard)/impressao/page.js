@@ -93,7 +93,7 @@ export default function ImpressaoPage() {
           <p className="text-primary mt-1 font-mono text-xs uppercase tracking-widest">{registros.length} registos de impressão // IMP</p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <button onClick={() => setModal(true)} className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold shadow-[0_0_15px_rgba(128,213,203,0.2)] hover:shadow-[0_0_25px_rgba(128,213,203,0.4)]">
+          <button onClick={() => setModal(true)} className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold ">
             <Icon name="add" className="text-[16px]" /> Novo Registo
           </button>
         </div>

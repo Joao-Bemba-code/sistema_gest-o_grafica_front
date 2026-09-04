@@ -11,19 +11,23 @@ import { criarFatura } from "@/services/faturacao";
 import { listar as listarOrcamentos } from "@/services/orcamentos";
 import { listarOrdens } from "@/services/producao";
 import { listar as listarClientes } from "@/services/clientes";
+import { listarContas } from "@/services/contasBancarias";
 
 const metodos = {
   dinheiro: { label: "Dinheiro", icon: "payments" },
   transferencia: { label: "Transferência", icon: "account_balance" },
+  ordem_saida: { label: "Ordem de Saque", icon: "receipt_long" },
+  deposito: { label: "Depósito", icon: "savings" },
   multicaixa: { label: "Multicaixa", icon: "credit_card" },
   referencia: { label: "Referência", icon: "receipt" },
+  cheque: { label: "Cheque", icon: "description" },
 };
 
 const hoje = new Date().toISOString().split("T")[0];
 const blankItem = { descricao: "", quantidade: "", preco_unit: "" };
 const blankFaturaForm = {
   tipo: "fatura", cliente_id: "", orcamento_id: "", op: "", data_emissao: hoje, data_vencimento: "", iva: 14,
-  metodo: "transferencia", itens: [{ ...blankItem }], observacoes: "", valor_pago: "",
+  metodo: "transferencia", conta_bancaria_id: "", itens: [{ ...blankItem }], observacoes: "", valor_pago: "",
 };
 
 function formatKz(v) { return `Kz ${Number(v || 0).toLocaleString("pt-AO")}`; }
@@ -33,6 +37,7 @@ export default function FaturaModal({ open, onClose, onSaved }) {
   const [clientes, setClientes] = useState([]);
   const [ordens, setOrdens] = useState([]);
   const [orcamentos, setOrcamentos] = useState([]);
+  const [contas, setContas] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [faturaForm, setFaturaForm] = useState(blankFaturaForm);
 
@@ -42,12 +47,13 @@ export default function FaturaModal({ open, onClose, onSaved }) {
     (async () => {
       setCarregando(true);
       setFaturaForm(blankFaturaForm);
-      Promise.all([listarClientes({ tipo: "cliente" }), listarOrdens(), listarOrcamentos()])
-        .then(([c, o, orcData]) => {
+      Promise.all([listarClientes({ tipo: "cliente" }), listarOrdens(), listarOrcamentos(), listarContas().catch(() => [])])
+        .then(([c, o, orcData, cb]) => {
           if (!ativo) return;
           setClientes(Array.isArray(c) ? c : c?.data || []);
           setOrdens(Array.isArray(o) ? o : o?.ordens || []);
           setOrcamentos((Array.isArray(orcData) ? orcData : orcData?.data || []).map((orc) => ({ ...orc, cliente_id: Number(orc.cliente_id) || Number(orc.cliente?.id) || null })));
+          setContas(Array.isArray(cb) ? cb : []);
         })
         .catch((err) => {
           if (ativo) addToast(err.response?.data?.erro || "Erro ao carregar dados", "error");
@@ -120,6 +126,7 @@ export default function FaturaModal({ open, onClose, onSaved }) {
         iva: Number(faturaForm.iva) || 0,
         itens,
         metodo: faturaForm.metodo,
+        conta_bancaria_id: Number(faturaForm.conta_bancaria_id) || null,
         valor_pago: faturaForm.tipo === "factura_recibo" ? undefined : Number(faturaForm.valor_pago) || 0,
         observacoes: faturaForm.observacoes,
       });
@@ -197,6 +204,13 @@ export default function FaturaModal({ open, onClose, onSaved }) {
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Método de Pagamento</label>
               <select value={faturaForm.metodo} onChange={(e) => setFaturaForm({ ...faturaForm, metodo: e.target.value })} className={inputCls}>
                 {Object.entries(metodos).map(([key, m]) => <option key={key} value={key}>{m.label}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Conta Bancária Destino</label>
+              <select value={faturaForm.conta_bancaria_id || ""} onChange={(e) => setFaturaForm({ ...faturaForm, conta_bancaria_id: e.target.value })} className={inputCls}>
+                <option value="">Seleccionar conta...</option>
+                {contas.map((c) => <option key={c.id} value={c.id}>{c.banco_nome}{c.numero_conta ? ` - ${c.numero_conta}` : ""}</option>)}
               </select>
             </div>
             {faturaForm.tipo !== "factura_recibo" && (

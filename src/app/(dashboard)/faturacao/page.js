@@ -18,14 +18,18 @@ import { criarFatura, listarFaturas, exportarFaturas, marcarPaga, buscarFatura, 
 import { listar as listarOrcamentos } from "@/services/orcamentos";
 import { listarOrdens } from "@/services/producao";
 import { listar as listarClientes } from "@/services/clientes";
+import { listarContas } from "@/services/contasBancarias";
 import { buscarOrganizacao } from "@/services/configuracoes";
 import gerarPDF from "@/lib/faturacaoPdf";
 
 const metodos = {
   dinheiro: { label: "Dinheiro", icon: "payments" },
   transferencia: { label: "Transferência", icon: "account_balance" },
+  ordem_saida: { label: "Ordem de Saque", icon: "receipt_long" },
+  deposito: { label: "Depósito", icon: "savings" },
   multicaixa: { label: "Multicaixa", icon: "credit_card" },
   referencia: { label: "Referência", icon: "receipt" },
+  cheque: { label: "Cheque", icon: "description" },
 };
 
 const tiposDoc = {
@@ -65,16 +69,22 @@ export default function FaturacaoPage() {
   const [empresa, setEmpresa] = useState({ nome: "", nif: "", endereco: "", telefone: "", email: "" });
   const [eliminarItem, setEliminarItem] = useState(null);
   const [deletando, setDeletando] = useState(false);
+  const [contas, setContas] = useState([]);
+  const [contaPagamento, setContaPagamento] = useState("");
   const { addToast } = useToast();
 
   const carregarDados = () => {
-    Promise.all([listarFaturas(), listarOrdens(), listarClientes({ tipo: "cliente" }), listarOrcamentos(), buscarOrganizacao().catch(() => null)])
-      .then(([f, o, c, orcData, emp]) => {
+    Promise.all([listarFaturas(), listarOrdens(), listarClientes({ tipo: "cliente" }), listarOrcamentos(), buscarOrganizacao().catch(() => null), listarContas().catch(() => [])])
+      .then(([f, o, c, orcData, emp, cb]) => {
         setFaturas(Array.isArray(f) ? f : f?.data || []);
         setOrdens(Array.isArray(o) ? o : o?.ordens || []);
         setClientes(Array.isArray(c) ? c : c?.data || []);
         setOrcamentos((Array.isArray(orcData) ? orcData : orcData?.data || []).map((o) => ({ ...o, cliente_id: Number(o.cliente_id) || Number(o.cliente?.id) || null })));
         if (emp) setEmpresa(emp);
+        const lista = Array.isArray(cb) ? cb : [];
+        setContas(lista);
+        const fav = lista.find((x) => x.favorita) || lista[0];
+        setContaPagamento(fav ? String(fav.id) : "");
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -198,9 +208,14 @@ export default function FaturacaoPage() {
     }
   };
 
+  const contaIdSelecionada = (() => {
+    if (contaPagamento) return Number(contaPagamento);
+    return Number(selectedFatura?.conta_bancaria_id) || null;
+  })();
+
   const handleMarcarPaga = async (f, valorPago) => {
     try {
-      const atual = await marcarPaga(f.id, { valor_pago: Number(valorPago) || undefined, metodo: f.metodo_pagamento || "transferencia" });
+      const atual = await marcarPaga(f.id, { valor_pago: Number(valorPago) || undefined, metodo: f.metodo_pagamento || "transferencia", conta_bancaria_id: contaIdSelecionada });
       setFaturas((prev) => prev.map((x) => (x.id === f.id ? atual : x)));
       setSelectedFatura(atual);
       addToast(valorPago && Number(valorPago) < Number(f.total || f.valor) ? "Pagamento parcial registado" : "Fatura marcada como paga", "success");
@@ -222,7 +237,7 @@ export default function FaturacaoPage() {
     const novoTotal = atual + extra;
     setRegistrando(true);
     try {
-      const atualizada = await marcarPaga(selectedFatura.id, { valor_pago: novoTotal, metodo: selectedFatura.metodo_pagamento || "transferencia" });
+      const atualizada = await marcarPaga(selectedFatura.id, { valor_pago: novoTotal, metodo: selectedFatura.metodo_pagamento || "transferencia", conta_bancaria_id: contaIdSelecionada });
       setFaturas((prev) => prev.map((x) => (x.id === selectedFatura.id ? atualizada : x)));
       setSelectedFatura(atualizada);
       setPagamentoExtra("");
@@ -278,7 +293,7 @@ export default function FaturacaoPage() {
           <p className="text-primary mt-1 font-mono text-xs uppercase tracking-widest">{faturas.length} documentos // FAT</p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <button onClick={() => setFatModalOpen(true)} className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold shadow-[0_0_15px_rgba(128,213,203,0.2)] hover:shadow-[0_0_25px_rgba(128,213,203,0.4)]">
+          <button onClick={() => setFatModalOpen(true)} className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold ">
             <Icon name="add" className="text-[16px]" /> Nova Fatura
           </button>
           {faturas.length > 0 && (
@@ -540,6 +555,19 @@ export default function FaturacaoPage() {
                         placeholder={String(Math.max(0, Number(selectedFatura.total || selectedFatura.valor) - Number(selectedFatura.valor_pago || 0)))}
                       />
                     </div>
+                  </div>
+                  <div className="flex flex-col gap-1 flex-1 min-w-[160px] max-w-[220px]">
+                    <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Conta bancária</label>
+                    <select
+                      value={contaPagamento}
+                      onChange={(e) => setContaPagamento(e.target.value)}
+                      className="flex h-11 w-full rounded-xl border border-input bg-background px-3.5 py-2 text-xs focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                    >
+                      <option value="">Sem conta</option>
+                      {contas.map((c) => (
+                        <option key={c.id} value={String(c.id)}>{c.banco_nome}{c.numero_conta ? ` · ${c.numero_conta}` : ""}</option>
+                      ))}
+                    </select>
                   </div>
                   <Button onClick={handleRegistarPagamento} disabled={registrando || !pagamentoExtra || Number(pagamentoExtra) <= 0}>
                     <Icon name="payments" className="text-sm" /> {registrando ? "A registar..." : "Registar Pagamento"}

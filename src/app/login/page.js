@@ -34,9 +34,9 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-aurora p-4">
       <div className="w-full max-w-sm">
-        <div className="border-gradient rounded-3xl bg-card/90 backdrop-blur-xl shadow-2xl shadow-black/10 dark:shadow-black/40 p-7 sm:p-8 animate-fade-up">
+        <div className="border-gradient rounded-3xl bg-card p-7 sm:p-8 animate-fade-up">
           <div className="flex flex-col items-center mb-8">
-            <div className="w-14 h-14 rounded-2xl bg-brand glow-brand flex items-center justify-center text-white mb-4">
+            <div className="w-14 h-14 rounded-2xl bg-brand flex items-center justify-center text-white mb-4">
               <Icon name="precision_manufacturing" className="text-2xl ms-fill" />
             </div>
             <h1 className="text-xl font-black tracking-tight">

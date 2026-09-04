@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Modal from "@/components/Modal";
 import Icon from "@/components/Icon";
 import NumeroInput from "@/components/ui/NumeroInput";
@@ -8,13 +8,17 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/Toast";
 import { marcarPaga } from "@/services/faturacao";
+import { listarContas } from "@/services/contasBancarias";
 import gerarPDF from "@/lib/faturacaoPdf";
 
 const metodos = {
   dinheiro: { label: "Dinheiro", icon: "payments" },
   transferencia: { label: "Transferência", icon: "account_balance" },
+  ordem_saida: { label: "Ordem de Saque", icon: "receipt_long" },
+  deposito: { label: "Depósito", icon: "savings" },
   multicaixa: { label: "Multicaixa", icon: "credit_card" },
   referencia: { label: "Referência", icon: "receipt" },
+  cheque: { label: "Cheque", icon: "description" },
 };
 
 const faturaEstados = {
@@ -31,13 +35,35 @@ export default function FaturaDetalhesModal({ fatura, empresa, onClose, onChange
   const { addToast } = useToast();
   const [pagamentoExtra, setPagamentoExtra] = useState("");
   const [registrando, setRegistrando] = useState(false);
+  const [contas, setContas] = useState([]);
+  const [contaPagamento, setContaPagamento] = useState("");
+
+  useEffect(() => {
+    if (!fatura) return;
+    let ativo = true;
+    listarContas()
+      .then((c) => {
+        if (!ativo) return;
+        const lista = Array.isArray(c) ? c : [];
+        setContas(lista);
+        const fav = lista.find((x) => x.favorita) || lista[0];
+        setContaPagamento(fav ? String(fav.id) : "");
+      })
+      .catch(() => {});
+    return () => { ativo = false; };
+  }, [fatura]);
 
   if (!fatura) return null;
   const f = fatura;
 
+  const contaIdSelecionada = (() => {
+    if (contaPagamento) return Number(contaPagamento);
+    return Number(f.conta_bancaria_id) || null;
+  })();
+
   const handleMarcarPaga = async (valorPago) => {
     try {
-      const atual = await marcarPaga(f.id, { valor_pago: Number(valorPago) || undefined, metodo: f.metodo_pagamento || "transferencia" });
+      const atual = await marcarPaga(f.id, { valor_pago: Number(valorPago) || undefined, metodo: f.metodo_pagamento || "transferencia", conta_bancaria_id: contaIdSelecionada });
       onChanged?.(atual);
       addToast(valorPago && Number(valorPago) < Number(f.total || f.valor) ? "Pagamento parcial registado" : "Fatura marcada como paga", "success");
     } catch (err) {
@@ -56,7 +82,7 @@ export default function FaturaDetalhesModal({ fatura, empresa, onClose, onChange
     const novoTotal = atual + extra;
     setRegistrando(true);
     try {
-      const atualizada = await marcarPaga(f.id, { valor_pago: novoTotal, metodo: f.metodo_pagamento || "transferencia" });
+      const atualizada = await marcarPaga(f.id, { valor_pago: novoTotal, metodo: f.metodo_pagamento || "transferencia", conta_bancaria_id: contaIdSelecionada });
       onChanged?.(atualizada);
       setPagamentoExtra("");
       addToast(novoTotal >= total ? "Fatura paga integralmente" : "Pagamento parcial registado", "success");
@@ -83,6 +109,19 @@ export default function FaturaDetalhesModal({ fatura, empresa, onClose, onChange
                   placeholder={String(Math.max(0, Number(f.total || f.valor) - Number(f.valor_pago || 0)))}
                 />
               </div>
+            </div>
+            <div className="flex flex-col gap-1 flex-1 min-w-[160px] max-w-[220px]">
+              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Conta bancária</label>
+              <select
+                value={contaPagamento}
+                onChange={(e) => setContaPagamento(e.target.value)}
+                className="flex h-11 w-full rounded-xl border border-input bg-background px-3.5 py-2 text-xs focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+              >
+                <option value="">Sem conta</option>
+                {contas.map((c) => (
+                  <option key={c.id} value={String(c.id)}>{c.banco_nome}{c.numero_conta ? ` · ${c.numero_conta}` : ""}</option>
+                ))}
+              </select>
             </div>
             <Button onClick={handleRegistarPagamento} disabled={registrando || !pagamentoExtra || Number(pagamentoExtra) <= 0}>
               <Icon name="payments" className="text-sm" /> {registrando ? "A registar..." : "Registar Pagamento"}

@@ -546,17 +546,15 @@ input[type="radio"] {
 
 /* ===== Glassmorphism (Estoque) ===== */
 .glass {
-  background: color-mix(in srgb, var(--card) 68%, transparent);
-  -webkit-backdrop-filter: blur(14px) saturate(150%);
-  backdrop-filter: blur(14px) saturate(150%);
-  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  background: var(--card);
+  border: 1px solid var(--border);
   box-shadow: var(--shadow-card);
 }
 
 .dark .glass {
-  background: rgba(10, 17, 34, 0.6);
-  border-color: rgba(128, 213, 203, 0.1);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 8px 32px rgba(0, 0, 0, 0.35);
+  background: var(--card);
+  border-color: var(--border);
+  box-shadow: var(--shadow-card);
 }
 
 .glass-hover {
@@ -584,10 +582,7 @@ body {
   background-color: var(--background);
 }
 .dark body {
-  background-image:
-    linear-gradient(to right, rgba(128, 213, 203, 0.025) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(128, 213, 203, 0.025) 1px, transparent 1px);
-  background-size: 40px 40px;
+  background-color: var(--background);
 }
 
 /* Scanlines overlay */
@@ -602,15 +597,13 @@ body {
   box-shadow: var(--shadow-card);
 }
 .dark .obsidian-glass {
-  background: rgba(10, 17, 34, 0.8);
-  border-color: rgba(255, 255, 255, 0.06);
+  background: var(--card);
+  border-color: var(--border);
 }
 
 /* Glass panel (clean surface, kept name for compatibility) */
 .glass-panel {
   background: var(--card);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
   border-top: 1px solid var(--border);
   border-left: 1px solid var(--border);
   box-shadow: var(--shadow-card);

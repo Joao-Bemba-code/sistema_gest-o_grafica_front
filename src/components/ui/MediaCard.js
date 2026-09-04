@@ -42,7 +42,7 @@ function MediaCard({
     <article
       className={cn(
         "group flex h-full flex-col overflow-hidden rounded-2xl border border-outline-variant/30 bg-card shadow-sm transition-all duration-300 ease-out",
-        "hover:scale-[1.02] hover:border-primary/40 hover:shadow-[0_0_20px_rgba(128,213,203,0.15)]",
+        "hover:border-primary/40",
         className
       )}
     >

@@ -94,9 +94,9 @@ export default function FilterBar({ search, onSearchChange, placeholder = "Pesqu
               key={f.value}
               type="button"
               onClick={() => onFilterChange(f.value)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors border ${
                 activeFilter === f.value
-                  ? "border-primary bg-primary/10 text-primary shadow-[0_0_10px_rgba(128,213,203,0.15)]"
+                  ? "border-primary bg-primary/10 text-primary"
                   : "border-outline-variant/30 bg-background/40 text-muted-foreground hover:border-outline-variant hover:text-foreground"
               }`}
             >

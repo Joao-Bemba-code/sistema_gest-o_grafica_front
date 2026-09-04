@@ -20,6 +20,7 @@ import {
   uploadLogo, buscarUtilizadorAtual,
   alterarEmail, alterarSenha,
 } from "@/services/configuracoes";
+import { listarContas, criarConta, atualizarConta, removerConta } from "@/services/contasBancarias";
 
 
 const CONTRATO_TEMPLATE = ``;
@@ -91,7 +92,7 @@ export default function ConfiguracoesPage() {
   const logoRef = useRef();
 
   const [carregando, setCarregando] = useState(true);
-  const [org, setOrg] = useState({ nome: "", sigla: "", endereco: "", telefone: "", email: "", nif: "", website: "", logo_url: "", template_contrato: CONTRATO_TEMPLATE, banco_nome: "", banco_iban: "", banco_conta: "" });
+  const [org, setOrg] = useState({ nome: "", sigla: "", endereco: "", telefone: "", email: "", nif: "", website: "", logo_url: "", template_contrato: CONTRATO_TEMPLATE });
   const [sis, setSis] = useState({ idioma: "Português", formato_data: "DD/MM/AAAA", moeda: "Kwanza (AOA)", fuso_horario: "Africa/Luanda (GMT+1)", dias_aviso_ferias: 30, limite_ficheiros: 10 });
   const [seg, setSeg] = useState({ tfa_ativo: true, forcar_senha: true, bloqueio_bruta: true, sessao_inativa: false });
   const [userAtual, setUserAtual] = useState({});
@@ -99,6 +100,10 @@ export default function ConfiguracoesPage() {
   const [mostrarAlterarSenha, setMostrarAlterarSenha] = useState(false);
   const [emailForm, setEmailForm] = useState({ novo_email: "", senha_atual: "" });
   const [senhaForm, setSenhaForm] = useState({ senha_atual: "", nova_senha: "", confirmar_senha: "" });
+  const [contas, setContas] = useState([]);
+  const [contaForm, setContaForm] = useState({ banco_nome: "", numero_conta: "", iban: "", titular: "" });
+  const [editandoConta, setEditandoConta] = useState(null);
+  const [mostrarContaForm, setMostrarContaForm] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -106,11 +111,13 @@ export default function ConfiguracoesPage() {
       buscarSistema().catch(() => null),
       buscarSeguranca().catch(() => null),
       buscarUtilizadorAtual().catch(() => null),
-    ]).then(([o, s, sg, u]) => {
+      listarContas().catch(() => []),
+    ]).then(([o, s, sg, u, c]) => {
       if (o) setOrg((prev) => ({ ...prev, ...o, template_contrato: o.template_contrato || CONTRATO_TEMPLATE }));
       if (s) setSis(s);
       if (sg) setSeg(sg);
       if (u) setUserAtual(u);
+      if (c && Array.isArray(c)) setContas(c);
     }).finally(() => setCarregando(false));
   }, []);
 
@@ -147,6 +154,47 @@ export default function ConfiguracoesPage() {
       setMostrarAlterarSenha(false);
       setSenhaForm({ senha_atual: "", nova_senha: "", confirmar_senha: "" });
     } catch { notificar("Erro ao alterar senha", "error"); }
+  };
+
+  const handleGuardarConta = async () => {
+    try {
+      const dados = { banco_nome: contaForm.banco_nome, numero_conta: contaForm.numero_conta, iban: contaForm.iban, titular: contaForm.titular };
+      if (editandoConta) {
+        await atualizarConta(editandoConta.id, dados);
+        notificar("Conta bancária atualizada com sucesso");
+      } else {
+        await criarConta(dados);
+        notificar("Conta bancária criada com sucesso");
+      }
+      const novasContas = await listarContas().catch(() => []);
+      setContas(Array.isArray(novasContas) ? novasContas : []);
+      setContaForm({ banco_nome: "", numero_conta: "", iban: "", titular: "" });
+      setEditandoConta(null);
+      setMostrarContaForm(false);
+    } catch (e) {
+      notificar(e?.response?.data?.erro || "Erro ao guardar conta bancária", "error");
+    }
+  };
+
+  const handleEditarConta = (conta) => {
+    setContaForm({
+      banco_nome: conta.banco_nome || "",
+      numero_conta: conta.numero_conta || "",
+      iban: conta.iban || "",
+      titular: conta.titular || "",
+    });
+    setEditandoConta(conta);
+    setMostrarContaForm(true);
+  };
+
+  const handleEliminarConta = async (conta) => {
+    try {
+      await removerConta(conta.id);
+      setContas((prev) => prev.filter((c) => c.id !== conta.id));
+      notificar("Conta bancária removida com sucesso");
+    } catch (e) {
+      notificar(e?.response?.data?.erro || "Erro ao remover conta", "error");
+    }
   };
 
 
@@ -229,20 +277,75 @@ export default function ConfiguracoesPage() {
                 <Input value={org.website || ""} onChange={(e) => setOrg((p) => ({ ...p, website: e.target.value }))} />
               </FormField>
 
-              <div className="flex items-center gap-2 pt-2">
-                <Icon name="account_balance" className="text-primary text-sm" />
-                <p className="text-sm font-semibold text-foreground">Dados Bancários</p>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <FormField label="Banco">
-                  <Input value={org.banco_nome || ""} onChange={(e) => setOrg((p) => ({ ...p, banco_nome: e.target.value }))} placeholder="Ex: BFA" />
-                </FormField>
-                <FormField label="Nº de Conta">
-                  <Input value={org.banco_conta || ""} onChange={(e) => setOrg((p) => ({ ...p, banco_conta: e.target.value }))} placeholder="Nº da conta" />
-                </FormField>
-                <FormField label="IBAN">
-                  <Input value={org.banco_iban || ""} onChange={(e) => setOrg((p) => ({ ...p, banco_iban: e.target.value }))} placeholder="AO06 0000 0000 0000 0000 00000 000" />
-                </FormField>
+              <div className="border-t pt-4 mt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Icon name="account_balance_wallet" className="text-primary text-sm" />
+                    <p className="text-sm font-semibold text-foreground">Contas Bancárias</p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => { setEditandoConta(null); setContaForm({ banco_nome: "", numero_conta: "", iban: "", titular: "" }); setMostrarContaForm(!mostrarContaForm); }}>
+                    <Icon name={mostrarContaForm ? "close" : "add"} className="text-sm" />
+                    {mostrarContaForm ? "Cancelar" : "Nova Conta"}
+                  </Button>
+                </div>
+
+                {mostrarContaForm && (
+                  <div className="bg-muted/50 rounded-xl p-4 space-y-3 mb-4">
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{editandoConta ? "Editar Conta" : "Nova Conta Bancária"}</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <FormField label="Banco *" required>
+                        <Input value={contaForm.banco_nome} onChange={(e) => setContaForm((p) => ({ ...p, banco_nome: e.target.value }))} placeholder="Ex: BFA, BAI, BIC" />
+                      </FormField>
+                      <FormField label="Nº de Conta">
+                        <Input value={contaForm.numero_conta} onChange={(e) => setContaForm((p) => ({ ...p, numero_conta: e.target.value }))} placeholder="Nº da conta" />
+                      </FormField>
+                      <FormField label="Titular">
+                        <Input value={contaForm.titular} onChange={(e) => setContaForm((p) => ({ ...p, titular: e.target.value }))} placeholder="Nome do titular" />
+                      </FormField>
+                      <FormField label="IBAN">
+                        <Input value={contaForm.iban} onChange={(e) => setContaForm((p) => ({ ...p, iban: e.target.value }))} placeholder="AO06 0000 0000..." />
+                      </FormField>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={() => { setMostrarContaForm(false); setEditandoConta(null); }}>Cancelar</Button>
+                      <Button size="sm" onClick={handleGuardarConta} disabled={!contaForm.banco_nome}>
+                        <Icon name="save" className="text-sm" />
+                        {editandoConta ? "Atualizar" : "Criar Conta"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  {contas.map((c) => (
+                    <div key={c.id} className="flex items-center justify-between gap-3 rounded-xl border bg-muted/30 p-3 transition-all hover:bg-muted/50">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                          <Icon name="account_balance" className="text-primary text-[18px]" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-foreground">{c.banco_nome}</p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {c.titular && `${c.titular}${c.numero_conta || c.iban ? " • " : ""}`}
+                            {c.numero_conta && `Conta: ${c.numero_conta}`}
+                            {c.iban && `${c.numero_conta ? " • " : ""}IBAN: ${c.iban}`}
+                            {!c.titular && !c.numero_conta && !c.iban && "Sem dados de conta"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button variant="ghost" size="icon" onClick={() => handleEditarConta(c)} title="Editar"><Icon name="edit" className="text-[16px]" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleEliminarConta(c)} title="Remover" className="text-error"><Icon name="delete" className="text-[16px]" /></Button>
+                      </div>
+                    </div>
+                  ))}
+                  {contas.length === 0 && (
+                    <div className="text-center py-6 text-muted-foreground">
+                      <Icon name="account_balance" className="text-2xl block mx-auto mb-2 opacity-30" />
+                      <p className="text-xs">Nenhuma conta bancária registada</p>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-2">

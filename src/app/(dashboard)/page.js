@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+
 import { listar as listarOrcamentos } from "@/services/orcamentos";
 import { listar as listarClientes } from "@/services/clientes";
 import { listar as listarMateriais, extrato, movimentar } from "@/services/materiais";
@@ -11,6 +12,7 @@ import { getUsuario } from "@/services/auth";
 import Icon from "@/components/Icon";
 import Modal from "@/components/Modal";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
+import { PieChart, Pie, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import ComboKpiCard from "@/components/ui/ComboKpiCard";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -103,7 +105,7 @@ function agregarOrdens(ordens, periodo) {
 function BarChart({ dados }) {
   const max = Math.max(...dados.map((b) => b.value), 1);
   return (
-    <div className="flex items-end gap-1.5 h-52 px-1">
+    <div className="flex items-end gap-1.5 h-44 px-1">
       {dados.map((b, i) => (
         <div key={i} className="flex flex-col items-center justify-end flex-1 h-full gap-1.5" title={`${b.label}: ${b.value}`}>
           <span className="text-[9px] font-bold text-foreground">{b.value || ""}</span>
@@ -161,7 +163,6 @@ export default function DashboardPage() {
   useEffect(() => {
     carregarDados();
   }, []);
-
 
   const hoje = new Date();
   const orcamentosHoje = orcamentos.filter((o) => {
@@ -273,9 +274,31 @@ export default function DashboardPage() {
   const dadosGrafico = agregarOrdens(ordens, periodo);
 
   const materiaisBaixo = materiais
-    .filter((m) => m.status === "repor" || m.status === "esgotado")
+    .filter((m) => m.status === "repor" || m.status === "esgotado" || m.status === "critico")
     .sort((a, b) => (a.estoque_disponivel || 0) - (b.estoque_disponivel || 0))
     .slice(0, 3);
+
+  const statusMateriais = useMemo(() => {
+    let repor = 0;
+    let critico = 0;
+    let bom = 0;
+    materiais.forEach((m) => {
+      if (m.status === "esgotado" || m.status === "critico") {
+        critico++;
+      } else if (m.status === "repor") {
+        repor++;
+      } else {
+        bom++;
+      }
+    });
+    return [
+      { name: "Crítico", value: critico, fill: "#FF5252" },
+      { name: "A Repor", value: repor, fill: "#FFC107" },
+      { name: "Bom", value: bom, fill: "#4CAF50" }
+    ];
+  }, [materiais]);
+
+  const totalMateriais = statusMateriais.reduce((sum, item) => sum + item.value, 0);
 
   const saidasMes = movimentos.filter((mv) => {
     const d = new Date(mv.createdAt);
@@ -403,15 +426,50 @@ export default function DashboardPage() {
         ))}
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2">
+      {/* Row 1: Status de Materiais + Volume de Produção */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Card 1: Status de Materiais */}
+        <Card>
+          <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <CardTitle>Status de Materiais</CardTitle>
+              <CardDescription>Distribuição dos materiais por status</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie 
+                  data={statusMateriais} 
+                  dataKey="value" 
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                >
+                  {statusMateriais.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value) => `${value} materiais`} />
+              </PieChart>
+            </ResponsiveContainer>
+            <p className="text-[10px] text-muted-foreground mt-3 px-1 text-center">
+              Total de materiais: <strong className="text-foreground">{totalMateriais}</strong>
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Card 2: Volume de Produção */}
+        <Card>
           <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <CardTitle>Volume de Produção</CardTitle>
-              <CardDescription>Ordens de produção por período (dados reais)</CardDescription>
+              <CardDescription>Ordens por período</CardDescription>
             </div>
             <div className="flex gap-1">
-              {[["semanal", "Semanal"], ["mensal", "Mensal"], ["anual", "Anual"]].map(([key, label]) => (
+              {[["semanal", "Sem"], ["mensal", "Mes"], ["anual", "Ano"]].map(([key, label]) => (
                 <Button key={key} variant={periodo === key ? "default" : "outline"} size="sm" onClick={() => setPeriodo(key)}>
                   {label}
                 </Button>
@@ -420,28 +478,33 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <BarChart dados={dadosGrafico} />
-            <p className="text-[10px] text-muted-foreground mt-3 px-1">
-              Total de ordens: <strong className="text-foreground">{ordens.length}</strong> — distribuição real do registo de produção
+            <p className="text-[10px] text-muted-foreground mt-3 px-1 text-center">
+              Total: <strong className="text-foreground">{ordens.length}</strong> ordens
             </p>
           </CardContent>
         </Card>
+      </div>
 
+      {/* Row 2: Insumos e Produção */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Status de Insumos e Produção</CardTitle>
+            <CardTitle>Insumos e Produção</CardTitle>
+            <CardDescription>Status atual do estoque e produção</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Materiais em falta */}
             {materiaisBaixo.length > 0 ? (
               materiaisBaixo.map((m) => (
-                <div key={m.id} className="bg-destructive/10 border border-destructive/30 p-4 rounded-xl flex items-center justify-between">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-lg bg-destructive/15 flex items-center justify-center text-destructive shrink-0">
-                      <Icon name="inventory_2" className="text-lg" />
+                <div key={m.id} className="bg-destructive/10 border border-destructive/30 p-3 rounded-xl flex items-center justify-between">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-destructive/15 flex items-center justify-center text-destructive shrink-0">
+                      <Icon name="inventory_2" className="text-base" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-foreground truncate">{m.nome}</p>
+                      <p className="text-xs font-semibold text-foreground truncate">{m.nome}</p>
                       <p className="text-[10px] text-destructive font-medium">
-                        Apenas {Number(m.estoque_disponivel)} {m.unidade || "un"} disponíveis
+                        {Number(m.estoque_disponivel)} {m.unidade || "un"}
                       </p>
                     </div>
                   </div>
@@ -449,59 +512,67 @@ export default function DashboardPage() {
                 </div>
               ))
             ) : (
-              <div className="bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-xl flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-emerald-500/15 flex items-center justify-center text-emerald-600 shrink-0">
-                  <Icon name="check_circle" className="text-lg" />
+              <div className="bg-emerald-500/10 border border-emerald-500/30 p-3 rounded-xl flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center text-emerald-600 shrink-0">
+                  <Icon name="check_circle" className="text-base" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-foreground">Estoque em dia</p>
+                  <p className="text-xs font-semibold text-foreground">Estoque em dia</p>
                   <p className="text-[10px] text-emerald-600 font-medium">Nenhum material em falta</p>
                 </div>
               </div>
             )}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-muted/50 p-4 rounded-xl flex flex-col justify-center border">
-                <Icon name="imagesearch_roller" className="text-primary mb-1" />
-                <p className="text-[10px] uppercase font-semibold text-muted-foreground">Consumo do Mês</p>
-                <p className="text-lg font-bold text-foreground">{formatNum(consumoMes)}</p>
-                <p className="text-[10px] text-muted-foreground">{saidasTotal} saídas registadas</p>
+
+            {/* Consumo e Produção */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-muted/50 p-3 rounded-xl flex flex-col justify-center border">
+                <Icon name="imagesearch_roller" className="text-primary mb-1 text-base" />
+                <p className="text-[9px] uppercase font-semibold text-muted-foreground">Consumo Mês</p>
+                <p className="text-base font-bold text-foreground">{formatNum(consumoMes)}</p>
+                <p className="text-[9px] text-muted-foreground">{saidasTotal} saídas</p>
               </div>
-              <div className="bg-muted/50 p-4 rounded-xl flex flex-col justify-center border">
-                <Icon name="settings_input_component" className="text-primary mb-1" />
-                <p className="text-[10px] uppercase font-semibold text-muted-foreground">Produção</p>
-                <p className="text-lg font-bold text-foreground">{producao}</p>
-                <p className="text-[10px] font-semibold text-emerald-600">Ativa — em produção</p>
+              <div className="bg-muted/50 p-3 rounded-xl flex flex-col justify-center border">
+                <Icon name="settings_input_component" className="text-primary mb-1 text-base" />
+                <p className="text-[9px] uppercase font-semibold text-muted-foreground">Produção</p>
+                <p className="text-base font-bold text-foreground">{producao}</p>
+                <p className="text-[9px] font-semibold text-emerald-600">Em produção</p>
               </div>
             </div>
-            <div className="pt-4 border-t">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-semibold text-foreground">Consumo Recente</p>
-                <Button variant="ghost" size="sm" onClick={() => setConsumoAberto(true)} className="shrink-0 gap-1.5">
-                  <Icon name="history" className="text-base" />
-                  Ver Histórico Completo
-                </Button>
-              </div>
-              <div className="space-y-2.5">
-                {consumoRecente.map((item, i) => (
-                  <div key={i} className="flex items-center justify-between text-sm gap-2">
-                    <span className="flex items-center gap-2 text-muted-foreground min-w-0">
-                      <span className="w-2 h-2 rounded-full bg-primary shrink-0" />
-                      <span className="truncate">{item.nome}</span>
-                    </span>
-                    <span className="text-muted-foreground/60 text-xs shrink-0 text-right">
-                      {item.detalhe} · {item.hora}
-                    </span>
-                  </div>
-                ))}
-                {consumoRecente.length === 0 && (
-                  <p className="text-xs text-muted-foreground text-center py-2">Nenhum consumo recente</p>
-                )}
-              </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Consumo Recente</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between mb-3">
+              <Button variant="ghost" size="sm" onClick={() => setConsumoAberto(true)} className="shrink-0 gap-1 text-[10px] h-7 ml-auto">
+                <Icon name="history" className="text-sm" />
+                Ver tudo
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {consumoRecente.slice(0, 6).map((item, i) => (
+                <div key={i} className="flex items-center justify-between text-xs gap-2 p-2 rounded-lg hover:bg-muted/40 transition-colors">
+                  <span className="flex items-center gap-2 text-muted-foreground min-w-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                    <span className="truncate">{item.nome}</span>
+                  </span>
+                  <span className="text-muted-foreground/60 text-[10px] shrink-0 text-right">
+                    {item.detalhe} · {item.hora}
+                  </span>
+                </div>
+              ))}
+              {consumoRecente.length === 0 && (
+                <p className="text-[10px] text-muted-foreground text-center py-1">Nenhum consumo recente</p>
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
 
+      {/* Atividades e Agenda */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         <Card className="xl:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
@@ -599,6 +670,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
+      {/* Modais */}
       <Modal
         open={reporModal.open}
         onClose={() => setReporModal({ open: false, material: null })}

@@ -178,7 +178,7 @@ export default function ConversorModal({ open, onClose, formatos, onCalcular }) 
             type="submit"
             form="form-conversor"
             disabled={calculando}
-            className="bg-primary text-on-primary hover:bg-primary-fixed hover:shadow-[0_0_20px_rgba(128,213,203,0.4)] transition-all duration-300 py-2 px-4 rounded font-mono text-[11px] uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-60"
+            className="bg-primary text-on-primary hover:bg-primary-fixed transition-colors py-2 px-4 rounded font-mono text-[11px] uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-60"
           >
             {calculando ? (
               <>
@@ -280,7 +280,7 @@ export default function ConversorModal({ open, onClose, formatos, onCalcular }) 
                 {(diagrama || []).map((cell, i) => (
                   <div
                     key={cell}
-                    className="bg-primary/10 border border-primary/50 rounded-sm shadow-[0_0_15px_rgba(128,213,203,0.1)] flex items-center justify-center"
+                    className="bg-primary/10 border border-primary/50 rounded-sm flex items-center justify-center"
                     style={{
                       width: `${100 / resultado.colunas}%`,
                       height: `${100 / resultado.linhas}%`,

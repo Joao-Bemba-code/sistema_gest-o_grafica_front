@@ -31,8 +31,11 @@ function rotuloMetodo(m) {
   const mapa = {
     dinheiro: "Dinheiro",
     transferencia: "Transferência",
+    ordem_saida: "Ordem de Saque",
+    deposito: "Depósito",
     multicaixa: "Multicaixa",
     referencia: "Referência",
+    cheque: "Cheque",
   };
   return mapa[m] || m || "—";
 }

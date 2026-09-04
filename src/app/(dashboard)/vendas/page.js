@@ -20,6 +20,7 @@ import OrcamentoModal from "@/components/vendas/OrcamentoModal";
 import OrcamentoDetalhesModal from "@/components/vendas/OrcamentoDetalhesModal";
 import FaturaModal from "@/components/vendas/FaturaModal";
 import FaturaDetalhesModal from "@/components/vendas/FaturaDetalhesModal";
+import TesourariaTab from "@/components/vendas/TesourariaTab";
 import gerarOrcamentoPdf from "@/lib/orcamentoPdf";
 import gerarFaturaPdf from "@/lib/faturacaoPdf";
 
@@ -52,7 +53,7 @@ export default function AreaComercialPage() {
   const [tab, setTab] = useState(() => {
     if (typeof window !== "undefined") {
       const q = new URLSearchParams(window.location.search).get("tab");
-      if (q && ["orcamentos", "faturas", "cadastros"].includes(q)) return q;
+      if (q && ["orcamentos", "faturas", "cadastros", "tesouraria"].includes(q)) return q;
     }
     return "orcamentos";
   });
@@ -213,7 +214,7 @@ export default function AreaComercialPage() {
         </div>
       </div>
 
-      {tab !== "cadastros" && (
+      {tab !== "cadastros" && tab !== "tesouraria" && (
       <section className="grid grid-cols-2 sm:grid-cols-4 gap-5">
         <KpiCard icon="request_quote" label="Orçamentos" value={orcamentos.length} iconVariant="info" />
         <KpiCard icon="pending" label="Pendentes" value={pendentes} iconVariant="warning" />
@@ -223,13 +224,13 @@ export default function AreaComercialPage() {
       )}
 
       <div className="flex gap-1.5 flex-wrap obsidian-glass cyber-border p-1.5 rounded-xl">
-        {["orcamentos", "faturas", "cadastros"].map((t) => (
+        {["orcamentos", "faturas", "cadastros", "tesouraria"].map((t) => (
           <button key={t} type="button" onClick={() => trocarTab(t)}
             className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all ${
               tab === t ? "nav-pill shadow-none text-primary" : "text-muted-foreground hover:text-foreground"
             }`}>
-            <Icon name={t === "orcamentos" ? "request_quote" : t === "faturas" ? "receipt_long" : "groups"} className="text-lg" />
-            {t === "orcamentos" ? "Orçamentos" : t === "faturas" ? "Facturas" : "Cadastros"}
+            <Icon name={t === "orcamentos" ? "request_quote" : t === "faturas" ? "receipt_long" : t === "tesouraria" ? "account_balance" : "groups"} className="text-lg" />
+            {t === "orcamentos" ? "Orçamentos" : t === "faturas" ? "Facturas" : t === "tesouraria" ? "Tesouraria" : "Cadastros"}
           </button>
         ))}
       </div>
@@ -245,7 +246,7 @@ export default function AreaComercialPage() {
                 {orcamentos.length} orçamentos · {pendentes} pendentes // {formatKz(totalOrc)}
               </p>
             </div>
-            <button onClick={() => setOrcForm({ open: true, id: null })} className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold shadow-[0_0_15px_rgba(128,213,203,0.2)] hover:shadow-[0_0_25px_rgba(128,213,203,0.4)]">
+            <button onClick={() => setOrcForm({ open: true, id: null })} className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold ">
               <Icon name="add" className="text-[16px]" /> Novo Orçamento
             </button>
           </div>
@@ -317,7 +318,7 @@ export default function AreaComercialPage() {
                 {faturas.length} facturas · {totalReceber > 0 ? `${formatKz(totalReceber)} a receber` : formatKz(totalFat)}
               </p>
             </div>
-            <button onClick={() => setFatFormOpen(true)} className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold shadow-[0_0_15px_rgba(128,213,203,0.2)] hover:shadow-[0_0_25px_rgba(128,213,203,0.4)]">
+            <button onClick={() => setFatFormOpen(true)} className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold ">
               <Icon name="add" className="text-[16px]" /> Nova Fatura
             </button>
           </div>
@@ -375,6 +376,8 @@ export default function AreaComercialPage() {
 
       {tab === "cadastros" && <CadastrosTab />}
 
+      {tab === "tesouraria" && <TesourariaTab />}
+
       <OrcamentoModal
         open={orcForm.open}
         editingId={orcForm.id}
@@ -421,7 +424,7 @@ export default function AreaComercialPage() {
         <p className="text-sm text-muted-foreground">SIGRAF — Sistema de Gestão para Indústria Gráfica</p>
       </footer>
 
-      {tab !== "cadastros" && (
+      {tab !== "cadastros" && tab !== "tesouraria" && (
         <FloatButton
           onClick={tab === "orcamentos" ? () => setOrcForm({ open: true, id: null }) : () => setFatFormOpen(true)}
           label={tab === "orcamentos" ? "Novo Orçamento" : "Nova Fatura"}
