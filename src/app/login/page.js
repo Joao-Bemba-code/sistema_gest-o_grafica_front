@@ -34,12 +34,12 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-aurora p-4">
       <div className="w-full max-w-sm">
-        <div className="border-gradient rounded-3xl bg-card p-7 sm:p-8 animate-fade-up">
+        <div className="border-gradient rounded-xl bg-card p-7 sm:p-8 animate-fade-up">
           <div className="flex flex-col items-center mb-8">
-            <div className="w-14 h-14 rounded-2xl bg-brand flex items-center justify-center text-white mb-4">
-              <Icon name="precision_manufacturing" className="text-2xl ms-fill" />
+            <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center text-primary-foreground mb-4">
+              <Icon name="precision_manufacturing" className="text-xl ms-fill" />
             </div>
-            <h1 className="text-xl font-black tracking-tight">
+            <h1 className="text-xl font-bold tracking-tight">
               <span className="text-gradient">SIGRAF</span>
             </h1>
             <p className="text-xs text-muted-foreground mt-1 text-center">Sistema de Gestão para Indústria Gráfica</p>
@@ -54,7 +54,7 @@ export default function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => { setEmail(e.target.value); setError(""); }}
-                  className="w-full pl-10 pr-3 h-11 bg-surface-container-high/70 border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-all placeholder:text-muted-foreground/50"
+                  className="w-full pl-10 pr-3 h-11 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-all placeholder:text-muted-foreground/50"
                   placeholder="seu.email@exemplo.com"
                   autoFocus
                 />
@@ -69,7 +69,7 @@ export default function LoginPage() {
                   type="password"
                   value={senha}
                   onChange={(e) => { setSenha(e.target.value); setError(""); }}
-                  className="w-full pl-10 pr-3 h-11 bg-surface-container-high/70 border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-all placeholder:text-muted-foreground/50"
+                  className="w-full pl-10 pr-3 h-11 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-all placeholder:text-muted-foreground/50"
                   placeholder="••••••••"
                 />
               </div>
@@ -85,9 +85,9 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-11 bg-brand hover:brightness-110 disabled:opacity-50 text-white text-sm font-bold rounded-xl shadow-md shadow-primary/25 transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+              className="w-full h-11 bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground text-sm font-semibold rounded-xl shadow-md transition-colors flex items-center justify-center gap-2"
             >
-              <Icon name="logout" className="text-base rotate-180" />
+              <Icon name="logout" className="text-base" />
               {loading ? "A entrar..." : "Entrar"}
             </button>
           </form>

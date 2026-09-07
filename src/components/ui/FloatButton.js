@@ -18,7 +18,7 @@ export default function FloatButton({ href, onClick, icon = "add", label, classN
   const classes = cn(
     "fixed bottom-6 right-6 z-50",
     "inline-flex items-center gap-2 h-14 rounded-full px-5",
-    "bg-primary text-on-primary shadow-lg",
+    "bg-primary text-on-primary shadow-md",
     "hover:bg-primary/90 hover:-translate-y-0.5",
     "transition-all duration-200 active:scale-95",
     "font-semibold text-sm",

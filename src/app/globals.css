@@ -30,11 +30,13 @@
   --color-info-foreground: var(--info-foreground);
   --color-on-info: var(--info-foreground);
 
-  /* Shadcn-style radius tokens */
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
+  /* Shadcn-style radius tokens (8–12px, nada acima) */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 0.75rem;
+  --radius-3xl: 0.75rem;
 
   /* Semantic utility tokens (MD3-style mapping) */
   --color-surface: var(--background);
@@ -67,77 +69,77 @@
   --color-on-warning: var(--primary-foreground);
   --color-on-error-state: var(--destructive-foreground);
 
-  /* Shadow system */
-  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
-  --shadow-card-hover: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
-  --shadow-dropdown: 0 4px 24px 0 rgba(0, 0, 0, 0.08);
-  --shadow-modal: 0 24px 48px -12px rgba(0, 0, 0, 0.12);
-  --shadow-lift: 0 12px 40px -12px rgba(0, 0, 0, 0.18), 0 6px 16px -8px rgba(0, 0, 0, 0.1);
+  /* Shadow system — neutro e subtil */
+  --shadow-card: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  --shadow-card-hover: 0 1px 2px 0 rgba(0, 0, 0, 0.04), 0 6px 16px -6px rgba(0, 0, 0, 0.08);
+  --shadow-dropdown: 0 4px 16px -4px rgba(0, 0, 0, 0.08);
+  --shadow-modal: 0 16px 40px -16px rgba(0, 0, 0, 0.18);
+  --shadow-lift: 0 8px 24px -8px rgba(0, 0, 0, 0.12);
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: var(--font-jbmono), ui-monospace, "Cascadia Code", "Consolas", monospace;
 }
 
 :root {
-  --radius: 0.75rem;
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --radius: 0.625rem;
+  --background: #f8f9fa;
+  --foreground: #1a1a1a;
   --card: #ffffff;
-  --card-foreground: #0f172a;
+  --card-foreground: #1a1a1a;
   --popover: #ffffff;
-  --popover-foreground: #0f172a;
-  --primary: #0f766e;
+  --popover-foreground: #1a1a1a;
+  --primary: #4f46e5;
   --primary-foreground: #ffffff;
-  --secondary: #475569;
+  --secondary: #6b7280;
   --secondary-foreground: #ffffff;
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
-  --accent: #f1f5f9;
-  --accent-foreground: #0f172a;
-  --destructive: #ef4444;
+  --muted: #f1f2f4;
+  --muted-foreground: #6b7280;
+  --accent: #f1f2f4;
+  --accent-foreground: #1a1a1a;
+  --destructive: #dc2626;
   --destructive-foreground: #ffffff;
-  --border: #e2e8f0;
-  --input: #e2e8f0;
-  --ring: #0f766e;
-  --success: #16a34a;
-  --warning: #d97706;
+  --border: #e3e5e9;
+  --input: #e3e5e9;
+  --ring: #4f46e5;
+  --success: #10b981;
+  --warning: #f59e0b;
   --error: #dc2626;
-  --info: #475569;
-  --info-foreground: #fafaf9;
-  --tertiary: #0f766e;
-  --tertiary-foreground: #052e16;
-  --surface-variant: #e6e8ee;
+  --info: #3b82f6;
+  --info-foreground: #ffffff;
+  --tertiary: #4f46e5;
+  --tertiary-foreground: #1e1b4b;
+  --surface-variant: #eef0f3;
 }
 
 .dark {
-  --radius: 0.75rem;
-  --background: #050914;
-  --foreground: #e2e8f0;
-  --card: #0a1122;
-  --card-foreground: #e2e8f0;
-  --popover: #0a1122;
-  --popover-foreground: #e2e8f0;
-  --primary: #2f9e8f;
-  --primary-foreground: #0b1f1c;
-  --secondary: #9aa4b2;
-  --secondary-foreground: #0b1f1c;
-  --muted: #141c2f;
-  --muted-foreground: #94a3b8;
-  --accent: #141c2f;
-  --accent-foreground: #e2e8f0;
-  --destructive: #ffb4ab;
-  --destructive-foreground: #690005;
-  --border: #2a364a;
-  --input: #2a364a;
-  --ring: #2f9e8f;
-  --success: #4ade80;
+  --radius: 0.625rem;
+  --background: #0b0f19;
+  --foreground: #e6e8ee;
+  --card: #111623;
+  --card-foreground: #e6e8ee;
+  --popover: #111623;
+  --popover-foreground: #e6e8ee;
+  --primary: #6366f1;
+  --primary-foreground: #ffffff;
+  --secondary: #8b93a7;
+  --secondary-foreground: #0b0f19;
+  --muted: #171d2e;
+  --muted-foreground: #8b93a7;
+  --accent: #171d2e;
+  --accent-foreground: #e6e8ee;
+  --destructive: #f87171;
+  --destructive-foreground: #450a0a;
+  --border: #242c3d;
+  --input: #242c3d;
+  --ring: #6366f1;
+  --success: #34d399;
   --warning: #fbbf24;
-  --error: #ffb4ab;
-  --info: #9aa4b2;
-  --info-foreground: #0b1f1c;
-  --tertiary: #2f9e8f;
-  --tertiary-foreground: #052e16;
-  --surface-variant: #141c2f;
+  --error: #f87171;
+  --info: #60a5fa;
+  --info-foreground: #0b0f19;
+  --tertiary: #6366f1;
+  --tertiary-foreground: #e0e7ff;
+  --surface-variant: #171d2e;
 }
 
 * {
@@ -301,7 +303,7 @@ body::before {
 
 /* ===== Selection ===== */
 ::selection {
-  background-color: rgba(15, 118, 110, 0.15);
+  background-color: color-mix(in srgb, var(--primary) 14%, transparent);
   color: var(--primary);
 }
 
@@ -382,19 +384,15 @@ input[type="radio"] {
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .hover-lift:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .hover-scale {
   transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .hover-scale:hover {
-  transform: scale(1.03);
-}
-
-.dark .hover-lift:hover {
-  box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.3);
+  transform: scale(1.02);
 }
 
 /* ===== Status Icon Colors ===== */
@@ -430,12 +428,13 @@ input[type="radio"] {
 .fluid-card {
   background: var(--card);
   border: 1px solid var(--border);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-  border-radius: var(--radius-xl);
-  transition: box-shadow 0.2s ease;
+  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-lg);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .fluid-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  border-color: color-mix(in srgb, var(--border) 60%, var(--foreground));
+  box-shadow: var(--shadow-card-hover);
 }
 
 /* ===== Material Symbols ===== */
@@ -558,19 +557,21 @@ input[type="radio"] {
 }
 
 .glass-hover {
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 .glass-hover:hover {
-  transform: scale(1.01);
-  box-shadow: var(--shadow-lift);
+  border-color: color-mix(in srgb, var(--border) 60%, var(--foreground));
+  box-shadow: var(--shadow-card-hover);
 }
 
-/* Gradiente de marca (teal) */
+/* Fundos de marca — sólidos, sem gradiente */
 .gradient-brand {
-  background-image: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+  background-color: var(--primary);
+  background-image: none;
 }
 .gradient-soft {
-  background-image: linear-gradient(135deg, color-mix(in srgb, #0f766e 14%, transparent), color-mix(in srgb, #0d9488 12%, transparent));
+  background-color: color-mix(in srgb, var(--primary) 8%, transparent);
+  background-image: none;
 }
 
 /* ==========================================================================
@@ -578,6 +579,16 @@ input[type="radio"] {
    ========================================================================== */
 
 /* Fundo com grid subtil (cyber blueprint) */
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+:root {
+  color-scheme: light;
+}
+.dark {
+  color-scheme: dark;
+}
 body {
   background-color: var(--background);
 }
@@ -604,8 +615,7 @@ body {
 /* Glass panel (clean surface, kept name for compatibility) */
 .glass-panel {
   background: var(--card);
-  border-top: 1px solid var(--border);
-  border-left: 1px solid var(--border);
+  border: 1px solid var(--border);
   box-shadow: var(--shadow-card);
 }
 
@@ -613,14 +623,6 @@ body {
 .input-glow:focus-within {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent);
   border-color: var(--primary);
-}
-
-/* Padrão de grelha do diagrama */
-.diagram-bg {
-  background-size: 40px 40px;
-  background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
 }
 
 .scrollbar-hide {
@@ -631,22 +633,26 @@ body {
   display: none;
 }
 
-/* Borda (clean, kept name for compatibility) */
+/* Borda interna fina (kept name for compatibility — o container já usa border) */
 .cyber-border {
   position: relative;
 }
 .cyber-border::before {
   content: "";
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: color-mix(in srgb, var(--border) 80%, transparent);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
+  inset: 0;
   pointer-events: none;
-  opacity: 1;
+  border-radius: inherit;
+  border: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
+}
+
+/* Fundo de grelha subtil (kept name for compatibility) */
+.diagram-bg {
+  background-color: color-mix(in srgb, var(--muted) 30%, transparent);
+  background-size: 32px 32px;
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--border) 45%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--border) 45%, transparent) 1px, transparent 1px);
 }
 
 /* Telemetry sparklines (KPIs) */
@@ -681,19 +687,19 @@ body {
   color: var(--muted-foreground);
 }
 
-/* Scrollbar cyber */
-.dark ::-webkit-scrollbar-thumb { background: rgba(128, 213, 203, 0.2); }
-.dark ::-webkit-scrollbar-thumb:hover { background: rgba(128, 213, 203, 0.5); }
+/* Scrollbar (neutro) */
+.dark ::-webkit-scrollbar-thumb { background: var(--border); }
+.dark ::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
 
-/* Input glass cyber */
+/* Input (clean, kept name for compatibility) */
 .glass-input {
   background: var(--background);
   border: 1px solid var(--input);
-  transition: all 0.3s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .glass-input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
   outline: none;
 }
 
@@ -732,15 +738,17 @@ body {
 .ms-fill { font-variation-settings: 'FILL' 1; }
 .ms-strong { font-variation-settings: 'FILL' 1, 'wght' 600; }
 
-/* ---- Gradiente de marca (teal) para fundos ---- */
+/* ---- Fundos de marca — sólidos ---- */
 .bg-brand {
-  background-image: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+  background-color: var(--primary);
+  background-image: none;
 }
 .bg-brand-soft {
-  background-image: linear-gradient(135deg, color-mix(in srgb, #0d9488 12%, transparent), color-mix(in srgb, #0d9488 8%, transparent));
+  background-color: color-mix(in srgb, var(--primary) 8%, transparent);
+  background-image: none;
 }
 
-/* Texto de marca — cor primária sólida (sem gradiente cyber) */
+/* Texto de marca — cor primária sólida */
 .text-gradient {
   color: var(--primary);
   background: none;
@@ -748,42 +756,41 @@ body {
   background-clip: unset;
 }
 .dark .text-gradient {
-  color: #5bbfb1;
+  color: var(--primary);
 }
 
-/* ---- Borda fina primária (glass premium) ---- */
+/* ---- Borda fina primária ---- */
 .border-gradient {
   border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border));
   background: var(--card);
 }
 
-/* ---- Glow (sombras de marca) — reduzido a sombra neutra ---- */
-.glow-primary { box-shadow: 0 4px 16px -6px color-mix(in srgb, var(--primary) 30%, transparent); }
-.glow-purple { box-shadow: 0 4px 16px -6px color-mix(in srgb, var(--secondary) 25%, transparent); }
-.glow-brand { box-shadow: 0 6px 20px -8px color-mix(in srgb, var(--primary) 30%, transparent); }
+/* ---- Glow reduzido a sombra neutra subtil ---- */
+.glow-primary { box-shadow: var(--shadow-card-hover); }
+.glow-purple { box-shadow: var(--shadow-card-hover); }
+.glow-brand { box-shadow: var(--shadow-card-hover); }
 
 /* ---- Chip de ícone (headers) ---- */
 .icon-chip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 0.9rem;
+  border-radius: var(--radius-md);
   background: var(--muted);
   border: 1px solid var(--border);
   color: var(--primary);
 }
 
-/* ---- Nav item ativo (pill sobrio) ---- */
+/* ---- Nav item ativo (pill sóbrio) ---- */
 .nav-pill {
-  border-radius: 0.75rem;
+  border-radius: var(--radius-lg);
   background-color: var(--primary);
   color: var(--primary-foreground);
-  box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--primary) 45%, transparent);
 }
 .dark .nav-pill {
-  background-color: color-mix(in srgb, var(--primary) 22%, transparent);
+  background-color: color-mix(in srgb, var(--primary) 18%, transparent);
   color: var(--primary);
-  box-shadow: inset 0 0 0 1px rgba(47, 158, 143, 0.3);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 25%, transparent);
 }
 
 /* ---- Fundo (login / hero) — plano clean ---- */
@@ -816,4 +823,16 @@ body {
 .ring-focus-soft:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
+}
+
+/* ---- Respeitar preferência de redução de movimento ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

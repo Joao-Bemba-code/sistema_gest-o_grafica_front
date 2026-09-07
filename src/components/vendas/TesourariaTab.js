@@ -174,8 +174,17 @@ export default function TesourariaTab() {
       addToast("Indique um valor válido", "error");
       return;
     }
-    if (form.tipo === "transferencia" && !form.conta_destino_id) {
-      addToast("Selecione a conta de destino", "error");
+    if (form.tipo === "transferencia") {
+      if (!form.conta_bancaria_id) {
+        addToast("Selecione a conta de origem", "error");
+        return;
+      }
+      if (!form.conta_destino_id) {
+        addToast("Selecione a conta de destino", "error");
+        return;
+      }
+    } else if (!form.conta_bancaria_id) {
+      addToast("Selecione a conta bancária para esta operação", "error");
       return;
     }
     setSalvando(true);
@@ -197,7 +206,7 @@ export default function TesourariaTab() {
       addToast("Movimento registado com sucesso", "success");
       setModalNovo(false);
       setForm(initialForm);
-      await Promise.all([carregarResumo(), carregarMovimentos()]);
+      await Promise.all([carregarResumo(), carregarMovimentos(), carregarContas()]);
     } catch (err) {
       addToast(err.response?.data?.erro || "Erro ao registar movimento", "error");
     } finally {
@@ -212,7 +221,7 @@ export default function TesourariaTab() {
       await removerMovimento(eliminarItem.id);
       addToast("Movimento removido com sucesso", "success");
       setEliminarItem(null);
-      await Promise.all([carregarResumo(), carregarMovimentos()]);
+      await Promise.all([carregarResumo(), carregarMovimentos(), carregarContas()]);
     } catch (err) {
       addToast(err.response?.data?.erro || "Erro ao eliminar movimento", "error");
     } finally {
@@ -222,11 +231,11 @@ export default function TesourariaTab() {
 
   const handleExportar = async () => {
     try {
-      const blob = await exportarTesouraria();
+      const blob = await exportarTesouraria({ formato: "xlsx" });
       const url = window.URL.createObjectURL(new Blob([blob]));
       const a = document.createElement("a");
       a.href = url;
-      a.download = `tesouraria_${new Date().toISOString().split("T")[0]}.csv`;
+      a.download = `tesouraria_${new Date().toISOString().split("T")[0]}.xlsx`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -252,7 +261,7 @@ export default function TesourariaTab() {
           <button onClick={handleExportar} disabled={movimentos.length === 0} className="bg-surface-variant text-on-surface border border-outline-variant px-4 py-2 rounded font-mono flex items-center gap-2 hover:border-primary hover:text-primary transition-all text-[11px] uppercase tracking-wider disabled:opacity-50 disabled:pointer-events-none">
             <Icon name="download" className="text-[16px]" /> Exportar CSV
           </button>
-          <button onClick={abrirNovo} className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold ">
+          <button onClick={abrirNovo} className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium shadow-sm hover:bg-primary/90 transition-colors ">
             <Icon name="add" className="text-[16px]" /> Novo Movimento
           </button>
         </div>
@@ -388,7 +397,7 @@ export default function TesourariaTab() {
         <form id="form-tesouraria" onSubmit={handleSubmit} className="space-y-5">
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Tipo de Movimento *</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {[tipoCfg.saida, tipoCfg.transferencia].map((v) => (
                 <button key={v.label} type="button" onClick={() => {
                   const novoTipo = v.label === "Saída" ? "saida" : "transferencia";
@@ -404,7 +413,9 @@ export default function TesourariaTab() {
                 </button>
               ))}
             </div>
-            <p className="text-[10px] text-muted-foreground">As entradas são registadas automaticamente quando uma fatura é paga.</p>
+            <p className="text-[10px] text-muted-foreground italic">
+              As entradas são registadas automaticamente quando uma fatura é marcada como paga.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

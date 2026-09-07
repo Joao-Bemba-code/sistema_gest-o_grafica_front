@@ -3,25 +3,24 @@ import Icon from "@/components/Icon";
 import { cn } from "@/lib/utils";
 
 const VARIANTS = {
-  primary: { chip: "border-primary/25 bg-primary/10 text-primary", bar: "from-primary to-teal-500", accent: "text-primary" },
-  success: { chip: "border-emerald-500/25 bg-emerald-500/10 text-emerald-600", bar: "from-emerald-500 to-teal-400", accent: "text-success" },
-  info: { chip: "border-secondary/25 bg-secondary/10 text-secondary", bar: "from-sky-500 to-teal-400", accent: "text-secondary" },
-  secondary: { chip: "border-slate-500/25 bg-slate-500/10 text-slate-600", bar: "from-teal-400 to-sky-400", accent: "text-primary" },
-  error: { chip: "border-error/25 bg-error/10 text-error", bar: "from-rose-400 to-red-500", accent: "text-error" },
-  warning: { chip: "border-warning/25 bg-warning/10 text-warning", bar: "from-amber-400 to-orange-500", accent: "text-warning" },
+  primary: { chip: "border-primary/20 bg-primary/10 text-primary", bar: "bg-primary", accent: "text-primary" },
+  success: { chip: "border-success/25 bg-success/10 text-success", bar: "bg-success", accent: "text-success" },
+  info: { chip: "border-info/25 bg-info/10 text-info", bar: "bg-info", accent: "text-info" },
+  secondary: { chip: "border-secondary/25 bg-secondary/10 text-secondary", bar: "bg-secondary", accent: "text-secondary" },
+  error: { chip: "border-error/25 bg-error/10 text-error", bar: "bg-error", accent: "text-error" },
+  warning: { chip: "border-warning/25 bg-warning/10 text-warning", bar: "bg-warning", accent: "text-warning" },
 };
 
 /**
- * Cartão KPI combinado: um único cartão que agrupa duas métricas lado a lado,
- * mantendo a identidade visual do KpiCard (chip de ícone, faixa superior em gradiente).
+ * Cartão KPI combinado: um único cartão que agrupa duas métricas lado a lado.
  *
  * stats = [{ label, value, sublabel }] (até 2)
  */
 export default function ComboKpiCard({ icon, title, subtitle, stats, iconVariant = "primary", className }) {
   const v = VARIANTS[iconVariant] || VARIANTS.primary;
   return (
-    <Card className={cn("hover-lift relative overflow-hidden", className)}>
-      <div className={cn("absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r", v.bar)} aria-hidden="true" />
+    <Card className={cn("relative overflow-hidden", className)}>
+      <div className={cn("absolute inset-x-0 top-0 h-0.5", v.bar)} aria-hidden="true" />
       <CardContent className="p-5 sm:p-6">
         <div className="flex items-center gap-3 mb-5">
           <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border", v.chip)}>

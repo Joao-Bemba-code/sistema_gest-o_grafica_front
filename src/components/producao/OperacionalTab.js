@@ -158,7 +158,7 @@ export default function OperacionalTab() {
 
   return (
     <div className="space-y-5">
-      <div className="obsidian-glass rounded-lg p-5 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-l-4 border-l-primary">
+      <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-3">
           <Icon name="precision_manufacturing" className="text-[22px] text-primary shrink-0" />
           <div>

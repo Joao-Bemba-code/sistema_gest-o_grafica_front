@@ -48,36 +48,17 @@ export default function TopBar() {
   const bellRef = useRef(null);
 
   return (
-    <header className="w-full sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-primary/10 flex justify-between items-center pl-14 pr-3 sm:pr-6 md:pl-6 h-14 sm:h-16">
-      <div className="flex items-center gap-5 flex-1 max-w-xl">
-        <h2 className="text-lg font-bold tracking-tight hidden sm:block">
-          <span className="text-foreground">SIGRAF</span>
-        </h2>
-        <div className="relative w-full group hidden sm:block">
-          <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors text-sm" />
-          <input
-            className="glass-input w-full pl-10 pr-4 py-2.5 rounded-xl text-xs focus-visible:outline-none transition-all placeholder:text-muted-foreground"
-            placeholder="Pesquisar console..."
-            type="text"
-          />
-        </div>
+    <header className="w-full sticky top-0 z-40 bg-background border-b border-border flex items-center gap-4 pl-14 pr-3 sm:pr-6 md:pl-6 h-14 sm:h-16">
+      <div className="min-w-0 flex-1">
+        <Breadcrumbs />
       </div>
-      <div className="flex items-center gap-2 sm:gap-5">
-        <nav className="hidden md:flex gap-5">
-          {podeAtual("comercial", "ver") && (
-            <Link href="/vendas" className="text-primary font-semibold border-b-2 border-primary pb-1 text-sm transition-all">Área Comercial</Link>
-          )}
-          {podeAtual("producao", "ver") && (
-            <Link href="/producao" className="text-muted-foreground hover:text-primary transition-all text-sm font-medium">Produção</Link>
-          )}
-        </nav>
-        <div className="flex items-center gap-3">
-          <div className="relative">
+      <div className="flex items-center gap-1 sm:gap-2">
+        <div className="relative">
             <button
               ref={bellRef}
               onClick={() => setNotifAberto(!notifAberto)}
               aria-label={naoLidas.length > 0 ? `Notificações (${naoLidas.length} por ler)` : "Notificações"}
-              className="relative p-2 rounded-full hover:text-primary hover:bg-accent transition-all duration-200 hover-scale"
+              className="relative p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-accent transition-colors"
             >
               <Icon name="notifications" className="text-muted-foreground" />
               {naoLidas.length > 0 && (
@@ -144,28 +125,28 @@ export default function TopBar() {
           {podeAtual("configuracao", "ver") && (
             <Link
               href="/configuracoes"
-              className="p-2 hover:text-primary hover:bg-accent rounded-full transition-all hidden sm:block hover-scale"
+              title="Configurações"
+              className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-accent transition-colors hidden sm:block"
             >
-              <Icon name="settings" className="text-muted-foreground" />
+              <Icon name="settings" />
             </Link>
           )}
-          <button onClick={logout} className="p-2 hover:text-destructive hover:bg-destructive/10 rounded-full transition-all duration-200 hover-scale" title="Sair">
-            <Icon name="logout" className="text-muted-foreground" />
+          <button onClick={logout} className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors" title="Sair">
+            <Icon name="logout" />
           </button>
-          <div className="h-6 w-px bg-border hidden sm:block" />
+          <div className="h-6 w-px bg-border hidden sm:block mx-1" />
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center font-bold text-xs">
+            <div className="w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 text-primary flex items-center justify-center font-semibold text-xs">
               {getInitials(usuario?.nome)}
             </div>
             <div className="hidden sm:block">
-              <p className="text-xs font-bold text-foreground leading-tight">{usuario?.nome || "Utilizador"}</p>
+              <p className="text-xs font-semibold text-foreground leading-tight">{usuario?.nome || "Utilizador"}</p>
               <p className="text-[11px] text-muted-foreground truncate max-w-[10rem]">
                 {usuario?.organizacao?.nome || usuario?.funcao || "Online"}
               </p>
             </div>
           </div>
         </div>
-      </div>
     </header>
   );
 }
@@ -179,12 +160,12 @@ export function Breadcrumbs() {
       : ["Painel"]);
 
   return (
-    <nav className="flex items-center gap-2 text-xs text-muted-foreground">
-      <Link href="/" className="hover:text-primary transition-colors font-medium uppercase tracking-wide">Início</Link>
+    <nav className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
+      <Link href="/" className="font-medium hover:text-primary transition-colors shrink-0">Início</Link>
       {crumbs.map((crumb, i) => (
-        <span key={i} className="flex items-center gap-1.5">
-          <Icon name="chevron_right" className="text-[12px]" />
-          <span className={`font-medium uppercase tracking-wide ${i === crumbs.length - 1 ? "text-primary" : ""}`}>{crumb}</span>
+        <span key={i} className="flex items-center gap-1.5 min-w-0">
+          <Icon name="chevron_right" className="text-[12px] shrink-0" />
+          <span className={`truncate font-medium ${i === crumbs.length - 1 ? "text-foreground font-semibold" : ""}`}>{crumb}</span>
         </span>
       ))}
     </nav>

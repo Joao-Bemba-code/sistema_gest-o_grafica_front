@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import Icon from "@/components/Icon";
@@ -235,10 +235,10 @@ export default function UtilizadoresPage() {
 
   return (
     <div className="space-y-5">
-      <div className="obsidian-glass rounded-lg p-5 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-l-4 border-l-primary">
+      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
-          <h1 className="font-sans text-3xl font-bold text-foreground tracking-tight">Utilizadores</h1>
-          <p className="text-primary mt-1 font-mono text-xs uppercase tracking-widest">Gestão de utilizadores e permissões // USR · {usuarios.length} utilizadores</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Utilizadores</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Gestão de utilizadores e permissões // USR · {usuarios.length} utilizadores</p>
         </div>
         {admin && (
           <Button onClick={abrirNovo}>

@@ -1,10 +1,9 @@
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
-const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-space" });
 const jetBrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jbmono" });
 
 export const metadata = {
@@ -23,12 +22,12 @@ export const metadata = {
 };
 
 export const viewport = {
-  themeColor: "#0f766e",
+  themeColor: "#4f46e5",
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="pt-br" className={`${inter.variable} ${spaceGrotesk.variable} ${jetBrainsMono.variable} antialiased`} suppressHydrationWarning>
+    <html lang="pt-br" className={`${inter.variable} ${jetBrainsMono.variable} antialiased`} suppressHydrationWarning>
       <head>
         <link rel="stylesheet" href="/fonts/material-symbols-outlined.css" />
       </head>

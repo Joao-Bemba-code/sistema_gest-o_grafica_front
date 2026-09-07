@@ -6,12 +6,12 @@ import Icon from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 
-const FALLBACK_GRADIENTS = [
-  "from-primary/25 via-primary/10 to-transparent",
-  "from-secondary/25 via-secondary/10 to-transparent",
-  "from-warning/25 via-warning/10 to-transparent",
-  "from-info/25 via-info/10 to-transparent",
-  "from-success/25 via-success/10 to-transparent",
+const FALLBACK_TINTS = [
+  "bg-primary/5",
+  "bg-secondary/10",
+  "bg-warning/10",
+  "bg-info/10",
+  "bg-success/10",
 ];
 
 function MediaCard({
@@ -34,8 +34,7 @@ function MediaCard({
   className,
 }) {
   const [imgError, setImgError] = useState(false);
-  const gradient =
-    FALLBACK_GRADIENTS[Math.abs(gradientIndex) % FALLBACK_GRADIENTS.length];
+  const tint = FALLBACK_TINTS[Math.abs(gradientIndex) % FALLBACK_TINTS.length];
   const showImage = thumbnail && !imgError;
 
   return (
@@ -46,12 +45,7 @@ function MediaCard({
         className
       )}
     >
-      <div
-        className={cn(
-          "relative aspect-[16/10] overflow-hidden bg-muted",
-          !thumbnail && "bg-gradient-to-br"
-        )}
-      >
+      <div className="relative aspect-[16/10] overflow-hidden bg-muted">
         {showImage ? (
           <img
             src={thumbnail}
@@ -61,7 +55,7 @@ function MediaCard({
             className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.05]"
           />
         ) : (
-          <div className={cn("flex h-full w-full items-center justify-center", gradient)}>
+          <div className={cn("flex h-full w-full items-center justify-center", tint)}>
             <Icon name="image" className="text-4xl text-muted-foreground/40" />
           </div>
         )}
@@ -69,7 +63,7 @@ function MediaCard({
         {badge && (
           <Badge
             variant={badgeVariant}
-            className="absolute left-3 top-3 border-transparent bg-white/95 text-[10px] shadow-sm backdrop-blur dark:bg-card/95"
+            className="absolute left-3 top-3 border border-outline-variant/40 text-[10px]"
           >
             {badge}
           </Badge>
@@ -82,10 +76,10 @@ function MediaCard({
             aria-pressed={favorite}
             aria-label={favorite ? "Remover dos favoritos" : "Adicionar aos favoritos"}
             className={cn(
-              "ds-motion absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full shadow-sm backdrop-blur",
+              "absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full border border-outline-variant/40 shadow-sm",
               favorite
                 ? "bg-white text-error dark:bg-card"
-                : "bg-white/95 text-muted-foreground hover:text-error dark:bg-card/95"
+                : "bg-white text-muted-foreground hover:text-error dark:bg-card"
             )}
           >
             <Icon

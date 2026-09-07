@@ -103,10 +103,10 @@ export default function PreImpressaoPage() {
 
   return (
     <div className="space-y-5">
-      <div className="obsidian-glass rounded-lg p-5 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-l-4 border-l-primary">
+      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
-          <h1 className="font-sans text-3xl font-bold text-foreground tracking-tight">Pré-Impressão</h1>
-          <p className="text-primary mt-1 font-mono text-xs uppercase tracking-widest">Checklist de preparação de arquivos // PRE</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Pré-Impressão</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Checklist de preparação de arquivos // PRE</p>
         </div>
       </div>
 

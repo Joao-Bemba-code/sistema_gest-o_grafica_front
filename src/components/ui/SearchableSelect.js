@@ -72,7 +72,7 @@ export default function SearchableSelect({ value, options, placeholder, required
       </button>
 
       {aberto && (
-        <div className="absolute z-50 mt-1 w-full obsidian-glass cyber-border rounded-xl shadow-xl overflow-hidden animate-scale-in">
+        <div className="absolute z-50 mt-1 w-full obsidian-glass cyber-border rounded-xl shadow-lg overflow-hidden animate-scale-in">
           <div className="p-2 border-b border-border/60">
             <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2">
               <Icon name="search" className="text-sm text-muted-foreground shrink-0" />

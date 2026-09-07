@@ -41,22 +41,22 @@ export default function Modal({ open, onClose, title, icon, children, size = "lg
       aria-modal="true"
       aria-labelledby={titleId}
     >
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className={`relative w-full obsidian-glass rounded-2xl shadow-xl border border-outline-variant/30 animate-[modalIn_0.2s_ease-out] ${sizes[size] || sizes.lg} max-h-[90vh] flex flex-col`}>
+      <div className="fixed inset-0 bg-black/60" onClick={onClose} />
+      <div className={`relative w-full obsidian-glass rounded-xl border border-outline-variant/30 shadow-md animate-[modalIn_0.2s_ease-out] ${sizes[size] || sizes.lg} max-h-[90vh] flex flex-col`}>
         <div className="flex items-center justify-between px-6 py-5 border-b border-outline-variant/20 shrink-0">
-          <div className="flex items-center gap-3 min-w-0 border-l-4 border-l-primary pl-4">
+          <div className="flex items-center gap-3 min-w-0">
             {icon && (
-              <span className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <span className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                 <Icon name={icon} className="text-lg text-primary" />
               </span>
             )}
-            <h2 id={titleId} className="text-base font-bold text-foreground truncate">{title}</h2>
+            <h2 id={titleId} className="text-base font-semibold text-foreground truncate">{title}</h2>
           </div>
           <button
             ref={closeRef}
             onClick={onClose}
             aria-label="Fechar janela"
-            className="w-8 h-8 rounded-xl hover:bg-muted flex items-center justify-center transition-colors text-muted-foreground shrink-0"
+            className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center transition-colors text-muted-foreground shrink-0"
           >
             <Icon name="close" className="text-lg" />
           </button>

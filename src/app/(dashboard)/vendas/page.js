@@ -205,10 +205,10 @@ export default function AreaComercialPage() {
 
   return (
     <div className="space-y-5">
-      <div className="obsidian-glass rounded-lg p-5 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-l-4 border-l-primary">
+      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
-          <h1 className="font-sans text-3xl font-bold text-foreground tracking-tight">Área Comercial</h1>
-          <p className="text-primary mt-1 font-mono text-xs uppercase tracking-widest">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Área Comercial</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Orçamentos · facturas · cadastros // COMERCIAL
           </p>
         </div>
@@ -246,7 +246,7 @@ export default function AreaComercialPage() {
                 {orcamentos.length} orçamentos · {pendentes} pendentes // {formatKz(totalOrc)}
               </p>
             </div>
-            <button onClick={() => setOrcForm({ open: true, id: null })} className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold ">
+            <button onClick={() => setOrcForm({ open: true, id: null })} className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium shadow-sm hover:bg-primary/90 transition-colors ">
               <Icon name="add" className="text-[16px]" /> Novo Orçamento
             </button>
           </div>
@@ -318,7 +318,7 @@ export default function AreaComercialPage() {
                 {faturas.length} facturas · {totalReceber > 0 ? `${formatKz(totalReceber)} a receber` : formatKz(totalFat)}
               </p>
             </div>
-            <button onClick={() => setFatFormOpen(true)} className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold ">
+            <button onClick={() => setFatFormOpen(true)} className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium shadow-sm hover:bg-primary/90 transition-colors ">
               <Icon name="add" className="text-[16px]" /> Nova Fatura
             </button>
           </div>

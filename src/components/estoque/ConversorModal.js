@@ -196,7 +196,7 @@ export default function ConversorModal({ open, onClose, formatos, onCalcular }) 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Painel de inputs */}
         <div className="lg:col-span-4 glass-panel rounded-xl p-6 relative group">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-xl pointer-events-none" />
+          <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl pointer-events-none" />
           <h3 className="font-mono text-sm text-primary mb-5 flex items-center gap-2 uppercase tracking-widest">
             <Icon name="tune" className="text-base" /> Parâmetros de Corte
           </h3>

@@ -72,7 +72,7 @@ export default function CreatableSelect({
       />
 
       {mostrarLista && (
-        <ul className="absolute z-50 mt-1 w-full obsidian-glass cyber-border rounded-xl shadow-xl overflow-hidden py-1 custom-scrollbar max-h-52 overflow-y-auto animate-scale-in" role="listbox">
+        <ul className="absolute z-50 mt-1 w-full obsidian-glass cyber-border rounded-xl shadow-lg overflow-hidden py-1 custom-scrollbar max-h-52 overflow-y-auto animate-scale-in" role="listbox">
           {filtrados.map((opt, i) => (
             <li key={opt.id}>
               <button

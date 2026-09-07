@@ -5,10 +5,10 @@ import Icon from "./Icon";
 const ToastContext = createContext();
 
 const variants = {
-  success: { bg: "bg-primary text-on-primary shadow-lg shadow-primary/30", icon: "check_circle" },
-  error: { bg: "bg-destructive text-white shadow-lg shadow-destructive/30", icon: "warning" },
-  warning: { bg: "bg-amber-500 text-white shadow-lg shadow-amber-500/30", icon: "warning" },
-  info: { bg: "bg-secondary text-white shadow-lg shadow-secondary/30", icon: "info" },
+  success: { bg: "bg-primary text-primary-foreground shadow-md", icon: "check_circle" },
+  error: { bg: "bg-destructive text-destructive-foreground shadow-md", icon: "warning" },
+  warning: { bg: "bg-warning text-white shadow-md", icon: "warning" },
+  info: { bg: "bg-secondary text-secondary-foreground shadow-md", icon: "info" },
 };
 
 export function ToastProvider({ children }) {
@@ -31,9 +31,7 @@ export function ToastProvider({ children }) {
           return (
             <div
               key={toast.id}
-              className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-semibold animate-slide-down border ${
-                toast.type === "error" ? "border-destructive/20" : "border-white/10"
-              } ${v.bg}`}
+              className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold animate-slide-down border border-black/10 ${v.bg}`}
               role="alert"
             >
               <Icon name={v.icon} className="text-lg shrink-0" />

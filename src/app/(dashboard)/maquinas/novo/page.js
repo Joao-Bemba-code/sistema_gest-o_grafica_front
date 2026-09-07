@@ -33,7 +33,7 @@ export default function NovaMaquinaPage() {
 
   return (
     <div className="space-y-5">
-      <div className="obsidian-glass rounded-lg p-5 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-l-4 border-l-primary">
+      <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-4">
           <button
             onClick={() => router.push("/maquinas")}
@@ -43,8 +43,8 @@ export default function NovaMaquinaPage() {
             <Icon name="arrow_back" className="text-xl" />
           </button>
           <div>
-            <h1 className="font-sans text-3xl font-bold text-foreground tracking-tight">Nova Máquina</h1>
-            <p className="text-primary mt-1 font-mono text-xs uppercase tracking-widest">Registar nova máquina no parque industrial</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Nova Máquina</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Registar nova máquina no parque industrial</p>
           </div>
         </div>
         <div className="flex gap-2">

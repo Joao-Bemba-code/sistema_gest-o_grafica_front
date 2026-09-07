@@ -95,7 +95,7 @@ export default function FornecedorSelect({ value = "", onChange, fornecedores = 
           id="fornecedor-opcoes"
           role="listbox"
           aria-label="Fornecedores"
-          className="absolute z-30 mt-1 w-full max-h-52 overflow-y-auto custom-scrollbar obsidian-glass cyber-border rounded-xl shadow-xl py-1"
+          className="absolute z-30 mt-1 w-full max-h-52 overflow-y-auto custom-scrollbar obsidian-glass cyber-border rounded-xl shadow-lg py-1"
         >
           {visiveis.map((nome, i) => (
             <li key={nome} role="option" aria-selected={ativo === i}>

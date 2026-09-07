@@ -181,7 +181,7 @@ function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEdita
             <div className="relative" ref={menuRef}>
               <BotaoIcone icon="more_vert" label="Mais opções" critico={critico} onClick={() => setMenuAberto((v) => !v)} />
               {menuAberto && (
-                <div className="absolute right-0 bottom-full mb-1 z-[60] w-48 bg-popover border border-border rounded-xl shadow-2xl overflow-y-auto max-h-[80vh]">
+                <div className="absolute right-0 bottom-full mb-1 z-[60] w-48 bg-popover border border-border rounded-xl shadow-lg overflow-y-auto max-h-[80vh]">
                   {mover && <MenuItem icon="swap_horiz" label="Transferência" onClick={() => executar(onTransferencia, item)} />}
                   {mover && <MenuItem icon="warning" label="Registar perda" onClick={() => executar(onPerda, item)} />}
                   {mover && <MenuItem icon="delete_sweep" label="Registar desperdício" onClick={() => executar(onDesperdicio, item)} />}

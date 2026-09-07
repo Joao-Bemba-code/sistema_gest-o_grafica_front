@@ -9,15 +9,33 @@ import Icon from "./Icon";
 import { cn, getInitials } from "@/lib/utils";
 import { podeAtual } from "@/lib/permissoes";
 
-const rotas = [
-  { icone: "dashboard", nome: "Painel", para: "/", perm: ["comercial", "ver"] },
-  { icone: "storefront", nome: "Área Comercial", para: "/vendas", perm: ["comercial", "ver"] },
-  { icone: "factory", nome: "Produção", para: "/producao", perm: ["producao", "ver"] },
-  { icone: "inventory_2", nome: "Provisionamento", para: "/estoque", perm: ["estoque", "ver"] },
-  { icone: "category", nome: "Recursos", para: "/categorias", perm: ["categorias", "ver"] },
-  { icone: "analytics", nome: "Relatórios", para: "/relatorios", perm: ["relatorios", "ver"] },
-  { icone: "settings", nome: "Configurações", para: "/configuracoes", perm: ["configuracao", "ver"] },
-  { icone: "manage_accounts", nome: "Utilizadores", para: "/utilizadores", perm: ["utilizadores", "ver"] },
+const grupos = [
+  {
+    rotulo: "Principal",
+    itens: [{ icone: "dashboard", nome: "Painel", para: "/", perm: ["comercial", "ver"] }],
+  },
+  {
+    rotulo: "Gestão",
+    itens: [
+      { icone: "storefront", nome: "Área Comercial", para: "/vendas", perm: ["comercial", "ver"] },
+      { icone: "analytics", nome: "Relatórios", para: "/relatorios", perm: ["relatorios", "ver"] },
+    ],
+  },
+  {
+    rotulo: "Operação",
+    itens: [
+      { icone: "factory", nome: "Produção", para: "/producao", perm: ["producao", "ver"] },
+      { icone: "inventory_2", nome: "Provisionamento", para: "/estoque", perm: ["estoque", "ver"] },
+      { icone: "category", nome: "Recursos", para: "/categorias", perm: ["categorias", "ver"] },
+    ],
+  },
+  {
+    rotulo: "Sistema",
+    itens: [
+      { icone: "settings", nome: "Configurações", para: "/configuracoes", perm: ["configuracao", "ver"] },
+      { icone: "manage_accounts", nome: "Utilizadores", para: "/utilizadores", perm: ["utilizadores", "ver"] },
+    ],
+  },
 ];
 
 export default function Sidebar() {
@@ -38,12 +56,12 @@ export default function Sidebar() {
       </button>
 
       {aberto && (
-        <div className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm" onClick={() => setAberto(false)} />
+        <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setAberto(false)} />
       )}
 
       <aside className={cn(
         "fixed left-0 top-0 h-full w-64 z-50",
-        "obsidian-glass border-r border-primary/10 flex flex-col",
+        "obsidian-glass border-r border-border/60 flex flex-col",
         "transition-[transform] duration-300 ease-out",
         "md:translate-x-0",
         aberto ? "translate-x-0" : "-translate-x-full"
@@ -62,32 +80,47 @@ export default function Sidebar() {
           </div>
         </div>
 
-        <nav className="flex-1 px-3 py-3 overflow-y-auto custom-scrollbar space-y-0.5">
-          <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/70">Menu</p>
-          {rotas.filter((rota) => podeAtual(...rota.perm)).map((rota) => {
-            const ativa = rota.para === "/" ? caminho === "/" : caminho.startsWith(rota.para);
+        <nav className="flex-1 px-3 py-2 overflow-y-auto custom-scrollbar">
+          {grupos.map((g) => {
+            const visiveis = g.itens.filter((rota) => podeAtual(...rota.perm));
+            if (visiveis.length === 0) return null;
             return (
-              <Link
-                key={rota.para}
-                href={rota.para}
-                onClick={() => setAberto(false)}
-                className={cn(
-                  "relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 text-sm",
-                  ativa
-                    ? "nav-pill font-semibold"
-                    : "font-medium text-muted-foreground hover:text-foreground hover:bg-accent"
-                )}
-              >
-                <Icon name={rota.icone} className={cn("text-lg shrink-0", ativa && "ms-fill")} />
-                <span className="font-medium">{rota.nome}</span>
-              </Link>
+              <div key={g.rotulo} className="mt-1 first:mt-0">
+                <p className="px-3 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                  {g.rotulo}
+                </p>
+                <div className="space-y-0.5">
+                  {visiveis.map((rota) => {
+                    const ativa = rota.para === "/" ? caminho === "/" : caminho.startsWith(rota.para);
+                    return (
+                      <Link
+                        key={rota.para}
+                        href={rota.para}
+                        onClick={() => setAberto(false)}
+                        className={cn(
+                          "relative flex items-center gap-3 pl-3 pr-3 py-2 rounded-lg transition-colors text-sm",
+                          ativa
+                            ? "bg-primary/10 text-primary font-semibold"
+                            : "font-medium text-muted-foreground hover:text-foreground hover:bg-accent"
+                        )}
+                      >
+                        {ativa && (
+                          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-full bg-primary" aria-hidden="true" />
+                        )}
+                        <Icon name={rota.icone} className={cn("text-lg shrink-0", ativa && "text-primary ms-fill")} />
+                        <span>{rota.nome}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
             );
           })}
         </nav>
 
         <div className="px-3 pb-3">
-          <div className="p-3 rounded-2xl border border-border/70 bg-gradient-to-br from-muted/60 via-muted/20 to-transparent flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-brand text-white flex items-center justify-center text-sm font-black border-2 border-white/40 dark:border-white/20 shadow-md shrink-0">
+          <div className="p-3 rounded-xl border border-border bg-muted/40 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold border border-primary/20 shrink-0">
               {getInitials(usuario?.nome)}
             </div>
             <div className="flex-1 min-w-0">

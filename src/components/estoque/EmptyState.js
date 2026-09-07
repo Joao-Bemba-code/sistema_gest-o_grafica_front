@@ -59,7 +59,7 @@ export default function EmptyState({ categorias = [], fornecedores = [], temMate
           return (
             <li
               key={p.n}
-              className={`relative rounded-2xl border p-5 transition-all duration-300 ${feito ? "border-primary/30 bg-primary/5" : "border-outline-variant/30 bg-card/60 hover:shadow-lg"}`}
+              className={`relative rounded-xl border p-5 transition-all duration-300 ${feito ? "border-primary/30 bg-primary/5" : "border-outline-variant/30 bg-card/60 hover:border-outline-variant"}`}
               style={{ "--stagger": `${i * 80}ms` }}
             >
               <div className="flex items-center justify-between">

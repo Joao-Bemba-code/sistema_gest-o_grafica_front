@@ -37,7 +37,7 @@ function BarChart({ dados }) {
         <div key={i} className="flex flex-col items-center justify-end flex-1 h-full gap-1.5" title={`${b.label}: ${b.value}`}>
           <span className="text-[9px] font-bold text-foreground">{b.value || ""}</span>
           <div
-            className="w-full max-w-[30px] rounded-t-lg bg-gradient-to-t from-primary/60 to-primary transition-all duration-500"
+            className="w-full max-w-[30px] rounded-t-md bg-primary transition-colors duration-500"
             style={{ height: `${Math.max((b.value / max) * 100, 3)}%` }}
           />
           <span className="text-[9px] font-semibold text-muted-foreground uppercase">{b.label}</span>
@@ -219,14 +219,14 @@ export default function OrcamentosPage() {
       {carregando && <ListSkeleton count={5} />}
 
       {!carregando && (
-        <div className="obsidian-glass rounded-lg p-5 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-l-4 border-l-primary">
+        <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
-            <h1 className="font-sans text-3xl font-bold text-foreground tracking-tight">Orçamentos</h1>
-            <p className="text-primary mt-1 font-mono text-xs uppercase tracking-widest">{orcamentos.length} orçamentos registados // ORC</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Orçamentos</h1>
+            <p className="mt-1 text-sm text-muted-foreground">{orcamentos.length} orçamentos registados // ORC</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Link href="/orcamentos/novo">
-              <button className="bg-primary/20 text-primary border border-primary/50 px-5 py-2 rounded font-mono flex items-center gap-2 hover:bg-primary/30 transition-all text-[11px] uppercase tracking-wider font-bold ">
+              <button className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium shadow-sm hover:bg-primary/90 transition-colors ">
                 <Icon name="add" className="text-[16px]" /> Novo Orçamento
               </button>
             </Link>
