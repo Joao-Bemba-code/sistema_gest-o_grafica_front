@@ -282,7 +282,7 @@ export default function CategoriasPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filtered.map((c) => {
               const fam = todosFamilias[normalizarFamilia(c.familia)] || { label: c.familia || "—", icon: "label", classe: "text-muted-foreground" };
-              const tipo = tiposItem[normalizarTipoItem(c.tipo)];
+              const tipo = tiposItem[normalizarTipoItem(c.tipo)] || { label: c.tipo || "—" };
               return (
                 <div key={c.id} className="bg-card border border-border rounded-xl p-5 space-y-3">
                   <div className="flex items-start justify-between gap-3">

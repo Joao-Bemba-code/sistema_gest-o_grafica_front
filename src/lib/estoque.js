@@ -44,8 +44,10 @@ export const tiposItem = {
 };
 
 export const tipoRecursoOptions = [
-  { valor: "servico", label: "Serviço" },
+  { valor: "materia_prima", label: "Matéria-Prima" },
+  { valor: "produto_acabado", label: "Produto Acabado" },
   { valor: "artigo", label: "Artigo / Produto" },
+  { valor: "servico", label: "Serviço" },
   { valor: "maquina", label: "Maquinaria" },
   { valor: "funcionario", label: "Funcionário" },
   { valor: "colaborador", label: "Colaborador" },
@@ -72,12 +74,11 @@ export function normalizarCategoriaTipo(t) {
 }
 
 export function normalizarTipoItem(t) {
-  if (!t) return "materia_prima";
+  if (!t) return "";
   const v = String(t).trim();
   if (tiposItem[v]) return v;
-  if (v === "servicos") return "servico";
   if (v === "materia_prima" || v === "produto_acabado") return v;
-  return "materia_prima";
+  return v;
 }
 
 export function normalizarUnidade(u) {

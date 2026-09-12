@@ -112,7 +112,7 @@ export default function NovoMaterialPage() {
             <PreviewLinha label="Categoria" valor={categoria?.nome} />
             <PreviewLinha label="Família" valor={catFamiliaCfg.label} />
             <PreviewLinha label="Subfamília" valor={(form.especificacoes?.subfamilia || categoria?.subfamilia || "").trim()} />
-            <PreviewLinha label="Tipo" valor={tiposItem[categoria?.tipo]?.label} />
+            <PreviewLinha label="Tipo" valor={tiposItem[normalizarTipoItem(categoria?.tipo)]?.label || String(categoria?.tipo || "")} />
             <PreviewLinha label="Unidade" valor={form.unidade} />
             <PreviewLinha label="Mover Estoque" valor={mover ? "Sim" : "Não"} acento={mover ? "text-success" : "text-warning"} />
             {entradasEspecificacao(form.especificacoes)
