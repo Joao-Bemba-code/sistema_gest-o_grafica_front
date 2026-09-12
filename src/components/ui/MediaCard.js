@@ -40,7 +40,7 @@ function MediaCard({
   return (
     <article
       className={cn(
-        "group flex h-full flex-col overflow-hidden rounded-2xl border border-outline-variant/30 bg-card shadow-sm transition-all duration-300 ease-out",
+        "group flex h-full flex-col overflow-hidden rounded-2xl border border-outline-variant/30 bg-card shadow-sm transition-all duration-200 ease-in-out",
         "hover:border-primary/40",
         className
       )}
@@ -52,7 +52,7 @@ function MediaCard({
             alt={alt}
             loading="lazy"
             onError={() => setImgError(true)}
-            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.05]"
+            className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.05]"
           />
         ) : (
           <div className={cn("flex h-full w-full items-center justify-center", tint)}>

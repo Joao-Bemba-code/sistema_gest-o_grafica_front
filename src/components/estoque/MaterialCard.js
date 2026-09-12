@@ -175,8 +175,8 @@ function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEdita
         {/* Col 4: Ações */}
         <div className="md:col-span-2 flex items-center justify-between md:justify-end gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-outline-variant/30">
           <div className="flex gap-1.5">
-            {mover && <BotaoIcone icon="add" label="Entrada" critico={critico} onClick={() => onEntrada(item)} />}
-            {mover && <BotaoIcone icon="remove" label="Saída" cor="saida" critico={critico} onClick={() => onSaida(item)} />}
+            <BotaoIcone icon="add" label="Entrada" critico={critico} onClick={() => onEntrada(item)} />
+            <BotaoIcone icon="remove" label="Saída" cor="saida" critico={critico} onClick={() => onSaida(item)} />
             <BotaoIcone icon="description" label="Ver ficha do material (PDF)" critico={critico} onClick={() => onFichaPdf(item)} />
             <div className="relative" ref={menuRef}>
               <BotaoIcone icon="more_vert" label="Mais opções" critico={critico} onClick={() => setMenuAberto((v) => !v)} />

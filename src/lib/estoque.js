@@ -363,6 +363,7 @@ export const blankItem = {
   largura: "", altura: "", controla_lote: false, percentual_quebra: "",
   estoque_min: "", estoque_max: "", ponto_ressuprimento: "", custo_unit: "", lucro: "",
   descricao: "", especificidade: "", condicao_armazenagem: "", localizacao: "", especificacoes: {},
+  composicao: [],
 };
 
 export function toNum(v) {
@@ -379,6 +380,16 @@ export function ehEquipamento(categoria) {
 
 export function moverEstoqueDe(categoria) {
   return ehEquipamento(categoria) ? false : true;
+}
+
+export function ehProduto(categoria) {
+  if (!categoria) return false;
+  const tipo = String(categoria.tipo || "").toLowerCase();
+  return tipo === "artigo" || tipo === "produto_acabado";
+}
+
+export function temComposicao(material) {
+  return Array.isArray(material?.composicao) && material.composicao.length > 0;
 }
 
 export function formatKz(v) {

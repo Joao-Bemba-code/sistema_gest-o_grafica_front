@@ -7,9 +7,17 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "lang": "pt-BR",
-  "background_color": "#f8fafc",
-  "theme_color": "#0f766e",
+  "lang": "pt-AO",
+  "background_color": "#f8f9fa",
+  "theme_color": "#4f46e5",
+  "display_override": ["standalone", "minimal-ui"],
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    { "name": "Painel", "url": "/", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Área Comercial", "url": "/vendas", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Produção", "url": "/producao", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Provisionamento", "url": "/estoque", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+  ],
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },

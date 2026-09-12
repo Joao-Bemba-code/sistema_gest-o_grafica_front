@@ -50,13 +50,13 @@ export default function Sidebar() {
         onClick={() => setAberto(!aberto)}
         aria-label={aberto ? "Fechar menu" : "Abrir menu"}
         aria-expanded={aberto}
-        className="fixed top-2.5 left-3 z-50 md:hidden h-11 w-11 rounded-xl bg-card border shadow-md flex items-center justify-center hover:bg-accent transition-colors ring-focus-soft"
+        className="fixed top-2.5 left-3 z-50 md:hidden h-11 w-11 rounded-xl bg-card border shadow-md flex items-center justify-center hover:bg-accent transition-all duration-200 ease-in-out ring-focus-soft"
       >
         <Icon name={aberto ? "close" : "menu"} className="text-muted-foreground text-xl" />
       </button>
 
       {aberto && (
-        <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setAberto(false)} />
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-[2px] z-40 md:hidden" onClick={() => setAberto(false)} />
       )}
 
       <aside className={cn(
@@ -98,7 +98,7 @@ export default function Sidebar() {
                         href={rota.para}
                         onClick={() => setAberto(false)}
                         className={cn(
-                          "relative flex items-center gap-3 pl-3 pr-3 py-2 rounded-lg transition-colors text-sm",
+                          "relative flex items-center gap-3 pl-3 pr-3 py-2 rounded-lg transition-all duration-200 ease-in-out text-sm",
                           ativa
                             ? "bg-primary/10 text-primary font-semibold"
                             : "font-medium text-muted-foreground hover:text-foreground hover:bg-accent"
@@ -136,7 +136,7 @@ export default function Sidebar() {
               onClick={toggleTheme}
               aria-label={dark ? "Ativar tema claro" : "Ativar tema escuro"}
               title={dark ? "Tema claro" : "Tema escuro"}
-              className="h-8 w-8 shrink-0 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="h-8 w-8 shrink-0 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-all duration-200 ease-in-out"
             >
               <Icon name={dark ? "light_mode" : "dark_mode"} className="text-lg" />
             </button>

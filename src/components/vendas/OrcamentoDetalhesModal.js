@@ -179,28 +179,33 @@ export default function OrcamentoDetalhesModal({ orcamento, empresa, onClose, on
             <div className="mt-4 space-y-3">
               <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Serviços (Mão de Obra)</h4>
               <div className="overflow-x-auto rounded-xl border">
-                <table className="w-full text-xs">
+                <table className="w-full text-xs min-w-[500px]">
                   <thead>
                     <tr className="border-b bg-muted/50">
                       <th className="text-left px-3 py-2 font-bold text-muted-foreground uppercase">Descrição</th>
                       <th className="text-center px-3 py-2 font-bold text-muted-foreground uppercase">MOB</th>
                       <th className="text-center px-3 py-2 font-bold text-muted-foreground uppercase">Prazo</th>
-                      <th className="text-center px-3 py-2 font-bold text-muted-foreground uppercase">Horas</th>
-                      <th className="text-right px-3 py-2 font-bold text-muted-foreground uppercase">Valor/Hora</th>
+                      <th className="text-center px-3 py-2 font-bold text-muted-foreground uppercase">Duração</th>
+                      <th className="text-right px-3 py-2 font-bold text-muted-foreground uppercase">Val./Hora</th>
                       <th className="text-right px-3 py-2 font-bold text-muted-foreground uppercase">Total</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {(o.servicos || []).map((sv, i) => (
-                      <tr key={i} className="border-b border-border/20">
-                        <td className="px-3 py-2 text-foreground">{sv.descricao}</td>
-                        <td className="px-3 py-2 text-center text-muted-foreground">{sv.mob || 1}</td>
-                        <td className="px-3 py-2 text-center text-muted-foreground">{sv.prazoExecucao || 1} dia{Number(sv.prazoExecucao) !== 1 ? "s" : ""}</td>
-                        <td className="px-3 py-2 text-center text-muted-foreground">{sv.duracaoHoras || 8}h</td>
-                        <td className="px-3 py-2 text-right text-muted-foreground">{formatKz(sv.valorHora)}</td>
-                        <td className="px-3 py-2 text-right font-bold text-foreground">{formatKz(sv.total)}</td>
-                      </tr>
-                    ))}
+                    {(o.servicos || []).map((sv, i) => {
+                      const unidade = sv.prazoUnidade || sv.prazo_unidade || "dias";
+                      const prazoLabel = unidade === "horas" ? "hora" : unidade === "minutos" ? "minuto" : "dia";
+                      const plural = Number(sv.prazoExecucao) !== 1;
+                      return (
+                        <tr key={i} className="border-b border-border/20">
+                          <td className="px-3 py-2 text-foreground">{sv.descricao}</td>
+                          <td className="px-3 py-2 text-center text-muted-foreground">{sv.mob || 1}</td>
+                          <td className="px-3 py-2 text-center text-muted-foreground">{sv.prazoExecucao || 1} {prazoLabel}{plural ? "s" : ""}</td>
+                          <td className="px-3 py-2 text-center text-muted-foreground">{sv.duracaoHoras || 8}h</td>
+                          <td className="px-3 py-2 text-right text-muted-foreground">{formatKz(sv.valorHora)}</td>
+                          <td className="px-3 py-2 text-right font-bold text-foreground">{formatKz(sv.total)}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

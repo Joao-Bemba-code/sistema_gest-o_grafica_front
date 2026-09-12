@@ -121,15 +121,20 @@ export default function gerarOrcamentoPdf(orcamento, empresa = {}) {
     doc.text("SERVIÇOS", 14, y); y += 4;
     doc.autoTable({
       startY: y,
-      head: [["Descrição", "Trabalhadores", "Prazo", "Horas", "Valor/Hora", "Total"]],
-      body: servicos.map((sv) => [
-        sv.descricao || "",
-        String(sv.mob || 1),
-        `${sv.prazoExecucao || 1} dia${Number(sv.prazoExecucao) !== 1 ? "s" : ""}`,
-        `${sv.duracaoHoras || 8}h`,
-        formatKz(sv.valorHora),
-        formatKz(sv.total),
-      ]),
+      head: [["Descrição", "Trabalhadores", "Prazo", "Duração", "Val./Hora", "Total"]],
+      body: servicos.map((sv) => {
+        const unidade = sv.prazoUnidade || sv.prazo_unidade || "dias";
+        const prazoLabel = unidade === "horas" ? "hora" : unidade === "minutos" ? "minuto" : "dia";
+        const plural = Number(sv.prazoExecucao) !== 1;
+        return [
+          sv.descricao || "",
+          String(sv.mob || 1),
+          `${sv.prazoExecucao || 1} ${prazoLabel}${plural ? "s" : ""}`,
+          `${sv.duracaoHoras || 8}h`,
+          formatKz(sv.valorHora),
+          formatKz(sv.total),
+        ];
+      }),
       theme: "grid",
       headStyles: { fillColor: COR_SERVICO, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 },
       bodyStyles: { fontSize: 8, textColor: COR_TEXTO, cellPadding: 2.5 },

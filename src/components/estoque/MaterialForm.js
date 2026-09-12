@@ -2,16 +2,18 @@
 
 import { useState, useCallback } from "react";
 import Icon from "@/components/Icon";
+import { Button } from "@/components/ui/Button";
 import FornecedorSelect from "./FornecedorSelect";
 import CategoriaSelect from "./CategoriaSelect";
 import UnidadeSelect from "./UnidadeSelect";
 import NumeroInput from "@/components/ui/NumeroInput";
-import { inputCls, unidades, unidadesParaFamilia, camposDeCategoria, familias, normalizarFamilia, normalizarUnidade, prefixoFamilia, especificacoesObjeto, tiposItem, normalizarTipoItem, moverEstoqueDe } from "@/lib/estoque";
+import { inputCls, unidades, unidadesParaFamilia, camposDeCategoria, familias, normalizarFamilia, normalizarUnidade, prefixoFamilia, especificacoesObjeto, tiposItem, normalizarTipoItem, moverEstoqueDe, ehProduto } from "@/lib/estoque";
 
 const tabs = [
   { key: "identificacao", label: "Identificação", icon: "badge" },
   { key: "especificacao", label: "Especificação", icon: "straighten" },
   { key: "estoque", label: "Stock", icon: "inventory" },
+  { key: "composicao", label: "Composição", icon: "layers" },
 ];
 
 function Campo({ label, children, obrigatorio, full }) {
@@ -75,7 +77,7 @@ function CampoEspecificacao({ campo, valor, onChange }) {
   );
 }
 
-export default function MaterialForm({ formId = "form-material", form, onChange, onSubmit, categorias, fornecedores, materiais = [] }) {
+export default function MaterialForm({ formId = "form-material", form, onChange, onSubmit, categorias, fornecedores, materiais = [], idMaterial }) {
   const [tab, setTab] = useState("identificacao");
   const id = (sufixo) => `${formId}-${sufixo}`;
   const categoria = categorias.find((c) => String(c.id) === String(form.categoria_id));
@@ -84,6 +86,20 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
   const ePapel = ["folha", "resma"].includes(normalizarUnidade(form.unidade));
   const unidadesDisponiveis = categoria ? unidadesParaFamilia(categoria.familia) : unidades;
   const mover = form.mover_estoque === undefined ? moverEstoqueDe(categoria) : !!form.mover_estoque;
+  const eComposicao = ehProduto(categoria);
+  const tabsVisiveis = eComposicao ? tabs : tabs.filter((t) => t.key !== "composicao");
+  const tabAtiva = tabsVisiveis.some((t) => t.key === tab) ? tab : tabsVisiveis[0]?.key || "identificacao";
+  const candidatosComposicao = materiais.filter((m) => !idMaterial || String(m.id) !== String(idMaterial));
+  const composicao = Array.isArray(form.composicao) ? form.composicao : [];
+
+  const aoMudarComposicao = (novaComposicao) => onChange("composicao", novaComposicao);
+  const addComponente = () => aoMudarComposicao([...composicao, { material_id: "", quantidade: "" }]);
+  const setComponente = (ci, chave, valor) => {
+    const nova = [...composicao];
+    nova[ci] = { ...nova[ci], [chave]: valor };
+    aoMudarComposicao(nova);
+  };
+  const removeComponente = (ci) => aoMudarComposicao(composicao.filter((_, i) => i !== ci));
 
   const subfamiliasSugeridas = (() => {
     if (!categoria) return [];
@@ -123,16 +139,16 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
   return (
     <form id={formId} onSubmit={onSubmit} className="space-y-5">
       <div role="tablist" aria-label="Secções do material" className="flex gap-1.5 flex-wrap obsidian-glass cyber-border p-1.5 rounded-xl">
-        {tabs.map((t) => (
+        {tabsVisiveis.map((t) => (
           <button
             key={t.key}
             type="button"
             role="tab"
-            aria-selected={tab === t.key}
+            aria-selected={tabAtiva === t.key}
             aria-controls={`${formId}-painel-${t.key}`}
             id={id(`tab-${t.key}`)}
             onClick={() => setTab(t.key)}
-            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${tab === t.key ? "nav-pill shadow-none text-primary" : "text-muted-foreground hover:text-foreground"}`}
+            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${tabAtiva === t.key ? "nav-pill shadow-none text-primary" : "text-muted-foreground hover:text-foreground"}`}
           >
             <Icon name={t.icon} className="text-lg" />
             <span className="hidden sm:inline">{t.label}</span>
@@ -140,8 +156,8 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
         ))}
       </div>
 
-      <div role="tabpanel" id={`${formId}-painel-${tab}`} aria-labelledby={id(`tab-${tab}`)} className="animate-scale-in">
-        {tab === "identificacao" && (
+      <div role="tabpanel" id={`${formId}-painel-${tabAtiva}`} aria-labelledby={id(`tab-${tabAtiva}`)} className="animate-scale-in">
+        {tabAtiva === "identificacao" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Campo label="Código" obrigatorio>
               <div className="flex items-center gap-2">
@@ -206,7 +222,7 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
           </div>
         )}
 
-        {tab === "especificacao" && (
+        {tabAtiva === "especificacao" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {ePapel && (
               <>
@@ -259,7 +275,7 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
           </div>
         )}
 
-        {tab === "estoque" && (
+        {tabAtiva === "estoque" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <label className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg cursor-pointer sm:col-span-2">
               <input
@@ -295,6 +311,61 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
             <Campo label="Armazém">
               <input value={form.armazem || form.especificacoes?.armazem || ""} onChange={(e) => { onChange("armazem", e.target.value); aoMudarEspec("armazem", e.target.value); }} className={inputCls} placeholder="Ex: Armazém Central" />
             </Campo>
+          </div>
+        )}
+
+        {tabAtiva === "composicao" && eComposicao && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-dashed border-primary/30 bg-primary/5 p-4">
+              <p className="text-xs text-muted-foreground">
+                Define quais <strong className="text-foreground">materiais do stock</strong> este produto consome para produzir <strong className="text-foreground">1 unidade</strong>.
+                Quando o produto for incluído num orçamento, os materiais abaixo serão utilizados automaticamente.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              {composicao.length === 0 && (
+                <p className="text-[11px] text-muted-foreground">Sem componentes — clique &quot;Adicionar componente&quot; para começar.</p>
+              )}
+              {composicao.map((comp, ci) => (
+                <div key={ci} className="grid grid-cols-12 gap-2 items-end">
+                  <div className="col-span-8 sm:col-span-9 flex flex-col gap-1.5">
+                    <select
+                      value={comp.material_id || ""}
+                      onChange={(e) => setComponente(ci, "material_id", e.target.value)}
+                      className={inputCls}
+                      aria-label="Componente"
+                    >
+                      <option value="">Selecionar material...</option>
+                      {candidatosComposicao.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.nome || m.nome_tecnico} — {m.unidade || "un"}
+                          {Number(m.quantidade) > 0 ? ` (${Number(m.quantidade).toLocaleString("pt-AO")} disp.)` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-span-3 sm:col-span-2 flex flex-col gap-1.5">
+                    <NumeroInput
+                      value={comp.quantidade}
+                      onChange={(e) => setComponente(ci, "quantidade", e.target.value)}
+                      className={inputCls}
+                      placeholder="Qtd"
+                      aria-label="Quantidade por unidade"
+                    />
+                  </div>
+                  <div className="col-span-1 flex justify-center">
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeComponente(ci)} title="Remover componente" className="text-error">
+                      <Icon name="close" className="text-sm" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <Button type="button" variant="ghost" size="sm" onClick={addComponente}>
+              <Icon name="add_circle" className="text-sm" /> Adicionar componente
+            </Button>
           </div>
         )}
       </div>

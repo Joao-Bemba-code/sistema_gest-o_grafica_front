@@ -58,7 +58,7 @@ export default function TopBar() {
               ref={bellRef}
               onClick={() => setNotifAberto(!notifAberto)}
               aria-label={naoLidas.length > 0 ? `Notificações (${naoLidas.length} por ler)` : "Notificações"}
-              className="relative p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-accent transition-colors"
+              className="relative p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-accent transition-all duration-200 ease-in-out"
             >
               <Icon name="notifications" className="text-muted-foreground" />
               {naoLidas.length > 0 && (
@@ -126,12 +126,12 @@ export default function TopBar() {
             <Link
               href="/configuracoes"
               title="Configurações"
-              className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-accent transition-colors hidden sm:block"
+              className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-accent transition-all duration-200 ease-in-out hidden sm:block"
             >
               <Icon name="settings" />
             </Link>
           )}
-          <button onClick={logout} className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors" title="Sair">
+          <button onClick={logout} className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-200 ease-in-out" title="Sair">
             <Icon name="logout" />
           </button>
           <div className="h-6 w-px bg-border hidden sm:block mx-1" />
@@ -161,7 +161,7 @@ export function Breadcrumbs() {
 
   return (
     <nav className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
-      <Link href="/" className="font-medium hover:text-primary transition-colors shrink-0">Início</Link>
+      <Link href="/" className="font-medium hover:text-primary transition-all duration-200 ease-in-out shrink-0">Início</Link>
       {crumbs.map((crumb, i) => (
         <span key={i} className="flex items-center gap-1.5 min-w-0">
           <Icon name="chevron_right" className="text-[12px] shrink-0" />

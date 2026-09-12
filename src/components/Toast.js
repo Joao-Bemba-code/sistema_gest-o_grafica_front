@@ -5,10 +5,10 @@ import Icon from "./Icon";
 const ToastContext = createContext();
 
 const variants = {
-  success: { bg: "bg-primary text-primary-foreground shadow-md", icon: "check_circle" },
-  error: { bg: "bg-destructive text-destructive-foreground shadow-md", icon: "warning" },
-  warning: { bg: "bg-warning text-white shadow-md", icon: "warning" },
-  info: { bg: "bg-secondary text-secondary-foreground shadow-md", icon: "info" },
+  success: { chip: "bg-success/10 text-success", icon: "check_circle" },
+  error: { chip: "bg-error/10 text-error", icon: "warning" },
+  warning: { chip: "bg-warning/10 text-warning", icon: "warning" },
+  info: { chip: "bg-info/10 text-info", icon: "info" },
 };
 
 export function ToastProvider({ children }) {
@@ -31,14 +31,17 @@ export function ToastProvider({ children }) {
           return (
             <div
               key={toast.id}
-              className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold animate-slide-down border border-black/10 ${v.bg}`}
+              className={`pointer-events-auto flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-xs font-semibold shadow-md animate-slide-down`}
               role="alert"
             >
-              <Icon name={v.icon} className="text-lg shrink-0" />
-              <span className="flex-1 min-w-0">{toast.message}</span>
+              <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${v.chip}`}>
+                <Icon name={v.icon} className="text-base" />
+              </span>
+              <span className="flex-1 min-w-0 text-foreground">{toast.message}</span>
               <button
                 onClick={() => removeToast(toast.id)}
-                className="w-6 h-6 rounded-full flex items-center justify-center opacity-70 hover:opacity-100 hover:bg-white/10 transition-all shrink-0"
+                className="w-6 h-6 rounded-full flex items-center justify-center text-muted-foreground opacity-60 hover:opacity-100 hover:bg-muted transition-all duration-200 ease-in-out shrink-0 self-start"
+                aria-label="Fechar notificação"
               >
                 <Icon name="close" className="text-sm" />
               </button>

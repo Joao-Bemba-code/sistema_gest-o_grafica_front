@@ -94,7 +94,7 @@ export default function FilterBar({ search, onSearchChange, placeholder = "Pesqu
               key={f.value}
               type="button"
               onClick={() => onFilterChange(f.value)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors border ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-200 ease-in-out border ${
                 activeFilter === f.value
                   ? "border-primary bg-primary/10 text-primary"
                   : "border-outline-variant/30 bg-background/40 text-muted-foreground hover:border-outline-variant hover:text-foreground"
@@ -116,7 +116,7 @@ export default function FilterBar({ search, onSearchChange, placeholder = "Pesqu
         <div className="flex items-center gap-2">
           <button
             onClick={() => onSearchChange("")}
-            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-primary/10 text-primary text-[10px] font-bold hover:bg-primary/20 transition-colors"
+            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-primary/10 text-primary text-[10px] font-bold hover:bg-primary/20 transition-all duration-200 ease-in-out"
           >
             <Icon name="close" className="text-xs" /> Limpar busca
           </button>

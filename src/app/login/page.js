@@ -54,7 +54,7 @@ export default function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => { setEmail(e.target.value); setError(""); }}
-                  className="w-full pl-10 pr-3 h-11 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-all placeholder:text-muted-foreground/50"
+                  className="w-full pl-10 pr-3 h-11 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-all duration-200 ease-in-out placeholder:text-muted-foreground/50"
                   placeholder="seu.email@exemplo.com"
                   autoFocus
                 />
@@ -69,7 +69,7 @@ export default function LoginPage() {
                   type="password"
                   value={senha}
                   onChange={(e) => { setSenha(e.target.value); setError(""); }}
-                  className="w-full pl-10 pr-3 h-11 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-all placeholder:text-muted-foreground/50"
+                  className="w-full pl-10 pr-3 h-11 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-all duration-200 ease-in-out placeholder:text-muted-foreground/50"
                   placeholder="••••••••"
                 />
               </div>
@@ -85,10 +85,17 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-11 bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground text-sm font-semibold rounded-xl shadow-md transition-colors flex items-center justify-center gap-2"
+              className="w-full h-11 bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground text-sm font-semibold rounded-xl shadow-md transition-all duration-200 ease-in-out active:scale-[0.99] flex items-center justify-center gap-2"
             >
-              <Icon name="logout" className="text-base" />
-              {loading ? "A entrar..." : "Entrar"}
+              <Icon name="logout" className={loading ? "hidden" : "text-base"} />
+              {loading ? (
+                <span className="inline-flex items-center gap-2">
+                  <span className="h-4 w-4 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin" />
+                  A entrar...
+                </span>
+              ) : (
+                "Entrar"
+              )}
             </button>
           </form>
         </div>

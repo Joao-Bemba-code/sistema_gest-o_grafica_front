@@ -4,7 +4,7 @@ import { useState } from "react";
 import Icon from "@/components/Icon";
 import NumeroInput from "@/components/ui/NumeroInput";
 import { Button } from "@/components/ui/Button";
-import { inputCls, especificacoesObjeto, normalizarFamilia, dimensaoPadrao, dimensoesFolhaMaterial, dimensoesFormatoFinal, encaixeGuilhotina, calcCustoParcialFolha } from "@/lib/estoque";
+import { inputCls, especificacoesObjeto, normalizarFamilia, dimensaoPadrao, dimensoesFolhaMaterial, dimensoesFormatoFinal, encaixeGuilhotina, calcCustoParcialFolha, temComposicao, ehProduto } from "@/lib/estoque";
 
 export const formatosSugeridos = ["A3", "A4", "A5", "A6", "A7", "A8", "A9", "B4", "B5", "66x96", "70x100"];
 
@@ -15,8 +15,8 @@ const tabs = [
 ];
 
 export const blankMaterial = { material_id: "", descricao: "", unidade: "un", quantidade: "", preco_venda: 0, custo_total: 0, mover_estoque: true, usar_parcial: false, formato_final: "", largura_final: "", altura_final: "", pecas_por_folha: 1, preco_folha: 0 };
-export const blankItem = { descricao: "", quantidade: "", materiais: [{ ...blankMaterial }] };
-export const blankServico = { servico_id: "", descricao: "", mob: 1, prazoExecucao: 1, valorHora: 0, duracaoHoras: 8, total: 0 };
+export const blankItem = { descricao: "", quantidade: "", valorUnitario: 0, total: 0, materiais: [{ ...blankMaterial }] };
+export const blankServico = { servico_id: "", descricao: "", mob: 1, prazoExecucao: 1, prazoUnidade: "dias", valorHora: 0, duracaoHoras: 8, total: 0 };
 
 export const blankForm = {
   cliente_id: "",
@@ -57,8 +57,17 @@ export function recalcularItem(it) {
 
 export function recalcularServico(sv) {
   const mob = Number(sv.mob) || 1;
-  const prazo = Number(sv.prazoExecucao) || 1;
-  const duracaoHoras = prazo * 8;
+  const prazo = Number(sv.prazoExecucao) || 0;
+  const unidade = sv.prazoUnidade || "dias";
+  let duracaoHoras;
+  if (unidade === "minutos") {
+    duracaoHoras = Number((prazo / 60).toFixed(2));
+  } else if (unidade === "horas") {
+    duracaoHoras = prazo;
+  } else {
+    duracaoHoras = prazo * 8;
+  }
+  if (duracaoHoras <= 0) duracaoHoras = 8;
   const valorHora = Number(sv.valorHora) || 0;
   const total = mob * duracaoHoras * valorHora;
   return { duracaoHoras, total: Number(total.toFixed(2)) };
@@ -147,19 +156,115 @@ function Campo({ label, children, obrigatorio, full }) {
 export default function OrcamentoForm({ formId = "form-orcamento", form, setField, setForm, onSubmit, onClienteSelect, clientes = [], materiais = [], servicosCatalogo = [] }) {
   const [tab, setTab] = useState("cliente");
   const id = (sufixo) => `${formId}-${sufixo}`;
+  const produtosComposicao = materiais.filter((m) => temComposicao(m));
+  const materiaisEstoque = materiais.filter((m) => m.mover_estoque !== false);
+  const produtosArquivo = materiais.filter((m) => m.mover_estoque === false && ehProduto(m.categoria));
+
+  const materiaisDaComposicao = (produto, qtdItem) => {
+    const comp = Array.isArray(produto.composicao) ? produto.composicao : [];
+    return comp
+      .filter((c) => c.material_id)
+      .map((c) => {
+        const mat = materiais.find((m) => String(m.id) === String(c.material_id));
+        const qtdPorUnidade = Number(c.quantidade) || 1;
+        return {
+          ...blankMaterial,
+          material_id: String(c.material_id),
+          descricao: mat?.nome || mat?.nome_tecnico || "",
+          unidade: mat?.unidade || "un",
+          tipo_estoque: mat?.tipo_estoque || "",
+          formato: mat?.formato || "",
+          especificacoes: mat?.especificacoes || {},
+          categoria: mat?.categoria || null,
+          preco_venda: Number(mat?.preco_venda) || 0,
+          preco_folha: Number(mat?.preco_venda) || 0,
+          quantidade: Number((qtdPorUnidade * qtdItem).toFixed(4)),
+          usar_parcial: false,
+          mover_estoque: mat?.mover_estoque !== false,
+        };
+      });
+  };
 
   const addItem = () => setForm((p) => ({ ...p, itens: [...p.itens, { ...blankItem, materiais: [{ ...blankMaterial }] }] }));
   const removeItem = (idx) => setForm((p) => ({ ...p, itens: p.itens.filter((_, i) => i !== idx) }));
+
+  const totalQuantidadeItem = (it) => {
+    const qtd = Number(it.quantidade) || 0;
+    const preco = Number(it.valorUnitario) || 0;
+    return qtd > 0 ? Number((qtd * preco).toFixed(2)) : preco;
+  };
 
   const setItem = (idx, key, val) => {
     setForm((p) => {
       const itens = [...p.itens];
       itens[idx] = { ...itens[idx], [key]: val };
-      if (key === "quantidade") {
-        const calc = recalcularItem(itens[idx]);
-        itens[idx].valorUnitario = calc.valorUnitario;
-        itens[idx].total = calc.total;
+      if (key === "valorUnitario") {
+        itens[idx].valorUnitario = Number(val) || 0;
+        itens[idx].total = totalQuantidadeItem(itens[idx]);
+      } else if (key === "quantidade") {
+        if (itens[idx].produtoAplicado) {
+          const produto = materiais.find((m) => String(m.id) === String(itens[idx].produtoAplicado));
+          if (produto) {
+            const qtd = Number(val) || 0;
+            itens[idx].materiais = materiaisDaComposicao(produto, qtd > 0 ? qtd : 1);
+            itens[idx].valorUnitario =
+              Number(itens[idx].valorUnitario) > 0
+                ? itens[idx].valorUnitario
+                : Number(produto.preco_venda) || Number(produto.custo_unit) || 0;
+            itens[idx].total = totalQuantidadeItem(itens[idx]);
+            return { ...p, itens };
+          }
+        }
+        const temMateriais = (itens[idx].materiais || []).some((m) => m.material_id);
+        if (temMateriais) {
+          const calc = recalcularItem(itens[idx]);
+          itens[idx].valorUnitario = calc.valorUnitario;
+          itens[idx].total = calc.total;
+        } else {
+          itens[idx].total = totalQuantidadeItem(itens[idx]);
+        }
       }
+      return { ...p, itens };
+    });
+  };
+
+  const aplicarComposicao = (idx, produtoId) => {
+    setForm((p) => {
+      const produto = materiais.find((m) => String(m.id) === String(produtoId));
+      if (!produto) return p;
+      const itens = [...p.itens];
+      const it = { ...itens[idx] };
+      const qtdItem = Number(it.quantidade) || 1;
+      const novasMat = materiaisDaComposicao(produto, qtdItem);
+      if (novasMat.length === 0) return p;
+      it.materiais = novasMat;
+      it.descricao = produto.nome || produto.nome_tecnico || it.descricao;
+      it.valorUnitario = Number(produto.preco_venda) || Number(produto.custo_unit) || 0;
+      it.total = totalQuantidadeItem(it);
+      it.produtoAplicado = produto.id;
+      itens[idx] = it;
+      return { ...p, itens };
+    });
+  };
+
+  const atualizarDescricaoItem = (idx, nome) => {
+    setForm((p) => {
+      const itens = [...p.itens];
+      itens[idx] = { ...itens[idx], descricao: nome };
+      const match = produtosArquivo.find((pr) => (pr.nome || pr.nome_tecnico) === nome);
+      if (!match) {
+        itens[idx].produtoAplicado = null;
+        return { ...p, itens };
+      }
+      if (itens[idx].produtoAplicado === match.id) return { ...p, itens };
+      const it = { ...itens[idx] };
+      const qtdItem = Number(it.quantidade) || 1;
+      const comp = Array.isArray(match.composicao) ? match.composicao : [];
+      it.materiais = comp.length > 0 ? materiaisDaComposicao(match, qtdItem) : [];
+      it.valorUnitario = Number(match.preco_venda) || Number(match.custo_unit) || 0;
+      it.total = totalQuantidadeItem(it);
+      it.produtoAplicado = match.id;
+      itens[idx] = it;
       return { ...p, itens };
     });
   };
@@ -170,7 +275,7 @@ export default function OrcamentoForm({ formId = "form-orcamento", form, setFiel
       const mat = [...(itens[idx].materiais || [])];
       mat[mi] = { ...mat[mi], [key]: val };
       if (key === "material_id") {
-        const matEstoque = materiais.find((m) => String(m.id) === String(val));
+        const matEstoque = materiaisEstoque.find((m) => String(m.id) === String(val));
         if (matEstoque) {
           const dims = dimensoesFolhaMaterial(matEstoque);
           mat[mi].descricao = matEstoque.nome || matEstoque.nome_tecnico || "";
@@ -183,6 +288,7 @@ export default function OrcamentoForm({ formId = "form-orcamento", form, setFiel
           mat[mi].categoria = matEstoque.categoria || null;
           mat[mi].preco_venda = Number(matEstoque.preco_venda) || Number(matEstoque.custo_unit) || 0;
           mat[mi].preco_folha = mat[mi].preco_venda;
+          mat[mi].mover_estoque = matEstoque.mover_estoque !== false;
           mat[mi].usar_parcial = false;
           mat[mi].formato_final = "";
           mat[mi].largura_final = "";
@@ -196,7 +302,7 @@ export default function OrcamentoForm({ formId = "form-orcamento", form, setFiel
       mat[mi].custo_total = Number(custoTotalMaterial(mat[mi]).toFixed(2));
       const calcParcial = custoParcialDoMaterial(mat[mi]);
       mat[mi].pecas_por_folha = calcParcial ? calcParcial.pecas_por_folha : 1;
-      itens[idx] = { ...itens[idx], materiais: mat };
+      itens[idx] = { ...itens[idx], materiais: mat, produtoAplicado: null };
       const calc = recalcularItem(itens[idx]);
       itens[idx].valorUnitario = calc.valorUnitario;
       itens[idx].total = calc.total;
@@ -214,7 +320,7 @@ export default function OrcamentoForm({ formId = "form-orcamento", form, setFiel
   const removeMaterial = (idx, mi) =>
     setForm((p) => {
       const itens = [...p.itens];
-      itens[idx] = { ...itens[idx], materiais: (itens[idx].materiais || []).filter((_, i) => i !== mi) };
+      itens[idx] = { ...itens[idx], materiais: (itens[idx].materiais || []).filter((_, i) => i !== mi), produtoAplicado: null };
       const calc = recalcularItem(itens[idx]);
       itens[idx].valorUnitario = calc.valorUnitario;
       itens[idx].total = calc.total;
@@ -328,7 +434,22 @@ return (
                 <div className="grid grid-cols-12 gap-2 items-end">
                   <div className="col-span-12 sm:col-span-6 flex flex-col gap-1.5">
                     {idx === 0 && <span className="cyber-label">Descrição do Produto *</span>}
-                    <input required aria-required="true" value={it.descricao} onChange={(e) => setItem(idx, "descricao", e.target.value)} className={inputCls} placeholder="Ex: Caderno A5, Cartão de visita" />
+                    <input
+                      required
+                      aria-required="true"
+                      list={`${formId}-produtos-arquivo`}
+                      value={it.descricao}
+                      onChange={(e) => atualizarDescricaoItem(idx, e.target.value)}
+                      className={inputCls}
+                      placeholder={produtosArquivo.length > 0 ? "Escrever ou escolher produto pronto (Ex: Cartão de visita)..." : "Ex: Caderno A5, Cartão de visita"}
+                    />
+                    <datalist id={`${formId}-produtos-arquivo`}>
+                      {produtosArquivo.map((p) => (
+                        <option key={p.id} value={p.nome || p.nome_tecnico}>
+                          {Number(p.preco_venda) > 0 ? ` · Kz ${Number(p.preco_venda).toLocaleString("pt-AO")}` : ""}
+                        </option>
+                      ))}
+                    </datalist>
                   </div>
                   <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
                     {idx === 0 && <span className="cyber-label">Quantidade *</span>}
@@ -336,7 +457,7 @@ return (
                   </div>
                   <div className="col-span-4 sm:col-span-3 flex flex-col gap-1.5">
                     {idx === 0 && <span className="cyber-label">Preço Venda/Un.</span>}
-                    <div className="px-2.5 py-2 bg-primary/10 border border-primary/30 rounded-lg text-xs font-bold font-mono text-primary">{`Kz ${(it.valorUnitario || 0).toLocaleString("pt-AO")}`}</div>
+                    <NumeroInput value={it.valorUnitario} onChange={(e) => setItem(idx, "valorUnitario", e.target.value)} className={inputCls} placeholder="0" />
                   </div>
                   <div className="col-span-4 sm:col-span-1 flex justify-center">
                     {form.itens.length > 0 && (
@@ -348,6 +469,30 @@ return (
                 </div>
 
                 <div className="border-t border-border/40 pt-2.5 space-y-2">
+                  {produtosComposicao.length > 0 && (
+                    <div className="flex flex-col gap-1.5">
+                      <span className="cyber-label">Produto acabado (aplicar composição)</span>
+                      <select
+                        defaultValue=""
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            aplicarComposicao(idx, e.target.value);
+                            e.target.value = "";
+                          }
+                        }}
+                        className={inputCls}
+                        aria-label="Aplicar composição de produto acabado"
+                      >
+                        <option value="">— Escolher produto acabado —</option>
+                        {produtosComposicao.map((pr) => (
+                          <option key={pr.id} value={pr.id}>
+                            {pr.nome || pr.nome_tecnico}
+                            {Number(pr.preco_venda) > 0 ? ` · Kz ${Number(pr.preco_venda).toLocaleString("pt-AO")}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between">
                     <span className="cyber-label">Materiais do estoque</span>
                     <Button type="button" variant="ghost" size="sm" onClick={() => addMaterial(idx)}><Icon name="add_circle" className="text-sm" /> Adicionar material</Button>
@@ -360,7 +505,7 @@ return (
                       <div className="col-span-12 sm:col-span-4 flex flex-col gap-1.5">
                         <select value={m.material_id || ""} onChange={(e) => setItemMaterial(idx, mi, "material_id", e.target.value)} className={inputCls} aria-label="Material">
                           <option value="">Selecionar material...</option>
-                          {materiais.map((mat) => (
+                          {materiaisEstoque.map((mat) => (
                             <option key={mat.id} value={mat.id}>
                               {mat.nome || mat.nome_tecnico} — {mat.unidade || "un"}
                               {ehPapel(mat) && resumoFolha(mat) ? ` · ${resumoFolha(mat)}` : ""}
@@ -513,26 +658,33 @@ return (
                       <input value={sv.descricao} onChange={(e) => setServico(idx, "descricao", e.target.value)} className={`${inputCls} mt-1`} placeholder="Ou digite a descrição..." />
                     )}
                   </div>
-                  <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
+                  <div className="col-span-6 sm:col-span-2 flex flex-col gap-1.5">
                     {idx === 0 && <span className="cyber-label">Trabalhadores *</span>}
                     <NumeroInput required aria-required="true" value={sv.mob} onChange={(e) => setServico(idx, "mob", e.target.value)} className={inputCls} placeholder="1" />
                   </div>
-                  <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
-                    {idx === 0 && <span className="cyber-label">Prazo (dias)</span>}
-                    <NumeroInput value={sv.prazoExecucao} onChange={(e) => setServico(idx, "prazoExecucao", e.target.value)} className={inputCls} placeholder="1" />
+                  <div className="col-span-6 sm:col-span-2 flex flex-col gap-1.5">
+                    {idx === 0 && <span className="cyber-label">Prazo</span>}
+                    <div className="flex flex-col gap-1.5">
+                      <NumeroInput value={sv.prazoExecucao} onChange={(e) => setServico(idx, "prazoExecucao", e.target.value)} className={inputCls} placeholder="1" />
+                      <select value={sv.prazoUnidade || "dias"} onChange={(e) => setServico(idx, "prazoUnidade", e.target.value)} className={inputCls}>
+                        <option value="minutos">minutos</option>
+                        <option value="horas">horas</option>
+                        <option value="dias">dias</option>
+                      </select>
+                    </div>
                   </div>
-                  <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
+                  <div className="col-span-6 sm:col-span-2 flex flex-col gap-1.5">
                     {idx === 0 && <span className="cyber-label">Valor/Hora</span>}
                     <NumeroInput value={sv.valorHora} onChange={(e) => setServico(idx, "valorHora", e.target.value)} className={inputCls} placeholder="0" />
                   </div>
-                  <div className="col-span-12 sm:col-span-2 flex flex-col gap-1.5">
+                  <div className="col-span-6 sm:col-span-2 flex flex-col gap-1.5">
                     {idx === 0 && <span className="cyber-label">Total</span>}
                     <div className="px-2.5 py-2 bg-primary/10 border border-primary/30 rounded-lg text-xs font-bold font-mono text-primary">{`Kz ${(sv.total || 0).toLocaleString("pt-AO")}`}</div>
                   </div>
                 </div>
-                <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
                   <span>Trabalhadores: <strong className="text-foreground">{sv.mob || 1}</strong></span>
-                  <span>Duração: <strong className="text-foreground">{sv.duracaoHoras || 8}h</strong> ({sv.prazoExecucao || 1} dia{Number(sv.prazoExecucao) !== 1 ? "s" : ""})</span>
+                  <span>Duração: <strong className="text-foreground">{sv.duracaoHoras || 8}h</strong> ({sv.prazoExecucao || 1} {sv.prazoUnidade === "horas" ? "hora" + (Number(sv.prazoExecucao) !== 1 ? "s" : "") : sv.prazoUnidade === "minutos" ? "minuto" + (Number(sv.prazoExecucao) !== 1 ? "s" : "") : "dia" + (Number(sv.prazoExecucao) !== 1 ? "s" : "")})</span>
                   {(form.servicos || []).length > 1 && (
                     <Button type="button" variant="ghost" size="icon" onClick={() => removeServico(idx)} title="Remover serviço" className="text-error ml-auto"><Icon name="close" className="text-sm" /></Button>
                   )}

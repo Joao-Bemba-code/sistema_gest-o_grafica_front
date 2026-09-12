@@ -2,6 +2,8 @@ import { getUsuario } from "@/services/auth";
 
 export const MODULOS = [
   { valor: "comercial", label: "Área Comercial" },
+  { valor: "faturacao", label: "Facturação" },
+  { valor: "tesouraria", label: "Tesouraria" },
   { valor: "producao", label: "Produção" },
   { valor: "estoque", label: "Provisionamento" },
   { valor: "maquinas", label: "Maquinária" },
@@ -37,10 +39,11 @@ const PERMISSOES_PADRAO = {
   gestao: {
     comercial: { ver: true, criar: true, editar: true, eliminar: true, aprovar: true },
     faturacao: { ver: true, criar: true, editar: true, eliminar: true, aprovar: true },
+    tesouraria: { ver: true, criar: true, editar: true, eliminar: true, aprovar: true },
     estoque: { ver: true, criar: true, editar: true, eliminar: true, aprovar: true },
     maquinas: { ver: true, criar: true, editar: true, eliminar: true, aprovar: true },
     categorias: { ver: true, criar: true, editar: true, eliminar: true, aprovar: true },
-    producao: { ver: false, criar: false, editar: false, eliminar: false, aprovar: false },
+    producao: { ver: true, criar: false, editar: true, eliminar: false, aprovar: true },
     relatorios: { ver: false, criar: false, editar: false, eliminar: false, aprovar: false },
     configuracao: { ver: false, criar: false, editar: false, eliminar: false, aprovar: false },
     utilizadores: { ver: false, criar: false, editar: false, eliminar: false, aprovar: false },
@@ -50,6 +53,7 @@ const PERMISSOES_PADRAO = {
     maquinas: { ver: false, criar: false, editar: true, eliminar: false, aprovar: false },
     comercial: { ver: false, criar: false, editar: false, eliminar: false, aprovar: false },
     faturacao: { ver: false, criar: false, editar: false, eliminar: false, aprovar: false },
+    tesouraria: { ver: false, criar: false, editar: false, eliminar: false, aprovar: false },
     estoque: { ver: false, criar: false, editar: false, eliminar: false, aprovar: false },
     categorias: { ver: false, criar: false, editar: false, eliminar: false, aprovar: false },
     relatorios: { ver: false, criar: false, editar: false, eliminar: false, aprovar: false },
@@ -59,6 +63,7 @@ const PERMISSOES_PADRAO = {
   leitura: {
     comercial: { ver: true, criar: false, editar: false, eliminar: false, aprovar: false },
     faturacao: { ver: true, criar: false, editar: false, eliminar: false, aprovar: false },
+    tesouraria: { ver: true, criar: false, editar: false, eliminar: false, aprovar: false },
     producao: { ver: true, criar: false, editar: false, eliminar: false, aprovar: false },
     estoque: { ver: true, criar: false, editar: false, eliminar: false, aprovar: false },
     maquinas: { ver: true, criar: false, editar: false, eliminar: false, aprovar: false },

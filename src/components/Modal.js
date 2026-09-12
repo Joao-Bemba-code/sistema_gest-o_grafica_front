@@ -41,7 +41,7 @@ export default function Modal({ open, onClose, title, icon, children, size = "lg
       aria-modal="true"
       aria-labelledby={titleId}
     >
-      <div className="fixed inset-0 bg-black/60" onClick={onClose} />
+      <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] dark:bg-black/50" onClick={onClose} />
       <div className={`relative w-full obsidian-glass rounded-xl border border-outline-variant/30 shadow-md animate-[modalIn_0.2s_ease-out] ${sizes[size] || sizes.lg} max-h-[90vh] flex flex-col`}>
         <div className="flex items-center justify-between px-6 py-5 border-b border-outline-variant/20 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
@@ -56,7 +56,7 @@ export default function Modal({ open, onClose, title, icon, children, size = "lg
             ref={closeRef}
             onClick={onClose}
             aria-label="Fechar janela"
-            className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center transition-colors text-muted-foreground shrink-0"
+            className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center transition-all duration-200 ease-in-out text-muted-foreground shrink-0"
           >
             <Icon name="close" className="text-lg" />
           </button>

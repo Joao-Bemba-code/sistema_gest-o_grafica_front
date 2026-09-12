@@ -32,6 +32,7 @@ function deItem(item) {
     condicao_armazenagem: item.condicao_armazenagem || "",
     localizacao: item.localizacao || "",
     especificacoes: especificacoesObjeto(item.especificacoes),
+    composicao: Array.isArray(item.composicao) ? item.composicao : [],
   };
 }
 
@@ -72,6 +73,7 @@ export default function EditMaterialModal({ open, item, categorias, fornecedores
         fornecedores={fornecedores}
         formatos={formatos}
         materiais={materiais}
+        idMaterial={item?.id}
       />
     </Modal>
   );
