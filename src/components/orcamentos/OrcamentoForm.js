@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Icon from "@/components/Icon";
 import NumeroInput from "@/components/ui/NumeroInput";
 import { Button } from "@/components/ui/Button";
@@ -153,12 +153,22 @@ function Campo({ label, children, obrigatorio, full }) {
   );
 }
 
-export default function OrcamentoForm({ formId = "form-orcamento", form, setField, setForm, onSubmit, onClienteSelect, clientes = [], materiais = [], servicosCatalogo = [] }) {
+export default function OrcamentoForm({ formId = "form-orcamento", form, setField, setForm, onSubmit, onClienteSelect, clientes = [], materiais = [], servicosCatalogo = [], valorHoraServicos = 0 }) {
   const [tab, setTab] = useState("cliente");
   const id = (sufixo) => `${formId}-${sufixo}`;
   const produtosComposicao = materiais.filter((m) => temComposicao(m));
   const materiaisEstoque = materiais.filter((m) => m.mover_estoque !== false);
   const produtosArquivo = materiais.filter((m) => m.mover_estoque === false && ehProduto(m.categoria));
+
+  useEffect(() => {
+    const vh = Number(valorHoraServicos) || 0;
+    if (vh <= 0) return;
+    setForm((p) => ({
+      ...p,
+      servicos: (p.servicos || []).map((sv) => (!sv.valorHora ? { ...sv, valorHora: vh } : sv)),
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [valorHoraServicos]);
 
   const materiaisDaComposicao = (produto, qtdItem) => {
     const comp = Array.isArray(produto.composicao) ? produto.composicao : [];
@@ -327,7 +337,7 @@ export default function OrcamentoForm({ formId = "form-orcamento", form, setFiel
       return { ...p, itens };
     });
 
-  const addServico = () => setForm((p) => ({ ...p, servicos: [...(p.servicos || []), { ...blankServico }] }));
+  const addServico = () => setForm((p) => ({ ...p, servicos: [...(p.servicos || []), { ...blankServico, valorHora: Number(valorHoraServicos) || 0 }] }));
   const removeServico = (idx) => setForm((p) => (p.servicos.length <= 1 ? p : { ...p, servicos: p.servicos.filter((_, i) => i !== idx) }));
 
   const selecionarServico = (idx, servicoId) => {
@@ -339,6 +349,7 @@ export default function OrcamentoForm({ formId = "form-orcamento", form, setFiel
           ...servicos[idx],
           servico_id: catalogo.id,
           descricao: catalogo.nome,
+          valorHora: Number(valorHoraServicos) || Number(servicos[idx].valorHora) || 0,
         };
       } else {
         servicos[idx] = { ...servicos[idx], servico_id: "", descricao: "" };
@@ -675,7 +686,7 @@ return (
                   </div>
                   <div className="col-span-6 sm:col-span-2 flex flex-col gap-1.5">
                     {idx === 0 && <span className="cyber-label">Valor/Hora</span>}
-                    <NumeroInput value={sv.valorHora} onChange={(e) => setServico(idx, "valorHora", e.target.value)} className={inputCls} placeholder="0" />
+                    <div className="px-2.5 py-2 bg-muted border border-border/40 rounded-lg text-xs font-bold font-mono text-foreground">{`Kz ${Number(sv.valorHora || 0).toLocaleString("pt-AO")}`}</div>
                   </div>
                   <div className="col-span-6 sm:col-span-2 flex flex-col gap-1.5">
                     {idx === 0 && <span className="cyber-label">Total</span>}

@@ -1,6 +1,9 @@
 import jsPDF from "jspdf";
 import { applyPlugin } from "jspdf-autotable";
 import { formatKz, familias, normalizarFamilia, tiposItem, normalizarTipoItem, entradasEspecificacao } from "./estoque";
+import { TEMA_TABELA, formatNumero } from "./pdfEstilo";
+
+const COR_ESTOQUE = [15, 118, 110];
 
 applyPlugin(jsPDF);
 
@@ -77,6 +80,7 @@ export async function gerarRequisicaoPDF(mov, org = {}) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
   const cx = pw / 2;
+
   const mat = mov.material || {};
   const cat = mat.categoria?.nome || "—";
   const ehEntrada = mov.tipo === "entrada";
@@ -121,16 +125,12 @@ export async function gerarRequisicaoPDF(mov, org = {}) {
   doc.setLineWidth(0.6);
   doc.line(14, linhaY, pw - 14, linhaY);
 
-  const headStyles = { fillColor: [5, 150, 105], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 };
-  const bodyStyles = { fontSize: 8, textColor: [50, 50, 50] };
-
   doc.autoTable({
     startY: linhaY + 6,
     head: [["Código", "Artigo", "Categoria", "Responsável", "Autorizado por"]],
     body: [[mat.codigo || "—", mat.nome || "—", cat, mov.solicitado_por || "—", mov.permitido_por || "—"]],
-    theme: "grid", headStyles, bodyStyles,
+    ...TEMA_TABELA,
     columnStyles: { 0: { cellWidth: 24 }, 1: { cellWidth: 56 }, 2: { cellWidth: 34 }, 3: { cellWidth: 34 }, 4: { cellWidth: 34 } },
-    margin: { left: 14, right: 14 },
   });
 
   let y = doc.lastAutoTable.finalY + 8;
@@ -141,9 +141,8 @@ export async function gerarRequisicaoPDF(mov, org = {}) {
     startY: y + 2,
     head: [["ID", "Nome", "Quantidade", "Custo Unitário"]],
     body: [[mat.id ?? "—", mat.nome || "—", `${Number(mov.quantidade)} ${mat.unidade || "un"}`, custoStr]],
-    theme: "grid", headStyles, bodyStyles,
+    ...TEMA_TABELA,
     columnStyles: { 0: { cellWidth: 22 }, 1: { cellWidth: 78 }, 2: { cellWidth: 42, halign: "right" }, 3: { cellWidth: 40, halign: "right" } },
-    margin: { left: 14, right: 14 },
   });
 
   const yObs = doc.lastAutoTable.finalY + 10;
@@ -166,9 +165,6 @@ export async function gerarFichaMaterialPDF(mat, org = {}) {
   const pw = doc.internal.pageSize.getWidth();
   const cx = pw / 2;
   const { tituloY, linhaY } = await desenharCabecalho(doc, org, "Ficha do Material");
-
-  const headStyles = { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 };
-  const bodyStyles = { fontSize: 8, textColor: [50, 50, 50] };
 
   const categoria = mat.categoria?.nome || mat.categoria_nome || "—";
   const linhas = [
@@ -200,9 +196,9 @@ export async function gerarFichaMaterialPDF(mat, org = {}) {
     startY: linhaY + 6,
     head: [["Campo", "Valor"]],
     body: linhas,
-    theme: "grid", headStyles, bodyStyles,
+    ...TEMA_TABELA,
+    headStyles: { ...TEMA_TABELA.headStyles, fillColor: COR_ESTOQUE },
     columnStyles: { 0: { cellWidth: 55, fontStyle: "bold" }, 1: { cellWidth: 113 } },
-    margin: { left: 14, right: 14 },
   });
 
   const yObs = doc.lastAutoTable.finalY + 8;
@@ -227,9 +223,6 @@ export async function gerarPedidoPDF(pedido, org = {}) {
   const pw = doc.internal.pageSize.getWidth();
   const cx = pw / 2;
   const { linhaY } = await desenharCabecalho(doc, org, "Pedido de Compra");
-
-  const headStyles = { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 };
-  const bodyStyles = { fontSize: 8, textColor: [50, 50, 50] };
 
   const numero = pedido.numero || `PED-${pedido.id || ""}`;
   const data = pedido.data_pedido ? new Date(pedido.data_pedido) : null;
@@ -270,8 +263,9 @@ export async function gerarPedidoPDF(pedido, org = {}) {
       formatKz(i.total),
     ]),
     foot: [["", "", "", "", "Total", formatKz(total)]],
-    theme: "grid", headStyles, bodyStyles,
-    footStyles: { fillColor: [236, 248, 245], textColor: [15, 118, 110], fontStyle: "bold", fontSize: 9 },
+    ...TEMA_TABELA,
+    headStyles: { ...TEMA_TABELA.headStyles, fillColor: COR_ESTOQUE },
+    footStyles: { fillColor: [236, 248, 245], textColor: COR_ESTOQUE, fontStyle: "bold", fontSize: 9 },
     columnStyles: {
       0: { cellWidth: 24 },
       1: { cellWidth: 62 },
@@ -280,7 +274,6 @@ export async function gerarPedidoPDF(pedido, org = {}) {
       4: { cellWidth: 30, halign: "right" },
       5: { cellWidth: 30, halign: "right" },
     },
-    margin: { left: 14, right: 14 },
   });
 
   if (pedido.observacoes) {
@@ -328,12 +321,12 @@ export async function gerarRelatorioStockPDF(materiais = [], categorias = [], or
     body: catRows.map(([nome, d]) => [
       nome,
       String(d.itens),
-      d.qtd.toLocaleString("pt-AO"),
-      d.disponivel.toLocaleString("pt-AO"),
+      formatNumero(d.qtd),
+      formatNumero(d.disponivel),
       formatKz(d.valorTotal),
     ]),
     theme: "grid",
-    headStyles: { fillColor: [15, 118, 110], textColor: 255, fontStyle: "bold", fontSize: 8 },
+    headStyles: { fillColor: COR_ESTOQUE, textColor: 255, fontStyle: "bold", fontSize: 8 },
     bodyStyles: { fontSize: 8, textColor: [30, 30, 30] },
     alternateRowStyles: { fillColor: [240, 249, 248] },
     columnStyles: {
@@ -356,7 +349,7 @@ export async function gerarRelatorioStockPDF(materiais = [], categorias = [], or
   const ty = doc.lastAutoTable.finalY + 5;
   doc.setFontSize(8); doc.setFont("helvetica", "bold");
   doc.text("TOTAL:", 14, ty);
-  doc.text(`${totais.itens} itens | Qtd: ${totais.qtd.toLocaleString("pt-AO")} | Disp: ${totais.disp.toLocaleString("pt-AO")} | Valor: ${formatKz(totais.val)}`, 30, ty);
+  doc.text(`${totais.itens} itens | Qtd: ${formatNumero(totais.qtd)} | Disp: ${formatNumero(totais.disp)} | Valor: ${formatKz(totais.val)}`, 30, ty);
 
   y = ty + 12;
   doc.setFontSize(11); doc.setFont("helvetica", "bold");
@@ -376,15 +369,15 @@ export async function gerarRelatorioStockPDF(materiais = [], categorias = [], or
     body: materiaisSorted.map((m) => [
       m.nome || "—",
       m.categoria?.nome || "—",
-      `${Number(m.quantidade || 0).toLocaleString("pt-AO")} ${m.unidade || ""}`,
-      Number(m.estoque_min || 0).toLocaleString("pt-AO"),
-      Number(m.estoque_max || 0).toLocaleString("pt-AO"),
-      Number(m.ponto_ressuprimento || 0).toLocaleString("pt-AO"),
+      `${formatNumero(m.quantidade)} ${m.unidade || ""}`,
+      formatNumero(m.estoque_min),
+      formatNumero(m.estoque_max),
+      formatNumero(m.ponto_ressuprimento),
       m.custo_unit > 0 ? formatKz(m.custo_unit) : "—",
       m.status === "esgotado" ? "Esgotado" : m.status === "repor" ? "Repôr" : "Ok",
     ]),
     theme: "grid",
-    headStyles: { fillColor: [15, 118, 110], textColor: 255, fontStyle: "bold", fontSize: 7 },
+    headStyles: { fillColor: COR_ESTOQUE, textColor: 255, fontStyle: "bold", fontSize: 7 },
     bodyStyles: { fontSize: 7, textColor: [30, 30, 30] },
     alternateRowStyles: { fillColor: [240, 249, 248] },
     didParseCell(data) {
@@ -434,7 +427,7 @@ export async function gerarRelatorioCadastrosPDF(clientes = [], org = {}, filtro
         c.codigo || "—", c.nome || "—", c.empresa || "—", c.nif || "—", c.telefone || "—", c.email || "—",
       ]),
       theme: "grid",
-      headStyles: { fillColor: [15, 118, 110], textColor: 255, fontStyle: "bold", fontSize: 8 },
+      headStyles: { fillColor: COR_ESTOQUE, textColor: 255, fontStyle: "bold", fontSize: 8 },
       bodyStyles: { fontSize: 8, textColor: [30, 30, 30] },
       alternateRowStyles: { fillColor: [240, 249, 248] },
       margin: { left: 14, right: 14 },
@@ -455,7 +448,7 @@ export async function gerarRelatorioCadastrosPDF(clientes = [], org = {}, filtro
         c.codigo || "—", c.nome || "—", c.empresa || "—", c.nif || "—", c.telefone || "—", c.email || "—",
       ]),
       theme: "grid",
-      headStyles: { fillColor: [5, 150, 105], textColor: 255, fontStyle: "bold", fontSize: 8 },
+      headStyles: { fillColor: COR_ESTOQUE, textColor: 255, fontStyle: "bold", fontSize: 8 },
       bodyStyles: { fontSize: 8, textColor: [30, 30, 30] },
       alternateRowStyles: { fillColor: [236, 248, 245] },
       margin: { left: 14, right: 14 },
@@ -502,7 +495,7 @@ export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [
         c.nome || "—", (tiposItem[normalizarTipoItem(c.tipo)]?.label) || "—", c.descricao || "—", String(materiaisPorCat[c.nome] || 0),
       ]),
       theme: "grid",
-      headStyles: { fillColor: [15, 118, 110], textColor: 255, fontStyle: "bold", fontSize: 8 },
+      headStyles: { fillColor: COR_ESTOQUE, textColor: 255, fontStyle: "bold", fontSize: 8 },
       bodyStyles: { fontSize: 8, textColor: [30, 30, 30] },
       alternateRowStyles: { fillColor: [240, 249, 248] },
       margin: { left: 14, right: 14 },

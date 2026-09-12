@@ -1,21 +1,7 @@
 import jsPDF from "jspdf";
 import { applyPlugin } from "jspdf-autotable";
+import { COR_PRIMARIA, COR_TEXTO, COR_SUAVE, formatKz, formatarData, TEMA_TABELA, cabecalhoPagina, rodape } from "@/lib/pdfEstilo";
 applyPlugin(jsPDF);
-
-const COR_PRIMARIA = [5, 150, 105];
-const COR_TEXTO = [51, 65, 85];
-const COR_SUAVE = [235, 245, 240];
-
-function formatKz(v) { return `Kz ${Number(v || 0).toLocaleString("pt-AO")}`; }
-
-function formatarData(d) {
-  if (!d) return "—";
-  try {
-    return new Date(d).toLocaleDateString("pt-AO");
-  } catch {
-    return String(d);
-  }
-}
 
 function capitalize(s) {
   if (!s) return "—";
@@ -31,28 +17,10 @@ export default function gerarRelatorioTesourariaPdf(movimentos = [], empresa = {
   const totalEntradas = resumo.total_entradas ?? 0;
   const totalSaidas = resumo.total_saidas ?? 0;
 
-  doc.setFillColor(...COR_PRIMARIA);
-  doc.rect(0, 0, pw, 40, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(18);
-  doc.setFont("helvetica", "bold");
-  doc.text(empresa.nome || "SIGRAF", 14, 16);
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  const contacto = [
-    empresa.endereco || "",
-    `NIF: ${empresa.nif || "—"}  |  Tel: ${empresa.telefone || "—"}  |  Email: ${empresa.email || "—"}`,
-  ].filter(Boolean);
-  contacto.forEach((linha, i) => doc.text(linha, 14, 23 + i * 5));
-
-  doc.setFontSize(15);
-  doc.setFont("helvetica", "bold");
-  doc.text("RELATÓRIO DE TESOURARIA", pw - 14, 16, { align: "right" });
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  if (resumo.data_inicio) doc.text(`De: ${formatarData(resumo.data_inicio)}`, pw - 14, 24, { align: "right" });
-  if (resumo.data_fim) doc.text(`Até: ${formatarData(resumo.data_fim)}`, pw - 14, 30, { align: "right" });
-  doc.text("SIGRAF", pw - 14, 36, { align: "right" });
+  const direitos = [];
+  if (resumo.data_inicio) direitos.push(`De: ${formatarData(resumo.data_inicio)}`);
+  if (resumo.data_fim) direitos.push(`Até: ${formatarData(resumo.data_fim)}`);
+  cabecalhoPagina(doc, "RELATÓRIO DE TESOURARIA", empresa, direitos);
 
   let y = 50;
 
@@ -114,37 +82,25 @@ export default function gerarRelatorioTesourariaPdf(movimentos = [], empresa = {
       startY: y,
       head: [["Data", "Tipo", "Categoria", "Descrição", "Valor", "Conta", "Método", "Estado"]],
       body,
-      theme: "grid",
-      headStyles: { fillColor: COR_PRIMARIA, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 7 },
-      bodyStyles: { fontSize: 7, textColor: COR_TEXTO, cellPadding: 2 },
+      ...TEMA_TABELA,
+      headStyles: { ...TEMA_TABELA.headStyles, fontSize: 7 },
+      bodyStyles: { ...TEMA_TABELA.bodyStyles, fontSize: 7 },
       columnStyles: {
         0: { cellWidth: 20 },
         1: { cellWidth: 18 },
-        2: { cellWidth: 22 },
+        2: { cellWidth: 22, halign: "center" },
         3: { cellWidth: "auto" },
-        4: { halign: "right", fontStyle: "bold", cellWidth: 24 },
+        4: { halign: "right", fontStyle: "bold", cellWidth: 26 },
         5: { cellWidth: 20 },
         6: { cellWidth: 22 },
-        7: { cellWidth: 18 },
-      },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
-      margin: { left: 14, right: 14 },
-      didDrawPage: (data) => {
-        doc.setFontSize(7);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(160, 170, 180);
-        doc.text(`Página ${doc.internal.getNumberOfPages()}`, pw - 14, ph - 8, { align: "right" });
-        doc.text("Documento gerado por SIGRAF", 14, ph - 8);
+        7: { cellWidth: 18, halign: "center" },
       },
     });
+    rodape(doc);
   }
 
   if (!movimentos || movimentos.length === 0) {
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(160, 170, 180);
-    doc.text(`Página ${doc.internal.getNumberOfPages()}`, pw - 14, ph - 8, { align: "right" });
-    doc.text("Documento gerado por SIGRAF", 14, ph - 8);
+    rodape(doc);
   }
 
   doc.save(`Relatorio_Tesouraria_${resumo.data_inicio || ""}_${resumo.data_fim || ""}.pdf`);

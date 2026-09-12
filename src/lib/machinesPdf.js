@@ -1,10 +1,7 @@
 import jsPDF from "jspdf";
 import { applyPlugin } from "jspdf-autotable";
+import { COR_PRIMARIA, COR_TEXTO, TEMA_TABELA, rodape as rodapeGeral } from "@/lib/pdfEstilo";
 applyPlugin(jsPDF);
-
-const COR_PRIMARIA = [5, 150, 105];
-const COR_TEXTO = [51, 65, 85];
-const COR_SUAVE = [235, 245, 240];
 
 const ESTADO_LABEL = {
   operacional: "Operacional",
@@ -44,18 +41,6 @@ function cabecalho(doc, pw, empresa, titulo, subtitulo) {
   doc.line(0, 35, pw, 35);
 }
 
-function rodape(doc, pw, ph, texto) {
-  const n = doc.internal.getNumberOfPages();
-  for (let i = 1; i <= n; i++) {
-    doc.setPage(i);
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(130, 140, 150);
-    doc.text(texto || "SIGRAF — Sistema de Gestão para Indústria Gráfica", 14, ph - 7);
-    doc.text(`Página ${i} de ${n}`, pw - 14, ph - 7, { align: "right" });
-  }
-}
-
 export default function gerarRelatorioMaquinas(maquinas, ordens = [], empresa = {}) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
@@ -78,10 +63,7 @@ export default function gerarRelatorioMaquinas(maquinas, ordens = [], empresa = 
       ["Operacionais", String(operacionais)],
       ["Em manutenção / avaria", String(manutencao)],
     ],
-    theme: "grid",
-    headStyles: { fillColor: COR_PRIMARIA, textColor: 255, fontSize: 8 },
-    styles: { fontSize: 8, textColor: COR_TEXTO },
-    margin: { left: 14, right: 14 },
+    ...TEMA_TABELA,
   });
 
   // ===== Tabela de máquinas =====
@@ -100,11 +82,10 @@ export default function gerarRelatorioMaquinas(maquinas, ordens = [], empresa = 
       m.ultima_manutencao || "—",
       m.proxima_manutencao || "—",
     ]),
-    theme: "grid",
-    headStyles: { fillColor: COR_PRIMARIA, textColor: 255, fontSize: 7.5 },
-    styles: { fontSize: 7.5, textColor: COR_TEXTO },
-    alternateRowStyles: { fillColor: COR_SUAVE },
-    margin: { left: 14, right: 14 },
+    ...TEMA_TABELA,
+    headStyles: { ...TEMA_TABELA.headStyles, fontSize: 7.5 },
+    bodyStyles: { ...TEMA_TABELA.bodyStyles, fontSize: 7.5 },
+    columnStyles: { 0: { halign: "center" }, 4: { halign: "center" } },
   });
 
   // ===== Detalhe por máquina =====
@@ -158,10 +139,9 @@ export default function gerarRelatorioMaquinas(maquinas, ordens = [], empresa = 
         startY: y,
         head: [["Data", "Estado", "Motivo", "Tempo / Técnico"]],
         body: linhasEstados,
-        theme: "striped",
-        headStyles: { fillColor: [90, 110, 130], textColor: 255, fontSize: 7 },
-        styles: { fontSize: 7, textColor: COR_TEXTO },
-        margin: { left: 14, right: 14 },
+        ...TEMA_TABELA,
+        headStyles: { ...TEMA_TABELA.headStyles, fillColor: [90, 110, 130], fontSize: 7 },
+        bodyStyles: { ...TEMA_TABELA.bodyStyles, fontSize: 7 },
       });
       y = doc.lastAutoTable.finalY + 4;
     }
@@ -171,10 +151,9 @@ export default function gerarRelatorioMaquinas(maquinas, ordens = [], empresa = 
         startY: y,
         head: [["Data", "Intervenção", "Técnico", "Tipo", "Paragem"]],
         body: linhasManut,
-        theme: "striped",
-        headStyles: { fillColor: [217, 119, 6], textColor: 255, fontSize: 7 },
-        styles: { fontSize: 7, textColor: COR_TEXTO },
-        margin: { left: 14, right: 14 },
+        ...TEMA_TABELA,
+        headStyles: { ...TEMA_TABELA.headStyles, fillColor: [217, 119, 6], fontSize: 7 },
+        bodyStyles: { ...TEMA_TABELA.bodyStyles, fontSize: 7 },
       });
       y = doc.lastAutoTable.finalY + 4;
     }
@@ -185,10 +164,10 @@ export default function gerarRelatorioMaquinas(maquinas, ordens = [], empresa = 
         startY: y,
         head: [["OP", "Data", "Operador", "Produzido", "Rejeitado"]],
         body: linhasUso,
-        theme: "striped",
-        headStyles: { fillColor: [59, 130, 246], textColor: 255, fontSize: 7 },
-        styles: { fontSize: 7, textColor: COR_TEXTO },
-        margin: { left: 14, right: 14 },
+        ...TEMA_TABELA,
+        headStyles: { ...TEMA_TABELA.headStyles, fillColor: [59, 130, 246], fontSize: 7 },
+        bodyStyles: { ...TEMA_TABELA.bodyStyles, fontSize: 7 },
+        columnStyles: { 0: { halign: "center" }, 3: { halign: "center" }, 4: { halign: "center" } },
       });
       y = doc.lastAutoTable.finalY + 6;
     } else {
@@ -201,6 +180,6 @@ export default function gerarRelatorioMaquinas(maquinas, ordens = [], empresa = 
     }
   }
 
-  rodape(doc, pw, ph);
+  rodapeGeral(doc);
   doc.save(`relatorio-maquinas-${new Date().toISOString().slice(0, 10)}.pdf`);
 }

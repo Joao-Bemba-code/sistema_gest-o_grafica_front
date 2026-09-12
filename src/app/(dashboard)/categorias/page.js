@@ -9,9 +9,11 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import { ListSkeleton } from "@/components/Skeleton";
 import { inputCls, familias, familiasServico, tiposItem, normalizarFamilia, normalizarTipoItem, tipoRecursoOptions } from "@/lib/estoque";
+import NumeroInput from "@/components/ui/NumeroInput";
 import CreatableSelect from "@/components/ui/CreatableSelect";
 import { listar, criar, atualizar, remover } from "@/services/categorias";
 import { listar as listarServicos, criar as criarServico, atualizar as atualizarServico, remover as removerServico } from "@/services/servicos";
+import { buscarOrganizacao, guardarOrganizacao } from "@/services/configuracoes";
 import FilterBar, { useFilter } from "@/components/ui/FilterBar";
 
 const blankForm = { nome: "", familia: "", tipo: "Artigo / Produto", descricao: "" };
@@ -76,6 +78,8 @@ export default function CategoriasPage() {
   const [formServico, setFormServico] = useState({ nome: "", descricao: "" });
   const [salvandoServico, setSalvandoServico] = useState(false);
   const [eliminarServico, setEliminarServico] = useState(null);
+  const [valorHoraServicos, setValorHoraServicos] = useState("");
+  const [salvandoValorHora, setSalvandoValorHora] = useState(false);
 
   const tiposRegistados = useMemo(() => {
     const mapa = new Map();
@@ -187,13 +191,33 @@ export default function CategoriasPage() {
     setModalServicos(true);
     setCarregandoServicos(true);
     try {
-      const srvData = await listarServicos().catch(() => []);
+      const [srvData, orgData] = await Promise.all([
+        listarServicos().catch(() => []),
+        buscarOrganizacao().catch(() => null),
+      ]);
       const listaSrv = Array.isArray(srvData) ? srvData : srvData?.data ?? [];
       setServicos(listaSrv);
+      if (orgData && orgData.valor_hora_servicos != null) {
+        setValorHoraServicos(String(orgData.valor_hora_servicos));
+      } else {
+        setValorHoraServicos("");
+      }
     } catch {
       addToast?.("Erro ao carregar serviços", "error");
     } finally {
       setCarregandoServicos(false);
+    }
+  };
+
+  const guardarValorHoraServicos = async () => {
+    setSalvandoValorHora(true);
+    try {
+      await guardarOrganizacao({ valor_hora_servicos: Number(valorHoraServicos) || 0 });
+      addToast?.("Valor por hora guardado", "success");
+    } catch (err) {
+      addToast?.(err.response?.data?.erro || "Erro ao guardar valor por hora", "error");
+    } finally {
+      setSalvandoValorHora(false);
     }
   };
 
@@ -368,6 +392,20 @@ export default function CategoriasPage() {
         footer={<Button type="button" variant="outline" onClick={() => setModalServicos(false)}>Fechar</Button>}
       >
         <div className="space-y-4">
+          <div className="bg-muted/50 rounded-xl p-4 flex flex-col sm:flex-row gap-3 items-end">
+            <div className="flex flex-col gap-1.5 flex-1">
+              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Valor por hora dos serviços (Kz)</label>
+              <NumeroInput
+                value={valorHoraServicos}
+                onChange={(e) => setValorHoraServicos(e.target.value)}
+                className={inputCls}
+                placeholder="0"
+              />
+            </div>
+            <Button size="sm" onClick={guardarValorHoraServicos} loading={salvandoValorHora}>
+              <Icon name="save" className="text-sm" /> Guardar valor
+            </Button>
+          </div>
           <div className="flex justify-between items-center">
             <p className="text-xs text-muted-foreground">{servicos.length} serviço(s) registado(s)</p>
             <Button size="sm" onClick={abrirNovoServico}><Icon name="add" className="text-sm" /> Novo Serviço</Button>

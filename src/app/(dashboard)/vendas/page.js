@@ -21,7 +21,7 @@ import OrcamentoDetalhesModal from "@/components/vendas/OrcamentoDetalhesModal";
 import FaturaModal from "@/components/vendas/FaturaModal";
 import FaturaDetalhesModal from "@/components/vendas/FaturaDetalhesModal";
 import TesourariaTab from "@/components/vendas/TesourariaTab";
-import gerarOrcamentoPdf from "@/lib/orcamentoPdf";
+import OrcamentoPdfModal from "@/components/orcamentos/OrcamentoPdfModal";
 import gerarFaturaPdf from "@/lib/faturacaoPdf";
 
 const ESTADOS_ORC = ["pendente", "aprovado", "cancelado", "rejeitado"];
@@ -65,6 +65,7 @@ export default function AreaComercialPage() {
   const [deletando, setDeletando] = useState(false);
   const [orcForm, setOrcForm] = useState({ open: false, id: null });
   const [orcDetalhe, setOrcDetalhe] = useState(null);
+  const [pdfOrcamento, setPdfOrcamento] = useState(null);
   const [fatFormOpen, setFatFormOpen] = useState(false);
   const [fatDetalhe, setFatDetalhe] = useState(null);
   const { addToast } = useToast();
@@ -290,7 +291,7 @@ export default function AreaComercialPage() {
                         <p className="text-[10px] text-muted-foreground">{formatData(o.data)}</p>
                       </div>
                       <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); abrirEdicaoOrc(o); }} title="Editar"><Icon name="edit" className="text-[16px]" /></Button>
-                      <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); gerarOrcamentoPdf(o, empresa); }} title="Baixar PDF"><Icon name="download" className="text-[16px]" /></Button>
+                      <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setPdfOrcamento(o); }} title="Baixar PDF"><Icon name="download" className="text-[16px]" /></Button>
                       <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setEliminarItem({ ...o, _tipo: "orcamento" }); }} title="Remover"><Icon name="delete" className="text-[16px] text-destructive" /></Button>
                     </div>
                   </div>
@@ -392,6 +393,13 @@ export default function AreaComercialPage() {
         onEditar={abrirEdicaoOrc}
         onEliminar={(o) => { setOrcDetalhe(null); setEliminarItem({ ...o, _tipo: "orcamento" }); }}
         onEstado={mudarEstadoOrc}
+      />
+
+      <OrcamentoPdfModal
+        open={Boolean(pdfOrcamento)}
+        orcamento={pdfOrcamento}
+        empresa={empresa}
+        onClose={() => setPdfOrcamento(null)}
       />
 
       <FaturaModal

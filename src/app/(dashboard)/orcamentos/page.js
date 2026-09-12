@@ -16,7 +16,7 @@ import FilterBar, { useFilter } from "@/components/ui/FilterBar";
 import { entradasEspecificacao } from "@/lib/estoque";
 import { listar, remover, mudarEstado } from "@/services/orcamentos";
 import { buscarOrganizacao } from "@/services/configuracoes";
-import gerarOrcamentoPdf from "@/lib/orcamentoPdf";
+import OrcamentoPdfModal from "@/components/orcamentos/OrcamentoPdfModal";
 
 const estadoColors = {
   aprovado: "success",
@@ -163,13 +163,10 @@ export default function OrcamentosPage() {
     window.open(`https://wa.me/${tel}?text=${msg}`, "_blank", "noopener,noreferrer");
   };
 
+  const [pdfOrcamento, setPdfOrcamento] = useState(null);
+
   const handleGerarPdf = (o) => {
-    try {
-      gerarOrcamentoPdf(o, empresa);
-      addToast("PDF gerado com sucesso", "success");
-    } catch {
-      addToast("Erro ao gerar PDF", "error");
-    }
+    setPdfOrcamento(o);
   };
 
   const confirmarEliminacao = async () => {
@@ -582,6 +579,13 @@ export default function OrcamentosPage() {
         );
       })()}
 
+
+      <OrcamentoPdfModal
+        open={Boolean(pdfOrcamento)}
+        orcamento={pdfOrcamento}
+        empresa={empresa}
+        onClose={() => setPdfOrcamento(null)}
+      />
 
       <ConfirmDialog
         open={Boolean(eliminarItem)}

@@ -1,21 +1,7 @@
 import jsPDF from "jspdf";
 import { applyPlugin } from "jspdf-autotable";
+import { COR_PRIMARIA, COR_TEXTO, COR_SUAVE, formatKz, formatarData, TEMA_TABELA } from "@/lib/pdfEstilo";
 applyPlugin(jsPDF);
-
-const COR_PRIMARIA = [5, 150, 105];
-const COR_TEXTO = [51, 65, 85];
-const COR_SUAVE = [235, 245, 240];
-
-function formatKz(v) { return `Kz ${Number(v || 0).toLocaleString("pt-AO")}`; }
-
-function formatarData(d) {
-  if (!d) return "—";
-  try {
-    return new Date(d).toLocaleDateString("pt-AO");
-  } catch {
-    return String(d);
-  }
-}
 
 function tituloTipo(tipo) {
   switch (tipo) {
@@ -97,12 +83,8 @@ export default function gerarPDF(fatura, empresa = {}) {
     startY: y,
     head: [["Descrição", "Qtd", "Valor Unit.", "Total"]],
     body: (fatura.itens || []).map((it) => [it.descricao || "", String(it.quantidade), formatKz(it.preco_unit), formatKz(it.total)]),
-    theme: "grid",
-    headStyles: { fillColor: COR_PRIMARIA, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 },
-    bodyStyles: { fontSize: 8, textColor: COR_TEXTO, cellPadding: 2.5 },
+    ...TEMA_TABELA,
     columnStyles: { 1: { halign: "center" }, 2: { halign: "right" }, 3: { halign: "right", fontStyle: "bold" } },
-    alternateRowStyles: { fillColor: [248, 250, 252] },
-    margin: { left: 14, right: 14 },
   });
 
   // ===== Totais =====

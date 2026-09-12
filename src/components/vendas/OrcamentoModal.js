@@ -18,6 +18,7 @@ import { buscarPorId, criar, atualizar } from "@/services/orcamentos";
 import { listar as listarClientes } from "@/services/clientes";
 import { listar as listarMateriais } from "@/services/materiais";
 import { listar as listarServicos } from "@/services/servicos";
+import { buscarOrganizacao } from "@/services/configuracoes";
 
 function formatKz(v) {
   return `Kz ${Number(v || 0).toLocaleString("pt-AO")}`;
@@ -38,6 +39,7 @@ export default function OrcamentoModal({ open, editingId, onClose, onSaved }) {
   const [clientes, setClientes] = useState([]);
   const [materiais, setMateriais] = useState([]);
   const [servicosCatalogo, setServicosCatalogo] = useState([]);
+  const [valorHoraServicos, setValorHoraServicos] = useState(0);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [form, setForm] = useState({ ...blankForm, itens: [{ ...blankItem, materiais: [{ ...blankMaterial }] }], servicos: [{ ...blankServico }] });
@@ -49,15 +51,17 @@ export default function OrcamentoModal({ open, editingId, onClose, onSaved }) {
       setCarregando(true);
       setForm({ ...blankForm, itens: [{ ...blankItem, materiais: [{ ...blankMaterial }] }], servicos: [{ ...blankServico }] });
       try {
-        const [cliData, matData, srvData] = await Promise.all([
+        const [cliData, matData, srvData, orgData] = await Promise.all([
           listarClientes({ tipo: "cliente" }),
           listarMateriais().catch(() => []),
           listarServicos().catch(() => []),
+          buscarOrganizacao().catch(() => null),
         ]);
         if (!ativo) return;
         setClientes(Array.isArray(cliData) ? cliData : cliData?.data ?? []);
         setMateriais(Array.isArray(matData) ? matData : matData?.data ?? []);
         setServicosCatalogo(Array.isArray(srvData) ? srvData : srvData?.data ?? []);
+        setValorHoraServicos(Number(orgData?.valor_hora_servicos) || 0);
         if (editingId) {
           try {
             const o = await buscarPorId(editingId);
@@ -267,6 +271,7 @@ export default function OrcamentoModal({ open, editingId, onClose, onSaved }) {
               clientes={clientes}
               materiais={materiais}
               servicosCatalogo={servicosCatalogo}
+              valorHoraServicos={valorHoraServicos}
             />
           </div>
 

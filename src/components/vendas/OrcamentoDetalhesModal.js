@@ -1,12 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import Icon from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import Modal from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import { entradasEspecificacao } from "@/lib/estoque";
-import gerarOrcamentoPdf from "@/lib/orcamentoPdf";
+import OrcamentoPdfModal from "@/components/orcamentos/OrcamentoPdfModal";
 
 const estadoColors = {
   aprovado: "success",
@@ -24,6 +25,7 @@ function formatKz(v) {
 export default function OrcamentoDetalhesModal({ orcamento, empresa, onClose, onEditar, onEliminar, onEstado }) {
   const { addToast } = useToast();
   const o = orcamento;
+  const [pdfAberto, setPdfAberto] = useState(false);
   if (!o) return null;
 
   const handleWhatsApp = () => {
@@ -37,15 +39,11 @@ export default function OrcamentoDetalhesModal({ orcamento, empresa, onClose, on
   };
 
   const handleGerarPdf = () => {
-    try {
-      gerarOrcamentoPdf(o, empresa || {});
-      addToast("PDF gerado com sucesso", "success");
-    } catch {
-      addToast("Erro ao gerar PDF", "error");
-    }
+    setPdfAberto(true);
   };
 
   return (
+    <>
     <Modal open={Boolean(o)} onClose={onClose} title={`Detalhes — ${o.numero || o.id}`} icon="description" size="lg"
       footer={<>
         <Button variant="outline" onClick={() => onEditar(o)}><Icon name="edit" className="text-[16px]" /> Editar</Button>
@@ -243,5 +241,7 @@ export default function OrcamentoDetalhesModal({ orcamento, empresa, onClose, on
         )}
       </div>
     </Modal>
+    <OrcamentoPdfModal open={pdfAberto} orcamento={o} empresa={empresa || {}} onClose={() => setPdfAberto(false)} />
+    </>
   );
 }

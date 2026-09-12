@@ -1,24 +1,26 @@
 import jsPDF from "jspdf";
 import { applyPlugin } from "jspdf-autotable";
+import { COR_PRIMARIA, COR_TEXTO, COR_SUAVE, COR_SERVICO, formatKz, formatarData, TEMA_TABELA } from "@/lib/pdfEstilo";
 applyPlugin(jsPDF);
 
-const COR_PRIMARIA = [5, 150, 105];
-const COR_TEXTO = [51, 65, 85];
-const COR_SUAVE = [235, 245, 240];
-const COR_SERVICO = [124, 58, 237];
+const OPCOES_PADRAO = {
+  mostrarQtd: true,
+  mostrarPrecoUnit: true,
+  mostrarTotalItem: true,
+  mostrarMateriais: true,
+  mostrarMob: true,
+  mostrarPrazo: true,
+  mostrarDuracao: true,
+  mostrarValorHora: true,
+  mostrarTotalServico: true,
+};
 
-function formatKz(v) { return `Kz ${Number(v || 0).toLocaleString("pt-AO")}`; }
-
-function formatarData(d) {
-  if (!d) return "—";
-  try {
-    return new Date(d).toLocaleDateString("pt-AO");
-  } catch {
-    return String(d);
-  }
+function juntarOpcoes(opcoes) {
+  return { ...OPCOES_PADRAO, ...(opcoes || {}) };
 }
 
-export default function gerarOrcamentoPdf(orcamento, empresa = {}) {
+export default function gerarOrcamentoPdf(orcamento, empresa = {}, opcoesEntrada) {
+  const opcoes = juntarOpcoes(opcoesEntrada);
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
   const ph = doc.internal.pageSize.getHeight();
@@ -78,21 +80,34 @@ export default function gerarOrcamentoPdf(orcamento, empresa = {}) {
   if (itens.length > 0) {
     doc.setFontSize(10); doc.setFont("helvetica", "bold");
     doc.text("ARTIGOS / PRODUTOS", 14, y); y += 4;
+    const headItens = ["Artigo/Produto"];
+    const colunasItens = [];
+    if (opcoes.mostrarQtd) { headItens.push("Qtd"); colunasItens.push("qtd"); }
+    if (opcoes.mostrarPrecoUnit) { headItens.push("Preço Unit."); colunasItens.push("preco"); }
+    if (opcoes.mostrarTotalItem) { headItens.push("Total"); colunasItens.push("total"); }
+    const bodyItens = itens.map((it) => headItens.map((_, ci) => {
+      const chave = colunasItens[ci - 1] || "";
+      if (chave === "qtd") return String(it.quantidade);
+      if (chave === "preco") return formatKz(it.valorUnitario);
+      if (chave === "total") return formatKz(it.total);
+      return it.descricao || "";
+    }));
     doc.autoTable({
       startY: y,
-      head: [["Artigo/Produto", "Qtd", "Preço Unit.", "Total"]],
-      body: itens.map((it) => [it.descricao || "", String(it.quantidade), formatKz(it.valorUnitario), formatKz(it.total)]),
-      theme: "grid",
-      headStyles: { fillColor: COR_PRIMARIA, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 },
-      bodyStyles: { fontSize: 8, textColor: COR_TEXTO, cellPadding: 2.5 },
-      columnStyles: { 1: { halign: "center" }, 2: { halign: "right" }, 3: { halign: "right", fontStyle: "bold" } },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
-      margin: { left: 14, right: 14 },
+      head: [headItens],
+      body: bodyItens,
+      ...TEMA_TABELA,
+      columnStyles: colunasItens.reduce((acc, c, i) => {
+        if (c === "qtd") acc[i + 1] = { halign: "center" };
+        else if (c === "preco") acc[i + 1] = { halign: "right" };
+        else if (c === "total") acc[i + 1] = { halign: "right", fontStyle: "bold" };
+        return acc;
+      }, {}),
     });
     y = doc.lastAutoTable.finalY + 6;
 
     const itensComMaterial = itens.filter((it) => (it.materiais || []).length > 0);
-    if (itensComMaterial.length > 0) {
+    if (itensComMaterial.length > 0 && opcoes.mostrarMateriais) {
       doc.setFontSize(9); doc.setFont("helvetica", "bold");
       doc.text("Materiais", 14, y); y += 3;
       const materialRows = [];
@@ -105,12 +120,10 @@ export default function gerarOrcamentoPdf(orcamento, empresa = {}) {
         startY: y,
         head: [["Produto", "Material", "Qtd", "Valor Unit.", "Total"]],
         body: materialRows,
-        theme: "grid",
-        headStyles: { fillColor: COR_SUAVE, textColor: COR_TEXTO, fontStyle: "bold", fontSize: 7 },
-        bodyStyles: { fontSize: 7, textColor: COR_TEXTO, cellPadding: 2 },
-        columnStyles: { 2: { halign: "center" }, 3: { halign: "right" }, 4: { halign: "right", fontStyle: "bold" } },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
-        margin: { left: 14, right: 14 },
+        ...TEMA_TABELA,
+        headStyles: { ...TEMA_TABELA.headStyles, fillColor: COR_SUAVE, textColor: COR_TEXTO, fontSize: 7 },
+        bodyStyles: { fontSize: 7 },
+        columnStyles: { 0: { fontStyle: "bold" }, 2: { halign: "center" }, 3: { halign: "right" }, 4: { halign: "right", fontStyle: "bold" } },
       });
       y = doc.lastAutoTable.finalY + 6;
     }
@@ -119,28 +132,39 @@ export default function gerarOrcamentoPdf(orcamento, empresa = {}) {
   if (servicos.length > 0) {
     doc.setFontSize(10); doc.setFont("helvetica", "bold");
     doc.text("SERVIÇOS", 14, y); y += 4;
+    const headServicos = ["Descrição"];
+    const colunasServicos = [];
+    if (opcoes.mostrarMob) { headServicos.push("Trabalhadores"); colunasServicos.push("mob"); }
+    if (opcoes.mostrarPrazo) { headServicos.push("Prazo"); colunasServicos.push("prazo"); }
+    if (opcoes.mostrarDuracao) { headServicos.push("Duração"); colunasServicos.push("duracao"); }
+    if (opcoes.mostrarValorHora) { headServicos.push("Val./Hora"); colunasServicos.push("valorHora"); }
+    if (opcoes.mostrarTotalServico) { headServicos.push("Total"); colunasServicos.push("total"); }
+    const bodyServicos = servicos.map((sv) => {
+      const unidade = sv.prazoUnidade || sv.prazo_unidade || "dias";
+      const prazoLabel = unidade === "horas" ? "hora" : unidade === "minutos" ? "minuto" : "dia";
+      const plural = Number(sv.prazoExecucao) !== 1;
+      return headServicos.map((_, ci) => {
+        const chave = colunasServicos[ci - 1] || "";
+        if (chave === "mob") return String(sv.mob || 1);
+        if (chave === "prazo") return `${sv.prazoExecucao || 1} ${prazoLabel}${plural ? "s" : ""}`;
+        if (chave === "duracao") return `${sv.duracaoHoras || 8}h`;
+        if (chave === "valorHora") return formatKz(sv.valorHora);
+        if (chave === "total") return formatKz(sv.total);
+        return sv.descricao || "";
+      });
+    });
     doc.autoTable({
       startY: y,
-      head: [["Descrição", "Trabalhadores", "Prazo", "Duração", "Val./Hora", "Total"]],
-      body: servicos.map((sv) => {
-        const unidade = sv.prazoUnidade || sv.prazo_unidade || "dias";
-        const prazoLabel = unidade === "horas" ? "hora" : unidade === "minutos" ? "minuto" : "dia";
-        const plural = Number(sv.prazoExecucao) !== 1;
-        return [
-          sv.descricao || "",
-          String(sv.mob || 1),
-          `${sv.prazoExecucao || 1} ${prazoLabel}${plural ? "s" : ""}`,
-          `${sv.duracaoHoras || 8}h`,
-          formatKz(sv.valorHora),
-          formatKz(sv.total),
-        ];
-      }),
-      theme: "grid",
-      headStyles: { fillColor: COR_SERVICO, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 },
-      bodyStyles: { fontSize: 8, textColor: COR_TEXTO, cellPadding: 2.5 },
-      columnStyles: { 1: { halign: "center" }, 2: { halign: "center" }, 3: { halign: "center" }, 4: { halign: "right" }, 5: { halign: "right", fontStyle: "bold" } },
-      alternateRowStyles: { fillColor: [245, 243, 255] },
-      margin: { left: 14, right: 14 },
+      head: [headServicos],
+      body: bodyServicos,
+      ...TEMA_TABELA,
+      headStyles: { ...TEMA_TABELA.headStyles, fillColor: COR_SERVICO },
+      columnStyles: colunasServicos.reduce((acc, c, i) => {
+        if (c === "mob" || c === "prazo" || c === "duracao") acc[i + 1] = { halign: "center" };
+        else if (c === "valorHora") acc[i + 1] = { halign: "right" };
+        else if (c === "total") acc[i + 1] = { halign: "right", fontStyle: "bold" };
+        return acc;
+      }, {}),
     });
     y = doc.lastAutoTable.finalY + 8;
   }
