@@ -350,25 +350,34 @@ export default function EstoquePage() {
         </div>
       )}
 
-      <div className="bg-card border border-border rounded-xl p-5 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="font-sans text-2xl font-semibold text-foreground tracking-tight">Provisionamento</h1>
-          <p className="text-muted-foreground mt-0.5 text-xs">Gestão e controlo de stock e inventário</p>
+      <div className="relative overflow-hidden gradient-hero rounded-2xl p-5 sm:p-6 mb-6 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-5">
+        <div className="wave-overlay" aria-hidden="true" />
+        <div className="relative flex items-start gap-4">
+          <span className="chip-icon-grad w-12 h-12 rounded-xl hidden sm:flex items-center justify-center shrink-0">
+            <Icon name="inventory_2" className="text-2xl" />
+          </span>
+          <div>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h1 className="font-sans text-2xl font-semibold text-foreground tracking-tight">Provisionamento</h1>
+              <span className="pill pill-primary">
+                <Icon name="inventory" className="text-sm" /> {total} {total === 1 ? "material" : "materiais"}
+              </span>
+            </div>
+            <p className="text-muted-foreground mt-1 text-xs">Gestão e controlo de stock e inventário</p>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={abrirPedidos} className="bg-muted text-muted-foreground border border-border px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-accent hover:text-foreground transition-all text-xs font-semibold">
+        <div className="relative flex flex-wrap gap-2">
+          <button onClick={abrirPedidos} className="pill pill-muted hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors">
             <Icon name="shopping_cart" className="text-[16px]" /> Pedidos
           </button>
-          <button onClick={movs.abrir} className="bg-muted text-muted-foreground border border-border px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-accent hover:text-foreground transition-all text-xs font-semibold">
+          <button onClick={movs.abrir} className="pill pill-muted hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors">
             <Icon name="sync_alt" className="text-[16px]" /> Movimentações
           </button>
-          <button onClick={abrirConversor} className="bg-muted text-muted-foreground border border-border px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-accent hover:text-foreground transition-all text-xs font-semibold">
+          <button onClick={abrirConversor} className="pill pill-muted hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors">
             <Icon name="calculate" className="text-[16px]" /> Conversor
           </button>
-          <Link href="/estoque/novo">
-            <button className="bg-primary text-primary-foreground px-5 py-2 rounded-lg flex items-center gap-2 hover:opacity-90 transition-all text-xs font-semibold">
-              <Icon name="add" className="text-[16px]" /> Novo Material
-            </button>
+          <Link href="/estoque/novo" className="pill nav-pill hover:opacity-90 transition-opacity">
+            <Icon name="add" className="text-[16px]" /> Novo Item
           </Link>
         </div>
       </div>
@@ -376,19 +385,19 @@ export default function EstoquePage() {
       <KpiGrid totais={totais} alertas={alertas} materiais={materiais} />
 
       {alertas.length > 0 && (
-        <div className="rounded-lg border border-error/30 bg-error/5 p-4 flex items-start gap-3 mb-8">
-          <span className="w-10 h-10 shrink-0 rounded bg-error/10 flex items-center justify-center">
+        <div className="rounded-2xl border border-error/30 bg-error/5 p-4 flex items-start gap-3 mb-8">
+          <span className="w-10 h-10 shrink-0 rounded-xl bg-error/10 flex items-center justify-center border border-error/20">
             <Icon name="warning" className="text-xl text-error" />
           </span>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-error">Materiais abaixo do ponto de pedido</p>
             <div className="flex flex-wrap gap-2 mt-2">
               {alertas.map((a) => (
-                <div key={a.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-error/10 text-error text-[10px] font-mono font-bold rounded-full border border-error/20">
-                  <span>{a.nome}: {a.estoque_disponivel}/{a.ponto_ressuprimento || a.estoque_min} {a.unidade}</span>
+                <div key={a.id} className="pill text-error bg-error/10 border border-error/25">
+                  <span className="font-mono">{a.nome}: {a.estoque_disponivel}/{a.ponto_ressuprimento || a.estoque_min} {a.unidade}</span>
                   <button
                     onClick={() => abrirNovoPedido(a)}
-                    className="ml-1 px-1.5 py-0.5 rounded-full bg-error/20 hover:bg-error hover:text-white transition-colors"
+                    className="ml-1 px-2 py-0.5 rounded-full bg-error/20 hover:bg-error hover:text-white transition-colors"
                     title={`Criar pedido de compra para ${a.nome}`}
                   >
                     <Icon name="add_shopping_cart" className="text-[12px]" /> Pedir
@@ -416,7 +425,7 @@ export default function EstoquePage() {
           <button
             type="button"
             onClick={() => setSubFiltro("todas")}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${subFiltro === "todas" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-accent"}`}
+            className={`pill transition-colors ${subFiltro === "todas" ? "nav-pill" : "pill-muted hover:border-primary hover:text-primary"}`}
           >
             Todas famílias
           </button>
@@ -425,9 +434,9 @@ export default function EstoquePage() {
               key={f.value}
               type="button"
               onClick={() => setSubFiltro(f.value)}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${subFiltro === f.value ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-accent"}`}
+              className={`pill transition-colors ${subFiltro === f.value ? "nav-pill" : "pill-muted hover:border-primary hover:text-primary"}`}
             >
-              <Icon name={f.icon} className="text-sm mr-1.5 align-[-2px]" />
+              <Icon name={f.icon} className="text-sm" />
               {f.label}
             </button>
           ))}
@@ -453,11 +462,11 @@ export default function EstoquePage() {
             return (
               <section key={g.value} className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <span className={`w-10 h-10 rounded-lg flex items-center justify-center ${g.classe} border border-outline-variant/30`}>
+                  <span className={`w-10 h-10 rounded-xl flex items-center justify-center ${g.classe} border border-outline-variant/30`}>
                     <Icon name={g.icon} className="text-xl" />
                   </span>
-                  <h2 className="font-mono text-xs font-bold uppercase tracking-widest text-foreground">{g.label}</h2>
-                  <span className="text-[10px] font-mono text-on-surface-variant">
+                  <h2 className="text-sm font-semibold text-foreground tracking-tight">{g.label}</h2>
+                  <span className="pill pill-muted">
                     {itens.length} {itens.length === 1 ? "material" : "materiais"}
                   </span>
                 </div>
@@ -486,11 +495,11 @@ export default function EstoquePage() {
           {porTipo._outras.length > 0 && (
             <section className="space-y-3">
               <div className="flex items-center gap-3">
-                <span className="w-10 h-10 rounded-lg flex items-center justify-center bg-surface-variant border border-outline-variant/30">
-                  <Icon name="label" className="text-xl" />
+                <span className="w-10 h-10 rounded-xl flex items-center justify-center bg-surface-variant border border-outline-variant/30">
+                  <Icon name="label" className="text-xl text-muted-foreground" />
                 </span>
-                <h2 className="font-mono text-xs font-bold uppercase tracking-widest text-foreground">Outros tipos</h2>
-                <span className="text-[10px] font-mono text-on-surface-variant">
+                <h2 className="text-sm font-semibold text-foreground tracking-tight">Outros tipos</h2>
+                <span className="pill pill-muted">
                   {porTipo._outras.length} {porTipo._outras.length === 1 ? "material" : "materiais"}
                 </span>
               </div>
@@ -635,7 +644,7 @@ export default function EstoquePage() {
         <p className="text-sm text-muted-foreground">SIGRAF — Sistema de Gestão para Indústria Gráfica</p>
       </footer>
 
-      <FloatButton href="/estoque/novo" label="Novo Material" icon="inventory_2" />
+      <FloatButton href="/estoque/novo" label="Novo Item" icon="inventory_2" />
     </div>
   );
 }

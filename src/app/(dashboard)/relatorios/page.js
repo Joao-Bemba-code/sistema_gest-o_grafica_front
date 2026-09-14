@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Icon from "@/components/Icon";
+import { AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import KpiCard from "@/components/ui/KpiCard";
 import { Button } from "@/components/ui/Button";
@@ -41,6 +42,97 @@ function compactKz(v) {
   if (n >= 1000000) return (n / 1000000).toLocaleString("pt-PT", { maximumFractionDigits: 1 }) + "M";
   if (n >= 1000) return Math.round(n / 1000) + "k";
   return String(Math.round(n));
+}
+
+const CORES_DONUT = ["#4338ca", "#0ea5e9", "#14b8a6", "#f59e0b", "#a855f7", "#64748b"];
+
+function ChartTooltip({ active, payload, label, formato }) {
+  if (!active || !payload || payload.length === 0) return null;
+  return (
+    <div className="bg-card border border-border rounded-xl shadow-card px-3 py-2 text-xs space-y-1">
+      <p className="font-semibold text-foreground">{label}</p>
+      {payload.map((p, i) => (
+        <p key={i} className="flex items-center gap-2 text-muted-foreground">
+          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: p.color || p.payload?.fill }} />
+          <span>{p.name}:</span>
+          <span className="font-bold text-foreground font-mono">{formato ? formato(p.value) : p.value}</span>
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function CabecalhoGrafico({ icon, titulo, sub }) {
+  return (
+    <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5 border-b border-border">
+      <span className="w-8 h-8 rounded-lg bg-muted border border-border flex items-center justify-center shrink-0">
+        <Icon name={icon} className="text-lg text-foreground" />
+      </span>
+      <div className="min-w-0">
+        <h3 className="text-sm font-semibold text-foreground tracking-tight truncate">{titulo}</h3>
+        {sub && <p className="text-[10px] text-muted-foreground truncate">{sub}</p>}
+      </div>
+    </div>
+  );
+}
+
+function CartaoGrafico({ icon, titulo, sub, children, className = "" }) {
+  return (
+    <section className={`rounded-2xl bg-card border border-border shadow-card overflow-hidden ${className}`}>
+      <CabecalhoGrafico icon={icon} titulo={titulo} sub={sub} />
+      <div className="p-4 sm:p-5">{children}</div>
+    </section>
+  );
+}
+
+function AreaGrafico({ dados, serie, nome, cor, formato, xKey = "label" }) {
+  const gradId = `grad-${serie}`;
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <AreaChart data={dados} margin={{ top: 10, right: 10, left: -14, bottom: 0 }}>
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={cor} stopOpacity={0.35} />
+            <stop offset="100%" stopColor={cor} stopOpacity={0.02} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.25} />
+        <XAxis dataKey={xKey} tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 11 }} dy={4} />
+        <YAxis tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 11 }} width={52} tickFormatter={formato} allowDecimals={false} />
+        <Tooltip content={<ChartTooltip formato={formato} />} />
+        <Area type="monotone" dataKey="valor" name={nome} stroke={cor} strokeWidth={2.5} fill={`url(#${gradId})`} activeDot={{ r: 4 }} />
+      </AreaChart>
+    </ResponsiveContainer>
+  );
+}
+
+function DonutGrafico({ dados, centro, tooltipFormat }) {
+  return (
+    <div className="relative h-52">
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart>
+          <Tooltip content={<ChartTooltip formato={tooltipFormat} />} />
+          <Pie data={dados} dataKey="value" nameKey="name" innerRadius={60} outerRadius={84} paddingAngle={2.5} strokeWidth={0} cornerRadius={6}>
+            {dados.map((d, i) => <Cell key={i} fill={d.color} />)}
+          </Pie>
+        </PieChart>
+      </ResponsiveContainer>
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+        <span className="text-xl font-extrabold text-foreground font-mono">{centro}</span>
+        <span className="text-[9px] text-muted-foreground uppercase tracking-widest">total</span>
+      </div>
+    </div>
+  );
+}
+
+function LinhaDonut({ cor, nome, valor }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: cor }} />
+      <span className="flex-1 min-w-0 text-sm text-foreground truncate">{nome}</span>
+      <span className="font-mono font-bold text-sm text-foreground">{valor}</span>
+    </div>
+  );
 }
 
 export default function RelatoriosPage() {
@@ -104,8 +196,6 @@ export default function RelatoriosPage() {
     return counts;
   }, [faturas, ultimosMeses]);
 
-  const maxValor = useMemo(() => Math.max(...vendasPorMes.map(v => v.valor), 1), [vendasPorMes]);
-
   const recebidoPorMes = useMemo(() => {
     const hoje = new Date();
     const mesesIndices = ultimosMeses.map((m) => m.mes);
@@ -122,8 +212,6 @@ export default function RelatoriosPage() {
     });
     return counts;
   }, [faturas, ultimosMeses]);
-
-  const maxRecebido = useMemo(() => Math.max(...recebidoPorMes.map(v => v.valor), 1), [recebidoPorMes]);
 
   const recebidoHoje = useMemo(() => {
     const hoje = new Date().toISOString().split("T")[0];
@@ -209,25 +297,27 @@ export default function RelatoriosPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="flex items-center gap-4">
+        <span className="w-12 h-12 rounded-2xl bg-card border border-border shadow-card flex items-center justify-center hidden sm:flex shrink-0">
+          <Icon name="query_stats" className="text-2xl text-primary" />
+        </span>
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Relatórios</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Relatórios</h1>
           <p className="text-sm text-muted-foreground">Visão geral do desempenho da produção</p>
         </div>
       </div>
 
-      <div className="flex gap-1.5 flex-wrap bg-muted/30 p-1 rounded-lg">
+      <div className="flex gap-2 flex-wrap">
         {abas.map((a) => (
-          <Button
+          <button
             key={a.key}
-            variant={aba === a.key ? "default" : "ghost"}
-            size="sm"
+            type="button"
             onClick={() => setAba(a.key)}
-            className={`gap-2 ${aba === a.key ? "" : "hover:bg-muted/50"}`}
+            className={`pill transition-colors ${aba === a.key ? "nav-pill" : "pill-muted hover:border-primary hover:text-primary"}`}
           >
             <Icon name={a.icon} className="text-base" />
             {a.label}
-          </Button>
+          </button>
         ))}
       </div>
 
@@ -246,80 +336,59 @@ export default function RelatoriosPage() {
 
           <div className="flex gap-2 flex-wrap">
             {ultimosMeses.map((m) => (
-              <Button
+              <button
                 key={m.labelCurto}
-                variant={periodo === m.labelCurto ? "default" : "outline"}
-                size="sm"
+                type="button"
                 onClick={() => setPeriodo(m.labelCurto)}
+                className={`pill transition-colors ${periodo === m.labelCurto ? "nav-pill" : "pill-muted hover:border-primary hover:text-primary"}`}
               >
                 {m.label}
-              </Button>
+              </button>
             ))}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm font-medium">Faturação Emitida</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-end gap-2 h-40">
-                  {vendasPorMes.map((v) => (
-                    <div key={v.mes} className="flex-1 flex flex-col items-center gap-1 h-full justify-end">
-                      <span className="text-xs font-medium">{v.valor > 0 ? compactKz(v.valor) : "0"}</span>
-                      <div className="w-full bg-muted rounded-sm overflow-hidden" style={{ height: `${(v.valor / maxValor) * 100}%` }}>
-                        <div className="w-full h-full bg-primary rounded-sm" style={{ height: `${(v.valor / maxValor) * 100}%` }} />
-                      </div>
-                      <span className="text-xs text-muted-foreground">{v.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <CartaoGrafico icon="receipt_long" titulo="Faturação Emitida" sub={`Total: ${fmtKz(vendasPorMes.reduce((s, v) => s + v.valor, 0))}`}>
+              <div className="h-52">
+                <AreaGrafico dados={vendasPorMes} serie="faturacao" nome="Faturação" cor="#4338ca" formato={compactKz} />
+              </div>
+            </CartaoGrafico>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm font-medium">Recebido (Faturas Pagas)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-end gap-2 h-40">
-                  {recebidoPorMes.map((v) => (
-                    <div key={v.mes} className="flex-1 flex flex-col items-center gap-1 h-full justify-end">
-                      <span className="text-xs font-medium">{v.valor > 0 ? compactKz(v.valor) : "0"}</span>
-                      <div className="w-full bg-muted rounded-sm overflow-hidden" style={{ height: `${(v.valor / maxRecebido) * 100}%` }}>
-                        <div className="w-full h-full bg-primary/70 rounded-sm" style={{ height: `${(v.valor / maxRecebido) * 100}%` }} />
-                      </div>
-                      <span className="text-xs text-muted-foreground">{v.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <CartaoGrafico icon="payments" titulo="Recebido (Faturas Pagas)" sub={`Total: ${fmtKz(recebidoPorMes.reduce((s, v) => s + v.valor, 0))}`}>
+              <div className="h-52">
+                <AreaGrafico dados={recebidoPorMes} serie="recebido" nome="Recebido" cor="#047857" formato={compactKz} />
+              </div>
+            </CartaoGrafico>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-medium">Top 5 Clientes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+            <CartaoGrafico icon="pie_chart" titulo="Faturação por Cliente" sub="Repartição dos Top 5 clientes">
+              <DonutGrafico
+                dados={clientesTop.map((c, i) => ({ ...c, color: CORES_DONUT[i % CORES_DONUT.length] }))}
+                centro={compactKz(clientesTotal)}
+                tooltipFormat={(v) => fmtKz(v)}
+              />
+            </CartaoGrafico>
+
+            <CartaoGrafico icon="workspace_premium" titulo="Top 5 Clientes" sub="Clientes com maior faturação">
+              <div className="h-full flex flex-col justify-center space-y-4">
                 {clientesTop.map((c, i) => (
                   <div key={i} className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-muted-foreground w-6">{i + 1}</span>
+                    <span className="text-sm font-mono font-bold text-muted-foreground w-5">{i + 1}</span>
                     <div className="flex-1">
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="font-medium">{c.nome}</span>
-                        <span className="font-medium">Kz {c.total.toLocaleString()}</span>
+                      <div className="flex justify-between text-sm mb-1 gap-2">
+                        <span className="font-medium truncate">{c.nome}</span>
+                        <span className="font-mono font-bold shrink-0">Kz {c.total.toLocaleString()}</span>
                       </div>
                       <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full ${c.cor}`} style={{ width: `${(c.total / clientesTotal) * 100}%` }} />
+                        <div className="h-full rounded-full" style={{ width: `${(c.total / clientesTotal) * 100}%`, background: CORES_DONUT[i % CORES_DONUT.length] }} />
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
+            </CartaoGrafico>
+          </div>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
@@ -409,71 +478,83 @@ export default function RelatoriosPage() {
         </>
       )}
 
-      {aba === "producao" && (
-        <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {opsPorStatus.map((s) => (
-              <Card key={s.status}>
-                <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-semibold">{s.quantidade}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+      {aba === "producao" && (() => {
+        const statusCores = { aguardando: "#f59e0b", em_producao: "#4338ca", finalizado: "#047857", entregue: "#a855f7" };
+        const totalOrdens = opsPorStatus.reduce((t, x) => t + x.quantidade, 0) || 1;
+        const donutsStatus = opsPorStatus.map((s) => ({ name: s.label, value: s.quantidade, color: statusCores[s.status] }));
+        const desempenhoMeses = ultimosMeses.map((m) => ({
+          label: m.label,
+          valor: (producaoPorMes[m.mes] || { produzidas: 0 }).produzidas,
+          entregues: (producaoPorMes[m.mes] || { entregues: 0 }).entregues,
+        }));
+        return (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {opsPorStatus.map((s) => (
+                <Card key={s.status}>
+                  <CardContent className="p-4 text-center">
+                    <p className="text-2xl font-semibold">{s.quantidade}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
 
-          <div className="w-full h-2 bg-muted rounded-full overflow-hidden flex">
-            {opsPorStatus.map((s) => {
-              const total = opsPorStatus.reduce((t, x) => t + x.quantidade, 0) || 1;
-              const pct = (s.quantidade / total) * 100;
-              const cores = { aguardando: "bg-amber-400", em_producao: "bg-primary", finalizado: "bg-emerald-400", entregue: "bg-purple-400" };
-              return pct > 0 ? <div key={s.status} className={`h-full ${cores[s.status]}`} style={{ width: `${pct}%` }} /> : null;
-            })}
-          </div>
+            <div className="w-full h-2 bg-muted rounded-full overflow-hidden flex">
+              {opsPorStatus.map((s) => {
+                const pct = (s.quantidade / totalOrdens) * 100;
+                return pct > 0 ? <div key={s.status} className="h-full" style={{ width: `${pct}%`, background: statusCores[s.status] }} /> : null;
+              })}
+            </div>
 
-          <div className="flex gap-4 flex-wrap text-xs">
-            {opsPorStatus.map((s) => {
-              const cores = { aguardando: "bg-amber-400", em_producao: "bg-primary", finalizado: "bg-emerald-400", entregue: "bg-purple-400" };
-              return (
+            <div className="flex gap-4 flex-wrap text-xs">
+              {opsPorStatus.map((s) => (
                 <div key={s.status} className="flex items-center gap-1.5">
-                  <span className={`w-2.5 h-2.5 rounded-full ${cores[s.status]}`} />
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ background: statusCores[s.status] }} />
                   <span className="text-muted-foreground">{s.label}</span>
-                  <span className="font-medium">
-                    {Math.round((s.quantidade / (opsPorStatus.reduce((t, x) => t + x.quantidade, 0) || 1)) * 100)}%
-                  </span>
+                  <span className="font-medium">{Math.round((s.quantidade / totalOrdens) * 100)}%</span>
                 </div>
-              );
-            })}
-          </div>
+              ))}
+            </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-medium">Desempenho por Período</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {ultimosMeses.map((m) => {
-                  const { produzidas, entregues, pct } = producaoPorMes[m.mes] || { produzidas: 0, entregues: 0, pct: 0 };
-                  return (
-                    <div key={m.labelCurto} className="flex items-center gap-3">
-                      <span className="text-sm font-medium text-muted-foreground w-8">{m.label}</span>
-                      <div className="flex-1">
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="text-muted-foreground">{produzidas} ordens</span>
-                          <span className="font-medium">{entregues} entregues ({pct}%)</span>
-                        </div>
-                        <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        </>
-      )}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+              <CartaoGrafico icon="pie_chart" titulo="Ordens por Estado" sub="Distribuição das ordens de produção">
+                <DonutGrafico dados={donutsStatus} centro={String(ordens.length)} tooltipFormat={(v) => `${v} ordens`} />
+                <div className="mt-3 space-y-2">
+                  {donutsStatus.map((d) => (
+                    <LinhaDonut key={d.name} cor={d.color} nome={d.name} valor={`${d.value} (${Math.round((d.value / totalOrdens) * 100)}%)`} />
+                  ))}
+                </div>
+              </CartaoGrafico>
+
+              <CartaoGrafico icon="wave" titulo="Desempenho por Período" sub="Ordens produzidas e entregues por mês">
+                <div className="h-52">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={desempenhoMeses} margin={{ top: 10, right: 10, left: -14, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="grad-produzidas" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#4338ca" stopOpacity={0.35} />
+                          <stop offset="100%" stopColor="#4338ca" stopOpacity={0.02} />
+                        </linearGradient>
+                        <linearGradient id="grad-entregues" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#047857" stopOpacity={0.3} />
+                          <stop offset="100%" stopColor="#047857" stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.25} />
+                      <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 11 }} dy={4} />
+                      <YAxis tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 11 }} width={40} allowDecimals={false} />
+                      <Tooltip content={<ChartTooltip />} />
+                      <Area type="monotone" dataKey="valor" name="Produzidas" stroke="#4338ca" strokeWidth={2.5} fill="url(#grad-produzidas)" activeDot={{ r: 4 }} />
+                      <Area type="monotone" dataKey="entregues" name="Entregues" stroke="#047857" strokeWidth={2.5} fill="url(#grad-entregues)" activeDot={{ r: 4 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </CartaoGrafico>
+            </div>
+          </>
+        );
+      })()}
 
       {aba === "provisionamento" && (() => {
         const catMap = {};
@@ -493,6 +574,12 @@ export default function RelatoriosPage() {
         const esgotados = materiais.filter((m) => m.status === "esgotado").length;
         const abaixoMin = materiais.filter((m) => m.status === "repor").length;
         const criticos = esgotados + abaixoMin;
+        const donutsCategorias = catSorted.slice(0, 6).map(([nome, d], i) => ({
+          name: nome,
+          value: d.valorTotal,
+          color: CORES_DONUT[i % CORES_DONUT.length],
+        }));
+        const donutCategoriasTotal = donutsCategorias.reduce((s, d) => s + d.value, 0);
 
         return (
           <>
@@ -503,7 +590,8 @@ export default function RelatoriosPage() {
               <KpiCard icon="warning" label="Críticos" value={`${criticos}`} />
             </div>
 
-            <Card>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+            <Card className="lg:col-span-2">
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-sm font-medium">Resumo por Categoria</CardTitle>
                 <Button size="sm" variant="outline" onClick={() => gerarRelatorioStockPDF(materiais, categorias, org)}>
@@ -553,6 +641,23 @@ export default function RelatoriosPage() {
                 </div>
               </CardContent>
             </Card>
+
+            <CartaoGrafico icon="pie_chart" titulo="Valor de Stock por Categoria" sub="Top 6 categorias por valor">
+              <DonutGrafico
+                dados={donutsCategorias}
+                centro={donutCategoriasTotal > 0 ? compactKz(donutCategoriasTotal) : "0"}
+                tooltipFormat={(v) => fmtKz(v)}
+              />
+              <div className="mt-3 space-y-2">
+                {donutsCategorias.map((d) => (
+                  <div key={d.name} className="flex items-center justify-between gap-2">
+                    <LinhaDonut cor={d.color} nome={d.name} valor="" />
+                    <span className="font-mono font-bold text-sm shrink-0">{compactKz(d.value)}</span>
+                  </div>
+                ))}
+              </div>
+            </CartaoGrafico>
+          </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Card>
@@ -605,8 +710,8 @@ export default function RelatoriosPage() {
       {aba === "recursos" && (() => {
         const materiaisPorCat = {};
         materiais.forEach((m) => {
-          const catNome = m.categoria?.nome || m.categoria_nome || "Sem categoria";
-          materiaisPorCat[catNome] = (materiaisPorCat[catNome] || 0) + 1;
+          const chave = m.categoria_id != null ? String(m.categoria_id) : `nome:${m.categoria?.nome || ""}`;
+          materiaisPorCat[chave] = (materiaisPorCat[chave] || 0) + 1;
         });
         const catMap = {};
         categorias.forEach((c) => {
@@ -614,6 +719,16 @@ export default function RelatoriosPage() {
           if (!catMap[fam]) catMap[fam] = [];
           catMap[fam].push(c);
         });
+        const contarItens = (c) => materiaisPorCat[String(c.id)] || 0;
+        const grupos = {};
+        categorias.forEach((c) => {
+          const rotulo = tiposItem[normalizarTipoItem(c.tipo)]?.label || String(c.tipo || "Outros");
+          grupos[rotulo] = (grupos[rotulo] || 0) + 1;
+        });
+        const donutsGrupos = Object.entries(grupos)
+          .sort((a, b) => b[1] - a[1])
+          .map(([name, value], i) => ({ name, value, color: CORES_DONUT[i % CORES_DONUT.length] }));
+        const totalCategorias = categorias.length || 1;
         return (
           <>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -623,56 +738,134 @@ export default function RelatoriosPage() {
               <KpiCard icon="people" label="Cadastros" value={clientes.length} />
             </div>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-medium">Categorias por Família</CardTitle>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+              <CartaoGrafico icon="pie_chart" titulo="Categorias por Grupo" sub="Distribuição do tipo de recurso">
+                <DonutGrafico dados={donutsGrupos} centro={String(categorias.length)} tooltipFormat={(v) => `${v} categorias`} />
+                <div className="mt-3 space-y-2">
+                  {donutsGrupos.map((d) => (
+                    <LinhaDonut key={d.name} cor={d.color} nome={d.name} valor={`${d.value} (${Math.round((d.value / totalCategorias) * 100)}%)`} />
+                  ))}
+                </div>
+              </CartaoGrafico>
+
+              <div className="rounded-2xl bg-card border border-border shadow-card overflow-hidden">
+                <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-border">
+                  <div className="flex items-center gap-3">
+                    <span className="w-8 h-8 rounded-lg bg-muted border border-border flex items-center justify-center">
+                      <Icon name="bar_chart" className="text-lg text-foreground" />
+                    </span>
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground tracking-tight">Itens por Família</h3>
+                      <p className="text-[10px] text-muted-foreground">Quantidade de materiais registados por família</p>
+                    </div>
+                  </div>
+                  <span className="pill pill-primary shrink-0">
+                    <Icon name="inventory_2" className="text-sm" /> {materiais.length} itens
+                  </span>
+                </div>
+                <div className="p-5 space-y-4">
+                  {Object.entries(catMap)
+                    .map(([fam, cats]) => ({
+                      fam,
+                      itens: cats.reduce((s, c) => s + contarItens(c), 0),
+                    }))
+                    .filter((f) => f.itens > 0)
+                    .sort((a, b) => b.itens - a.itens)
+                    .slice(0, 6)
+                    .map((f, i) => {
+                      const famCfg = familias[f.fam] || { label: f.fam || "Outras", icon: "label" };
+                      return (
+                        <div key={f.fam} className="flex items-center gap-3">
+                          <span className="w-8 h-8 rounded-lg bg-muted border border-border flex items-center justify-center shrink-0">
+                            <Icon name={famCfg.icon} className="text-base text-foreground" />
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex justify-between text-sm mb-1 gap-2">
+                              <span className="font-medium truncate">{famCfg.label || f.fam}</span>
+                              <span className="font-mono font-bold shrink-0">{f.itens}</span>
+                            </div>
+                            <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div className="h-full rounded-full" style={{ width: `${(f.itens / (materiais.length || 1)) * 100}%`, background: CORES_DONUT[i % CORES_DONUT.length] }} />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  {Object.entries(catMap).every(([, cats]) => cats.reduce((s, c) => s + contarItens(c), 0) === 0) && (
+                    <p className="text-center text-xs text-muted-foreground py-6">Nenhum material registado ainda</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-card border border-border rounded-2xl shadow-card overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 sm:px-6 py-5 border-b border-border">
+                <div className="flex items-center gap-3">
+                  <span className="w-10 h-10 rounded-xl bg-muted border border-border flex items-center justify-center">
+                    <Icon name="category" className="text-xl text-foreground" />
+                  </span>
+                  <div>
+                    <h3 className="text-base font-semibold text-foreground tracking-tight">Categorias por Família</h3>
+                    <p className="text-[11px] text-muted-foreground">Distribuição de categorias e itens por família</p>
+                  </div>
+                </div>
                 <Button size="sm" variant="outline" onClick={() => gerarRelatorioCategoriasPDF(categorias, materiais, org)}>
                   <Icon name="picture_as_pdf" className="text-sm" />
                   PDF
                 </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  {Object.entries(catMap).sort((a, b) => a[0].localeCompare(b[0])).map(([fam, cats]) => {
-                    const famCfg = familias[fam];
+              </div>
+              <div className="px-5 sm:px-6 py-5 space-y-5">
+                {Object.entries(catMap)
+                  .sort((a, b) => (familias[a[0]]?.label || a[0]).localeCompare(familias[b[0]]?.label || b[0]))
+                  .map(([fam, cats]) => {
+                    const famCfg = familias[fam] || { icon: "label", label: fam || "Outras", classe: "text-muted-foreground" };
+                    const totalItens = cats.reduce((s, c) => s + contarItens(c), 0);
                     return (
-                      <div key={fam}>
-                        <div className="flex items-center gap-2 mb-3">
-                          {famCfg && <Icon name={famCfg.icon} className="text-sm text-muted-foreground" />}
-                          <h3 className="text-sm font-medium uppercase tracking-wider">{famCfg?.label || fam}</h3>
-                          <span className="text-xs text-muted-foreground">({cats.length})</span>
-                        </div>
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="border-b">
-                                <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Categoria</th>
-                                <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase hidden sm:table-cell">Tipo</th>
-                                <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase hidden sm:table-cell">Descrição</th>
-                                <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Itens</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {cats.sort((a, b) => a.nome.localeCompare(b.nome)).map((c) => (
-                                <tr key={c.id} className="border-b">
-                                  <td className="px-3 py-2.5 font-medium">{c.nome}</td>
-                                  <td className="px-3 py-2.5 text-muted-foreground text-xs hidden sm:table-cell">{tiposItem[normalizarTipoItem(c.tipo)]?.label || "—"}</td>
-                                  <td className="px-3 py-2.5 text-muted-foreground text-xs hidden sm:table-cell">{c.descricao || "—"}</td>
-                                  <td className="px-3 py-2.5 text-right font-mono text-xs">{materiaisPorCat[c.nome] || 0}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
+                      <section key={fam} className="bg-card border border-border rounded-2xl overflow-hidden shadow-card">
+                        <header className="bg-muted/40 px-5 py-3.5 flex items-center justify-between gap-3 border-b border-border">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="w-10 h-10 rounded-xl bg-muted border border-border flex items-center justify-center shrink-0">
+                              <Icon name={famCfg.icon} className="text-xl text-foreground" />
+                            </span>
+                            <div className="min-w-0">
+                              <h4 className="font-semibold text-foreground tracking-tight truncate">{famCfg.label || fam}</h4>
+                              <p className="text-[11px] text-muted-foreground">{cats.length} {cats.length === 1 ? "categoria" : "categorias"}</p>
+                            </div>
+                          </div>
+                          <span className="pill pill-primary shrink-0">
+                            <Icon name="inventory_2" className="text-sm" />
+                            {totalItens} {totalItens === 1 ? "item" : "itens"}
+                          </span>
+                        </header>
+                        <ul className="divide-y divide-border">
+                          {cats
+                            .slice()
+                            .sort((a, b) => (a.subfamilia || "").localeCompare(b.subfamilia || "") || String(a.tipo || "").localeCompare(String(b.tipo || "")))
+                            .map((c) => {
+                              const grupoLabel = tiposItem[normalizarTipoItem(c.tipo)]?.label || "—";
+                              const itens = contarItens(c);
+                              return (
+                                <li key={c.id} className="px-5 py-3.5 flex flex-wrap items-center gap-x-4 gap-y-2 hover:bg-muted/30 transition-colors">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium text-foreground truncate">{c.subfamilia || "Sem subfamília"}</p>
+                                    {c.descricao && <p className="text-[11px] text-muted-foreground truncate">{c.descricao}</p>}
+                                  </div>
+                                  <span className="pill pill-outline">Grupo: {grupoLabel}</span>
+                                  <span className={`pill ${itens > 0 ? "pill-primary" : "pill-muted"}`}>
+                                    {itens} {itens === 1 ? "item" : "itens"}
+                                  </span>
+                                </li>
+                              );
+                            })}
+                        </ul>
+                      </section>
                     );
                   })}
-                  {categorias.length === 0 && (
-                    <p className="text-center py-8 text-muted-foreground text-sm">Nenhuma categoria cadastrada</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                {categorias.length === 0 && (
+                  <p className="text-center py-8 text-muted-foreground text-sm">Nenhuma categoria cadastrada</p>
+                )}
+              </div>
+            </div>
           </>
         );
       })()}

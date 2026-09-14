@@ -82,6 +82,7 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
   const id = (sufixo) => `${formId}-${sufixo}`;
   const categoria = categorias.find((c) => String(c.id) === String(form.categoria_id));
   const tipoLabel = categoria ? (tiposItem[normalizarTipoItem(categoria.tipo)]?.label || String(categoria.tipo || "")) : "";
+  const catFamiliaLabel = categoria ? (familias[normalizarFamilia(categoria.familia)]?.label || categoria.familia || "") : "";
   const camposEspec = camposDeCategoria(categoria, form.unidade);
   const ePapel = ["folha", "resma"].includes(normalizarUnidade(form.unidade));
   const unidadesDisponiveis = categoria ? unidadesParaFamilia(categoria.familia) : unidades;
@@ -114,6 +115,7 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
   })();
 
   const aoMudarCategoria = useCallback((novaCatId) => {
+    const mudou = String(novaCatId) !== String(form.categoria_id);
     onChange("categoria_id", novaCatId);
     const cat = categorias.find((c) => String(c.id) === String(novaCatId));
     if (cat) {
@@ -127,8 +129,14 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
         }
       }
       onChange("codigo", `${prefixo}-${String(maxNum + 1).padStart(4, "0")}`);
+      if (mudou) {
+        onChange("especificacoes", {
+          ...(form.especificacoes || {}),
+          subfamilia: String(cat.subfamilia || "").trim(),
+        });
+      }
     }
-  }, [categorias, materiais, onChange]);
+  }, [categorias, materiais, onChange, form]);
 
   const aoMudarEspec = (chave, valor) => {
     const especificacoes = { ...(form.especificacoes || {}) };
@@ -138,7 +146,7 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
 
   return (
     <form id={formId} onSubmit={onSubmit} className="space-y-5">
-      <div role="tablist" aria-label="Secções do material" className="flex gap-1.5 flex-wrap obsidian-glass cyber-border p-1.5 rounded-xl">
+      <div role="tablist" aria-label="Secções do material" className="flex gap-2 flex-wrap bg-muted/60 border border-border p-1.5 rounded-full">
         {tabsVisiveis.map((t) => (
           <button
             key={t.key}
@@ -148,7 +156,7 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
             aria-controls={`${formId}-painel-${t.key}`}
             id={id(`tab-${t.key}`)}
             onClick={() => setTab(t.key)}
-            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${tabAtiva === t.key ? "nav-pill shadow-none text-primary" : "text-muted-foreground hover:text-foreground"}`}
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${tabAtiva === t.key ? "nav-pill text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
           >
             <Icon name={t.icon} className="text-lg" />
             <span className="hidden sm:inline">{t.label}</span>
@@ -156,7 +164,7 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
         ))}
       </div>
 
-      <div role="tabpanel" id={`${formId}-painel-${tabAtiva}`} aria-labelledby={id(`tab-${tabAtiva}`)} className="animate-scale-in">
+      <div role="tabpanel" id={`${formId}-painel-${tabAtiva}`} aria-labelledby={id(`tab-${tabAtiva}`)} className="animate-fade-up">
         {tabAtiva === "identificacao" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Campo label="Código" obrigatorio>
@@ -175,14 +183,22 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
                 onChange={(id) => aoMudarCategoria(id)}
               />
             </Campo>
-            <Campo label="Tipo" obrigatorio>
+            <Campo label="Família">
+              <input
+                value={catFamiliaLabel}
+                readOnly
+                className={`${inputCls} bg-muted/50 cursor-not-allowed`}
+                placeholder={form.categoria_id ? "Carregando família..." : "Escolha a categoria"}
+              />
+            </Campo>
+            <Campo label="Grupo" obrigatorio>
               <input
                 required
                 aria-required="true"
                 value={tipoLabel}
                 readOnly
                 className={`${inputCls} bg-muted/50 cursor-not-allowed`}
-                placeholder={form.categoria_id ? "Carregando tipo..." : "Escolha a categoria"}
+                placeholder={form.categoria_id ? "Carregando grupo..." : "Escolha a categoria"}
               />
             </Campo>
             <Campo label="Subfamília">

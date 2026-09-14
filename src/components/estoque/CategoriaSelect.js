@@ -10,15 +10,21 @@ export default function CategoriaSelect({ value, categorias = [], onChange, plac
   const [busca, setBusca] = useState("");
   const ref = useRef(null);
 
+  const rotuloDe = (c) => {
+    const famCfg = familias[normalizarFamilia(c.familia)];
+    const tipoCfg = tiposItem[normalizarTipoItem(c.tipo)];
+    return [famCfg?.label || c.familia, c.subfamilia, tipoCfg?.label || c.tipo].filter(Boolean).join(" > ");
+  };
+
   const selecionada = categorias.find((c) => String(c.id) === String(value));
-  const textoInicial = selecionada ? selecionada.nome : "";
+  const textoInicial = selecionada
+    ? familias[normalizarFamilia(selecionada.familia)]?.label || selecionada.nome || selecionada.familia || ""
+    : "";
 
   const filtrados = categorias.filter((c) => {
     const t = busca.toLowerCase();
     if (!t) return true;
-    const familia = (() => { const f = normalizarFamilia(c.familia); return familias[f]?.label || ""; })().toLowerCase();
-    const tipo = (() => tiposItem[normalizarTipoItem(c.tipo)]?.label || String(c.tipo || "")).toLowerCase();
-    return c.nome.toLowerCase().includes(t) || familia.includes(t) || tipo.includes(t);
+    return rotuloDe(c).toLowerCase().includes(t) || String(c.nome || "").toLowerCase().includes(t);
   });
 
   const total = filtrados.length;
@@ -94,7 +100,14 @@ export default function CategoriaSelect({ value, categorias = [], onChange, plac
                   className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 transition-colors ${String(cat.id) === String(value) ? "bg-primary/10 text-primary font-semibold" : ativo === i ? "bg-accent" : ""}`}
                 >
                   {famCfg && <Icon name={famCfg.icon} className="text-sm text-primary shrink-0" />}
-                  <span className="flex-1 truncate">{cat.nome}</span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block truncate">{famCfg?.label || cat.familia || cat.nome}</span>
+                    {(cat.subfamilia || tipoLabel) && (
+                      <span className="block text-[9px] text-muted-foreground truncate">
+                        {[cat.subfamilia, tipoLabel].filter(Boolean).join(" > ")}
+                      </span>
+                    )}
+                  </span>
                   {tipoLabel && <span className="text-[9px] font-mono text-primary border border-primary/30 rounded px-1.5 py-0.5 shrink-0 bg-primary/5">{tipoLabel}</span>}
                 </button>
               </li>

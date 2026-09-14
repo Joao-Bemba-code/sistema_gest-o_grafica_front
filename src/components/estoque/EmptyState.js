@@ -39,7 +39,7 @@ export default function EmptyState({ categorias = [], fornecedores = [], temMate
   const concluidos = passos.filter((p) => p.checado(dados)).length;
 
   return (
-    <section className="obsidian-glass rounded-3xl p-8 sm:p-12 text-center max-w-3xl mx-auto animate-scale-in">
+    <section className="bg-card border border-border rounded-3xl p-8 sm:p-12 text-center max-w-3xl mx-auto shadow-card animate-fade-up">
       <div className="mx-auto w-20 h-20 rounded-3xl icon-chip flex items-center justify-center mb-5">
         <Icon name="inventory_2" className="text-4xl text-primary" />
       </div>

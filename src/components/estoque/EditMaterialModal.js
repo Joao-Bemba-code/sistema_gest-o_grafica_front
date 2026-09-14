@@ -60,7 +60,7 @@ export default function EditMaterialModal({ open, item, categorias, fornecedores
       footer={
         <>
           <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button type="submit" form="form-material" loading={submetendo}>Guardar Material</Button>
+          <Button type="submit" form="form-material" loading={submetendo}>{item ? "Guardar Alterações" : "Guardar Item"}</Button>
         </>
       }
     >

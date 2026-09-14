@@ -73,7 +73,9 @@ function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEdita
 
   return (
     <article
-      className={`relative overflow-visible obsidian-glass rounded-lg p-4 transition-all duration-300 group animate-card-in ${critico ? "border border-error/50 bg-error/5" : "cyber-border"}`}
+      className={`relative overflow-visible rounded-2xl bg-card border p-4 shadow-card transition-shadow duration-300 group animate-card-in ${
+        critico ? "border-error/50 bg-error/5 shadow-card" : "border-border hover:shadow-card-hover"
+      }`}
       style={{ "--stagger": `${Math.min(index, 14) * 60}ms` }}
     >
       {critico && <div className="absolute top-0 left-0 w-1 h-full bg-error" aria-hidden="true" />}
@@ -85,7 +87,7 @@ function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEdita
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 mb-1 min-w-0">
-              <h3 className="font-sans text-base text-on-surface tracking-wide font-medium truncate">{item.nome}</h3>
+              <h3 className="font-sans text-base text-on-surface tracking-wide font-medium truncate">{item.nome || "Item sem nome"}</h3>
               <span className={`px-1.5 py-0.5 rounded-sm border text-[9px] font-mono tracking-widest bg-surface-variant shrink-0 ${critico ? "border-error/50 text-error bg-error/10" : "border-outline-variant text-on-surface-variant"}`}>
                 {familiaCfg.label}
               </span>
@@ -214,7 +216,7 @@ function MenuItem({ icon, label, onClick }) {
 
 function MaterialCardSkeleton() {
   return (
-    <div className="obsidian-glass rounded-lg p-4 animate-pulse" aria-hidden="true">
+    <div className="bg-card border border-border rounded-2xl p-4 animate-pulse" aria-hidden="true">
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
         <div className="md:col-span-5 flex gap-4 items-center">
           <div className="w-10 h-10 rounded bg-surface-variant" />

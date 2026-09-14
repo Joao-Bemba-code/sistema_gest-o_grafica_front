@@ -35,29 +35,45 @@ export default function NovoMaterialPage() {
   const catFamiliaTexto = categoria?.familia || "";
   const catFamilia = normalizarFamilia(catFamiliaTexto);
   const catFamiliaCfg = familias[catFamilia] || { icon: "label", label: catFamiliaTexto || "" };
+  const catTipoLabel = tiposItem[normalizarTipoItem(categoria?.tipo)]?.label || "";
+  const tituloNovo = "Novo Item";
+  const guardarLabel = catTipoLabel ? `Guardar ${catTipoLabel}` : "Guardar Item";
   const custoTotal = toNum(form.custo_unit) * toNum(form.estoque_max);
   const mover = form.mover_estoque === undefined ? moverEstoqueDe(categoria) : !!form.mover_estoque;
 
   return (
     <div className="space-y-5">
-      <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="flex items-center gap-4">
+      <div className="relative overflow-hidden gradient-hero rounded-2xl p-5 sm:p-6 mb-6 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-5">
+        <div className="wave-overlay" aria-hidden="true" />
+        <div className="relative flex items-center gap-4">
           <button
             onClick={() => router.push("/estoque")}
             aria-label="Voltar ao estoque"
-            className="w-10 h-10 rounded bg-surface-variant border border-outline-variant flex items-center justify-center text-on-surface hover:border-primary hover:text-primary transition-colors shrink-0"
+            className="w-10 h-10 rounded-xl bg-card border border-border flex items-center justify-center text-muted-foreground hover:border-primary hover:text-primary transition-colors shrink-0"
           >
             <Icon name="arrow_back" className="text-xl" />
           </button>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Novo Material</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Registar novo material no inventário</p>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">{tituloNovo}</h1>
+              {catTipoLabel && (
+                <span className="pill pill-primary">
+                  <Icon name="label" className="text-sm" /> {catTipoLabel}
+                </span>
+              )}
+              {catFamiliaCfg.label && (
+                <span className="pill pill-muted">
+                  <Icon name={catFamiliaCfg.icon} className="text-sm" /> {catFamiliaCfg.label}
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">Registar novo item no inventário</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="relative flex gap-2">
           <Button variant="outline" onClick={() => router.push("/estoque")}>Cancelar</Button>
           <Button type="submit" form="form-material" loading={salvando}>
-            <Icon name="save" className="text-lg" /> Guardar Material
+            <Icon name="save" className="text-lg" /> {guardarLabel}
           </Button>
         </div>
       </div>
@@ -88,7 +104,7 @@ export default function NovoMaterialPage() {
           </div>
         </div>
 
-        <aside className="lg:col-span-1 obsidian-glass cyber-border rounded-xl p-5 lg:sticky lg:top-24 space-y-4" aria-label="Pré-visualização do material">
+        <aside className="lg:col-span-1 bg-card border border-border rounded-2xl p-5 lg:sticky lg:top-24 space-y-4 shadow-card" aria-label="Pré-visualização do material">
           <div className="flex items-center justify-between">
             <p className="cyber-label flex items-center gap-1.5">
               <Icon name="visibility" className="text-sm text-primary" /> Pré-visualização
@@ -96,7 +112,7 @@ export default function NovoMaterialPage() {
             <span className="w-2 h-2 rounded-full bg-success animate-pulse" aria-hidden="true" />
           </div>
 
-          <div className="relative w-24 h-24 rounded-2xl obsidian-glass cyber-border flex items-center justify-center mx-auto">
+          <div className="relative w-24 h-24 rounded-2xl chip-icon-grad flex items-center justify-center mx-auto">
             <Icon name={catFamiliaCfg.icon || "category"} className="text-4xl text-primary" />
             <span className="absolute -top-2 -right-2 w-6 h-6 rounded-lg bg-success flex items-center justify-center">
               <Icon name="check" className="text-sm text-on-success" />
@@ -104,15 +120,14 @@ export default function NovoMaterialPage() {
           </div>
 
           <div className="text-center">
-            <p className="text-lg font-extrabold text-foreground truncate">{form.nome || "Novo Material"}</p>
+            <p className="text-lg font-extrabold text-foreground truncate">{form.nome || "Sem nome — preencha o formulário"}</p>
             <p className="text-xs font-mono text-primary">{form.codigo || "SEM-CÓDIGO"}</p>
           </div>
 
           <div>
-            <PreviewLinha label="Categoria" valor={categoria?.nome} />
             <PreviewLinha label="Família" valor={catFamiliaCfg.label} />
-            <PreviewLinha label="Subfamília" valor={(form.especificacoes?.subfamilia || categoria?.subfamilia || "").trim()} />
-            <PreviewLinha label="Tipo" valor={tiposItem[normalizarTipoItem(categoria?.tipo)]?.label || String(categoria?.tipo || "")} />
+            <PreviewLinha label="Subfamília" valor={(form.especificacoes?.subfamilia || "").trim()} />
+            <PreviewLinha label="Grupo" valor={tiposItem[normalizarTipoItem(categoria?.tipo)]?.label || String(categoria?.tipo || "")} />
             <PreviewLinha label="Unidade" valor={form.unidade} />
             <PreviewLinha label="Mover Estoque" valor={mover ? "Sim" : "Não"} acento={mover ? "text-success" : "text-warning"} />
             {entradasEspecificacao(form.especificacoes)

@@ -570,14 +570,15 @@ input[type="radio"] {
   box-shadow: var(--shadow-card-hover);
 }
 
-/* Fundos de marca — sólidos, sem gradiente */
+/* Fundos de marca — gradiente profissional (primary → tertiary) */
 .gradient-brand {
-  background-color: var(--primary);
-  background-image: none;
+  background-image: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 55%, var(--tertiary)));
+}
+.dark .gradient-brand {
+  background-image: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 45%, var(--tertiary)));
 }
 .gradient-soft {
-  background-color: color-mix(in srgb, var(--primary) 8%, transparent);
-  background-image: none;
+  background-image: linear-gradient(135deg, color-mix(in srgb, var(--primary) 10%, transparent), color-mix(in srgb, var(--tertiary) 8%, transparent));
 }
 
 /* ==========================================================================
@@ -639,17 +640,9 @@ body {
   display: none;
 }
 
-/* Borda interna fina (kept name for compatibility — o container já usa border) */
+/* Borda interna fina (removida — usa-se apenas a borda única do container) */
 .cyber-border {
   position: relative;
-}
-.cyber-border::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  border-radius: inherit;
-  border: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
 }
 
 /* Fundo de grelha subtil (kept name for compatibility) */
@@ -661,27 +654,26 @@ body {
     linear-gradient(to bottom, color-mix(in srgb, var(--border) 45%, transparent) 1px, transparent 1px);
 }
 
-/* Telemetry sparklines (KPIs) */
+/* Telemetry sparklines (neutralizadas — sem decoração) */
 .telemetry-sparkline,
 .telemetry-sparkline-error,
 .telemetry-sparkline-secondary,
 .telemetry-sparkline-tertiary {
   width: 60px;
   height: 20px;
-  background-repeat: no-repeat;
-  background-position: center;
+  background: none;
 }
 .telemetry-sparkline {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 20'%3E%3Cpath d='M0 15 Q 10 5, 20 10 T 40 15 T 60 5' fill='none' stroke='%2380d5cb' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 20'%3E%3Cpath d='M2 15 L 58 15' fill='none' stroke='%234338ca' stroke-opacity='0.12' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 .telemetry-sparkline-error {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 20'%3E%3Cpath d='M0 5 Q 10 15, 20 10 T 40 5 T 60 15' fill='none' stroke='%23ffb4ab' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 20'%3E%3Cpath d='M2 15 L 58 15' fill='none' stroke='%234338ca' stroke-opacity='0.12' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 .telemetry-sparkline-secondary {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 20'%3E%3Cpath d='M0 15 Q 10 5, 20 10 T 40 15 T 60 5' fill='none' stroke='%23d2bbff' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 20'%3E%3Cpath d='M2 15 L 58 15' fill='none' stroke='%234338ca' stroke-opacity='0.12' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 .telemetry-sparkline-tertiary {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 20'%3E%3Cpath d='M0 15 Q 10 5, 20 10 T 40 15 T 60 5' fill='none' stroke='%237bd0ff' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 20'%3E%3Cpath d='M2 15 L 58 15' fill='none' stroke='%234338ca' stroke-opacity='0.12' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 
 /* Rótulos label (clean) */
@@ -727,12 +719,17 @@ body {
 .tab-btn.active { color: var(--primary); }
 .tab-btn.active::after { transform: scaleX(1); }
 
-/* Texto com cor primária (sem gradiente cyber) */
-.text-gradient-brand {
-  color: var(--primary);
-  background: none;
-  -webkit-background-clip: unset;
-  background-clip: unset;
+/* Texto com gradiente de marca */
+.text-gradient-brand,
+.text-gradient {
+  background-image: linear-gradient(120deg, var(--primary), color-mix(in srgb, var(--primary) 50%, var(--tertiary)));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.dark .text-gradient-brand,
+.dark .text-gradient {
+  background-image: linear-gradient(120deg, var(--primary), #a5b4fc);
 }
 
 /* ==========================================================================
@@ -754,15 +751,15 @@ body {
   background-image: none;
 }
 
-/* Texto de marca — cor primária sólida */
+/* ---- Texto de marca — gradiente ---- */
 .text-gradient {
-  color: var(--primary);
-  background: none;
-  -webkit-background-clip: unset;
-  background-clip: unset;
+  background-image: linear-gradient(120deg, var(--primary), color-mix(in srgb, var(--primary) 50%, var(--tertiary)));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 .dark .text-gradient {
-  color: var(--primary);
+  background-image: linear-gradient(120deg, var(--primary), #a5b4fc);
 }
 
 /* ---- Borda fina primária ---- */
@@ -787,16 +784,17 @@ body {
   color: var(--primary);
 }
 
-/* ---- Nav item ativo (pill sóbrio) ---- */
+/* ---- Nav item ativo (pill com gradiente de marca) ---- */
 .nav-pill {
-  border-radius: var(--radius-lg);
-  background-color: var(--primary);
+  border-radius: 999px;
+  background-image: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 55%, var(--tertiary)));
   color: var(--primary-foreground);
+  box-shadow: var(--shadow-card-hover);
 }
 .dark .nav-pill {
-  background-color: color-mix(in srgb, var(--primary) 18%, transparent);
-  color: var(--primary);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 25%, transparent);
+  background-image: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 45%, var(--tertiary)));
+  color: #ffffff;
+  box-shadow: var(--shadow-card-hover);
 }
 
 /* ---- Fundo (login / hero) — plano clean ---- */
@@ -841,4 +839,89 @@ body {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ==========================================================================
+   LAYER PROFISSIONAL — gradientes, pills e ondas (SIGRAF)
+   ========================================================================== */
+
+/* ---- Faixa (hero) com gradiente de marca subtil ---- */
+.gradient-hero {
+  background-image:
+    radial-gradient(90% 160% at 0% 0%, color-mix(in srgb, var(--primary) 14%, transparent), transparent 52%),
+    radial-gradient(70% 130% at 100% 0%, color-mix(in srgb, var(--tertiary) 12%, transparent), transparent 50%),
+    var(--card);
+  border: 1px solid var(--border);
+}
+.dark .gradient-hero {
+  background-image:
+    radial-gradient(90% 160% at 0% 0%, color-mix(in srgb, var(--primary) 18%, transparent), transparent 52%),
+    radial-gradient(70% 130% at 100% 0%, color-mix(in srgb, var(--tertiary) 16%, transparent), transparent 50%),
+    var(--card);
+}
+
+/* ---- Chip de ícone com gradiente (cabeçalhos) ---- */
+.chip-icon-grad {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.625rem;
+  background-image: linear-gradient(135deg, color-mix(in srgb, var(--primary) 14%, transparent), color-mix(in srgb, var(--tertiary) 12%, transparent));
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent);
+  color: var(--primary);
+}
+.dark .chip-icon-grad {
+  color: var(--primary);
+}
+
+/* ---- Pill (etiqueta arredondada) ---- */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.pill-primary {
+  background-image: linear-gradient(135deg, color-mix(in srgb, var(--primary) 14%, transparent), color-mix(in srgb, var(--tertiary) 12%, transparent));
+  color: var(--primary);
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent);
+}
+.pill-muted {
+  background-color: var(--muted);
+  color: var(--muted-foreground);
+  border: 1px solid var(--border);
+}
+.pill-outline {
+  background: transparent;
+  color: var(--muted-foreground);
+  border: 1px solid var(--border);
+}
+
+/* ---- Onda decorativa (base de faixas hero) ---- */
+.wave-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.wave-overlay::before {
+  content: "";
+  position: absolute;
+  left: -6%;
+  right: -6%;
+  bottom: -9px;
+  height: 22px;
+  background-repeat: repeat-x;
+  background-position: center;
+  background-size: 260px 22px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 260 22' preserveAspectRatio='none'%3E%3Cpath d='M0 14 C 32 2, 64 20, 98 14 S 162 2, 196 14 S 228 16, 260 10' fill='none' stroke='%234338ca' stroke-opacity='0.14' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.dark .wave-overlay::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 260 22' preserveAspectRatio='none'%3E%3Cpath d='M0 14 C 32 2, 64 20, 98 14 S 162 2, 196 14 S 228 16, 260 10' fill='none' stroke='%236366f1' stroke-opacity='0.24' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E");
 }

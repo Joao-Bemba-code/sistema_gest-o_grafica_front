@@ -16,7 +16,7 @@ import { listar as listarServicos, criar as criarServico, atualizar as atualizar
 import { buscarOrganizacao, guardarOrganizacao } from "@/services/configuracoes";
 import FilterBar, { useFilter } from "@/components/ui/FilterBar";
 
-const blankForm = { nome: "", familia: "", tipo: "Artigo / Produto", descricao: "" };
+const blankForm = { familia: "", subfamilia: "", tipo: "Artigo / Produto", descricao: "" };
 
 const todosFamilias = { ...familias, ...familiasServico };
 
@@ -59,6 +59,17 @@ function tipoChave(v) {
   const n = normalizarTipoItem(v);
   if (RECURSO_META[n]) return n;
   return `custom:${txt}`;
+}
+
+// Rótulo legível de uma categoria: Família › Subfamília › Grupo
+function categoriaLabel(c) {
+  const famCfg = todosFamilias[normalizarFamilia(c?.familia)];
+  const tipoCfg = tiposItem[normalizarTipoItem(c?.tipo)];
+  return [
+    famCfg?.label || c?.familia,
+    c?.subfamilia,
+    tipoCfg?.label || c?.tipo,
+  ].filter(Boolean).join(" › ");
 }
 
 export default function CategoriasPage() {
@@ -107,9 +118,21 @@ export default function CategoriasPage() {
     })),
   ], [tiposRegistados]);
 
+  const categoriasComBusca = useMemo(() => categorias.map((c) => {
+    const famCfg = todosFamilias[normalizarFamilia(c.familia)];
+    const tipoCfg = tiposItem[normalizarTipoItem(c.tipo)];
+    const buscavel = [
+      famCfg?.label || c.familia,
+      c.subfamilia,
+      tipoCfg?.label || c.tipo,
+      c.descricao,
+    ].filter(Boolean).join(" ").toLowerCase();
+    return { ...c, _busca: buscavel };
+  }), [categorias]);
+
   const { search, setSearch, activeFilter, setActiveFilter, filtered, total } = useFilter({
-    items: categorias,
-    searchFields: ["nome", "descricao"],
+    items: categoriasComBusca,
+    searchFields: ["_busca", "familia", "subfamilia", "descricao"],
     filterConfig,
   });
 
@@ -146,8 +169,8 @@ export default function CategoriasPage() {
   const abrirEdicao = (categoria) => {
     setModal({ aberto: true, id: categoria.id });
     setForm({
-      nome: categoria.nome || "",
       familia: todosFamilias[normalizarFamilia(categoria.familia)]?.label || categoria.familia || "",
+      subfamilia: categoria.subfamilia || "",
       tipo: tipoRecursoOptions.find((o) => o.valor === categoria.tipo)?.label || String(categoria.tipo || "Artigo / Produto"),
       descricao: categoria.descricao || "",
     });
@@ -155,11 +178,11 @@ export default function CategoriasPage() {
 
   const aoSubmeter = async (e) => {
     e.preventDefault();
-    if (!form.nome.trim()) return addToast?.("Informe o nome", "error");
     if (!form.familia.trim()) return addToast?.("Escolha ou crie uma família", "error");
+    if (salvando) return;
     setSalvando(true);
     try {
-      const payload = { nome: form.nome.trim(), familia: familiaParaSalvar(form.familia), tipo: tipoParaSalvar(form.tipo), descricao: form.descricao.trim() };
+      const payload = { familia: familiaParaSalvar(form.familia), subfamilia: form.subfamilia.trim(), tipo: tipoParaSalvar(form.tipo), descricao: form.descricao.trim() };
       if (modal.id) await atualizar(modal.id, payload);
       else await criar(payload);
       addToast?.(modal.id ? "Categoria atualizada" : "Categoria criada", "success");
@@ -230,6 +253,7 @@ export default function CategoriasPage() {
   const aoSubmeterServico = async (e) => {
     e.preventDefault();
     if (!formServico.nome.trim()) return addToast?.("Nome é obrigatório", "error");
+    if (salvandoServico) return;
     setSalvandoServico(true);
     try {
       const dados = { nome: formServico.nome.trim(), descricao: formServico.descricao.trim() };
@@ -279,7 +303,7 @@ export default function CategoriasPage() {
       <FilterBar
         search={search}
         onSearchChange={setSearch}
-        placeholder="Pesquisar por nome, descrição..."
+        placeholder="Pesquisar por nome, família, subfamília, grupo..."
         filters={filterConfig}
         activeFilter={activeFilter}
         onFilterChange={setActiveFilter}
@@ -315,16 +339,18 @@ export default function CategoriasPage() {
                         <Icon name={fam.icon} className="text-lg text-muted-foreground" />
                       </span>
                       <div className="min-w-0">
-                        <h3 className="font-semibold text-foreground truncate">{c.nome}</h3>
-                        {c.descricao && <p className="text-[11px] text-muted-foreground truncate">{c.descricao}</p>}
+                        <h3 className="font-semibold text-foreground truncate">{fam.label}</h3>
                       </div>
                     </div>
-                    <Badge variant="outline" className="shrink-0">{tipo.label}</Badge>
+                    <Badge variant="outline" className="shrink-0">Grupo: {tipo.label}</Badge>
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground border-t border-border pt-3">
-                    <span>Família: <strong className="text-foreground font-medium">{fam.label}</strong></span>
+                    <span>Subfamília: <strong className="text-foreground font-medium">{c.subfamilia || "—"}</strong></span>
                   </div>
+                  {c.descricao && (
+                    <p className="text-[11px] text-muted-foreground border-t border-border pt-2 line-clamp-2">{c.descricao}</p>
+                  )}
 
                   <div className="flex justify-end gap-2 pt-2 border-t border-border">
                     <Button variant="outline" size="sm" onClick={() => abrirEdicao(c)}>
@@ -350,10 +376,6 @@ export default function CategoriasPage() {
         <form id="form-categoria" onSubmit={aoSubmeter} className="space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Nome *</label>
-              <input required value={form.nome} onChange={(e) => setForm((p) => ({ ...p, nome: e.target.value }))} className={inputCls} placeholder="Ex: Papel Couché 150g" />
-            </div>
-            <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Família *</label>
               <CreatableSelect
                 required
@@ -366,13 +388,17 @@ export default function CategoriasPage() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Tipo *</label>
+              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Subfamília</label>
+              <input value={form.subfamilia} onChange={(e) => setForm((p) => ({ ...p, subfamilia: e.target.value }))} className={inputCls} placeholder="Ex: Couché, Offset..." />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Grupo *</label>
               <CreatableSelect
                 required
                 value={form.tipo}
                 options={tipoRecursoOptions.map((t) => ({ id: t.label, label: t.label }))}
-                placeholder="Escolher um tipo..."
-                createLabel="Criar novo tipo"
+                placeholder="Escolher um grupo..."
+                createLabel="Criar novo grupo"
                 onChange={(label) => setForm((p) => ({ ...p, tipo: label }))}
                 className={inputCls}
               />
@@ -386,7 +412,7 @@ export default function CategoriasPage() {
       </Modal>
 
       <ConfirmDialog open={Boolean(eliminar)} onClose={() => setEliminar(null)} onConfirm={confirmarEliminacao} loading={deletando} title="Remover categoria"
-        description={eliminar ? `Remover "${eliminar.nome}"?` : ""} />
+        description={eliminar ? `Remover a categoria "${categoriaLabel(eliminar)}"?` : ""} />
 
       <Modal open={modalServicos} onClose={() => setModalServicos(false)} title="Gerir Serviços" icon="home_repair_service" size="lg"
         footer={<Button type="button" variant="outline" onClick={() => setModalServicos(false)}>Fechar</Button>}

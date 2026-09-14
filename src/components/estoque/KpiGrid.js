@@ -10,18 +10,14 @@ const cards = [
     icon: "inventory_2",
     label: "Total de Itens",
     unit: "itens",
-    cor: "text-primary",
-    barra: "bg-primary",
-    spark: "telemetry-sparkline",
+    barra: "gradient-brand",
   },
   {
     key: "alertas",
     icon: "warning",
     label: "Alertas Críticos",
     unit: "req",
-    cor: "text-error",
     barra: "bg-error",
-    spark: "telemetry-sparkline-error",
     critico: true,
   },
   {
@@ -29,9 +25,7 @@ const cards = [
     icon: "attach_money",
     label: "Valor em Stock",
     unit: "",
-    cor: "text-secondary",
     barra: "bg-secondary",
-    spark: "telemetry-sparkline-secondary",
     prefixo: true,
   },
   {
@@ -39,33 +33,43 @@ const cards = [
     icon: "pending_actions",
     label: "Reservado (OPs)",
     unit: "un",
-    cor: "text-tertiary",
     barra: "bg-tertiary",
-    spark: "telemetry-sparkline-tertiary",
   },
 ];
 
 function KpiCard({ card, valor, barra }) {
   return (
-    <div className={`obsidian-glass rounded-lg p-5 flex flex-col gap-3 relative overflow-hidden ${card.critico ? "border border-error/30 bg-error/5" : "cyber-border"}`}>
-      <div className="flex justify-between items-start">
-        <div className="flex items-center gap-2">
-          <Icon name={card.icon} className={`${card.cor} text-[18px]`} />
-          <p className={`text-[10px] font-mono uppercase tracking-widest ${card.critico ? "text-error" : "text-on-surface-variant"}`}>{card.label}</p>
-        </div>
-        <div className={card.spark} aria-hidden="true" />
+    <div
+      className={`relative overflow-hidden rounded-2xl bg-card border p-5 flex flex-col gap-3 transition-shadow ${
+        card.critico ? "border-error/30 bg-error/5" : "border-border shadow-card hover:shadow-card-hover"
+      }`}
+    >
+      <div className="flex items-center gap-2.5 min-w-0">
+        <span
+          className={`w-9 h-9 shrink-0 rounded-lg flex items-center justify-center ${
+            card.critico ? "bg-error/10 text-error border border-error/25" : "chip-icon-grad"
+          }`}
+        >
+          <Icon name={card.icon} className="text-lg" />
+        </span>
+        <p className={`text-[11px] font-semibold uppercase tracking-wider truncate ${card.critico ? "text-error" : "text-muted-foreground"}`}>
+          {card.label}
+        </p>
       </div>
       <div>
-        <p className={`font-mono text-3xl font-bold tracking-tight ${card.critico ? "text-error" : "text-on-surface"}`}>
-          {card.prefixo && <span className={`text-sm mr-1 ${card.cor}`}>{valor.moeda}</span>}
+        <p className={`font-mono text-3xl font-bold tracking-tight ${card.critico ? "text-error" : "text-foreground"}`}>
+          {card.prefixo && <span className={`text-sm mr-1 ${card.critico ? "text-error/70" : "text-muted-foreground"}`}>{valor.moeda}</span>}
           {valor.numero}
           {card.unit && (
-            <span className={`text-xs ml-1 font-normal ${card.critico ? "text-error/60" : "text-on-surface-variant"}`}>{card.unit}</span>
+            <span className={`text-xs ml-1 font-normal ${card.critico ? "text-error/70" : "text-muted-foreground"}`}>{card.unit}</span>
           )}
         </p>
       </div>
-      <div className={`w-full h-1 mt-1 rounded-full overflow-hidden ${card.critico ? "bg-error/20" : "bg-surface-variant"}`}>
-        <div className={`${card.barra} h-full ${card.critico ? "animate-pulse" : ""}`} style={{ width: `${barra}%` }} />
+      <div className="w-full h-1.5 mt-auto rounded-full overflow-hidden bg-muted">
+        <div
+          className={`h-full rounded-full ${card.critico ? "bg-error animate-pulse" : card.barra}`}
+          style={{ width: `${barra}%` }}
+        />
       </div>
     </div>
   );

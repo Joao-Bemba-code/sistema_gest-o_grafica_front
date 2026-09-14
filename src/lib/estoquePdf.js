@@ -4,6 +4,8 @@ import { formatKz, familias, normalizarFamilia, tiposItem, normalizarTipoItem, e
 import { TEMA_TABELA, formatNumero } from "./pdfEstilo";
 
 const COR_ESTOQUE = [15, 118, 110];
+const COR_ESTOQUE_CLARO = [236, 248, 245];
+const COR_TEXTO = [30, 41, 59];
 
 applyPlugin(jsPDF);
 
@@ -74,6 +76,108 @@ async function desenharCabecalho(doc, org = {}, titulo) {
   doc.line(14, linhaY, pw - 14, linhaY);
 
   return { tituloY, linhaY, pw, box };
+}
+
+const TEMA_RELATORIO = {
+  theme: "grid",
+  headStyles: { fillColor: COR_ESTOQUE, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8, cellPadding: 2 },
+  bodyStyles: { fontSize: 8, textColor: COR_TEXTO, cellPadding: 2 },
+  alternateRowStyles: { fillColor: COR_ESTOQUE_CLARO },
+  margin: { left: 14, right: 14 },
+};
+
+// Cabeçalho dos relatórios: faixa colorida com logótipo, título e data/hora.
+async function desenharCabecalhoRelatorio(doc, org = {}, titulo) {
+  const pw = doc.internal.pageSize.getWidth();
+  const y = 10;
+  const bandX = 10;
+  const bandW = pw - 20;
+  const bandH = 20;
+  const box = 16;
+  const boxY = y + (bandH - box) / 2;
+  const logo = await carregarLogo(org);
+
+  doc.setFillColor(...COR_ESTOQUE);
+  doc.roundedRect(bandX, y, bandW, bandH, 3, 3, "F");
+
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(bandX + 3, boxY, box, box, 2, 2, "F");
+  if (logo && logo.data) {
+    const escala = Math.min(box / logo.w, box / logo.h);
+    const mmW = logo.w * escala;
+    const mmH = logo.h * escala;
+    doc.addImage(logo.data, logo.formato, bandX + 3 + (box - mmW) / 2, boxY + (box - mmH) / 2, mmW, mmH);
+  } else {
+    doc.setTextColor(...COR_ESTOQUE);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text((org.nome || "S").charAt(0).toUpperCase(), bandX + 3 + box / 2, boxY + box / 2 + 1, { align: "center" });
+  }
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text(org.nome || "SIGRAF", bandX + box + 8, y + 8.5);
+  doc.setTextColor(231, 245, 243);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text(titulo, bandX + box + 8, y + 14.5);
+
+  doc.setFontSize(7.5);
+  doc.setTextColor(230, 240, 240);
+  const infos = [`Data: ${new Date().toLocaleDateString("pt-BR")}`, `Hora: ${new Date().toLocaleTimeString("pt-BR")}`];
+  infos.forEach((linha, i) => doc.text(linha, pw - 12, y + 5 + i * 4.2, { align: "right" }));
+
+  const linhaY = y + bandH + 5;
+  return { tituloY: linhaY, linhaY, pw, box };
+}
+
+// Cartões de resumo (KPIs) sob o cabeçalho.
+function desenharKpis(doc, y, kpis) {
+  const pw = doc.internal.pageSize.getWidth();
+  const margem = 10;
+  const totalW = pw - margem * 2;
+  const gap = 4;
+  const n = Math.max(kpis.length, 1);
+  const cardW = Math.floor((totalW - gap * (n - 1)) / n);
+  const cardH = 15;
+  doc.setLineWidth(0.3);
+  kpis.forEach((k, i) => {
+    const x = margem + i * (cardW + gap);
+    doc.setFillColor(...COR_ESTOQUE_CLARO);
+    doc.setDrawColor(173, 208, 203);
+    doc.roundedRect(x, y, cardW, cardH, 2, 2, "FD");
+    doc.setFontSize(6.5);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...COR_TEXTO);
+    doc.text(String(k.label || "").toUpperCase(), x + 3, y + 5);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...COR_ESTOQUE);
+    doc.text(String(k.value), x + 3, y + 12, { maxWidth: cardW - 6 });
+  });
+  return y + cardH + 6;
+}
+
+function secaoPdf(doc, y, titulo) {
+  doc.setFontSize(10.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...COR_TEXTO);
+  doc.text(titulo, 14, y);
+  doc.setDrawColor(...COR_ESTOQUE);
+  doc.setLineWidth(0.7);
+  doc.line(14, y + 1.2, 60, y + 1.2);
+  return y + 5;
+}
+
+function rodapePdf(doc, pw) {
+  const h = doc.internal.pageSize.getHeight();
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.3);
+  doc.line(10, h - 12, pw - 10, h - 12);
+  doc.setTextColor(148, 163, 184);
+  doc.setFontSize(6.5);
+  doc.text(`Gerado por SIGRAF em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR")}`, pw / 2, h - 8, { align: "center" });
 }
 
 export async function gerarRequisicaoPDF(mov, org = {}) {
@@ -294,14 +398,8 @@ export async function gerarPedidoPDF(pedido, org = {}) {
 
 export async function gerarRelatorioStockPDF(materiais = [], categorias = [], org = {}) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const { linhaY: ly, pw } = await desenharCabecalho(doc, org, "Relatório de Stock e Categorias");
-
-  let y = ly + 8;
-
-  doc.setFontSize(11); doc.setFont("helvetica", "bold");
-  doc.setTextColor(24, 33, 48);
-  doc.text("Resumo por Categoria", 14, y);
-  y += 6;
+  const pw = doc.internal.pageSize.getWidth();
+  const { linhaY: ly } = await desenharCabecalhoRelatorio(doc, org, "Relatório de Stock e Categorias");
 
   const catMap = {};
   materiais.forEach((m) => {
@@ -314,6 +412,21 @@ export async function gerarRelatorioStockPDF(materiais = [], categorias = [], or
   });
 
   const catRows = Object.entries(catMap).sort((a, b) => b[1].valorTotal - a[1].valorTotal);
+  const totais = catRows.reduce((s, [, d]) => ({
+    itens: s.itens + d.itens,
+    qtd: s.qtd + d.qtd,
+    disp: s.disp + d.disponivel,
+    val: s.val + d.valorTotal,
+  }), { itens: 0, qtd: 0, disp: 0, val: 0 });
+
+  let y = desenharKpis(doc, ly + 3, [
+    { label: "Total de materiais", value: String(totais.itens) },
+    { label: "Qtd. em stock", value: formatNumero(totais.qtd) },
+    { label: "Disponível", value: formatNumero(totais.disp) },
+    { label: "Valor de stock", value: formatKz(totais.val) },
+  ]);
+
+  y = secaoPdf(doc, y + 2, "Resumo por Categoria");
 
   doc.autoTable({
     startY: y,
@@ -325,37 +438,20 @@ export async function gerarRelatorioStockPDF(materiais = [], categorias = [], or
       formatNumero(d.disponivel),
       formatKz(d.valorTotal),
     ]),
-    theme: "grid",
-    headStyles: { fillColor: COR_ESTOQUE, textColor: 255, fontStyle: "bold", fontSize: 8 },
-    bodyStyles: { fontSize: 8, textColor: [30, 30, 30] },
-    alternateRowStyles: { fillColor: [240, 249, 248] },
+    foot: [[{ content: "TOTAL", colSpan: 1, styles: { fontStyle: "bold" } }, { content: String(totais.itens), styles: { fontStyle: "bold", halign: "right" } }, { content: formatNumero(totais.qtd), styles: { fontStyle: "bold", halign: "right" } }, { content: formatNumero(totais.disp), styles: { fontStyle: "bold", halign: "right" } }, { content: formatKz(totais.val), styles: { fontStyle: "bold", halign: "right" } }]],
+    ...TEMA_RELATORIO,
+    footStyles: { fillColor: COR_ESTOQUE_CLARO, textColor: COR_ESTOQUE, fontStyle: "bold", fontSize: 8 },
     columnStyles: {
       0: { cellWidth: 50 },
-      1: { halign: "right", cellWidth: 20 },
-      2: { halign: "right", cellWidth: 30 },
-      3: { halign: "right", cellWidth: 30 },
+      1: { halign: "right", cellWidth: 22 },
+      2: { halign: "right", cellWidth: 32 },
+      3: { halign: "right", cellWidth: 32 },
       4: { halign: "right", cellWidth: 40 },
     },
-    margin: { left: 14, right: 14 },
   });
 
-  const totais = catRows.reduce((s, [, d]) => ({
-    itens: s.itens + d.itens,
-    qtd: s.qtd + d.qtd,
-    disp: s.disp + d.disponivel,
-    val: s.val + d.valorTotal,
-  }), { itens: 0, qtd: 0, disp: 0, val: 0 });
-
-  const ty = doc.lastAutoTable.finalY + 5;
-  doc.setFontSize(8); doc.setFont("helvetica", "bold");
-  doc.text("TOTAL:", 14, ty);
-  doc.text(`${totais.itens} itens | Qtd: ${formatNumero(totais.qtd)} | Disp: ${formatNumero(totais.disp)} | Valor: ${formatKz(totais.val)}`, 30, ty);
-
-  y = ty + 12;
-  doc.setFontSize(11); doc.setFont("helvetica", "bold");
-  doc.setTextColor(24, 33, 48);
-  doc.text("Detalhe de Materiais", 14, y);
-  y += 2;
+  y = doc.lastAutoTable.finalY + 10;
+  y = secaoPdf(doc, y, "Detalhe de Materiais");
 
   const materiaisSorted = [...materiais].sort((a, b) => {
     const sa = a.status === "esgotado" ? 0 : a.status === "repor" ? 1 : 2;
@@ -376,10 +472,19 @@ export async function gerarRelatorioStockPDF(materiais = [], categorias = [], or
       m.custo_unit > 0 ? formatKz(m.custo_unit) : "—",
       m.status === "esgotado" ? "Esgotado" : m.status === "repor" ? "Repôr" : "Ok",
     ]),
-    theme: "grid",
-    headStyles: { fillColor: COR_ESTOQUE, textColor: 255, fontStyle: "bold", fontSize: 7 },
-    bodyStyles: { fontSize: 7, textColor: [30, 30, 30] },
-    alternateRowStyles: { fillColor: [240, 249, 248] },
+    ...TEMA_RELATORIO,
+    headStyles: { ...TEMA_RELATORIO.headStyles, fontSize: 7 },
+    bodyStyles: { ...TEMA_RELATORIO.bodyStyles, fontSize: 7 },
+    columnStyles: {
+      0: { cellWidth: 58 },
+      1: { cellWidth: 38 },
+      2: { cellWidth: 26, halign: "right" },
+      3: { cellWidth: 14, halign: "right" },
+      4: { cellWidth: 14, halign: "right" },
+      5: { cellWidth: 14, halign: "right" },
+      6: { cellWidth: 24, halign: "right" },
+      7: { cellWidth: 18, halign: "center" },
+    },
     didParseCell(data) {
       if (data.section === "body" && data.column.index === 7) {
         const v = String(data.cell.raw);
@@ -387,86 +492,83 @@ export async function gerarRelatorioStockPDF(materiais = [], categorias = [], or
         else if (v === "Repôr") { data.cell.styles.textColor = [234, 179, 8]; data.cell.styles.fontStyle = "bold"; }
       }
     },
-    margin: { left: 14, right: 14 },
   });
 
-  const cx = pw / 2;
-  doc.setTextColor(180, 180, 180); doc.setFontSize(7);
-  doc.text(`Documento gerado por SIGRAF — ${new Date().toLocaleDateString("pt-BR")}`, cx, 285, { align: "center" });
+  rodapePdf(doc, pw);
   doc.save(`Relatorio_Stock_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
 export async function gerarRelatorioCadastrosPDF(clientes = [], org = {}, filtro = "todos") {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const pw = doc.internal.pageSize.getWidth();
   let titulo = "Relatório de Cadastros";
   if (filtro === "cliente") titulo = "Relatório de Clientes";
   else if (filtro === "fornecedor") titulo = "Relatório de Fornecedores";
-  const { linhaY: ly, pw } = await desenharCabecalho(doc, org, titulo);
+  const { linhaY: ly } = await desenharCabecalhoRelatorio(doc, org, titulo);
 
   const lista = filtro === "todos" ? clientes : clientes.filter((c) => c.tipo === filtro);
   const totalClientes = lista.filter((c) => c.tipo === "cliente").length;
   const totalFornecedores = lista.filter((c) => c.tipo === "fornecedor").length;
 
-  let y = ly + 8;
-  doc.setFontSize(11); doc.setFont("helvetica", "bold");
-  doc.setTextColor(24, 33, 48);
-  if (filtro === "todos") doc.text(`Total: ${lista.length} cadastros (${totalClientes} clientes, ${totalFornecedores} fornecedores)`, 14, y);
-  else doc.text(`Total: ${lista.length} ${filtro === "cliente" ? "clientes" : "fornecedores"}`, 14, y);
-  y += 8;
+  let y = desenharKpis(doc, ly + 3, [
+    { label: "Total de cadastros", value: String(lista.length) },
+    { label: "Clientes", value: String(totalClientes) },
+    { label: "Fornecedores", value: String(totalFornecedores) },
+    { label: filtro === "todos" || filtro === "cliente" ? "Relatório" : "Filtro", value: filtro === "todos" ? "Completo" : filtro === "cliente" ? "Clientes" : "Fornecedores" },
+  ]);
+  y += 2;
+
+  const colunas = ["Código", "Nome", "Empresa", "NIF", "Telefone", "Email"];
+  const linhasCliente = (cs) => cs.map((c) => [c.codigo || "—", c.nome || "—", c.empresa || "—", c.nif || "—", c.telefone || "—", c.email || "—"]);
 
   const clientesLista = filtro === "fornecedor" ? [] : lista.filter((c) => c.tipo === "cliente");
   if (clientesLista.length > 0) {
-    doc.setFontSize(11); doc.setFont("helvetica", "bold");
-    doc.text("Clientes", 14, y);
-    y += 2;
-
+    y = secaoPdf(doc, y, `Clientes (${clientesLista.length})`);
     doc.autoTable({
       startY: y,
-      head: [["Código", "Nome", "Empresa", "NIF", "Telefone", "Email"]],
-      body: clientesLista.map((c) => [
-        c.codigo || "—", c.nome || "—", c.empresa || "—", c.nif || "—", c.telefone || "—", c.email || "—",
-      ]),
-      theme: "grid",
-      headStyles: { fillColor: COR_ESTOQUE, textColor: 255, fontStyle: "bold", fontSize: 8 },
-      bodyStyles: { fontSize: 8, textColor: [30, 30, 30] },
-      alternateRowStyles: { fillColor: [240, 249, 248] },
-      margin: { left: 14, right: 14 },
+      head: [colunas],
+      body: linhasCliente(clientesLista),
+      ...TEMA_RELATORIO,
+      columnStyles: {
+        0: { cellWidth: 20, fontStyle: "bold" },
+        1: { cellWidth: 44 },
+        2: { cellWidth: 34 },
+        3: { cellWidth: 22, halign: "center" },
+        4: { cellWidth: 24 },
+        5: { cellWidth: 42 },
+      },
     });
     y = doc.lastAutoTable.finalY + 8;
   }
 
   const fornecedoresLista = filtro === "cliente" ? [] : lista.filter((c) => c.tipo === "fornecedor");
   if (fornecedoresLista.length > 0) {
-    doc.setFontSize(11); doc.setFont("helvetica", "bold");
-    doc.text("Fornecedores", 14, y);
-    y += 2;
-
+    y = secaoPdf(doc, y, `Fornecedores (${fornecedoresLista.length})`);
     doc.autoTable({
       startY: y,
-      head: [["Código", "Nome", "Empresa", "NIF", "Telefone", "Email"]],
-      body: fornecedoresLista.map((c) => [
-        c.codigo || "—", c.nome || "—", c.empresa || "—", c.nif || "—", c.telefone || "—", c.email || "—",
-      ]),
-      theme: "grid",
-      headStyles: { fillColor: COR_ESTOQUE, textColor: 255, fontStyle: "bold", fontSize: 8 },
-      bodyStyles: { fontSize: 8, textColor: [30, 30, 30] },
-      alternateRowStyles: { fillColor: [236, 248, 245] },
-      margin: { left: 14, right: 14 },
+      head: [colunas],
+      body: linhasCliente(fornecedoresLista),
+      ...TEMA_RELATORIO,
+      columnStyles: {
+        0: { cellWidth: 20, fontStyle: "bold" },
+        1: { cellWidth: 44 },
+        2: { cellWidth: 34 },
+        3: { cellWidth: 22, halign: "center" },
+        4: { cellWidth: 24 },
+        5: { cellWidth: 42 },
+      },
     });
   }
 
-  const cx = pw / 2;
-  doc.setTextColor(180, 180, 180); doc.setFontSize(7);
-  doc.text(`Documento gerado por SIGRAF — ${new Date().toLocaleDateString("pt-BR")}`, cx, 285, { align: "center" });
+  rodapePdf(doc, pw);
   const nomeFicheiro = filtro === "todos" ? "Relatorio_Cadastros" : filtro === "cliente" ? "Relatorio_Clientes" : "Relatorio_Fornecedores";
   doc.save(`${nomeFicheiro}_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
 export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [], org = {}) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const { linhaY: ly, pw } = await desenharCabecalho(doc, org, "Relatório de Categorias e Famílias");
-
-  let y = ly + 8;
+  const pw = doc.internal.pageSize.getWidth();
+  const { linhaY: ly } = await desenharCabecalhoRelatorio(doc, org, "Relatório de Categorias e Famílias");
 
   const catMap = {};
   categorias.forEach((c) => {
@@ -481,30 +583,50 @@ export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [
     materiaisPorCat[catNome] = (materiaisPorCat[catNome] || 0) + 1;
   });
 
-  Object.entries(catMap).sort((a, b) => a[0].localeCompare(b[0])).forEach(([fam, cats]) => {
-    const famCfg = familias[fam];
-    doc.setFontSize(11); doc.setFont("helvetica", "bold");
-    doc.setTextColor(15, 118, 110);
-    doc.text(`${famCfg?.label || fam}`, 14, y);
-    y += 2;
+  const totalMateriais = Object.values(materiaisPorCat).reduce((s, n) => s + n, 0);
 
-    doc.autoTable({
-      startY: y,
-      head: [["Categoria", "Tipo", "Descrição", "Itens em Stock"]],
-      body: cats.map((c) => [
-        c.nome || "—", (tiposItem[normalizarTipoItem(c.tipo)]?.label) || "—", c.descricao || "—", String(materiaisPorCat[c.nome] || 0),
-      ]),
-      theme: "grid",
-      headStyles: { fillColor: COR_ESTOQUE, textColor: 255, fontStyle: "bold", fontSize: 8 },
-      bodyStyles: { fontSize: 8, textColor: [30, 30, 30] },
-      alternateRowStyles: { fillColor: [240, 249, 248] },
-      margin: { left: 14, right: 14 },
+  let y = desenharKpis(doc, ly + 3, [
+    { label: "Famílias", value: String(Object.keys(catMap).length) },
+    { label: "Categorias", value: String(categorias.length) },
+    { label: "Materiais em stock", value: String(totalMateriais) },
+    { label: "Grupos", value: String(new Set(categorias.map((c) => normalizarTipoItem(c.tipo))).size) },
+  ]);
+  y += 2;
+
+  Object.entries(catMap)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .forEach(([fam, cats]) => {
+      if (y + 20 > doc.internal.pageSize.getHeight() - 20) doc.addPage();
+      const famCfg = familias[fam];
+      doc.setFillColor(...COR_ESTOQUE);
+      doc.circle(15.5, y - 1.1, 1.1, "F");
+      doc.setFontSize(10.5); doc.setFont("helvetica", "bold");
+      doc.setTextColor(...COR_ESTOQUE);
+      doc.text(`${famCfg?.label || fam} · ${cats.length} ${cats.length === 1 ? "categoria" : "categorias"}`, 18.5, y);
+      y += 2;
+
+      doc.autoTable({
+        startY: y,
+        head: [["Categoria", "Grupo", "Itens em Stock"]],
+        body: cats
+          .slice()
+          .sort((a, b) => (a.subfamilia || "").localeCompare(b.subfamilia || ""))
+          .map((c) => {
+            const grupoLabel = tiposItem[normalizarTipoItem(c.tipo)]?.label || "—";
+            return [c.descricao || c.subfamilia || c.nome || "—", grupoLabel, String(materiaisPorCat[c.nome] || 0)];
+          }),
+        foot: [[{ content: `TOTAL ${cats.length}`, colSpan: 2, styles: { fontStyle: "bold" } }, { content: String(cats.reduce((s, c) => s + (materiaisPorCat[c.nome] || 0), 0)), styles: { fontStyle: "bold", halign: "right" } }]],
+        ...TEMA_RELATORIO,
+        footStyles: { fillColor: COR_ESTOQUE_CLARO, textColor: COR_ESTOQUE, fontStyle: "bold", fontSize: 8 },
+        columnStyles: {
+          0: { cellWidth: 130 },
+          1: { cellWidth: 40 },
+          2: { cellWidth: 26, halign: "right" },
+        },
+      });
+      y = doc.lastAutoTable.finalY + 8;
     });
-    y = doc.lastAutoTable.finalY + 8;
-  });
 
-  const cx = pw / 2;
-  doc.setTextColor(180, 180, 180); doc.setFontSize(7);
-  doc.text(`Documento gerado por SIGRAF — ${new Date().toLocaleDateString("pt-BR")}`, cx, 285, { align: "center" });
+  rodapePdf(doc, pw);
   doc.save(`Relatorio_Categorias_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
