@@ -234,16 +234,13 @@ function desenharKpis(doc, y, kpis) {
   doc.setLineWidth(0.3);
   lista.forEach((k, i) => {
     const x = MARGEM + i * (cardW + gap);
-    // Fundo cinza claro + borda cinza médio
     doc.setFillColor(...CINZA_CLARO);
     doc.setDrawColor(...CINZA_MEDIO);
     doc.roundedRect(x, y, cardW, cardH, 2, 2, "FD");
-    // Rótulo (cinza escuro)
     doc.setFontSize(6.5);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...CINZA_ESCURO);
     doc.text(String(k.label || "").toUpperCase(), x + 2.5, y + 4.5, { maxWidth: cardW - 5 });
-    // Valor (preto, destacado)
     doc.setFontSize(9.5);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...PRETO);
@@ -700,18 +697,14 @@ export async function gerarRelatorioCadastrosPDF(clientes = [], org = {}, filtro
 
 // ============================================================
 // RELATÓRIO DE CATEGORIAS E FAMÍLIAS
+// Agrupa por GRUPO › cada linha tem Família | Subfamília | Itens
+// Faixa do grupo em CINZA (não preta)
 // ============================================================
 export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [], org = {}) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const { linhaY: ly } = await desenharCabecalhoRelatorio(doc, org, "Relatório de Categorias e Famílias");
 
-  const catMap = {};
-  categorias.forEach((c) => {
-    const fam = normalizarFamilia(c.familia);
-    if (!catMap[fam]) catMap[fam] = [];
-    catMap[fam].push(c);
-  });
-
+  // ── Contar materiais por categoria (id + nome como fallback) ──
   const materiaisPorCatId = {};
   const materiaisPorCatNome = {};
   materiais.forEach((m) => {
@@ -731,71 +724,108 @@ export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [
     return chaveNome ? materiaisPorCatNome[chaveNome] || 0 : 0;
   };
 
+  // ── Agrupar por GRUPO › FAMÍLIA › SUBFAMÍLIA ──
+  const grupos = {};
+  categorias.forEach((c) => {
+    const grupoLabel = tiposItem[normalizarTipoItem(c.tipo)]?.label || "Sem grupo";
+    const famCfg = familias[normalizarFamilia(c.familia)];
+    const famLabel = famCfg?.label || c.familia || "Sem família";
+    const subLabel = String(c.subfamilia || "").trim() || "Sem subfamília";
+    const itens = contarItens(c);
+
+    if (!grupos[grupoLabel]) grupos[grupoLabel] = { total: 0, familias: {} };
+    const g = grupos[grupoLabel];
+    g.total += 1;
+
+    if (!g.familias[famLabel]) g.familias[famLabel] = {};
+    const f = g.familias[famLabel];
+
+    if (!f[subLabel]) f[subLabel] = 0;
+    f[subLabel] += itens;
+  });
+
+  // ── KPIs de topo ──
+  const totalCategorias = categorias.length;
+  const totalGrupos = Object.keys(grupos).length;
+  const totalFamilias = new Set(
+    categorias.map((c) => familias[normalizarFamilia(c.familia)]?.label || c.familia || "Sem família")
+  ).size;
   const totalMateriais = materiais.length;
 
   let y = desenharKpis(doc, ly + 3, [
-    { label: "Famílias", value: String(Object.keys(catMap).length) },
-    { label: "Categorias", value: String(categorias.length) },
+    { label: "Grupos", value: String(totalGrupos) },
+    { label: "Famílias", value: String(totalFamilias) },
+    { label: "Categorias", value: String(totalCategorias) },
     { label: "Materiais em stock", value: String(totalMateriais) },
-    {
-      label: "Grupos",
-      value: String(new Set(categorias.map((c) => normalizarTipoItem(c.tipo))).size),
-    },
   ]);
   y += 3;
 
-  const familiasOrdenadas = Object.entries(catMap).sort((a, b) =>
-    (familias[a[0]]?.label || a[0]).localeCompare(familias[b[0]]?.label || b[0], "pt")
-  );
-
-  if (familiasOrdenadas.length === 0) {
+  if (totalCategorias === 0) {
     doc.setFontSize(10);
     doc.setTextColor(...CINZA_MEDIO);
     doc.text("Nenhuma categoria registada.", MARGEM, y + 6);
+    finalizarComRodape(doc);
+    doc.save(`Relatorio_Categorias_${new Date().toISOString().slice(0, 10)}.pdf`);
+    return;
   }
 
-  familiasOrdenadas.forEach(([fam, cats]) => {
-    const famCfg = familias[fam] || { label: fam || "Outras" };
-    const totalItensFam = cats.reduce((s, c) => s + contarItens(c), 0);
+  // ── Ordenar grupos alfabeticamente ──
+  const gruposOrdenados = Object.entries(grupos).sort((a, b) =>
+    a[0].localeCompare(b[0], "pt")
+  );
 
-    if (y + 24 > doc.internal.pageSize.getHeight() - 20) {
+  gruposOrdenados.forEach(([grupoLabel, g]) => {
+    if (y + 30 > doc.internal.pageSize.getHeight() - 20) {
       doc.addPage();
       y = 22;
     }
 
-    // Faixa de título da família — CINZA
+    // ── Faixa de título do GRUPO em CINZA ──
     doc.setFillColor(...CINZA_CLARO);
     doc.setDrawColor(...CINZA_MEDIO);
     doc.setLineWidth(0.2);
     doc.roundedRect(MARGEM, y - 4, LARGURA_UTIL, 8, 1.5, 1.5, "FD");
     doc.setTextColor(...PRETO);
-    doc.setFontSize(9);
+    doc.setFontSize(9.5);
     doc.setFont("helvetica", "bold");
-    doc.text(
-      `${(famCfg.label || fam).toUpperCase()}  ·  ${cats.length} ${cats.length === 1 ? "categoria" : "categorias"}  ·  ${totalItensFam} ${totalItensFam === 1 ? "item" : "itens"}`,
-      MARGEM + 3,
-      y + 1
+    doc.text(grupoLabel.toUpperCase(), MARGEM + 3, y + 1);
+    y += 8;
+
+    // ── Linhas: Família (sempre) | Subfamília | Itens ──
+    const linhas = [];
+    const familiasOrdenadas = Object.entries(g.familias).sort((a, b) =>
+      a[0].localeCompare(b[0], "pt")
     );
-    y += 7;
+
+    familiasOrdenadas.forEach(([famLabel, subsMap]) => {
+      const subsOrdenadas = Object.entries(subsMap).sort((a, b) =>
+        a[0].localeCompare(b[0], "pt")
+      );
+      subsOrdenadas.forEach(([subLabel, qtdItens]) => {
+        linhas.push([
+          famLabel,
+          subLabel,
+          String(qtdItens),
+        ]);
+      });
+    });
+
+    const totalItensGrupo = linhas.reduce((s, l) => s + (Number(l[2]) || 0), 0);
 
     autoTable(doc, {
       startY: y,
-      head: [["Categoria / Subfamília", "Grupo", "Itens em Stock"]],
-      body: cats
-        .slice()
-        .sort(
-          (a, b) =>
-            (a.subfamilia || "").localeCompare(b.subfamilia || "", "pt") ||
-            String(a.tipo || "").localeCompare(String(b.tipo || ""), "pt")
-        )
-        .map((c) => {
-          const grupoLabel = tiposItem[normalizarTipoItem(c.tipo)]?.label || "—";
-          const rotulo = c.subfamilia || c.descricao || c.nome || "—";
-          return [rotulo, grupoLabel, String(contarItens(c))];
-        }),
+      head: [["Família", "Subfamília", "Itens"]],
+      body: linhas,
       foot: [[
-        { content: `Subtotal ${famCfg.label || fam}`, colSpan: 2, styles: { fontStyle: "bold" } },
-        { content: String(totalItensFam), styles: { fontStyle: "bold", halign: "right" } },
+        {
+          content: `TOTAL ${grupoLabel}`,
+          colSpan: 2,
+          styles: { fontStyle: "bold" },
+        },
+        {
+          content: String(totalItensGrupo),
+          styles: { fontStyle: "bold", halign: "right" },
+        },
       ]],
       ...TEMA_RELATORIO,
       footStyles: {
@@ -805,8 +835,10 @@ export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [
         fontSize: 8,
       },
       columnStyles: colunasProporcionais(
-        [3.4, 1.6, 1],
-        { 2: { halign: "right" } }
+        [3, 3.6, 1.2],
+        {
+          2: { halign: "right" },
+        }
       ),
     });
 

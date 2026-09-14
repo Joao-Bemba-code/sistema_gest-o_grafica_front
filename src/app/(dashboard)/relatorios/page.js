@@ -130,7 +130,7 @@ function LinhaDonut({ cor, nome, valor }) {
     <div className="flex items-center gap-2.5">
       <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: cor }} />
       <span className="flex-1 min-w-0 text-sm text-foreground truncate">{nome}</span>
-      <span className="font-mono font-bold text-sm text-foreground">{valor}</span>
+      <span className="font-mono font-bold text-sm text-foreground shrink-0">{valor}</span>
     </div>
   );
 }
@@ -591,73 +591,73 @@ export default function RelatoriosPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-            <Card className="lg:col-span-2">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-medium">Resumo por Categoria</CardTitle>
-                <Button size="sm" variant="outline" onClick={() => gerarRelatorioStockPDF(materiais, categorias, org)}>
-                  <Icon name="picture_as_pdf" className="text-sm" />
-                  PDF
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Categoria</th>
-                        <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Itens</th>
-                        <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Qtd.</th>
-                        <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Disponível</th>
-                        <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase hidden sm:table-cell">Valor</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {catSorted.map(([nome, d]) => {
-                        const famCfg = familias[d.familia];
-                        return (
-                          <tr key={nome} className="border-b">
-                            <td className="px-3 py-2.5 flex items-center gap-2">
-                              {famCfg && <Icon name={famCfg.icon} className="text-sm text-muted-foreground" />}
-                              <span className="font-medium">{nome}</span>
-                            </td>
-                            <td className="px-3 py-2.5 text-right font-mono text-xs">{d.itens}</td>
-                            <td className="px-3 py-2.5 text-right font-mono text-xs">{d.qtd.toLocaleString("pt-AO")}</td>
-                            <td className="px-3 py-2.5 text-right font-mono text-xs">{d.disponivel.toLocaleString("pt-AO")}</td>
-                            <td className="px-3 py-2.5 text-right font-mono text-xs hidden sm:table-cell">Kz {d.valorTotal.toLocaleString("pt-AO")}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                    <tfoot>
-                      <tr className="border-t-2 font-medium">
-                        <td className="px-3 py-2.5 text-xs">TOTAL</td>
-                        <td className="px-3 py-2.5 text-right font-mono text-xs">{totalItens}</td>
-                        <td className="px-3 py-2.5 text-right font-mono text-xs">{totalQtd.toLocaleString("pt-AO")}</td>
-                        <td className="px-3 py-2.5 text-right font-mono text-xs">{totalQtd.toLocaleString("pt-AO")}</td>
-                        <td className="px-3 py-2.5 text-right font-mono text-xs hidden sm:table-cell">Kz {totalValor.toLocaleString("pt-AO")}</td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-
-            <CartaoGrafico icon="pie_chart" titulo="Valor de Stock por Categoria" sub="Top 6 categorias por valor">
-              <DonutGrafico
-                dados={donutsCategorias}
-                centro={donutCategoriasTotal > 0 ? compactKz(donutCategoriasTotal) : "0"}
-                tooltipFormat={(v) => fmtKz(v)}
-              />
-              <div className="mt-3 space-y-2">
-                {donutsCategorias.map((d) => (
-                  <div key={d.name} className="flex items-center justify-between gap-2">
-                    <LinhaDonut cor={d.color} nome={d.name} valor="" />
-                    <span className="font-mono font-bold text-sm shrink-0">{compactKz(d.value)}</span>
+              <Card className="lg:col-span-2">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-sm font-medium">Resumo por Categoria</CardTitle>
+                  <Button size="sm" variant="outline" onClick={() => gerarRelatorioStockPDF(materiais, categorias, org)}>
+                    <Icon name="picture_as_pdf" className="text-sm" />
+                    PDF
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Categoria</th>
+                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Itens</th>
+                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Qtd.</th>
+                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Disponível</th>
+                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase hidden sm:table-cell">Valor</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {catSorted.map(([nome, d]) => {
+                          const famCfg = familias[d.familia];
+                          return (
+                            <tr key={nome} className="border-b">
+                              <td className="px-3 py-2.5 flex items-center gap-2">
+                                {famCfg && <Icon name={famCfg.icon} className="text-sm text-muted-foreground" />}
+                                <span className="font-medium">{nome}</span>
+                              </td>
+                              <td className="px-3 py-2.5 text-right font-mono text-xs">{d.itens}</td>
+                              <td className="px-3 py-2.5 text-right font-mono text-xs">{d.qtd.toLocaleString("pt-AO")}</td>
+                              <td className="px-3 py-2.5 text-right font-mono text-xs">{d.disponivel.toLocaleString("pt-AO")}</td>
+                              <td className="px-3 py-2.5 text-right font-mono text-xs hidden sm:table-cell">Kz {d.valorTotal.toLocaleString("pt-AO")}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t-2 font-medium">
+                          <td className="px-3 py-2.5 text-xs">TOTAL</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-xs">{totalItens}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-xs">{totalQtd.toLocaleString("pt-AO")}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-xs">{totalQtd.toLocaleString("pt-AO")}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-xs hidden sm:table-cell">Kz {totalValor.toLocaleString("pt-AO")}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
                   </div>
-                ))}
-              </div>
-            </CartaoGrafico>
-          </div>
+                </CardContent>
+              </Card>
+
+              <CartaoGrafico icon="pie_chart" titulo="Valor de Stock por Categoria" sub="Top 6 categorias por valor">
+                <DonutGrafico
+                  dados={donutsCategorias}
+                  centro={donutCategoriasTotal > 0 ? compactKz(donutCategoriasTotal) : "0"}
+                  tooltipFormat={(v) => fmtKz(v)}
+                />
+                <div className="mt-3 space-y-2">
+                  {donutsCategorias.map((d) => (
+                    <div key={d.name} className="flex items-center justify-between gap-2">
+                      <LinhaDonut cor={d.color} nome={d.name} valor="" />
+                      <span className="font-mono font-bold text-sm shrink-0">{compactKz(d.value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </CartaoGrafico>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Card>
@@ -708,27 +708,67 @@ export default function RelatoriosPage() {
       })()}
 
       {aba === "recursos" && (() => {
-        const materiaisPorCat = {};
-        materiais.forEach((m) => {
-          const chave = m.categoria_id != null ? String(m.categoria_id) : `nome:${m.categoria?.nome || ""}`;
-          materiaisPorCat[chave] = (materiaisPorCat[chave] || 0) + 1;
-        });
         const catMap = {};
         categorias.forEach((c) => {
           const fam = normalizarFamilia(c.familia);
           if (!catMap[fam]) catMap[fam] = [];
           catMap[fam].push(c);
         });
-        const contarItens = (c) => materiaisPorCat[String(c.id)] || 0;
-        const grupos = {};
+
+        // ── Distribuições para os 3 donuts (Grupo / Família / Subfamília) ──
+        const porGrupo = {};
+        const porFamilia = {};
+        const porSubfamilia = {};
+
         categorias.forEach((c) => {
-          const rotulo = tiposItem[normalizarTipoItem(c.tipo)]?.label || String(c.tipo || "Outros");
-          grupos[rotulo] = (grupos[rotulo] || 0) + 1;
+          const grupoLabel = tiposItem[normalizarTipoItem(c.tipo)]?.label || "Sem grupo";
+          porGrupo[grupoLabel] = (porGrupo[grupoLabel] || 0) + 1;
+
+          const famCfg = familias[normalizarFamilia(c.familia)];
+          const famLabel = famCfg?.label || c.familia || "Sem família";
+          porFamilia[famLabel] = (porFamilia[famLabel] || 0) + 1;
+
+          const sub = String(c.subfamilia || "").trim() || "Sem subfamília";
+          porSubfamilia[sub] = (porSubfamilia[sub] || 0) + 1;
         });
-        const donutsGrupos = Object.entries(grupos)
-          .sort((a, b) => b[1] - a[1])
-          .map(([name, value], i) => ({ name, value, color: CORES_DONUT[i % CORES_DONUT.length] }));
-        const totalCategorias = categorias.length || 1;
+
+        const ordenar = (obj) =>
+          Object.entries(obj)
+            .sort((a, b) => b[1] - a[1])
+            .map(([name, value], i) => ({
+              name,
+              value,
+              color: CORES_DONUT[i % CORES_DONUT.length],
+            }));
+
+        const listaGrupos = ordenar(porGrupo);
+        const listaFamilias = ordenar(porFamilia);
+        const listaSubfamilias = ordenar(porSubfamilia);
+
+        const totalGrupos = listaGrupos.reduce((s, d) => s + d.value, 0);
+        const totalFamilias = listaFamilias.reduce((s, d) => s + d.value, 0);
+        const totalSubfamilias = listaSubfamilias.reduce((s, d) => s + d.value, 0);
+
+        const renderDonut = (titulo, sub, icon, lista, total) => (
+          <CartaoGrafico icon={icon} titulo={titulo} sub={sub}>
+            <DonutGrafico
+              dados={lista}
+              centro={String(total)}
+              tooltipFormat={(v) => `${v} categoria${v === 1 ? "" : "s"}`}
+            />
+            <div className="mt-3 space-y-2 max-h-56 overflow-y-auto pr-1">
+              {lista.map((d) => (
+                <LinhaDonut
+                  key={d.name}
+                  cor={d.color}
+                  nome={d.name}
+                  valor={`${d.value} (${Math.round((d.value / (total || 1)) * 100)}%)`}
+                />
+              ))}
+            </div>
+          </CartaoGrafico>
+        );
+
         return (
           <>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -738,133 +778,18 @@ export default function RelatoriosPage() {
               <KpiCard icon="people" label="Cadastros" value={clientes.length} />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
-              <CartaoGrafico icon="pie_chart" titulo="Categorias por Grupo" sub="Distribuição do tipo de recurso">
-                <DonutGrafico dados={donutsGrupos} centro={String(categorias.length)} tooltipFormat={(v) => `${v} categorias`} />
-                <div className="mt-3 space-y-2">
-                  {donutsGrupos.map((d) => (
-                    <LinhaDonut key={d.name} cor={d.color} nome={d.name} valor={`${d.value} (${Math.round((d.value / totalCategorias) * 100)}%)`} />
-                  ))}
-                </div>
-              </CartaoGrafico>
-
-              <div className="rounded-2xl bg-card border border-border shadow-card overflow-hidden">
-                <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-border">
-                  <div className="flex items-center gap-3">
-                    <span className="w-8 h-8 rounded-lg bg-muted border border-border flex items-center justify-center">
-                      <Icon name="bar_chart" className="text-lg text-foreground" />
-                    </span>
-                    <div>
-                      <h3 className="text-sm font-semibold text-foreground tracking-tight">Itens por Família</h3>
-                      <p className="text-[10px] text-muted-foreground">Quantidade de materiais registados por família</p>
-                    </div>
-                  </div>
-                  <span className="pill pill-primary shrink-0">
-                    <Icon name="inventory_2" className="text-sm" /> {materiais.length} itens
-                  </span>
-                </div>
-                <div className="p-5 space-y-4">
-                  {Object.entries(catMap)
-                    .map(([fam, cats]) => ({
-                      fam,
-                      itens: cats.reduce((s, c) => s + contarItens(c), 0),
-                    }))
-                    .filter((f) => f.itens > 0)
-                    .sort((a, b) => b.itens - a.itens)
-                    .slice(0, 6)
-                    .map((f, i) => {
-                      const famCfg = familias[f.fam] || { label: f.fam || "Outras", icon: "label" };
-                      return (
-                        <div key={f.fam} className="flex items-center gap-3">
-                          <span className="w-8 h-8 rounded-lg bg-muted border border-border flex items-center justify-center shrink-0">
-                            <Icon name={famCfg.icon} className="text-base text-foreground" />
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex justify-between text-sm mb-1 gap-2">
-                              <span className="font-medium truncate">{famCfg.label || f.fam}</span>
-                              <span className="font-mono font-bold shrink-0">{f.itens}</span>
-                            </div>
-                            <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                              <div className="h-full rounded-full" style={{ width: `${(f.itens / (materiais.length || 1)) * 100}%`, background: CORES_DONUT[i % CORES_DONUT.length] }} />
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  {Object.entries(catMap).every(([, cats]) => cats.reduce((s, c) => s + contarItens(c), 0) === 0) && (
-                    <p className="text-center text-xs text-muted-foreground py-6">Nenhum material registado ainda</p>
-                  )}
-                </div>
-              </div>
+            {/* ─────────── 3 DONUTS NO MESMO SENTIDO ─────────── */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {renderDonut("Categorias por Grupo", "Distribuição por grupo", "label", listaGrupos, totalGrupos)}
+              {renderDonut("Categorias por Família", "Distribuição por família", "folder", listaFamilias, totalFamilias)}
+              {renderDonut("Categorias por Subfamília", "Distribuição por subfamília", "sell", listaSubfamilias, totalSubfamilias)}
             </div>
 
-            <div className="bg-card border border-border rounded-2xl shadow-card overflow-hidden">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 sm:px-6 py-5 border-b border-border">
-                <div className="flex items-center gap-3">
-                  <span className="w-10 h-10 rounded-xl bg-muted border border-border flex items-center justify-center">
-                    <Icon name="category" className="text-xl text-foreground" />
-                  </span>
-                  <div>
-                    <h3 className="text-base font-semibold text-foreground tracking-tight">Categorias por Família</h3>
-                    <p className="text-[11px] text-muted-foreground">Distribuição de categorias e itens por família</p>
-                  </div>
-                </div>
-                <Button size="sm" variant="outline" onClick={() => gerarRelatorioCategoriasPDF(categorias, materiais, org)}>
-                  <Icon name="picture_as_pdf" className="text-sm" />
-                  PDF
-                </Button>
-              </div>
-              <div className="px-5 sm:px-6 py-5 space-y-5">
-                {Object.entries(catMap)
-                  .sort((a, b) => (familias[a[0]]?.label || a[0]).localeCompare(familias[b[0]]?.label || b[0]))
-                  .map(([fam, cats]) => {
-                    const famCfg = familias[fam] || { icon: "label", label: fam || "Outras", classe: "text-muted-foreground" };
-                    const totalItens = cats.reduce((s, c) => s + contarItens(c), 0);
-                    return (
-                      <section key={fam} className="bg-card border border-border rounded-2xl overflow-hidden shadow-card">
-                        <header className="bg-muted/40 px-5 py-3.5 flex items-center justify-between gap-3 border-b border-border">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <span className="w-10 h-10 rounded-xl bg-muted border border-border flex items-center justify-center shrink-0">
-                              <Icon name={famCfg.icon} className="text-xl text-foreground" />
-                            </span>
-                            <div className="min-w-0">
-                              <h4 className="font-semibold text-foreground tracking-tight truncate">{famCfg.label || fam}</h4>
-                              <p className="text-[11px] text-muted-foreground">{cats.length} {cats.length === 1 ? "categoria" : "categorias"}</p>
-                            </div>
-                          </div>
-                          <span className="pill pill-primary shrink-0">
-                            <Icon name="inventory_2" className="text-sm" />
-                            {totalItens} {totalItens === 1 ? "item" : "itens"}
-                          </span>
-                        </header>
-                        <ul className="divide-y divide-border">
-                          {cats
-                            .slice()
-                            .sort((a, b) => (a.subfamilia || "").localeCompare(b.subfamilia || "") || String(a.tipo || "").localeCompare(String(b.tipo || "")))
-                            .map((c) => {
-                              const grupoLabel = tiposItem[normalizarTipoItem(c.tipo)]?.label || "—";
-                              const itens = contarItens(c);
-                              return (
-                                <li key={c.id} className="px-5 py-3.5 flex flex-wrap items-center gap-x-4 gap-y-2 hover:bg-muted/30 transition-colors">
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-medium text-foreground truncate">{c.subfamilia || "Sem subfamília"}</p>
-                                    {c.descricao && <p className="text-[11px] text-muted-foreground truncate">{c.descricao}</p>}
-                                  </div>
-                                  <span className="pill pill-outline">Grupo: {grupoLabel}</span>
-                                  <span className={`pill ${itens > 0 ? "pill-primary" : "pill-muted"}`}>
-                                    {itens} {itens === 1 ? "item" : "itens"}
-                                  </span>
-                                </li>
-                              );
-                            })}
-                        </ul>
-                      </section>
-                    );
-                  })}
-                {categorias.length === 0 && (
-                  <p className="text-center py-8 text-muted-foreground text-sm">Nenhuma categoria cadastrada</p>
-                )}
-              </div>
+            {/* Botão de exportação PDF do relatório de categorias */}
+            <div className="flex justify-end">
+              <Button size="sm" variant="outline" onClick={() => gerarRelatorioCategoriasPDF(categorias, materiais, org)}>
+                <Icon name="picture_as_pdf" className="text-sm" /> Exportar Categorias PDF
+              </Button>
             </div>
           </>
         );
