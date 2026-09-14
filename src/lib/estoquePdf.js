@@ -1,24 +1,74 @@
 import jsPDF from "jspdf";
-import { applyPlugin } from "jspdf-autotable";
+import autoTable from "jspdf-autotable";
 import { formatKz, familias, normalizarFamilia, tiposItem, normalizarTipoItem, entradasEspecificacao } from "./estoque";
 import { TEMA_TABELA, formatNumero } from "./pdfEstilo";
 
-const COR_ESTOQUE = [15, 118, 110];
-const COR_ESTOQUE_CLARO = [236, 248, 245];
-const COR_TEXTO = [30, 41, 59];
+// ─────────────────────────────────────────────────────────────
+// PALETA MONOCROMÁTICA (preto / branco / cinzas)
+// ─────────────────────────────────────────────────────────────
+const PRETO = [17, 17, 17];
+const PRETO_SUAVE = [38, 38, 38];
+const CINZA_ESCURO = [64, 64, 64];
+const CINZA_MEDIO = [120, 120, 120];
+const CINZA_CLARO = [230, 230, 230];
+const CINZA_MUITO_CLARO = [245, 245, 245];
+const BRANCO = [255, 255, 255];
 
-applyPlugin(jsPDF);
+const COR_TEXTO = [30, 41, 59];
+const MARGEM = 12;
+const LARGURA_A4 = 210;
+const ALTURA_A4 = 297;
+
+// Largura útil real disponível para tabelas (igual ao cabeçalho)
+const LARGURA_UTIL = LARGURA_A4 - MARGEM * 2; // = 186mm
+
+// ------------------------------------------------------------
+// Helper: distribui larguras proporcionalmente, garantindo
+// que a soma final é EXATAMENTE LARGURA_UTIL.
+// ------------------------------------------------------------
+function colunasProporcionais(pesos, opcoes = {}) {
+  if (!Array.isArray(pesos) || pesos.length === 0) return {};
+  const totalPeso = pesos.reduce((s, p) => s + Math.max(0, Number(p) || 0), 0) || 1;
+  const estilos = {};
+  let acumulado = 0;
+  pesos.forEach((peso, i) => {
+    let largura;
+    if (i === pesos.length - 1) {
+      largura = +(LARGURA_UTIL - acumulado).toFixed(2);
+    } else {
+      largura = +((LARGURA_UTIL * peso) / totalPeso).toFixed(2);
+      acumulado += largura;
+    }
+    const extra = opcoes[i] || {};
+    estilos[i] = { cellWidth: largura, ...extra };
+  });
+  return estilos;
+}
+
+const MARGEM_TABELA = { left: MARGEM, right: MARGEM, top: 22, bottom: 18 };
 
 function origemApi() {
   return (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api").replace(/\/api$/, "");
 }
 
+function dataHoraAgora() {
+  const agora = new Date();
+  return {
+    data: agora.toLocaleDateString("pt-PT"),
+    hora: agora.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }),
+  };
+}
+
+// ============================================================
+// LOGO
+// ============================================================
 export async function carregarLogo(org) {
   if (!org?.logo_url) return null;
   try {
     const resp = await fetch(`${origemApi()}${org.logo_url}`);
+    if (!resp.ok) return null;
     const blob = await resp.blob();
-    if (!resp.ok || !blob.type.startsWith("image")) return null;
+    if (!blob.type.startsWith("image")) return null;
     const data = await new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
@@ -33,74 +83,112 @@ export async function carregarLogo(org) {
       img.onerror = () => resolve(null);
       img.src = data;
     });
-    return { data, formato, w: dims?.w, h: dims?.h };
+    if (!dims?.w || !dims?.h) return null;
+    return { data, formato, w: dims.w, h: dims.h };
   } catch {
     return null;
   }
 }
 
+// ============================================================
+// CABEÇALHO PADRÃO (Ficha de Material / Requisição)
+// ============================================================
 async function desenharCabecalho(doc, org = {}, titulo) {
   const pw = doc.internal.pageSize.getWidth();
-  const box = 30;
+  const box = 26;
   const logo = await carregarLogo(org);
+  const { data, hora } = dataHoraAgora();
 
   if (logo && logo.data) {
     const escala = Math.min(box / logo.w, box / logo.h);
     const mmW = logo.w * escala;
     const mmH = logo.h * escala;
-    doc.addImage(logo.data, logo.formato, 14, 12 + (box - mmH) / 2, mmW, mmH);
+    doc.addImage(logo.data, logo.formato, MARGEM, 12 + (box - mmH) / 2, mmW, mmH);
   } else {
-    doc.setFillColor(15, 118, 110);
-    doc.roundedRect(14, 12, box, box, 4, 4, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(15); doc.setFont("helvetica", "bold");
-    doc.text((org.nome || "S").charAt(0).toUpperCase(), 14 + box / 2, 12 + box / 2 + 1, { align: "center" });
+    doc.setFillColor(...PRETO);
+    doc.roundedRect(MARGEM, 12, box, box, 4, 4, "F");
+    doc.setTextColor(...BRANCO);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text((org.nome || "S").charAt(0).toUpperCase(), MARGEM + box / 2, 12 + box / 2 + 1, { align: "center" });
   }
 
-  doc.setFontSize(12); doc.setFont("helvetica", "bold");
-  doc.setTextColor(24, 33, 48);
-  doc.text(org.nome || "SIGRAF", 14, 12 + box + 3);
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...PRETO);
+  doc.text(org.nome || "SIGRAF", MARGEM, 12 + box + 3);
 
   const tituloY = 12 + box + 13;
-  doc.setFontSize(14); doc.setFont("helvetica", "bold");
-  doc.text(titulo, 14, tituloY);
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.text(titulo, MARGEM, tituloY);
 
-  const infos = [`Data: ${new Date().toLocaleDateString("pt-BR")}`, `Hora: ${new Date().toLocaleTimeString("pt-BR")}`];
-  doc.setFontSize(9); doc.setFont("helvetica", "normal");
-  doc.setTextColor(50, 50, 50);
-  infos.forEach((linha, i) => doc.text(linha, pw - 14, tituloY + i * 4.5, { align: "right" }));
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...CINZA_ESCURO);
+  doc.text(`Data: ${data}`, pw - MARGEM, tituloY - 4, { align: "right" });
+  doc.text(`Hora: ${hora}`, pw - MARGEM, tituloY + 1.5, { align: "right" });
 
-  const linhaY = tituloY + 4.5 * infos.length + 2;
-  doc.setDrawColor(15, 118, 110);
+  const linhaY = tituloY + 5;
+  doc.setDrawColor(...PRETO);
   doc.setLineWidth(0.6);
-  doc.line(14, linhaY, pw - 14, linhaY);
+  doc.line(MARGEM, linhaY, pw - MARGEM, linhaY);
 
   return { tituloY, linhaY, pw, box };
 }
 
+// ============================================================
+// TEMA DE TABELA PADRÃO (preto e branco)
+// ============================================================
 const TEMA_RELATORIO = {
   theme: "grid",
-  headStyles: { fillColor: COR_ESTOQUE, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8, cellPadding: 2 },
-  bodyStyles: { fontSize: 8, textColor: COR_TEXTO, cellPadding: 2 },
-  alternateRowStyles: { fillColor: COR_ESTOQUE_CLARO },
-  margin: { left: 14, right: 14 },
+  headStyles: {
+    fillColor: PRETO,
+    textColor: BRANCO,
+    fontStyle: "bold",
+    fontSize: 8,
+    cellPadding: 2,
+    halign: "left",
+    lineColor: PRETO,
+    lineWidth: 0.1,
+  },
+  bodyStyles: {
+    fontSize: 8,
+    textColor: PRETO,
+    cellPadding: 2,
+    overflow: "linebreak",
+    lineColor: CINZA_CLARO,
+    lineWidth: 0.1,
+  },
+  alternateRowStyles: { fillColor: CINZA_MUITO_CLARO },
+  margin: MARGEM_TABELA,
+  tableWidth: LARGURA_UTIL,
+  styles: {
+    overflow: "linebreak",
+    lineColor: CINZA_CLARO,
+    lineWidth: 0.1,
+    cellPadding: 2,
+  },
 };
 
-// Cabeçalho dos relatórios: faixa colorida com logótipo, título e data/hora.
+// ============================================================
+// CABEÇALHO DE RELATÓRIO (faixa preta)
+// ============================================================
 async function desenharCabecalhoRelatorio(doc, org = {}, titulo) {
   const pw = doc.internal.pageSize.getWidth();
   const y = 10;
-  const bandX = 10;
-  const bandW = pw - 20;
-  const bandH = 20;
-  const box = 16;
+  const bandX = MARGEM;
+  const bandW = LARGURA_UTIL;
+  const bandH = 18;
+  const box = 14;
   const boxY = y + (bandH - box) / 2;
   const logo = await carregarLogo(org);
+  const { data, hora } = dataHoraAgora();
 
-  doc.setFillColor(...COR_ESTOQUE);
+  doc.setFillColor(...PRETO);
   doc.roundedRect(bandX, y, bandW, bandH, 3, 3, "F");
 
-  doc.setFillColor(255, 255, 255);
+  doc.setFillColor(...BRANCO);
   doc.roundedRect(bandX + 3, boxY, box, box, 2, 2, "F");
   if (logo && logo.data) {
     const escala = Math.min(box / logo.w, box / logo.h);
@@ -108,167 +196,170 @@ async function desenharCabecalhoRelatorio(doc, org = {}, titulo) {
     const mmH = logo.h * escala;
     doc.addImage(logo.data, logo.formato, bandX + 3 + (box - mmW) / 2, boxY + (box - mmH) / 2, mmW, mmH);
   } else {
-    doc.setTextColor(...COR_ESTOQUE);
-    doc.setFontSize(12);
+    doc.setTextColor(...PRETO);
+    doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.text((org.nome || "S").charAt(0).toUpperCase(), bandX + 3 + box / 2, boxY + box / 2 + 1, { align: "center" });
   }
 
-  doc.setTextColor(255, 255, 255);
+  doc.setTextColor(...BRANCO);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.text(org.nome || "SIGRAF", bandX + box + 8, y + 8.5);
-  doc.setTextColor(231, 245, 243);
+  doc.setFontSize(11);
+  doc.text(org.nome || "SIGRAF", bandX + box + 8, y + 7.5);
+
+  doc.setTextColor(...CINZA_CLARO);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.text(titulo, bandX + box + 8, y + 14.5);
+  doc.setFontSize(8.5);
+  doc.text(titulo, bandX + box + 8, y + 13.5);
 
   doc.setFontSize(7.5);
-  doc.setTextColor(230, 240, 240);
-  const infos = [`Data: ${new Date().toLocaleDateString("pt-BR")}`, `Hora: ${new Date().toLocaleTimeString("pt-BR")}`];
-  infos.forEach((linha, i) => doc.text(linha, pw - 12, y + 5 + i * 4.2, { align: "right" }));
+  doc.setTextColor(...CINZA_CLARO);
+  doc.text(`Data: ${data}`, pw - MARGEM - 3, y + 6, { align: "right" });
+  doc.text(`Hora: ${hora}`, pw - MARGEM - 3, y + 11, { align: "right" });
 
-  const linhaY = y + bandH + 5;
-  return { tituloY: linhaY, linhaY, pw, box };
+  return { linhaY: y + bandH + 5, pw, box };
 }
 
-// Cartões de resumo (KPIs) sob o cabeçalho.
+// ============================================================
+// KPIs (cartões em cinza)
+// ============================================================
 function desenharKpis(doc, y, kpis) {
-  const pw = doc.internal.pageSize.getWidth();
-  const margem = 10;
-  const totalW = pw - margem * 2;
-  const gap = 4;
-  const n = Math.max(kpis.length, 1);
-  const cardW = Math.floor((totalW - gap * (n - 1)) / n);
-  const cardH = 15;
+  const totalW = LARGURA_UTIL;
+  const gap = 3;
+  const lista = Array.isArray(kpis) && kpis.length > 0 ? kpis : [{ label: "—", value: "—" }];
+  const n = lista.length;
+  const cardW = (totalW - gap * (n - 1)) / n;
+  const cardH = 14;
+
   doc.setLineWidth(0.3);
-  kpis.forEach((k, i) => {
-    const x = margem + i * (cardW + gap);
-    doc.setFillColor(...COR_ESTOQUE_CLARO);
-    doc.setDrawColor(173, 208, 203);
+  lista.forEach((k, i) => {
+    const x = MARGEM + i * (cardW + gap);
+    // Fundo cinza claro + borda cinza médio
+    doc.setFillColor(...CINZA_CLARO);
+    doc.setDrawColor(...CINZA_MEDIO);
     doc.roundedRect(x, y, cardW, cardH, 2, 2, "FD");
+    // Rótulo (cinza escuro)
     doc.setFontSize(6.5);
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(...COR_TEXTO);
-    doc.text(String(k.label || "").toUpperCase(), x + 3, y + 5);
-    doc.setFontSize(10);
+    doc.setTextColor(...CINZA_ESCURO);
+    doc.text(String(k.label || "").toUpperCase(), x + 2.5, y + 4.5, { maxWidth: cardW - 5 });
+    // Valor (preto, destacado)
+    doc.setFontSize(9.5);
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(...COR_ESTOQUE);
-    doc.text(String(k.value), x + 3, y + 12, { maxWidth: cardW - 6 });
+    doc.setTextColor(...PRETO);
+    doc.text(String(k.value), x + 2.5, y + 11, { maxWidth: cardW - 5 });
   });
-  return y + cardH + 6;
+  return y + cardH + 5;
 }
 
+// ============================================================
+// SECÇÃO
+// ============================================================
 function secaoPdf(doc, y, titulo) {
-  doc.setFontSize(10.5);
+  doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COR_TEXTO);
-  doc.text(titulo, 14, y);
-  doc.setDrawColor(...COR_ESTOQUE);
-  doc.setLineWidth(0.7);
-  doc.line(14, y + 1.2, 60, y + 1.2);
+  doc.setTextColor(...PRETO);
+  doc.text(titulo, MARGEM, y);
+  doc.setDrawColor(...PRETO);
+  doc.setLineWidth(0.6);
+  doc.line(MARGEM, y + 1.2, MARGEM + 40, y + 1.2);
   return y + 5;
 }
 
-function rodapePdf(doc, pw) {
-  const h = doc.internal.pageSize.getHeight();
-  doc.setDrawColor(226, 232, 240);
+// ============================================================
+// RODAPÉ (desenhado em todas as páginas)
+// ============================================================
+function desenharRodapePagina(doc, paginaAtual, totalPaginas) {
+  const pw = doc.internal.pageSize.getWidth();
+  const ph = doc.internal.pageSize.getHeight();
+  const { data, hora } = dataHoraAgora();
+
+  doc.setDrawColor(...CINZA_CLARO);
   doc.setLineWidth(0.3);
-  doc.line(10, h - 12, pw - 10, h - 12);
-  doc.setTextColor(148, 163, 184);
+  doc.line(MARGEM, ph - 10, pw - MARGEM, ph - 10);
+
+  doc.setTextColor(...CINZA_MEDIO);
   doc.setFontSize(6.5);
-  doc.text(`Gerado por SIGRAF em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR")}`, pw / 2, h - 8, { align: "center" });
+  doc.setFont("helvetica", "normal");
+  doc.text(`Gerado por SIGRAF em ${data} às ${hora}`, MARGEM, ph - 6);
+  doc.text(`Página ${paginaAtual} de ${totalPaginas}`, pw - MARGEM, ph - 6, { align: "right" });
 }
 
+function finalizarComRodape(doc) {
+  const total = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= total; i++) {
+    doc.setPage(i);
+    desenharRodapePagina(doc, i, total);
+  }
+}
+
+// ============================================================
+// REQUISIÇÃO DE MATERIAL
+// ============================================================
 export async function gerarRequisicaoPDF(mov, org = {}) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
-  const cx = pw / 2;
+  const { linhaY } = await desenharCabecalho(doc, org, "Requisição de Material");
 
   const mat = mov.material || {};
   const cat = mat.categoria?.nome || "—";
   const ehEntrada = mov.tipo === "entrada";
   const custoUnit = mat.custo_unitario != null ? mat.custo_unitario : mat.custo_unit;
   const custoStr = custoUnit != null && Number(custoUnit) > 0 ? formatKz(custoUnit) : "—";
+
   const dt = new Date(mov.createdAt);
-  const dataStr = isNaN(dt.getTime()) ? "—" : dt.toLocaleDateString("pt-BR");
-  const horaStr = isNaN(dt.getTime()) ? "—" : dt.toLocaleTimeString("pt-BR");
+  const dataStr = isNaN(dt.getTime()) ? "—" : dt.toLocaleDateString("pt-PT");
+  const horaStr = isNaN(dt.getTime()) ? "—" : dt.toLocaleTimeString("pt-PT");
   const parteNome = ehEntrada ? (mov.fornecedor_nome || "—") : (mov.cliente_nome || "—");
 
-  const box = 30;
-  const logo = await carregarLogo(org);
-
-  if (logo && logo.data) {
-    const escala = Math.min(box / logo.w, box / logo.h);
-    const mmW = logo.w * escala;
-    const mmH = logo.h * escala;
-    doc.addImage(logo.data, logo.formato, 14, 12 + (box - mmH) / 2, mmW, mmH);
-  } else {
-    doc.setFillColor(5, 150, 105);
-    doc.roundedRect(14, 12, box, box, 4, 4, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(15); doc.setFont("helvetica", "bold");
-    doc.text((org.nome || "S").charAt(0).toUpperCase(), 14 + box / 2, 12 + box / 2 + 1, { align: "center" });
-  }
-
-  doc.setFontSize(12); doc.setFont("helvetica", "bold");
-  doc.setTextColor(24, 33, 48);
-  doc.text(org.nome || "SIGRAF", 14, 12 + box + 3);
-
-  const tituloY = 12 + box + 13;
-  doc.setFontSize(14); doc.setFont("helvetica", "bold");
-  doc.text("Requisição de Material", 14, tituloY);
-
-  doc.setFontSize(9); doc.setFont("helvetica", "normal");
-  doc.setTextColor(50, 50, 50);
-  const infos = [`Hora: ${horaStr}`, `Data: ${dataStr}`, `${ehEntrada ? "Fornecedor" : "Cliente"}: ${parteNome}`];
-  infos.forEach((linha, i) => doc.text(linha, pw - 14, tituloY + i * 4.5, { align: "right" }));
-
-  const linhaY = tituloY + 4.5 * infos.length + 2;
-  doc.setDrawColor(5, 150, 105);
-  doc.setLineWidth(0.6);
-  doc.line(14, linhaY, pw - 14, linhaY);
-
-  doc.autoTable({
+  autoTable(doc, {
     startY: linhaY + 6,
     head: [["Código", "Artigo", "Categoria", "Responsável", "Autorizado por"]],
     body: [[mat.codigo || "—", mat.nome || "—", cat, mov.solicitado_por || "—", mov.permitido_por || "—"]],
-    ...TEMA_TABELA,
-    columnStyles: { 0: { cellWidth: 24 }, 1: { cellWidth: 56 }, 2: { cellWidth: 34 }, 3: { cellWidth: 34 }, 4: { cellWidth: 34 } },
+    ...TEMA_RELATORIO,
+    columnStyles: colunasProporcionais([1.4, 3, 2, 1.8, 1.8]),
   });
 
   let y = doc.lastAutoTable.finalY + 8;
-  doc.setFontSize(10); doc.setFont("helvetica", "bold");
-  doc.setTextColor(24, 33, 48);
-  doc.text("Materiais e Insumos", 14, y);
-  doc.autoTable({
-    startY: y + 2,
+  y = secaoPdf(doc, y, "Materiais e Insumos");
+
+  autoTable(doc, {
+    startY: y,
     head: [["ID", "Nome", "Quantidade", "Custo Unitário"]],
     body: [[mat.id ?? "—", mat.nome || "—", `${Number(mov.quantidade)} ${mat.unidade || "un"}`, custoStr]],
-    ...TEMA_TABELA,
-    columnStyles: { 0: { cellWidth: 22 }, 1: { cellWidth: 78 }, 2: { cellWidth: 42, halign: "right" }, 3: { cellWidth: 40, halign: "right" } },
+    ...TEMA_RELATORIO,
+    columnStyles: colunasProporcionais(
+      [1, 4, 1.6, 1.4],
+      { 0: { halign: "center" }, 2: { halign: "right" }, 3: { halign: "right" } }
+    ),
   });
 
-  const yObs = doc.lastAutoTable.finalY + 10;
-  doc.setFontSize(9); doc.setFont("helvetica", "bold");
-  doc.setTextColor(24, 33, 48);
-  doc.text("Observações:", 14, yObs);
+  const yObs = doc.lastAutoTable.finalY + 8;
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...PRETO);
+  doc.text("Observações:", MARGEM, yObs);
   doc.setFont("helvetica", "normal");
-  doc.setTextColor(70, 70, 70);
+  doc.setTextColor(...CINZA_ESCURO);
   const obsText = (mov.observacoes || "").trim() || "—";
-  const obsLines = doc.splitTextToSize(obsText, pw - 28);
-  doc.text(obsLines, 14, yObs + 5);
+  const obsLines = doc.splitTextToSize(obsText, LARGURA_UTIL);
+  doc.text(obsLines, MARGEM, yObs + 5);
 
-  doc.setTextColor(180, 180, 180); doc.setFontSize(7);
-  doc.text(`Documento gerado por SIGRAF — ${new Date().toLocaleDateString("pt-BR")}`, cx, 285, { align: "center" });
-  doc.save(`Requisicao_Material_${mov.id}.pdf`);
+  doc.setFontSize(8);
+  doc.setTextColor(...CINZA_ESCURO);
+  doc.text(`${ehEntrada ? "Fornecedor" : "Cliente"}: ${parteNome}`, MARGEM, yObs + 12);
+
+  finalizarComRodape(doc);
+  doc.save(`Requisicao_Material_${mov.id || "doc"}.pdf`);
 }
 
+// ============================================================
+// FICHA DE MATERIAL
+// ============================================================
 export async function gerarFichaMaterialPDF(mat, org = {}) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
-  const cx = pw / 2;
-  const { tituloY, linhaY } = await desenharCabecalho(doc, org, "Ficha do Material");
+  const { linhaY } = await desenharCabecalho(doc, org, "Ficha do Material");
 
   const categoria = mat.categoria?.nome || mat.categoria_nome || "—";
   const linhas = [
@@ -288,49 +379,50 @@ export async function gerarFichaMaterialPDF(mat, org = {}) {
     ["Quebra técnica", mat.percentual_quebra ? `${mat.percentual_quebra}%` : "—"],
     ["Rastreabilidade por lote", mat.controla_lote ? "Sim" : "Não"],
     ["Localização na prateleira", mat.localizacao || "—"],
-    ["Estoque mínimo", mat.estoque_min != null ? String(mat.estoque_min) : "—"],
-    ["Estoque máximo", mat.estoque_max != null ? String(mat.estoque_max) : "—"],
-    ["Ponto de pedido", mat.ponto_ressuprimento != null ? String(mat.ponto_ressuprimento) : "—"],
-    ["Quantidade atual", mat.quantidade != null ? String(mat.quantidade) : "—"],
-    ["Disponível", mat.estoque_disponivel != null ? String(mat.estoque_disponivel) : "—"],
+    ["Estoque mínimo", mat.estoque_min != null ? formatNumero(mat.estoque_min) : "—"],
+    ["Estoque máximo", mat.estoque_max != null ? formatNumero(mat.estoque_max) : "—"],
+    ["Ponto de pedido", mat.ponto_ressuprimento != null ? formatNumero(mat.ponto_ressuprimento) : "—"],
+    ["Quantidade atual", mat.quantidade != null ? formatNumero(mat.quantidade) : "—"],
+    ["Disponível", mat.estoque_disponivel != null ? formatNumero(mat.estoque_disponivel) : "—"],
     ["Custo unitário", mat.custo_unitario != null ? formatKz(mat.custo_unitario) : (mat.custo_unit != null ? formatKz(mat.custo_unit) : "—")],
   ];
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: linhaY + 6,
     head: [["Campo", "Valor"]],
     body: linhas,
-    ...TEMA_TABELA,
-    headStyles: { ...TEMA_TABELA.headStyles, fillColor: COR_ESTOQUE },
-    columnStyles: { 0: { cellWidth: 55, fontStyle: "bold" }, 1: { cellWidth: 113 } },
+    ...TEMA_RELATORIO,
+    columnStyles: colunasProporcionais([1, 3], { 0: { fontStyle: "bold" } }),
   });
 
   const yObs = doc.lastAutoTable.finalY + 8;
-  doc.setFontSize(9); doc.setFont("helvetica", "bold");
-  doc.setTextColor(24, 33, 48);
-  doc.text("Observações / Armazenagem:", 14, yObs);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...PRETO);
+  doc.text("Observações / Armazenagem:", MARGEM, yObs);
   doc.setFont("helvetica", "normal");
-  doc.setTextColor(70, 70, 70);
+  doc.setTextColor(...CINZA_ESCURO);
   const texto = [mat.descricao, mat.especificidade, mat.condicao_armazenagem ? `Condições de armazenagem: ${mat.condicao_armazenagem}` : ""]
     .filter(Boolean)
     .join(" — ") || "—";
-  const obsLines = doc.splitTextToSize(texto, pw - 28);
-  doc.text(obsLines, 14, yObs + 5);
+  const obsLines = doc.splitTextToSize(texto, LARGURA_UTIL);
+  doc.text(obsLines, MARGEM, yObs + 5);
 
-  doc.setTextColor(180, 180, 180); doc.setFontSize(7);
-  doc.text(`Documento gerado por SIGRAF — ${new Date().toLocaleDateString("pt-BR")}`, cx, 285, { align: "center" });
+  finalizarComRodape(doc);
   doc.save(`Ficha_Material_${(mat.codigo || mat.id || "Material").replace(/[^\w-]+/g, "_")}.pdf`);
 }
 
+// ============================================================
+// PEDIDO DE COMPRA
+// ============================================================
 export async function gerarPedidoPDF(pedido, org = {}) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
-  const cx = pw / 2;
   const { linhaY } = await desenharCabecalho(doc, org, "Pedido de Compra");
 
   const numero = pedido.numero || `PED-${pedido.id || ""}`;
   const data = pedido.data_pedido ? new Date(pedido.data_pedido) : null;
-  const dataStr = data && !isNaN(data.getTime()) ? data.toLocaleDateString("pt-BR") : "—";
+  const dataStr = data && !isNaN(data.getTime()) ? data.toLocaleDateString("pt-PT") : "—";
   const itens = (pedido.itens || []).map((i) => ({
     codigo: i.codigo || "—",
     nome: i.nome || "—",
@@ -341,7 +433,7 @@ export async function gerarPedidoPDF(pedido, org = {}) {
   }));
   const total = itens.reduce((s, i) => s + i.total, 0);
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: linhaY + 6,
     head: [["", ""]],
     body: [
@@ -350,55 +442,67 @@ export async function gerarPedidoPDF(pedido, org = {}) {
       ["Data do pedido", dataStr],
       ["Solicitado por", pedido.solicitado_por || "—"],
     ],
-    theme: "plain", styles: { fontSize: 9, cellPadding: 1.5 },
-    columnStyles: { 0: { cellWidth: 40, fontStyle: "bold", textColor: [15, 118, 110] }, 1: { cellWidth: 128 } },
-    margin: { left: 14, right: 14 },
+    theme: "plain",
+    tableWidth: LARGURA_UTIL,
+    styles: { fontSize: 9, cellPadding: 1.5, overflow: "linebreak" },
+    margin: MARGEM_TABELA,
+    columnStyles: colunasProporcionais([1, 3], {
+      0: { fontStyle: "bold", textColor: PRETO },
+    }),
   });
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: doc.lastAutoTable.finalY + 6,
     head: [["Código", "Material", "Unid.", "Quantidade", "Preço Unit.", "Total"]],
     body: itens.map((i) => [
       i.codigo,
       i.nome,
       i.unidade,
-      String(i.quantidade),
+      formatNumero(i.quantidade),
       formatKz(i.preco_unit),
       formatKz(i.total),
     ]),
     foot: [["", "", "", "", "Total", formatKz(total)]],
-    ...TEMA_TABELA,
-    headStyles: { ...TEMA_TABELA.headStyles, fillColor: COR_ESTOQUE },
-    footStyles: { fillColor: [236, 248, 245], textColor: COR_ESTOQUE, fontStyle: "bold", fontSize: 9 },
-    columnStyles: {
-      0: { cellWidth: 24 },
-      1: { cellWidth: 62 },
-      2: { cellWidth: 16, halign: "center" },
-      3: { cellWidth: 30, halign: "right" },
-      4: { cellWidth: 30, halign: "right" },
-      5: { cellWidth: 30, halign: "right" },
+    ...TEMA_RELATORIO,
+    footStyles: {
+      fillColor: CINZA_CLARO,
+      textColor: PRETO,
+      fontStyle: "bold",
+      fontSize: 9,
     },
+    columnStyles: colunasProporcionais(
+      [1.2, 3.2, 0.8, 1.5, 1.5, 1.5],
+      {
+        0: { halign: "center" },
+        2: { halign: "center" },
+        3: { halign: "right" },
+        4: { halign: "right" },
+        5: { halign: "right" },
+      }
+    ),
   });
 
   if (pedido.observacoes) {
-    const yObs = doc.lastAutoTable.finalY + 10;
-    doc.setFontSize(9); doc.setFont("helvetica", "bold");
-    doc.setTextColor(24, 33, 48);
-    doc.text("Observações:", 14, yObs);
+    const yObs = doc.lastAutoTable.finalY + 8;
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...PRETO);
+    doc.text("Observações:", MARGEM, yObs);
     doc.setFont("helvetica", "normal");
-    doc.setTextColor(70, 70, 70);
-    const obsLines = doc.splitTextToSize(String(pedido.observacoes), pw - 28);
-    doc.text(obsLines, 14, yObs + 5);
+    doc.setTextColor(...CINZA_ESCURO);
+    const obsLines = doc.splitTextToSize(String(pedido.observacoes), LARGURA_UTIL);
+    doc.text(obsLines, MARGEM, yObs + 5);
   }
 
-  doc.setTextColor(180, 180, 180); doc.setFontSize(7);
-  doc.text(`Documento gerado por SIGRAF — ${new Date().toLocaleDateString("pt-BR")}`, cx, 285, { align: "center" });
+  finalizarComRodape(doc);
   doc.save(`Pedido_${numero.replace(/[^\w-]+/g, "_")}.pdf`);
 }
 
+// ============================================================
+// RELATÓRIO DE STOCK
+// ============================================================
 export async function gerarRelatorioStockPDF(materiais = [], categorias = [], org = {}) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const pw = doc.internal.pageSize.getWidth();
   const { linhaY: ly } = await desenharCabecalhoRelatorio(doc, org, "Relatório de Stock e Categorias");
 
   const catMap = {};
@@ -428,7 +532,7 @@ export async function gerarRelatorioStockPDF(materiais = [], categorias = [], or
 
   y = secaoPdf(doc, y + 2, "Resumo por Categoria");
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: y,
     head: [["Categoria", "Itens", "Qtd. Total", "Disponível", "Valor Estoque"]],
     body: catRows.map(([nome, d]) => [
@@ -438,16 +542,24 @@ export async function gerarRelatorioStockPDF(materiais = [], categorias = [], or
       formatNumero(d.disponivel),
       formatKz(d.valorTotal),
     ]),
-    foot: [[{ content: "TOTAL", colSpan: 1, styles: { fontStyle: "bold" } }, { content: String(totais.itens), styles: { fontStyle: "bold", halign: "right" } }, { content: formatNumero(totais.qtd), styles: { fontStyle: "bold", halign: "right" } }, { content: formatNumero(totais.disp), styles: { fontStyle: "bold", halign: "right" } }, { content: formatKz(totais.val), styles: { fontStyle: "bold", halign: "right" } }]],
+    foot: [[
+      { content: "TOTAL", styles: { fontStyle: "bold" } },
+      { content: String(totais.itens), styles: { fontStyle: "bold", halign: "right" } },
+      { content: formatNumero(totais.qtd), styles: { fontStyle: "bold", halign: "right" } },
+      { content: formatNumero(totais.disp), styles: { fontStyle: "bold", halign: "right" } },
+      { content: formatKz(totais.val), styles: { fontStyle: "bold", halign: "right" } },
+    ]],
     ...TEMA_RELATORIO,
-    footStyles: { fillColor: COR_ESTOQUE_CLARO, textColor: COR_ESTOQUE, fontStyle: "bold", fontSize: 8 },
-    columnStyles: {
-      0: { cellWidth: 50 },
-      1: { halign: "right", cellWidth: 22 },
-      2: { halign: "right", cellWidth: 32 },
-      3: { halign: "right", cellWidth: 32 },
-      4: { halign: "right", cellWidth: 40 },
+    footStyles: {
+      fillColor: CINZA_CLARO,
+      textColor: PRETO,
+      fontStyle: "bold",
+      fontSize: 8,
     },
+    columnStyles: colunasProporcionais(
+      [3, 0.8, 1.3, 1.3, 1.6],
+      { 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" } }
+    ),
   });
 
   y = doc.lastAutoTable.finalY + 10;
@@ -459,13 +571,13 @@ export async function gerarRelatorioStockPDF(materiais = [], categorias = [], or
     return sa - sb;
   });
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: y,
     head: [["Material", "Categoria", "Qtd.", "Mín", "Máx", "Ponto", "Custo", "Estado"]],
     body: materiaisSorted.map((m) => [
       m.nome || "—",
       m.categoria?.nome || "—",
-      `${formatNumero(m.quantidade)} ${m.unidade || ""}`,
+      `${formatNumero(m.quantidade)} ${m.unidade || ""}`.trim(),
       formatNumero(m.estoque_min),
       formatNumero(m.estoque_max),
       formatNumero(m.ponto_ressuprimento),
@@ -473,34 +585,42 @@ export async function gerarRelatorioStockPDF(materiais = [], categorias = [], or
       m.status === "esgotado" ? "Esgotado" : m.status === "repor" ? "Repôr" : "Ok",
     ]),
     ...TEMA_RELATORIO,
-    headStyles: { ...TEMA_RELATORIO.headStyles, fontSize: 7 },
-    bodyStyles: { ...TEMA_RELATORIO.bodyStyles, fontSize: 7 },
-    columnStyles: {
-      0: { cellWidth: 58 },
-      1: { cellWidth: 38 },
-      2: { cellWidth: 26, halign: "right" },
-      3: { cellWidth: 14, halign: "right" },
-      4: { cellWidth: 14, halign: "right" },
-      5: { cellWidth: 14, halign: "right" },
-      6: { cellWidth: 24, halign: "right" },
-      7: { cellWidth: 18, halign: "center" },
-    },
+    headStyles: { ...TEMA_RELATORIO.headStyles, fontSize: 7.5 },
+    bodyStyles: { ...TEMA_RELATORIO.bodyStyles, fontSize: 7.5 },
+    columnStyles: colunasProporcionais(
+      [2.8, 2, 1.4, 0.8, 0.8, 0.8, 1.4, 1],
+      {
+        2: { halign: "right" },
+        3: { halign: "right" },
+        4: { halign: "right" },
+        5: { halign: "right" },
+        6: { halign: "right" },
+        7: { halign: "center" },
+      }
+    ),
     didParseCell(data) {
       if (data.section === "body" && data.column.index === 7) {
         const v = String(data.cell.raw);
-        if (v === "Esgotado") { data.cell.styles.textColor = [220, 38, 38]; data.cell.styles.fontStyle = "bold"; }
-        else if (v === "Repôr") { data.cell.styles.textColor = [234, 179, 8]; data.cell.styles.fontStyle = "bold"; }
+        if (v === "Esgotado") {
+          data.cell.styles.textColor = PRETO;
+          data.cell.styles.fontStyle = "bold";
+        } else if (v === "Repôr") {
+          data.cell.styles.textColor = CINZA_ESCURO;
+          data.cell.styles.fontStyle = "bold";
+        }
       }
     },
   });
 
-  rodapePdf(doc, pw);
+  finalizarComRodape(doc);
   doc.save(`Relatorio_Stock_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
+// ============================================================
+// RELATÓRIO DE CADASTROS
+// ============================================================
 export async function gerarRelatorioCadastrosPDF(clientes = [], org = {}, filtro = "todos") {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const pw = doc.internal.pageSize.getWidth();
   let titulo = "Relatório de Cadastros";
   if (filtro === "cliente") titulo = "Relatório de Clientes";
   else if (filtro === "fornecedor") titulo = "Relatório de Fornecedores";
@@ -514,60 +634,75 @@ export async function gerarRelatorioCadastrosPDF(clientes = [], org = {}, filtro
     { label: "Total de cadastros", value: String(lista.length) },
     { label: "Clientes", value: String(totalClientes) },
     { label: "Fornecedores", value: String(totalFornecedores) },
-    { label: filtro === "todos" || filtro === "cliente" ? "Relatório" : "Filtro", value: filtro === "todos" ? "Completo" : filtro === "cliente" ? "Clientes" : "Fornecedores" },
+    {
+      label: "Filtro aplicado",
+      value: filtro === "todos" ? "Completo" : filtro === "cliente" ? "Clientes" : "Fornecedores",
+    },
   ]);
   y += 2;
 
   const colunas = ["Código", "Nome", "Empresa", "NIF", "Telefone", "Email"];
-  const linhasCliente = (cs) => cs.map((c) => [c.codigo || "—", c.nome || "—", c.empresa || "—", c.nif || "—", c.telefone || "—", c.email || "—"]);
+  const linhasCliente = (cs) => cs.map((c) => [
+    c.codigo || "—",
+    c.nome || "—",
+    c.empresa || "—",
+    c.nif || "—",
+    c.telefone || "—",
+    c.email || "—",
+  ]);
+
+  const colStyles = colunasProporcionais(
+    [1, 2.6, 2, 1.2, 1.5, 2],
+    {
+      0: { fontStyle: "bold" },
+      3: { halign: "center" },
+    }
+  );
 
   const clientesLista = filtro === "fornecedor" ? [] : lista.filter((c) => c.tipo === "cliente");
   if (clientesLista.length > 0) {
     y = secaoPdf(doc, y, `Clientes (${clientesLista.length})`);
-    doc.autoTable({
+    autoTable(doc, {
       startY: y,
       head: [colunas],
       body: linhasCliente(clientesLista),
       ...TEMA_RELATORIO,
-      columnStyles: {
-        0: { cellWidth: 20, fontStyle: "bold" },
-        1: { cellWidth: 44 },
-        2: { cellWidth: 34 },
-        3: { cellWidth: 22, halign: "center" },
-        4: { cellWidth: 24 },
-        5: { cellWidth: 42 },
-      },
+      columnStyles: colStyles,
     });
     y = doc.lastAutoTable.finalY + 8;
   }
 
   const fornecedoresLista = filtro === "cliente" ? [] : lista.filter((c) => c.tipo === "fornecedor");
   if (fornecedoresLista.length > 0) {
+    if (y + 20 > doc.internal.pageSize.getHeight() - 20) {
+      doc.addPage();
+      y = 22;
+    }
     y = secaoPdf(doc, y, `Fornecedores (${fornecedoresLista.length})`);
-    doc.autoTable({
+    autoTable(doc, {
       startY: y,
       head: [colunas],
       body: linhasCliente(fornecedoresLista),
       ...TEMA_RELATORIO,
-      columnStyles: {
-        0: { cellWidth: 20, fontStyle: "bold" },
-        1: { cellWidth: 44 },
-        2: { cellWidth: 34 },
-        3: { cellWidth: 22, halign: "center" },
-        4: { cellWidth: 24 },
-        5: { cellWidth: 42 },
-      },
+      columnStyles: colStyles,
     });
   }
 
-  rodapePdf(doc, pw);
-  const nomeFicheiro = filtro === "todos" ? "Relatorio_Cadastros" : filtro === "cliente" ? "Relatorio_Clientes" : "Relatorio_Fornecedores";
+  finalizarComRodape(doc);
+  const nomeFicheiro =
+    filtro === "todos"
+      ? "Relatorio_Cadastros"
+      : filtro === "cliente"
+      ? "Relatorio_Clientes"
+      : "Relatorio_Fornecedores";
   doc.save(`${nomeFicheiro}_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
+// ============================================================
+// RELATÓRIO DE CATEGORIAS E FAMÍLIAS
+// ============================================================
 export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [], org = {}) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const pw = doc.internal.pageSize.getWidth();
   const { linhaY: ly } = await desenharCabecalhoRelatorio(doc, org, "Relatório de Categorias e Famílias");
 
   const catMap = {};
@@ -577,56 +712,107 @@ export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [
     catMap[fam].push(c);
   });
 
-  const materiaisPorCat = {};
+  const materiaisPorCatId = {};
+  const materiaisPorCatNome = {};
   materiais.forEach((m) => {
-    const catNome = m.categoria?.nome || m.categoria_nome || "Sem categoria";
-    materiaisPorCat[catNome] = (materiaisPorCat[catNome] || 0) + 1;
+    if (m.categoria_id != null) {
+      const k = String(m.categoria_id);
+      materiaisPorCatId[k] = (materiaisPorCatId[k] || 0) + 1;
+    }
+    const nome = m.categoria?.nome || m.categoria_nome || "Sem categoria";
+    materiaisPorCatNome[nome] = (materiaisPorCatNome[nome] || 0) + 1;
   });
 
-  const totalMateriais = Object.values(materiaisPorCat).reduce((s, n) => s + n, 0);
+  const contarItens = (c) => {
+    if (c.id != null && materiaisPorCatId[String(c.id)] != null) {
+      return materiaisPorCatId[String(c.id)];
+    }
+    const chaveNome = c.descricao || c.subfamilia || c.nome;
+    return chaveNome ? materiaisPorCatNome[chaveNome] || 0 : 0;
+  };
+
+  const totalMateriais = materiais.length;
 
   let y = desenharKpis(doc, ly + 3, [
     { label: "Famílias", value: String(Object.keys(catMap).length) },
     { label: "Categorias", value: String(categorias.length) },
     { label: "Materiais em stock", value: String(totalMateriais) },
-    { label: "Grupos", value: String(new Set(categorias.map((c) => normalizarTipoItem(c.tipo))).size) },
+    {
+      label: "Grupos",
+      value: String(new Set(categorias.map((c) => normalizarTipoItem(c.tipo))).size),
+    },
   ]);
-  y += 2;
+  y += 3;
 
-  Object.entries(catMap)
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .forEach(([fam, cats]) => {
-      if (y + 20 > doc.internal.pageSize.getHeight() - 20) doc.addPage();
-      const famCfg = familias[fam];
-      doc.setFillColor(...COR_ESTOQUE);
-      doc.circle(15.5, y - 1.1, 1.1, "F");
-      doc.setFontSize(10.5); doc.setFont("helvetica", "bold");
-      doc.setTextColor(...COR_ESTOQUE);
-      doc.text(`${famCfg?.label || fam} · ${cats.length} ${cats.length === 1 ? "categoria" : "categorias"}`, 18.5, y);
-      y += 2;
+  const familiasOrdenadas = Object.entries(catMap).sort((a, b) =>
+    (familias[a[0]]?.label || a[0]).localeCompare(familias[b[0]]?.label || b[0], "pt")
+  );
 
-      doc.autoTable({
-        startY: y,
-        head: [["Categoria", "Grupo", "Itens em Stock"]],
-        body: cats
-          .slice()
-          .sort((a, b) => (a.subfamilia || "").localeCompare(b.subfamilia || ""))
-          .map((c) => {
-            const grupoLabel = tiposItem[normalizarTipoItem(c.tipo)]?.label || "—";
-            return [c.descricao || c.subfamilia || c.nome || "—", grupoLabel, String(materiaisPorCat[c.nome] || 0)];
-          }),
-        foot: [[{ content: `TOTAL ${cats.length}`, colSpan: 2, styles: { fontStyle: "bold" } }, { content: String(cats.reduce((s, c) => s + (materiaisPorCat[c.nome] || 0), 0)), styles: { fontStyle: "bold", halign: "right" } }]],
-        ...TEMA_RELATORIO,
-        footStyles: { fillColor: COR_ESTOQUE_CLARO, textColor: COR_ESTOQUE, fontStyle: "bold", fontSize: 8 },
-        columnStyles: {
-          0: { cellWidth: 130 },
-          1: { cellWidth: 40 },
-          2: { cellWidth: 26, halign: "right" },
-        },
-      });
-      y = doc.lastAutoTable.finalY + 8;
+  if (familiasOrdenadas.length === 0) {
+    doc.setFontSize(10);
+    doc.setTextColor(...CINZA_MEDIO);
+    doc.text("Nenhuma categoria registada.", MARGEM, y + 6);
+  }
+
+  familiasOrdenadas.forEach(([fam, cats]) => {
+    const famCfg = familias[fam] || { label: fam || "Outras" };
+    const totalItensFam = cats.reduce((s, c) => s + contarItens(c), 0);
+
+    if (y + 24 > doc.internal.pageSize.getHeight() - 20) {
+      doc.addPage();
+      y = 22;
+    }
+
+    // Faixa de título da família — CINZA
+    doc.setFillColor(...CINZA_CLARO);
+    doc.setDrawColor(...CINZA_MEDIO);
+    doc.setLineWidth(0.2);
+    doc.roundedRect(MARGEM, y - 4, LARGURA_UTIL, 8, 1.5, 1.5, "FD");
+    doc.setTextColor(...PRETO);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text(
+      `${(famCfg.label || fam).toUpperCase()}  ·  ${cats.length} ${cats.length === 1 ? "categoria" : "categorias"}  ·  ${totalItensFam} ${totalItensFam === 1 ? "item" : "itens"}`,
+      MARGEM + 3,
+      y + 1
+    );
+    y += 7;
+
+    autoTable(doc, {
+      startY: y,
+      head: [["Categoria / Subfamília", "Grupo", "Itens em Stock"]],
+      body: cats
+        .slice()
+        .sort(
+          (a, b) =>
+            (a.subfamilia || "").localeCompare(b.subfamilia || "", "pt") ||
+            String(a.tipo || "").localeCompare(String(b.tipo || ""), "pt")
+        )
+        .map((c) => {
+          const grupoLabel = tiposItem[normalizarTipoItem(c.tipo)]?.label || "—";
+          const rotulo = c.subfamilia || c.descricao || c.nome || "—";
+          return [rotulo, grupoLabel, String(contarItens(c))];
+        }),
+      foot: [[
+        { content: `Subtotal ${famCfg.label || fam}`, colSpan: 2, styles: { fontStyle: "bold" } },
+        { content: String(totalItensFam), styles: { fontStyle: "bold", halign: "right" } },
+      ]],
+      ...TEMA_RELATORIO,
+      footStyles: {
+        fillColor: CINZA_CLARO,
+        textColor: PRETO,
+        fontStyle: "bold",
+        fontSize: 8,
+      },
+      columnStyles: colunasProporcionais(
+        [3.4, 1.6, 1],
+        { 2: { halign: "right" } }
+      ),
     });
 
-  rodapePdf(doc, pw);
+    y = doc.lastAutoTable.finalY + 8;
+  });
+
+  finalizarComRodape(doc);
   doc.save(`Relatorio_Categorias_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
