@@ -75,18 +75,16 @@ function categoriaLabel(c) {
   ].filter(Boolean).join(" › ");
 }
 
-// ─────────────────────────────────────────────────────────────
-// Hook: arrasto da modal (só em ecrãs >= 640px)
-// Abre SEMPRE centrada (pos = 0,0) e desloca-se a partir daí.
-// ─────────────────────────────────────────────────────────────
 function useArrastavel({ ativo }) {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const startRef = useRef({ x: 0, y: 0, posX: 0, posY: 0 });
 
   useEffect(() => {
-    setPos({ x: 0, y: 0 });
-    if (!ativo) setDragging(false);
+    if (!ativo) {
+      setPos({ x: 0, y: 0 });
+      setDragging(false);
+    }
   }, [ativo]);
 
   const onHeaderMouseDown = useCallback((e) => {
@@ -542,49 +540,35 @@ export default function CategoriasPage() {
               const fam = todosFamilias[normalizarFamilia(c.familia)] || { label: c.familia || "—", icon: "label", classe: "text-muted-foreground" };
               const tipo = tiposItem[normalizarTipoItem(c.tipo)] || { label: c.tipo || "—" };
               return (
-                <div key={c.id} className="bg-card border border-border rounded-xl p-4 sm:p-5 flex flex-col gap-3">
-                  {/* Cabeçalho: ícone + família + badge do grupo */}
-                  <div className="flex items-start gap-3">
-                    <span className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                      <Icon name={fam.icon} className="text-lg text-muted-foreground" />
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-foreground leading-snug break-words">
-                        {fam.label}
-                      </h3>
-                      <Badge variant="outline" className="mt-1.5 text-[10px] px-1.5 py-0.5 whitespace-normal break-words leading-tight max-w-full">
-                        <Icon name="label" className="text-[10px] mr-1 shrink-0" />
-                        <span className="break-words">{tipo.label}</span>
-                      </Badge>
+                <div key={c.id} className="bg-card border border-border rounded-xl p-5 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        <Icon name={fam.icon} className="text-lg text-muted-foreground" />
+                      </span>
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-foreground truncate">{fam.label}</h3>
+                      </div>
                     </div>
+                    <Badge variant="outline" className="shrink-0">Grupo: {tipo.label}</Badge>
                   </div>
 
-                  {/* Subfamília (quebra em várias linhas) */}
-                  <div className="text-[11px] text-muted-foreground border-t border-border pt-3 flex flex-wrap gap-x-1.5 gap-y-0.5">
-                    <span className="shrink-0">Subfamília:</span>
-                    <strong className="text-foreground font-medium break-words">{c.subfamilia || "—"}</strong>
+                  <div className="flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground border-t border-border pt-3">
+                    <span>Subfamília: <strong className="text-foreground font-medium">{c.subfamilia || "—"}</strong></span>
                   </div>
-
-                  {/* Descrição (2 linhas no máximo) */}
                   {c.descricao && (
-                    <p className="text-[11px] text-muted-foreground border-t border-border pt-2 line-clamp-2 break-words">
-                      {c.descricao}
-                    </p>
+                    <p className="text-[11px] text-muted-foreground border-t border-border pt-2 line-clamp-2">{c.descricao}</p>
                   )}
 
-                  {/* Ações */}
-                  <div className="flex flex-wrap justify-end gap-1 pt-2 border-t border-border mt-auto">
+                  <div className="flex justify-end gap-1 pt-2 border-t border-border flex-wrap">
                     <Button variant="outline" size="sm" onClick={() => abrirDuplicar(c)} title="Duplicar esta categoria">
-                      <Icon name="content_copy" className="text-sm" />
-                      <span className="hidden sm:inline">Duplicar</span>
+                      <Icon name="content_copy" className="text-sm" /> Duplicar
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => abrirEdicao(c)} title="Editar">
-                      <Icon name="edit" className="text-sm" />
-                      <span className="hidden sm:inline">Editar</span>
+                    <Button variant="outline" size="sm" onClick={() => abrirEdicao(c)}>
+                      <Icon name="edit" className="text-sm" /> Editar
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setEliminar(c)} className="text-destructive" title="Remover">
-                      <Icon name="delete" className="text-sm" />
-                      <span className="hidden sm:inline">Remover</span>
+                    <Button variant="ghost" size="sm" onClick={() => setEliminar(c)} className="text-destructive">
+                      <Icon name="delete" className="text-sm" /> Remover
                     </Button>
                   </div>
                 </div>
@@ -594,7 +578,6 @@ export default function CategoriasPage() {
         </>
       )}
 
-      {/* ─────────── MODAL: CRIAR / EDITAR (arrastável) ─────────── */}
       <Modal
         open={modal.aberto}
         onClose={() => setModal({ aberto: false, id: null })}
@@ -651,7 +634,6 @@ export default function CategoriasPage() {
         </form>
       </Modal>
 
-      {/* ─────────── MODAL: DUPLICAR (arrastável) ─────────── */}
       <Modal
         open={modalDuplicar.aberto}
         onClose={fecharDuplicar}
@@ -676,7 +658,7 @@ export default function CategoriasPage() {
               <Icon name="info" className="text-primary text-base shrink-0 mt-0.5" />
               <div className="text-xs text-foreground">
                 <p className="font-semibold">A duplicar a partir de:</p>
-                <p className="text-muted-foreground mt-0.5 break-words">{categoriaLabel(modalDuplicar.origem)}</p>
+                <p className="text-muted-foreground mt-0.5">{categoriaLabel(modalDuplicar.origem)}</p>
                 <p className="text-muted-foreground mt-1.5 text-[11px]">
                   Altera apenas os campos que precisares. Será criada uma <strong>nova categoria</strong>.
                 </p>
@@ -730,7 +712,6 @@ export default function CategoriasPage() {
       <ConfirmDialog open={Boolean(eliminar)} onClose={() => setEliminar(null)} onConfirm={confirmarEliminacao} loading={deletando} title="Remover categoria"
         description={eliminar ? `Remover a categoria "${categoriaLabel(eliminar)}"?` : ""} />
 
-      {/* ─────────── MODAL SERVIÇOS ─────────── */}
       <Modal open={modalServicos} onClose={() => setModalServicos(false)} title="Gerir Serviços" icon="home_repair_service" size="lg"
         footer={<Button type="button" variant="outline" onClick={() => setModalServicos(false)}>Fechar</Button>}
       >
