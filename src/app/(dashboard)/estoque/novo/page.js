@@ -6,7 +6,7 @@ import Icon from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
 import MaterialForm from "@/components/estoque/MaterialForm";
 import useEstoque from "@/hooks/useEstoque";
-import { blankItem, entradasEspecificacao, formatKz, toNum, familias, tiposItem, normalizarFamilia, normalizarUnidade, moverEstoqueDe } from "@/lib/estoque";
+import { blankItem, entradasEspecificacao, formatKz, toNum, familias, tiposItem, normalizarFamilia, normalizarTipoItem, normalizarUnidade, moverEstoqueDe } from "@/lib/estoque";
 
 function PreviewLinha({ label, valor, acento }) {
   return (
