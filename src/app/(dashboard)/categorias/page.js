@@ -17,7 +17,6 @@ import { buscarOrganizacao, guardarOrganizacao } from "@/services/configuracoes"
 import FilterBar, { useFilter } from "@/components/ui/FilterBar";
 
 const blankForm = { familia: "", subfamilia: "", tipo: "Artigo / Produto", descricao: "" };
-
 const todosFamilias = { ...familias, ...familiasServico };
 
 function familiaParaSalvar(texto) {
@@ -77,43 +76,43 @@ function categoriaLabel(c) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Hook: torna um elemento arrastável (X/Y) via handle no cabeçalho
+// Hook: arrasto da modal (só em ecrãs >= 640px)
+// Abre SEMPRE centrada (pos = 0,0) e desloca-se a partir daí.
 // ─────────────────────────────────────────────────────────────
 function useArrastavel({ ativo }) {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
-  const offsetRef = useRef({ x: 0, y: 0 });
+  const startRef = useRef({ x: 0, y: 0, posX: 0, posY: 0 });
 
-  // Reset quando a modal abre/fecha
   useEffect(() => {
-    if (!ativo) {
-      setPos({ x: 0, y: 0 });
-      setDragging(false);
-    }
+    setPos({ x: 0, y: 0 });
+    if (!ativo) setDragging(false);
   }, [ativo]);
 
-  const onMouseDown = useCallback((e) => {
-    // Não iniciar drag se o clique for num botão/ícone de fechar
+  const onHeaderMouseDown = useCallback((e) => {
     if (e.target.closest("button")) return;
+    if (typeof window !== "undefined" && window.innerWidth < 640) return;
     e.preventDefault();
     setDragging(true);
-    offsetRef.current = {
-      x: e.clientX - pos.x,
-      y: e.clientY - pos.y,
+    startRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      posX: pos.x,
+      posY: pos.y,
     };
   }, [pos.x, pos.y]);
 
   useEffect(() => {
     if (!dragging) return;
-
     const onMove = (e) => {
+      const dx = e.clientX - startRef.current.x;
+      const dy = e.clientY - startRef.current.y;
       setPos({
-        x: e.clientX - offsetRef.current.x,
-        y: e.clientY - offsetRef.current.y,
+        x: startRef.current.posX + dx,
+        y: startRef.current.posY + dy,
       });
     };
     const onUp = () => setDragging(false);
-
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
     return () => {
@@ -122,7 +121,7 @@ function useArrastavel({ ativo }) {
     };
   }, [dragging]);
 
-  return { pos, dragging, onMouseDown };
+  return { pos, dragging, onHeaderMouseDown };
 }
 
 export default function CategoriasPage() {
@@ -152,7 +151,6 @@ export default function CategoriasPage() {
   const [subFiltro, setSubFiltro] = useState("todas");
   const [subSubFiltro, setSubSubFiltro] = useState("todas");
 
-  // Hooks de arrasto (um por modal)
   const dragCategoria = useArrastavel({ ativo: modal.aberto });
   const dragDuplicar = useArrastavel({ ativo: modalDuplicar.aberto });
 
@@ -544,35 +542,49 @@ export default function CategoriasPage() {
               const fam = todosFamilias[normalizarFamilia(c.familia)] || { label: c.familia || "—", icon: "label", classe: "text-muted-foreground" };
               const tipo = tiposItem[normalizarTipoItem(c.tipo)] || { label: c.tipo || "—" };
               return (
-                <div key={c.id} className="bg-card border border-border rounded-xl p-5 space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                        <Icon name={fam.icon} className="text-lg text-muted-foreground" />
-                      </span>
-                      <div className="min-w-0">
-                        <h3 className="font-semibold text-foreground truncate">{fam.label}</h3>
-                      </div>
+                <div key={c.id} className="bg-card border border-border rounded-xl p-4 sm:p-5 flex flex-col gap-3">
+                  {/* Cabeçalho: ícone + família + badge do grupo */}
+                  <div className="flex items-start gap-3">
+                    <span className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                      <Icon name={fam.icon} className="text-lg text-muted-foreground" />
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-foreground leading-snug break-words">
+                        {fam.label}
+                      </h3>
+                      <Badge variant="outline" className="mt-1.5 text-[10px] px-1.5 py-0.5 whitespace-normal break-words leading-tight max-w-full">
+                        <Icon name="label" className="text-[10px] mr-1 shrink-0" />
+                        <span className="break-words">{tipo.label}</span>
+                      </Badge>
                     </div>
-                    <Badge variant="outline" className="shrink-0">Grupo: {tipo.label}</Badge>
                   </div>
 
-                  <div className="flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground border-t border-border pt-3">
-                    <span>Subfamília: <strong className="text-foreground font-medium">{c.subfamilia || "—"}</strong></span>
+                  {/* Subfamília (quebra em várias linhas) */}
+                  <div className="text-[11px] text-muted-foreground border-t border-border pt-3 flex flex-wrap gap-x-1.5 gap-y-0.5">
+                    <span className="shrink-0">Subfamília:</span>
+                    <strong className="text-foreground font-medium break-words">{c.subfamilia || "—"}</strong>
                   </div>
+
+                  {/* Descrição (2 linhas no máximo) */}
                   {c.descricao && (
-                    <p className="text-[11px] text-muted-foreground border-t border-border pt-2 line-clamp-2">{c.descricao}</p>
+                    <p className="text-[11px] text-muted-foreground border-t border-border pt-2 line-clamp-2 break-words">
+                      {c.descricao}
+                    </p>
                   )}
 
-                  <div className="flex justify-end gap-1 pt-2 border-t border-border flex-wrap">
+                  {/* Ações */}
+                  <div className="flex flex-wrap justify-end gap-1 pt-2 border-t border-border mt-auto">
                     <Button variant="outline" size="sm" onClick={() => abrirDuplicar(c)} title="Duplicar esta categoria">
-                      <Icon name="content_copy" className="text-sm" /> Duplicar
+                      <Icon name="content_copy" className="text-sm" />
+                      <span className="hidden sm:inline">Duplicar</span>
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => abrirEdicao(c)}>
-                      <Icon name="edit" className="text-sm" /> Editar
+                    <Button variant="outline" size="sm" onClick={() => abrirEdicao(c)} title="Editar">
+                      <Icon name="edit" className="text-sm" />
+                      <span className="hidden sm:inline">Editar</span>
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setEliminar(c)} className="text-destructive">
-                      <Icon name="delete" className="text-sm" /> Remover
+                    <Button variant="ghost" size="sm" onClick={() => setEliminar(c)} className="text-destructive" title="Remover">
+                      <Icon name="delete" className="text-sm" />
+                      <span className="hidden sm:inline">Remover</span>
                     </Button>
                   </div>
                 </div>
@@ -582,15 +594,16 @@ export default function CategoriasPage() {
         </>
       )}
 
-      {/* ─────────────────────────────────────────────
-          MODAL: CRIAR / EDITAR CATEGORIA (ARRASTÁVEL)
-          ───────────────────────────────────────────── */}
-      <ModalFlutuante
+      {/* ─────────── MODAL: CRIAR / EDITAR (arrastável) ─────────── */}
+      <Modal
         open={modal.aberto}
         onClose={() => setModal({ aberto: false, id: null })}
         title={modal.id ? "Editar Categoria" : "Nova Categoria"}
         icon="category"
-        drag={dragCategoria}
+        size="lg"
+        dragPos={dragCategoria.pos}
+        dragging={dragCategoria.dragging}
+        onHeaderMouseDown={dragCategoria.onHeaderMouseDown}
         footer={
           <>
             <Button type="button" variant="outline" onClick={() => setModal({ aberto: false, id: null })}>Cancelar</Button>
@@ -636,17 +649,18 @@ export default function CategoriasPage() {
             </div>
           </div>
         </form>
-      </ModalFlutuante>
+      </Modal>
 
-      {/* ─────────────────────────────────────────────
-          MODAL: DUPLICAR CATEGORIA (ARRASTÁVEL)
-          ───────────────────────────────────────────── */}
-      <ModalFlutuante
+      {/* ─────────── MODAL: DUPLICAR (arrastável) ─────────── */}
+      <Modal
         open={modalDuplicar.aberto}
         onClose={fecharDuplicar}
         title="Duplicar Categoria"
         icon="content_copy"
-        drag={dragDuplicar}
+        size="lg"
+        dragPos={dragDuplicar.pos}
+        dragging={dragDuplicar.dragging}
+        onHeaderMouseDown={dragDuplicar.onHeaderMouseDown}
         footer={
           <>
             <Button type="button" variant="outline" onClick={fecharDuplicar}>Cancelar</Button>
@@ -662,7 +676,7 @@ export default function CategoriasPage() {
               <Icon name="info" className="text-primary text-base shrink-0 mt-0.5" />
               <div className="text-xs text-foreground">
                 <p className="font-semibold">A duplicar a partir de:</p>
-                <p className="text-muted-foreground mt-0.5">{categoriaLabel(modalDuplicar.origem)}</p>
+                <p className="text-muted-foreground mt-0.5 break-words">{categoriaLabel(modalDuplicar.origem)}</p>
                 <p className="text-muted-foreground mt-1.5 text-[11px]">
                   Altera apenas os campos que precisares. Será criada uma <strong>nova categoria</strong>.
                 </p>
@@ -711,11 +725,12 @@ export default function CategoriasPage() {
             </div>
           </div>
         </form>
-      </ModalFlutuante>
+      </Modal>
 
       <ConfirmDialog open={Boolean(eliminar)} onClose={() => setEliminar(null)} onConfirm={confirmarEliminacao} loading={deletando} title="Remover categoria"
         description={eliminar ? `Remover a categoria "${categoriaLabel(eliminar)}"?` : ""} />
 
+      {/* ─────────── MODAL SERVIÇOS ─────────── */}
       <Modal open={modalServicos} onClose={() => setModalServicos(false)} title="Gerir Serviços" icon="home_repair_service" size="lg"
         footer={<Button type="button" variant="outline" onClick={() => setModalServicos(false)}>Fechar</Button>}
       >
@@ -787,89 +802,5 @@ export default function CategoriasPage() {
         <p className="text-sm text-muted-foreground">SIGRAF — Sistema de Gestão para Indústria Gráfica</p>
       </footer>
     </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// ModalFlutuante: modal arrastável com handle no cabeçalho
-// ─────────────────────────────────────────────────────────────
-function ModalFlutuante({ open, onClose, title, icon, size = "lg", footer, drag, children }) {
-  const { pos, dragging, onMouseDown } = drag;
-
-  if (!open) return null;
-
-  const maxW =
-    size === "sm" ? "max-w-md" :
-    size === "md" ? "max-w-lg" :
-    size === "xl" ? "max-w-4xl" :
-    "max-w-2xl";
-
-  return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-
-      {/* Wrapper que aplica o translate */}
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none p-4"
-      >
-        <div
-          className={`pointer-events-auto w-full ${maxW} bg-card border border-border rounded-2xl shadow-2xl overflow-hidden ${dragging ? "select-none" : ""}`}
-          style={{
-            transform: `translate(${pos.x}px, ${pos.y}px)`,
-            transition: dragging ? "none" : "transform 0.15s ease-out",
-          }}
-        >
-          {/* Cabeçalho arrastável */}
-          <div
-            onMouseDown={onMouseDown}
-            className={`flex items-center justify-between gap-3 px-5 py-3.5 border-b border-border bg-card ${
-              dragging ? "cursor-grabbing" : "cursor-grab"
-            }`}
-            title="Arrasta para mover a janela"
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              {icon && (
-                <span className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                  <Icon name={icon} className="text-base text-muted-foreground" />
-                </span>
-              )}
-              <h3 className="font-semibold text-foreground truncate">{title}</h3>
-            </div>
-            <div className="flex items-center gap-1">
-              {/* Indicador de drag */}
-              <span className="hidden sm:flex items-center text-muted-foreground/60 text-[10px] uppercase tracking-wider gap-1 mr-1 select-none">
-                <Icon name="drag_indicator" className="text-sm" />
-                Arrastar
-              </span>
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center transition-colors"
-                aria-label="Fechar"
-              >
-                <Icon name="close" className="text-lg text-muted-foreground" />
-              </button>
-            </div>
-          </div>
-
-          {/* Corpo */}
-          <div className="p-5 max-h-[70vh] overflow-y-auto">
-            {children}
-          </div>
-
-          {/* Rodapé */}
-          {footer && (
-            <div className="px-5 py-3.5 border-t border-border bg-muted/30 flex justify-end gap-2">
-              {footer}
-            </div>
-          )}
-        </div>
-      </div>
-    </>
   );
 }
