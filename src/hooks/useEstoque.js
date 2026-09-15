@@ -252,12 +252,11 @@ export default function useEstoque() {
   );
 
   const totais = useMemo(() => {
-    const movem = materiais.filter((i) => i.mover_estoque !== false);
     return {
-      itens: movem.length,
-      stock: movem.reduce((s, i) => s + toNum(i.quantidade), 0),
-      reservado: movem.reduce((s, i) => s + toNum(i.estoque_reservado), 0),
-      disponivel: movem.reduce((s, i) => s + toNum(i.estoque_disponivel), 0),
+      itens: materiais.length,
+      stock: materiais.reduce((s, i) => s + toNum(i.quantidade), 0),
+      reservado: materiais.reduce((s, i) => s + toNum(i.estoque_reservado), 0),
+      disponivel: materiais.reduce((s, i) => s + toNum(i.estoque_disponivel), 0),
     };
   }, [materiais]);
 
