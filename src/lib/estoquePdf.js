@@ -777,14 +777,6 @@ export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [
   ]);
   y += 3;
 
-  // ── Linha de filtros aplicados ──
-  const resumoFam = famsSel.length > 6 ? `${famsSel.slice(0, 6).join(", ")} +${famsSel.length - 6}` : famsSel.join(", ");
-  const resumoGru = grpsSel.length > 6 ? `${grpsSel.slice(0, 6).join(", ")} +${grpsSel.length - 6}` : grpsSel.join(", ");
-  doc.setFontSize(8);
-  doc.setTextColor(...CINZA_MEDIO);
-  doc.text(`Famílias: ${famsSel.length ? resumoFam : "todas"} | Grupos: ${grpsSel.length ? resumoGru : "todos"}`, MARGEM, y + 3);
-  y += 6;
-
   if (totalCategorias === 0) {
     doc.setFontSize(10);
     doc.setTextColor(...CINZA_MEDIO);
