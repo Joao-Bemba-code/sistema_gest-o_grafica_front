@@ -10,7 +10,7 @@ const cards = [
     icon: "inventory_2",
     label: "Total de Itens",
     unit: "itens",
-    barra: "gradient-brand",
+    barra: "bg-primary",
   },
   {
     key: "alertas",
@@ -47,7 +47,7 @@ function KpiCard({ card, valor, barra }) {
       <div className="flex items-center gap-2.5 min-w-0">
         <span
           className={`w-9 h-9 shrink-0 rounded-lg flex items-center justify-center ${
-            card.critico ? "bg-error/10 text-error border border-error/25" : "chip-icon-grad"
+            card.critico ? "bg-error/10 text-error border border-error/25" : "bg-muted text-primary border border-border"
           }`}
         >
           <Icon name={card.icon} className="text-lg" />

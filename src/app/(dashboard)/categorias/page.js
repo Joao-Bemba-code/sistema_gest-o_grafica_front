@@ -15,6 +15,7 @@ import { listar, criar, atualizar, remover } from "@/services/categorias";
 import { listar as listarServicos, criar as criarServico, atualizar as atualizarServico, remover as removerServico } from "@/services/servicos";
 import { buscarOrganizacao, guardarOrganizacao } from "@/services/configuracoes";
 import FilterBar, { useFilter } from "@/components/ui/FilterBar";
+import { useOpcoesCategoria } from "@/hooks/useOpcoesCategoria";
 
 const blankForm = { familia: "", subfamilia: "", tipo: "Artigo / Produto", descricao: "" };
 const todosFamilias = { ...familias, ...familiasServico };
@@ -151,6 +152,8 @@ export default function CategoriasPage() {
 
   const dragCategoria = useArrastavel({ ativo: modal.aberto });
   const dragDuplicar = useArrastavel({ ativo: modalDuplicar.aberto });
+
+  const opcoesCategoria = useOpcoesCategoria(categorias);
 
   const tiposRegistados = useMemo(() => {
     const mapa = new Map();
@@ -603,7 +606,7 @@ export default function CategoriasPage() {
               <CreatableSelect
                 required
                 value={form.familia}
-                options={Object.entries(todosFamilias).map(([key, cfg]) => ({ id: cfg.label, label: cfg.label }))}
+                options={opcoesCategoria.familias.map((f) => ({ id: f.label, label: f.label, icon: f.icon }))}
                 placeholder="Escolher uma família..."
                 createLabel="Criar nova família"
                 onChange={(label) => setForm((p) => ({ ...p, familia: label }))}
@@ -619,7 +622,7 @@ export default function CategoriasPage() {
               <CreatableSelect
                 required
                 value={form.tipo}
-                options={tipoRecursoOptions.map((t) => ({ id: t.label, label: t.label }))}
+                options={opcoesCategoria.grupos.map((g) => ({ id: g.label, label: g.label, icon: g.icon }))}
                 placeholder="Escolher um grupo..."
                 createLabel="Criar novo grupo"
                 onChange={(label) => setForm((p) => ({ ...p, tipo: label }))}
@@ -672,7 +675,7 @@ export default function CategoriasPage() {
               <CreatableSelect
                 required
                 value={formDuplicar.familia}
-                options={Object.entries(todosFamilias).map(([key, cfg]) => ({ id: cfg.label, label: cfg.label }))}
+                options={opcoesCategoria.familias.map((f) => ({ id: f.label, label: f.label, icon: f.icon }))}
                 placeholder="Escolher uma família..."
                 createLabel="Criar nova família"
                 onChange={(label) => setFormDuplicar((p) => ({ ...p, familia: label }))}
@@ -694,7 +697,7 @@ export default function CategoriasPage() {
               <CreatableSelect
                 required
                 value={formDuplicar.tipo}
-                options={tipoRecursoOptions.map((t) => ({ id: t.label, label: t.label }))}
+                options={opcoesCategoria.grupos.map((g) => ({ id: g.label, label: g.label, icon: g.icon }))}
                 placeholder="Escolher um grupo..."
                 createLabel="Criar novo grupo"
                 onChange={(label) => setFormDuplicar((p) => ({ ...p, tipo: label }))}

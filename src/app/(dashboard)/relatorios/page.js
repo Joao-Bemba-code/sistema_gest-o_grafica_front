@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Icon from "@/components/Icon";
-import { AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import KpiCard from "@/components/ui/KpiCard";
 import { Button } from "@/components/ui/Button";
@@ -147,6 +147,8 @@ export default function RelatoriosPage() {
   const [periodo, setPeriodo] = useState(getUltimos6Meses()[5].labelCurto);
   const [aba, setAba] = useState("comercial");
   const [filtroTipo, setFiltroTipo] = useState("todos");
+  const [filtroFamilia, setFiltroFamilia] = useState("todas");
+  const [filtroGrupo, setFiltroGrupo] = useState("todas");
   const [busca, setBusca] = useState("");
   const { addToast } = useToast();
 
@@ -527,7 +529,7 @@ export default function RelatoriosPage() {
                 </div>
               </CartaoGrafico>
 
-              <CartaoGrafico icon="wave" titulo="Desempenho por Período" sub="Ordens produzidas e entregues por mês">
+              <CartaoGrafico icon="show_chart" titulo="Desempenho por Período" sub="Ordens produzidas e entregues por mês">
                 <div className="h-52">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={desempenhoMeses} margin={{ top: 10, right: 10, left: -14, bottom: 0 }}>
@@ -708,19 +710,37 @@ export default function RelatoriosPage() {
       })()}
 
       {aba === "recursos" && (() => {
-        const catMap = {};
+        const fams = new Map();
+        const grupos = new Map();
         categorias.forEach((c) => {
+          const fam = normalizarFamilia(c.familia);
+          const famCfg = familias[fam];
+          if (!fams.has(fam)) fams.set(fam, { value: fam, label: famCfg?.label || c.familia || fam });
+          const gLabel = tiposItem[normalizarTipoItem(c.tipo)]?.label || "Sem grupo";
+          if (!grupos.has(gLabel)) grupos.set(gLabel, { value: gLabel, label: gLabel });
+        });
+        const opcoesFamilias = [...fams.values()].sort((a, b) => a.label.localeCompare(b.label, "pt"));
+        const opcoesGrupos = [...grupos.values()].sort((a, b) => a.label.localeCompare(b.label, "pt"));
+
+        const categoriasFiltradas = categorias.filter((c) => {
+          const fam = normalizarFamilia(c.familia);
+          const gLabel = tiposItem[normalizarTipoItem(c.tipo)]?.label || "Sem grupo";
+          return (filtroFamilia === "todas" || fam === filtroFamilia) && (filtroGrupo === "todas" || gLabel === filtroGrupo);
+        });
+
+        const catMap = {};
+        categoriasFiltradas.forEach((c) => {
           const fam = normalizarFamilia(c.familia);
           if (!catMap[fam]) catMap[fam] = [];
           catMap[fam].push(c);
         });
 
-        // ── Distribuições para os 3 donuts (Grupo / Família / Subfamília) ──
+        // ── Distribuições (Grupo / Família / Subfamília) ──
         const porGrupo = {};
         const porFamilia = {};
         const porSubfamilia = {};
 
-        categorias.forEach((c) => {
+        categoriasFiltradas.forEach((c) => {
           const grupoLabel = tiposItem[normalizarTipoItem(c.tipo)]?.label || "Sem grupo";
           porGrupo[grupoLabel] = (porGrupo[grupoLabel] || 0) + 1;
 
@@ -749,40 +769,97 @@ export default function RelatoriosPage() {
         const totalFamilias = listaFamilias.reduce((s, d) => s + d.value, 0);
         const totalSubfamilias = listaSubfamilias.reduce((s, d) => s + d.value, 0);
 
-        const renderDonut = (titulo, sub, icon, lista, total) => (
-          <CartaoGrafico icon={icon} titulo={titulo} sub={sub}>
-            <DonutGrafico
-              dados={lista}
-              centro={String(total)}
-              tooltipFormat={(v) => `${v} categoria${v === 1 ? "" : "s"}`}
-            />
-            <div className="mt-3 space-y-2 max-h-56 overflow-y-auto pr-1">
-              {lista.map((d) => (
-                <LinhaDonut
-                  key={d.name}
-                  cor={d.color}
-                  nome={d.name}
-                  valor={`${d.value} (${Math.round((d.value / (total || 1)) * 100)}%)`}
-                />
-              ))}
-            </div>
-          </CartaoGrafico>
-        );
+        const cortarNome = (v) => (String(v).length > 11 ? `${String(v).slice(0, 10)}…` : String(v));
+
+        const temFiltro = filtroFamilia !== "todas" || filtroGrupo !== "todas";
+        const nomesCatsFiltradas = new Set(categoriasFiltradas.map((c) => c.nome));
+        const materiaisFiltrados = temFiltro
+          ? materiais.filter((m) => nomesCatsFiltradas.has(m.categoria?.nome))
+          : materiais;
+
+        const pillCls = (ativo) => `pill transition-colors ${ativo ? "nav-pill" : "pill-muted hover:border-primary hover:text-primary"}`;
 
         return (
           <>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <KpiCard icon="category" label="Categorias" value={categorias.length} />
+              <KpiCard icon="category" label="Categorias" value={categoriasFiltradas.length} />
               <KpiCard icon="folder_open" label="Famílias" value={Object.keys(catMap).length} />
-              <KpiCard icon="inventory_2" label="Materiais" value={materiais.length} />
+              <KpiCard icon="inventory_2" label="Materiais" value={materiaisFiltrados.length} />
               <KpiCard icon="people" label="Cadastros" value={clientes.length} />
             </div>
 
-            {/* ─────────── 3 DONUTS NO MESMO SENTIDO ─────────── */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              {renderDonut("Categorias por Grupo", "Distribuição por grupo", "label", listaGrupos, totalGrupos)}
-              {renderDonut("Categorias por Família", "Distribuição por família", "folder", listaFamilias, totalFamilias)}
-              {renderDonut("Categorias por Subfamília", "Distribuição por subfamília", "sell", listaSubfamilias, totalSubfamilias)}
+            {/* ─────────── FILTROS (Família / Grupo) ─────────── */}
+            <div className="bg-card border border-border rounded-2xl shadow-card p-3 sm:p-4 space-y-2">
+              <div className="flex items-start gap-2 flex-wrap">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground shrink-0 leading-7">Família:</span>
+                <button type="button" onClick={() => setFiltroFamilia("todas")} className={pillCls(filtroFamilia === "todas")}>Todas</button>
+                {opcoesFamilias.map((f) => (
+                  <button key={f.value} type="button" onClick={() => setFiltroFamilia(filtroFamilia === f.value ? "todas" : f.value)} className={pillCls(filtroFamilia === f.value)}>
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-start gap-2 flex-wrap">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground shrink-0 leading-7">Grupo:</span>
+                <button type="button" onClick={() => setFiltroGrupo("todas")} className={pillCls(filtroGrupo === "todas")}>Todos</button>
+                {opcoesGrupos.map((g) => (
+                  <button key={g.value} type="button" onClick={() => setFiltroGrupo(filtroGrupo === g.value ? "todas" : g.value)} className={pillCls(filtroGrupo === g.value)}>
+                    {g.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ─────────── 3 GRÁFICOS DISTINTOS (Grupo / Família / Subfamília) ─────────── */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
+              <CartaoGrafico icon="bar_chart" titulo="Grupo" sub="Categorias por grupo">
+                <div className="h-52">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={listaGrupos} margin={{ top: 10, right: 10, left: -14, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.25} />
+                      <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 10 }} dy={4} interval={0} tickFormatter={cortarNome} />
+                      <YAxis tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 11 }} width={40} allowDecimals={false} />
+                      <Tooltip content={<ChartTooltip formato={(v) => `${v} categoria${v === 1 ? "" : "s"}`} />} cursor={{ fill: "rgba(148,163,184,0.08)" }} />
+                      <Bar dataKey="value" name="Categorias" radius={[6, 6, 0, 0]} maxBarSize={34}>
+                        {listaGrupos.map((d, i) => <Cell key={i} fill={d.color} />)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mt-3 space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {listaGrupos.map((d) => (
+                    <LinhaDonut key={d.name} cor={d.color} nome={d.name} valor={`${d.value} (${Math.round((d.value / (totalGrupos || 1)) * 100)}%)`} />
+                  ))}
+                </div>
+              </CartaoGrafico>
+
+              <CartaoGrafico icon="folder" titulo="Família" sub="Categorias por família">
+                <DonutGrafico dados={listaFamilias} centro={String(totalFamilias)} tooltipFormat={(v) => `${v} categoria${v === 1 ? "" : "s"}`} />
+                <div className="mt-3 space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {listaFamilias.map((d) => (
+                    <LinhaDonut key={d.name} cor={d.color} nome={d.name} valor={`${d.value} (${Math.round((d.value / (totalFamilias || 1)) * 100)}%)`} />
+                  ))}
+                </div>
+              </CartaoGrafico>
+
+              <CartaoGrafico icon="sell" titulo="Subfamília" sub="Categorias por subfamília">
+                <div className="mt-3 space-y-3 pr-1 max-h-56 overflow-y-auto">
+                  {listaSubfamilias.map((d) => {
+                    const pct = Math.round((d.value / (totalSubfamilias || 1)) * 100);
+                    return (
+                      <div key={d.name}>
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <span className="flex-1 min-w-0 text-sm text-foreground truncate">{d.name}</span>
+                          <span className="font-mono font-bold text-sm text-foreground shrink-0">{d.value} · {pct}%</span>
+                        </div>
+                        <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: d.color }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CartaoGrafico>
             </div>
 
             {/* Botão de exportação PDF do relatório de categorias */}

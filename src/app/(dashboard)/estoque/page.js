@@ -350,11 +350,10 @@ export default function EstoquePage() {
         </div>
       )}
 
-      <div className="relative overflow-hidden gradient-hero rounded-2xl p-5 sm:p-6 mb-6 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-5">
-        <div className="wave-overlay" aria-hidden="true" />
-        <div className="relative flex items-start gap-4">
-          <span className="chip-icon-grad w-12 h-12 rounded-xl hidden sm:flex items-center justify-center shrink-0">
-            <Icon name="inventory_2" className="text-2xl" />
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-5 bg-card border border-border shadow-card rounded-2xl p-5 sm:p-6 mb-6">
+        <div className="flex items-start gap-4">
+          <span className="w-12 h-12 rounded-2xl bg-muted border border-border flex items-center justify-center hidden sm:flex shrink-0">
+            <Icon name="inventory_2" className="text-2xl text-primary" />
           </span>
           <div>
             <div className="flex items-center gap-2.5 flex-wrap">
