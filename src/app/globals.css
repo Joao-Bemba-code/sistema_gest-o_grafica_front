@@ -385,6 +385,23 @@ input[type="radio"] {
   animation: pulse-slow 2s ease-in-out infinite;
 }
 
+/* ===== Entrada de modais ===== */
+@keyframes ds-modal-in {
+  from { opacity: 0; transform: scale(0.96) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.animate-modal-in {
+  animation: ds-modal-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes ds-modal-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-modal-fade {
+  animation: ds-modal-fade 0.2s ease-out both;
+}
+
 /* ===== Hover Utilities ===== */
 .hover-lift {
   transition: all 0.2s ease-in-out;

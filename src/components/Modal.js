@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useId, useRef } from "react";
 import Icon from "@/components/Icon";
 
 export default function Modal({
@@ -18,11 +18,19 @@ export default function Modal({
   dragging = false,
   onHeaderMouseDown,
 }) {
+  const titleId = useId();
+  const closeRef = useRef(null);
+
   useEffect(() => {
     if (!open) return;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
     const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open, onClose]);
 
   if (!open) return null;
@@ -31,6 +39,8 @@ export default function Modal({
     size === "sm" ? "max-w-md" :
     size === "lg" ? "max-w-2xl" :
     size === "xl" ? "max-w-4xl" :
+    size === "2xl" ? "max-w-5xl" :
+    size === "full" ? "max-w-6xl" :
     "max-w-lg";
 
   const arrastavel = Boolean(onHeaderMouseDown);
@@ -40,61 +50,75 @@ export default function Modal({
 
   return (
     <div
-      className={
-        arrastavel
-          ? "fixed inset-0 z-50 pointer-events-none"
-          : "fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
-      }
-      onClick={arrastavel ? undefined : onClose}
+      className="fixed inset-0 z-50"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
     >
       <div
-        className={`pointer-events-auto bg-card border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[calc(100vh-2rem)] ${
+        className="fixed inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div
+        className={
           arrastavel
-            ? `absolute left-1/2 top-1/2 w-[calc(100%-2rem)] ${maxW}`
-            : `w-full ${maxW}`
-        } ${dragging ? "select-none" : ""}`}
-        style={
-          arrastavel
-            ? {
-                transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
-                transition: dragging ? "none" : "transform 0.15s ease-out",
-              }
-            : undefined
+            ? "fixed inset-0 z-10 pointer-events-none"
+            : "fixed inset-0 z-10 flex items-center justify-center p-4 pointer-events-none"
         }
-        onClick={(e) => e.stopPropagation()}
       >
         <div
-          onMouseDown={onHeaderMouseDown}
-          className={`flex items-center justify-between gap-3 px-5 py-3.5 border-b border-border bg-card shrink-0 ${
-            arrastavel ? (dragging ? "cursor-grabbing" : "cursor-grab") : ""
-          }`}
+          className={`pointer-events-auto bg-card border border-border rounded-2xl shadow-modal overflow-hidden flex flex-col max-h-[calc(100vh-2rem)] ${
+            arrastavel
+              ? `absolute left-1/2 top-1/2 w-[calc(100%-2rem)] ${maxW}`
+              : `w-full ${maxW} animate-modal-in`
+          } ${dragging ? "select-none" : ""}`}
+          style={
+            arrastavel
+              ? {
+                  transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
+                  transition: dragging ? "none" : "transform 0.15s ease-out",
+                }
+              : undefined
+          }
+          onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center gap-3 min-w-0">
-            {icon && (
-              <span className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                <Icon name={icon} className="text-base text-muted-foreground" />
-              </span>
+          <div className={`flex flex-col flex-1 min-h-0 ${arrastavel ? "animate-modal-fade" : ""}`}>
+            <div
+              onMouseDown={onHeaderMouseDown}
+              className={`flex items-center justify-between gap-3 px-5 py-3.5 border-b border-border bg-card shrink-0 ${
+                arrastavel ? (dragging ? "cursor-grabbing" : "cursor-grab") : ""
+              }`}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                {icon && (
+                  <span className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                    <Icon name={icon} className="text-base text-muted-foreground" />
+                  </span>
+                )}
+                <h3 id={titleId} className="font-semibold text-foreground truncate">{title}</h3>
+              </div>
+              <button
+                ref={closeRef}
+                type="button"
+                onClick={onClose}
+                onMouseDown={(e) => e.stopPropagation()}
+                className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center transition-colors shrink-0"
+                aria-label="Fechar"
+              >
+                <Icon name="close" className="text-lg text-muted-foreground" />
+              </button>
+            </div>
+
+            <div className="p-5 overflow-y-auto flex-1 min-h-0 custom-scrollbar">{children}</div>
+
+            {footer && (
+              <div className="px-5 py-3.5 border-t border-border bg-muted/30 flex flex-wrap justify-end gap-2 shrink-0">
+                {footer}
+              </div>
             )}
-            <h3 className="font-semibold text-foreground truncate">{title}</h3>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            onMouseDown={(e) => e.stopPropagation()}
-            className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center transition-colors shrink-0"
-            aria-label="Fechar"
-          >
-            <Icon name="close" className="text-lg text-muted-foreground" />
-          </button>
         </div>
-
-        <div className="p-5 overflow-y-auto flex-1">{children}</div>
-
-        {footer && (
-          <div className="px-5 py-3.5 border-t border-border bg-muted/30 flex flex-wrap justify-end gap-2 shrink-0">
-            {footer}
-          </div>
-        )}
       </div>
     </div>
   );
