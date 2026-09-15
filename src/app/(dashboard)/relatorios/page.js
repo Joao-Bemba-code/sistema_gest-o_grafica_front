@@ -712,11 +712,12 @@ export default function RelatoriosPage() {
       {aba === "recursos" && (() => {
         const fams = new Map();
         const grupos = new Map();
+        const resolverGrupo = (c) => tiposItem[normalizarTipoItem(c.tipo)]?.label || String(c.tipo || "").trim() || "Sem grupo";
         categorias.forEach((c) => {
           const fam = normalizarFamilia(c.familia);
           const famCfg = familias[fam];
           if (!fams.has(fam)) fams.set(fam, { value: fam, label: famCfg?.label || c.familia || fam });
-          const gLabel = tiposItem[normalizarTipoItem(c.tipo)]?.label || "Sem grupo";
+          const gLabel = resolverGrupo(c);
           if (!grupos.has(gLabel)) grupos.set(gLabel, { value: gLabel, label: gLabel });
         });
         const opcoesFamilias = [...fams.values()].sort((a, b) => a.label.localeCompare(b.label, "pt"));
@@ -724,8 +725,7 @@ export default function RelatoriosPage() {
 
         const categoriasFiltradas = categorias.filter((c) => {
           const fam = normalizarFamilia(c.familia);
-          const gLabel = tiposItem[normalizarTipoItem(c.tipo)]?.label || "Sem grupo";
-          return (filtroFamilia === "todas" || fam === filtroFamilia) && (filtroGrupo === "todas" || gLabel === filtroGrupo);
+          return (filtroFamilia === "todas" || fam === filtroFamilia) && (filtroGrupo === "todas" || resolverGrupo(c) === filtroGrupo);
         });
 
         const catMap = {};
@@ -741,7 +741,7 @@ export default function RelatoriosPage() {
         const porSubfamilia = {};
 
         categoriasFiltradas.forEach((c) => {
-          const grupoLabel = tiposItem[normalizarTipoItem(c.tipo)]?.label || "Sem grupo";
+          const grupoLabel = resolverGrupo(c);
           porGrupo[grupoLabel] = (porGrupo[grupoLabel] || 0) + 1;
 
           const famCfg = familias[normalizarFamilia(c.familia)];

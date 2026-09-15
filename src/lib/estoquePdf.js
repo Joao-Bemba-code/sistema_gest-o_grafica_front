@@ -727,7 +727,7 @@ export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [
   // ── Agrupar por GRUPO › FAMÍLIA › SUBFAMÍLIA ──
   const grupos = {};
   categorias.forEach((c) => {
-    const grupoLabel = tiposItem[normalizarTipoItem(c.tipo)]?.label || "Sem grupo";
+    const grupoLabel = tiposItem[normalizarTipoItem(c.tipo)]?.label || String(c.tipo || "").trim() || "Sem grupo";
     const famCfg = familias[normalizarFamilia(c.familia)];
     const famLabel = famCfg?.label || c.familia || "Sem família";
     const subLabel = String(c.subfamilia || "").trim() || "Sem subfamília";

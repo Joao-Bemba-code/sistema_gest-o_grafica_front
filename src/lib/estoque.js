@@ -75,8 +75,9 @@ export function normalizarCategoriaTipo(t) {
 
 export function normalizarTipoItem(t) {
   if (!t) return "";
-  const v = String(t).trim();
+  const v = String(t).trim().toLowerCase().replace(/\s+/g, " ");
   if (tiposItem[v]) return v;
+  if (v === "materia-prima" || v === "matéria-prima" || v === "vulgar" || v === "ordinaria" || v === "importado" || v === "nacional") return v;
   if (v === "materia_prima" || v === "produto_acabado") return v;
   return v;
 }
