@@ -8,17 +8,17 @@ export default function FiltroChips({ titulo, icon, opcoes = [], valor = [], onC
   return (
     <div>
       <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">
-        <Icon name={icon} className="text-sm text-primary" />
+        <Icon name={icon} className="text-sm" />
         {titulo}
       </p>
       <div className="flex flex-wrap items-center gap-1.5">
         <button
           type="button"
           onClick={() => onChange([])}
-          className={`flex items-center gap-1 px-3 py-1.5 rounded-full border text-[11px] font-semibold transition-colors ${
+          className={`flex items-center gap-1 px-3 py-1.5 rounded-full border text-[11px] font-medium transition-colors ${
             valor.length === 0
               ? "border-foreground/40 bg-foreground/5 text-foreground"
-              : "border-border bg-card text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+              : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground"
           }`}
         >
           <Icon name="close" className="text-xs" />
@@ -31,22 +31,15 @@ export default function FiltroChips({ titulo, icon, opcoes = [], valor = [], onC
               key={o.value}
               type="button"
               onClick={() => alternar(o.value)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] font-semibold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] font-medium transition-colors ${
                 ativo
-                  ? "shadow-sm"
-                  : "border-border bg-card text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+                  ? "border-primary/40 bg-primary/10 text-primary"
+                  : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground"
               }`}
-              style={
-                ativo
-                  ? { borderColor: o.cor, background: `${o.cor}1f`, color: o.cor }
-                  : undefined
-              }
             >
-              <Icon name={o.icon || "circle"} className="text-[13px] shrink-0" style={{ color: o.cor }} />
+              <Icon name={o.icon || "circle"} className="text-[13px] shrink-0" />
               {o.label}
-              {typeof o.count === "number" && (
-                <span className={`font-mono text-[10px] px-1 rounded ${ativo ? "bg-white/40" : "bg-muted/70"}`}>{o.count}</span>
-              )}
+              {typeof o.count === "number" && <span className="font-mono text-[10px]">{o.count}</span>}
             </button>
           );
         })}

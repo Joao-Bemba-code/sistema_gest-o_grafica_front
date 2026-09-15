@@ -865,3 +865,185 @@ export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [
   finalizarComRodape(doc);
   doc.save(`Relatorio_Categorias_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
+
+// ============================================================
+// RELATÓRIO DE FATURAÇÃO (ÁREA COMERCIAL)
+// Respeita os filtros de estado e tipo seleccionados
+// ============================================================
+export async function gerarRelatorioFaturacoesPDF(faturas = [], org = {}, filtros = {}) {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const { linhaY: ly } = await desenharCabecalhoRelatorio(doc, org, "Relatório de Faturação");
+
+  const estados = Array.isArray(filtros?.estados) ? filtros.estados : [];
+  const tipos = Array.isArray(filtros?.tipos) ? filtros.tipos : [];
+  const lista = faturas.filter(
+    (f) =>
+      (estados.length === 0 || estados.includes(f.estado)) &&
+      (tipos.length === 0 || tipos.includes(f.tipo))
+  );
+
+  const tipoLabel = (t) =>
+    t === "factura_recibo" ? "Factura-recibo" : t === "recibo" ? "Recibo" : t === "factura" ? "Fatura" : t || "—";
+  const estadoLabel = (e) =>
+    e === "paga" ? "Paga" : e === "parcial" ? "Pagamento parcial" : e === "emitida" ? "Emitida" : e === "cancelada" ? "Cancelada" : e || "—";
+
+  const totalGeral = lista.reduce((s, f) => s + (Number(f.total) || Number(f.valor) || 0), 0);
+  const recebido = lista.reduce((s, f) => s + (Number(f.valor_pago) || (f.estado === "paga" ? Number(f.total) || Number(f.valor) || 0 : 0)), 0);
+  const aReceber = lista.filter((f) => !["paga", "cancelada"].includes(f.estado))
+    .reduce((s, f) => s + Math.max(0, (Number(f.total) || Number(f.valor) || 0) - (Number(f.valor_pago) || 0)), 0);
+
+  const filtroTxt = [];
+  if (estados.length > 0) filtroTxt.push(`Estados: ${estados.map(estadoLabel).join(", ")}`);
+  if (tipos.length > 0) filtroTxt.push(`Tipos: ${tipos.map(tipoLabel).join(", ")}`);
+
+  let y = desenharKpis(doc, ly + 3, [
+    { label: "Documentos", value: String(lista.length) },
+    { label: "Total faturado", value: formatKz(totalGeral) },
+    { label: "Recebido", value: formatKz(recebido) },
+    { label: "A receber", value: formatKz(aReceber) },
+  ]);
+  y += 2;
+  if (filtroTxt.length > 0) {
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "italic");
+    doc.setTextColor(...CINZA_ESCURO);
+    doc.text(`Filtros aplicados: ${filtroTxt.join("  ·  ")}`, MARGEM, y);
+    y += 5;
+  }
+
+  y = secaoPdf(doc, y, "Faturação");
+
+  autoTable(doc, {
+    startY: y,
+    head: [["Nº", "Data", "Tipo", "Cliente", "Estado", "Total", "Pago", "A receber"]],
+    body: lista.map((f) => {
+      const total = Number(f.total) || Number(f.valor) || 0;
+      const pago = Number(f.valor_pago) || (f.estado === "paga" ? total : 0);
+      const pend = ["paga", "cancelada"].includes(f.estado) ? 0 : Math.max(0, total - pago);
+      return [
+        f.numero || String(f.id || "—"),
+        String(f.data_emissao || "—").slice(0, 10),
+        tipoLabel(f.tipo),
+        f.cliente?.nome || f.cliente || "—",
+        estadoLabel(f.estado),
+        formatKz(total),
+        f.estado === "cancelada" ? "—" : formatKz(pago),
+        f.estado === "cancelada" ? "—" : formatKz(pend),
+      ];
+    }),
+    foot: [[
+      { content: "TOTAL", colSpan: 5, styles: { fontStyle: "bold" } },
+      { content: formatKz(totalGeral), styles: { fontStyle: "bold", halign: "right" } },
+      { content: formatKz(recebido), styles: { fontStyle: "bold", halign: "right" } },
+      { content: formatKz(aReceber), styles: { fontStyle: "bold", halign: "right" } },
+    ]],
+    ...TEMA_RELATORIO,
+    headStyles: { ...TEMA_RELATORIO.headStyles, fontSize: 7.5 },
+    bodyStyles: { ...TEMA_RELATORIO.bodyStyles, fontSize: 7.5 },
+    footStyles: {
+      fillColor: CINZA_CLARO,
+      textColor: PRETO,
+      fontStyle: "bold",
+      fontSize: 8,
+    },
+    columnStyles: colunasProporcionais(
+      [1, 1.4, 1.6, 2.4, 1.4, 1.3, 1.3, 1.3],
+      { 5: { halign: "right" }, 6: { halign: "right" }, 7: { halign: "right" } }
+    ),
+    didParseCell(data) {
+      if (data.section === "body" && data.column.index === 4) {
+        const v = String(data.cell.raw);
+        if (v === "Paga") data.cell.styles.textColor = CINZA_ESCURO;
+        else if (v === "Cancelada") data.cell.styles.textColor = CINZA_MEDIO;
+      }
+    },
+  });
+
+  finalizarComRodape(doc);
+  doc.save(`Relatorio_Faturacao_${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
+// ============================================================
+// RELATÓRIO DE PRODUÇÃO
+// Respeita os filtros de estado da ordem
+// ============================================================
+export async function gerarRelatorioProducaoPDF(ordens = [], org = {}, filtros = {}) {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const { linhaY: ly } = await desenharCabecalhoRelatorio(doc, org, "Relatório de Produção");
+
+  const estados = Array.isArray(filtros?.estados) ? filtros.estados : [];
+  const lista = ordens.filter((o) => estados.length === 0 || estados.includes(o.estado || o.status));
+
+  const estadoLabel = (e) =>
+    e === "aguardando" ? "Aguardando"
+    : e === "em_producao" ? "Em produção"
+    : e === "finalizado" ? "Finalizado"
+    : e === "entregue" ? "Entregue"
+    : e || "—";
+
+  const contagem = (e) => lista.filter((o) => (o.estado || o.status) === e).length;
+  const entregues = contagem("entregue");
+  const finalizadas = contagem("finalizado");
+  const emProducao = contagem("em_producao");
+
+  const filtroTxt = estados.length > 0 ? `Estados: ${estados.map(estadoLabel).join(", ")}` : "";
+
+  let y = desenharKpis(doc, ly + 3, [
+    { label: "Total de ordens", value: String(lista.length) },
+    { label: "Entregues", value: String(entregues) },
+    { label: "Em produção", value: String(emProducao) },
+    { label: "Finalizadas", value: String(finalizadas) },
+  ]);
+  y += 2;
+  if (filtroTxt) {
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "italic");
+    doc.setTextColor(...CINZA_ESCURO);
+    doc.text(`Filtros aplicados: ${filtroTxt}`, MARGEM, y);
+    y += 5;
+  }
+
+  y = secaoPdf(doc, y, "Ordens de Produção");
+
+  autoTable(doc, {
+    startY: y,
+    head: [["Nº", "Produto", "Qtd.", "Entrada", "Entrega", "Estado", "Progresso"]],
+    body: lista.map((o) => [
+      o.numero || String(o.id || "—"),
+      o.produto || "—",
+      String(o.quantidade ?? "—"),
+      String(o.data_entrada || "—").slice(0, 10),
+      String(o.data_entrega || "—").slice(0, 10),
+      estadoLabel(o.estado || o.status),
+      `${Number(o.progresso) || 0}%`,
+    ]),
+    foot: [[
+      { content: "TOTAL", colSpan: 6, styles: { fontStyle: "bold" } },
+      { content: `${lista.length}`, styles: { fontStyle: "bold", halign: "right" } },
+    ]],
+    ...TEMA_RELATORIO,
+    headStyles: { ...TEMA_RELATORIO.headStyles, fontSize: 7.5 },
+    bodyStyles: { ...TEMA_RELATORIO.bodyStyles, fontSize: 7.5 },
+    footStyles: {
+      fillColor: CINZA_CLARO,
+      textColor: PRETO,
+      fontStyle: "bold",
+      fontSize: 8,
+    },
+    columnStyles: colunasProporcionais(
+      [1, 2.6, 0.8, 1.4, 1.4, 1.6, 1.2],
+      { 5: { halign: "center" }, 6: { halign: "right" } }
+    ),
+    didParseCell(data) {
+      if (data.section === "body" && data.column.index === 5) {
+        const v = String(data.cell.raw);
+        if (v === "Entregue") data.cell.styles.textColor = CINZA_ESCURO;
+        else if (v === "Finalizado") data.cell.styles.textColor = CINZA_ESCURO;
+        else if (v === "Em produção") data.cell.styles.textColor = CINZA_MEDIO;
+      }
+    },
+  });
+
+  finalizarComRodape(doc);
+  doc.save(`Relatorio_Producao_${new Date().toISOString().slice(0, 10)}.pdf`);
+}

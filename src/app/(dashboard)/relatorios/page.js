@@ -15,7 +15,7 @@ import { listar } from "@/services/clientes";
 import { listar as listarFaturas } from "@/services/faturacao";
 import { listar as listarMateriais } from "@/services/materiais";
 import { listar as listarCategorias } from "@/services/categorias";
-import { gerarRelatorioStockPDF, gerarRelatorioCadastrosPDF, gerarRelatorioCategoriasPDF } from "@/lib/estoquePdf";
+import { gerarRelatorioStockPDF, gerarRelatorioCadastrosPDF, gerarRelatorioCategoriasPDF, gerarRelatorioFaturacoesPDF, gerarRelatorioProducaoPDF } from "@/lib/estoquePdf";
 import { toNum, familias, normalizarFamilia, tiposItem, normalizarTipoItem } from "@/lib/estoque";
 import { buscarOrganizacao } from "@/services/configuracoes";
 
@@ -74,15 +74,15 @@ const STATUS_MATERIAL = [
   { value: "esgotado", label: "Esgotado", cor: "#b91c1c", icon: "error" },
 ];
 
-function PainelFiltros({ icon, titulo, cor = "#4338ca", children }) {
+function PainelFiltros({ icon, titulo, acoes, children }) {
   return (
     <div className="bg-card border border-border rounded-2xl shadow-card overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/70" style={{ background: `${cor}0d` }}>
-        <span className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${cor}1a`, color: cor }}>
-          <Icon name={icon} className="text-sm" />
+      <div className="flex items-center gap-2.5 px-4 sm:px-5 py-3 border-b border-border">
+        <span className="w-7 h-7 rounded-lg bg-muted border border-border flex items-center justify-center shrink-0">
+          <Icon name={icon} className="text-base text-muted-foreground" />
         </span>
-        <p className="text-[11px] font-bold uppercase tracking-widest text-foreground">{titulo}</p>
-        <span className="ml-auto h-px flex-1" style={{ background: `${cor}26` }} />
+        <p className="text-sm font-semibold text-foreground tracking-tight">{titulo}</p>
+        {acoes && <div className="ml-auto flex items-center gap-2">{acoes}</div>}
       </div>
       <div className="p-3 sm:p-4 space-y-3">{children}</div>
     </div>
@@ -427,7 +427,15 @@ export default function RelatoriosPage() {
 
       {aba === "comercial" && (
         <>
-          <PainelFiltros icon="filter_list" titulo="Filtros da Área Comercial" cor="#4338ca">
+          <PainelFiltros
+              icon="filter_list"
+              titulo="Filtros da Área Comercial"
+              acoes={
+                <Button size="sm" variant="outline" onClick={() => gerarRelatorioFaturacoesPDF(faturasFiltradas, org, { estados: filtroEstadosFatura, tipos: filtroTiposFatura })}>
+                  <Icon name="picture_as_pdf" className="text-sm" /> Exportar PDF
+                </Button>
+              }
+            >
             <FiltroChips
               icon="info"
               titulo="Estado da Fatura"
@@ -612,7 +620,15 @@ export default function RelatoriosPage() {
         }));
         return (
           <>
-            <PainelFiltros icon="filter_list" titulo="Filtros de Produção" cor="#4338ca">
+            <PainelFiltros
+              icon="filter_list"
+              titulo="Filtros de Produção"
+              acoes={
+                <Button size="sm" variant="outline" onClick={() => gerarRelatorioProducaoPDF(ordensFiltradas, org, { estados: filtroEstadosOrdem })}>
+                  <Icon name="picture_as_pdf" className="text-sm" /> Exportar PDF
+                </Button>
+              }
+            >
               <FiltroChips
                 icon="info"
                 titulo="Estado da Ordem"
@@ -719,7 +735,15 @@ export default function RelatoriosPage() {
 
         return (
           <>
-            <PainelFiltros icon="filter_list" titulo="Filtros de Provisionamento" cor="#b45309">
+            <PainelFiltros
+              icon="filter_list"
+              titulo="Filtros de Provisionamento"
+              acoes={
+                <Button size="sm" variant="outline" onClick={() => gerarRelatorioStockPDF(materiaisFiltrados, categorias, org)}>
+                  <Icon name="picture_as_pdf" className="text-sm" /> Exportar PDF
+                </Button>
+              }
+            >
               <FiltroChips
                 icon="info"
                 titulo="Estado do Material"
@@ -755,7 +779,7 @@ export default function RelatoriosPage() {
               <Card className="lg:col-span-2">
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-sm font-medium">Resumo por Categoria</CardTitle>
-                  <Button size="sm" variant="outline" onClick={() => gerarRelatorioStockPDF(materiais, categorias, org)}>
+                  <Button size="sm" variant="outline" onClick={() => gerarRelatorioStockPDF(materiaisFiltrados, categorias, org)}>
                     <Icon name="picture_as_pdf" className="text-sm" />
                     PDF
                   </Button>
