@@ -769,8 +769,6 @@ export default function RelatoriosPage() {
         const totalFamilias = listaFamilias.reduce((s, d) => s + d.value, 0);
         const totalSubfamilias = listaSubfamilias.reduce((s, d) => s + d.value, 0);
 
-        const cortarNome = (v) => (String(v).length > 11 ? `${String(v).slice(0, 10)}…` : String(v));
-
         const temFiltro = filtroFamilia !== "todas" || filtroGrupo !== "todas";
         const nomesCatsFiltradas = new Set(categoriasFiltradas.map((c) => c.nome));
         const materiaisFiltrados = temFiltro
@@ -817,7 +815,7 @@ export default function RelatoriosPage() {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={listaGrupos} margin={{ top: 10, right: 10, left: -14, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.25} />
-                      <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 10 }} dy={4} interval={0} tickFormatter={cortarNome} />
+                      <XAxis dataKey="name" tick={false} axisLine={false} height={8} />
                       <YAxis tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 11 }} width={40} allowDecimals={false} />
                       <Tooltip content={<ChartTooltip formato={(v) => `${v} categoria${v === 1 ? "" : "s"}`} />} cursor={{ fill: "rgba(148,163,184,0.08)" }} />
                       <Bar dataKey="value" name="Categorias" radius={[6, 6, 0, 0]} maxBarSize={34}>
