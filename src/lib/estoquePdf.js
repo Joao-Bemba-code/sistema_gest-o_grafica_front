@@ -700,9 +700,20 @@ export async function gerarRelatorioCadastrosPDF(clientes = [], org = {}, filtro
 // Agrupa por GRUPO › cada linha tem Família | Subfamília | Itens
 // Faixa do grupo em CINZA (não preta)
 // ============================================================
-export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [], org = {}) {
+export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [], org = {}, filtros = {}) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const { linhaY: ly } = await desenharCabecalhoRelatorio(doc, org, "Relatório de Categorias e Famílias");
+
+  // ── Filtros aplicados (Famílias / Grupos) ──
+  const resolverGrupo = (c) => tiposItem[normalizarTipoItem(c.tipo)]?.label || String(c.tipo || "").trim() || "Sem grupo";
+  const famLabelDe = (c) => familias[normalizarFamilia(c.familia)]?.label || c.familia || "Sem família";
+  const famsSel = Array.isArray(filtros?.familias) ? filtros.familias : [];
+  const grpsSel = Array.isArray(filtros?.grupos) ? filtros.grupos : [];
+  const categoriasFiltradas = categorias.filter(
+    (c) =>
+      (famsSel.length === 0 || famsSel.includes(famLabelDe(c))) &&
+      (grpsSel.length === 0 || grpsSel.includes(resolverGrupo(c)))
+  );
 
   // ── Contar materiais por categoria (id + nome como fallback) ──
   const materiaisPorCatId = {};
@@ -726,7 +737,7 @@ export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [
 
   // ── Agrupar por GRUPO › FAMÍLIA › SUBFAMÍLIA ──
   const grupos = {};
-  categorias.forEach((c) => {
+  categoriasFiltradas.forEach((c) => {
     const grupoLabel = tiposItem[normalizarTipoItem(c.tipo)]?.label || String(c.tipo || "").trim() || "Sem grupo";
     const famCfg = familias[normalizarFamilia(c.familia)];
     const famLabel = famCfg?.label || c.familia || "Sem família";
@@ -745,12 +756,18 @@ export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [
   });
 
   // ── KPIs de topo ──
-  const totalCategorias = categorias.length;
+  const totalCategorias = categoriasFiltradas.length;
   const totalGrupos = Object.keys(grupos).length;
   const totalFamilias = new Set(
-    categorias.map((c) => familias[normalizarFamilia(c.familia)]?.label || c.familia || "Sem família")
+    categoriasFiltradas.map((c) => familias[normalizarFamilia(c.familia)]?.label || c.familia || "Sem família")
   ).size;
-  const totalMateriais = materiais.length;
+  const catsFiltradasId = new Set(categoriasFiltradas.map((c) => String(c.id)));
+  const nomesFiltrados = new Set(categoriasFiltradas.map((c) => String(c.nome).trim().toLowerCase()));
+  const totalMateriais = materiais.filter((m) => {
+    if (famsSel.length === 0 && grpsSel.length === 0) return true;
+    if (m.categoria_id != null) return catsFiltradasId.has(String(m.categoria_id));
+    return nomesFiltrados.has(String(m.categoria?.nome || m.categoria_nome || "").trim().toLowerCase());
+  }).length;
 
   let y = desenharKpis(doc, ly + 3, [
     { label: "Grupos", value: String(totalGrupos) },
@@ -760,10 +777,18 @@ export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [
   ]);
   y += 3;
 
+  // ── Linha de filtros aplicados ──
+  const resumoFam = famsSel.length > 6 ? `${famsSel.slice(0, 6).join(", ")} +${famsSel.length - 6}` : famsSel.join(", ");
+  const resumoGru = grpsSel.length > 6 ? `${grpsSel.slice(0, 6).join(", ")} +${grpsSel.length - 6}` : grpsSel.join(", ");
+  doc.setFontSize(8);
+  doc.setTextColor(...CINZA_MEDIO);
+  doc.text(`Filtros aplicados — Famílias: ${famsSel.length ? resumoFam : "todas"} | Grupos: ${grpsSel.length ? resumoGru : "todos"}`, MARGEM, y + 3);
+  y += 6;
+
   if (totalCategorias === 0) {
     doc.setFontSize(10);
     doc.setTextColor(...CINZA_MEDIO);
-    doc.text("Nenhuma categoria registada.", MARGEM, y + 6);
+    doc.text(famsSel.length > 0 || grpsSel.length > 0 ? "Nenhuma categoria corresponde aos filtros aplicados." : "Nenhuma categoria registada.", MARGEM, y + 6);
     finalizarComRodape(doc);
     doc.save(`Relatorio_Categorias_${new Date().toISOString().slice(0, 10)}.pdf`);
     return;

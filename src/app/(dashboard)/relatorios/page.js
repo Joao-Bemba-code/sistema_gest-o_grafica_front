@@ -5,6 +5,7 @@ import Icon from "@/components/Icon";
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import KpiCard from "@/components/ui/KpiCard";
+import MultiSelect from "@/components/ui/MultiSelect";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/Toast";
@@ -147,8 +148,8 @@ export default function RelatoriosPage() {
   const [periodo, setPeriodo] = useState(getUltimos6Meses()[5].labelCurto);
   const [aba, setAba] = useState("comercial");
   const [filtroTipo, setFiltroTipo] = useState("todos");
-  const [filtroFamilia, setFiltroFamilia] = useState("todas");
-  const [filtroGrupo, setFiltroGrupo] = useState("todas");
+  const [filtroFamilias, setFiltroFamilias] = useState([]);
+  const [filtroGrupos, setFiltroGrupos] = useState([]);
   const [busca, setBusca] = useState("");
   const { addToast } = useToast();
 
@@ -724,8 +725,9 @@ export default function RelatoriosPage() {
         const opcoesGrupos = [...grupos.values()].sort((a, b) => a.label.localeCompare(b.label, "pt"));
 
         const categoriasFiltradas = categorias.filter((c) => {
-          const fam = normalizarFamilia(c.familia);
-          return (filtroFamilia === "todas" || fam === filtroFamilia) && (filtroGrupo === "todas" || resolverGrupo(c) === filtroGrupo);
+          const famOk = filtroFamilias.length === 0 || filtroFamilias.includes(normalizarFamilia(c.familia));
+          const gruOk = filtroGrupos.length === 0 || filtroGrupos.includes(resolverGrupo(c));
+          return famOk && gruOk;
         });
 
         const catMap = {};
@@ -769,13 +771,13 @@ export default function RelatoriosPage() {
         const totalFamilias = listaFamilias.reduce((s, d) => s + d.value, 0);
         const totalSubfamilias = listaSubfamilias.reduce((s, d) => s + d.value, 0);
 
-        const temFiltro = filtroFamilia !== "todas" || filtroGrupo !== "todas";
+        const temFiltro = filtroFamilias.length > 0 || filtroGrupos.length > 0;
         const nomesCatsFiltradas = new Set(categoriasFiltradas.map((c) => c.nome));
         const materiaisFiltrados = temFiltro
           ? materiais.filter((m) => nomesCatsFiltradas.has(m.categoria?.nome))
           : materiais;
 
-        const pillCls = (ativo) => `pill transition-colors ${ativo ? "nav-pill" : "pill-muted hover:border-primary hover:text-primary"}`;
+        const labelDeFam = (k) => opcoesFamilias.find((o) => o.value === k)?.label || k;
 
         return (
           <>
@@ -783,29 +785,31 @@ export default function RelatoriosPage() {
               <KpiCard icon="category" label="Categorias" value={categoriasFiltradas.length} />
               <KpiCard icon="folder_open" label="Famílias" value={Object.keys(catMap).length} />
               <KpiCard icon="inventory_2" label="Materiais" value={materiaisFiltrados.length} />
-              <KpiCard icon="people" label="Cadastros" value={clientes.length} />
+              <KpiCard icon="sell" label="Subfamílias" value={listaSubfamilias.length} />
             </div>
 
-            {/* ─────────── FILTROS (Família / Grupo) ─────────── */}
-            <div className="bg-card border border-border rounded-2xl shadow-card p-3 sm:p-4 space-y-2">
-              <div className="flex items-start gap-2 flex-wrap">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground shrink-0 leading-7">Família:</span>
-                <button type="button" onClick={() => setFiltroFamilia("todas")} className={pillCls(filtroFamilia === "todas")}>Todas</button>
-                {opcoesFamilias.map((f) => (
-                  <button key={f.value} type="button" onClick={() => setFiltroFamilia(filtroFamilia === f.value ? "todas" : f.value)} className={pillCls(filtroFamilia === f.value)}>
-                    {f.label}
+            {/* ─────────── FILTROS (Família / Grupo — multi-seleção) ─────────── */}
+            <div className="bg-card border border-border rounded-2xl shadow-card p-3 sm:p-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <MultiSelect icon="folder" value={filtroFamilias} onChange={setFiltroFamilias} options={opcoesFamilias} placeholder="Todas as famílias" />
+                <MultiSelect icon="category" value={filtroGrupos} onChange={setFiltroGrupos} options={opcoesGrupos} placeholder="Todos os grupos" />
+                {temFiltro && (
+                  <button
+                    type="button"
+                    onClick={() => { setFiltroFamilias([]); setFiltroGrupos([]); }}
+                    className="shrink-0 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-border bg-muted/40 text-xs text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+                  >
+                    <Icon name="close" className="text-sm text-primary" /> Limpar filtros
                   </button>
-                ))}
+                )}
               </div>
-              <div className="flex items-start gap-2 flex-wrap">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground shrink-0 leading-7">Grupo:</span>
-                <button type="button" onClick={() => setFiltroGrupo("todas")} className={pillCls(filtroGrupo === "todas")}>Todos</button>
-                {opcoesGrupos.map((g) => (
-                  <button key={g.value} type="button" onClick={() => setFiltroGrupo(filtroGrupo === g.value ? "todas" : g.value)} className={pillCls(filtroGrupo === g.value)}>
-                    {g.label}
-                  </button>
-                ))}
-              </div>
+              {temFiltro && (
+                <p className="mt-2.5 text-[11px] text-muted-foreground">
+                  A mostrar {categoriasFiltradas.length} de {categorias.length} categorias
+                  {filtroFamilias.length > 0 && <> · Famílias: <span className="text-foreground">{filtroFamilias.map(labelDeFam).join(", ")}</span></>}
+                  {filtroGrupos.length > 0 && <> · Grupos: <span className="text-foreground">{filtroGrupos.join(", ")}</span></>}
+                </p>
+              )}
             </div>
 
             {/* ─────────── 3 GRÁFICOS DISTINTOS (Grupo / Família / Subfamília) ─────────── */}
@@ -862,7 +866,7 @@ export default function RelatoriosPage() {
 
             {/* Botão de exportação PDF do relatório de categorias */}
             <div className="flex justify-end">
-              <Button size="sm" variant="outline" onClick={() => gerarRelatorioCategoriasPDF(categorias, materiais, org)}>
+              <Button size="sm" variant="outline" onClick={() => gerarRelatorioCategoriasPDF(categorias, materiais, org, { familias: filtroFamilias.map(labelDeFam), grupos: filtroGrupos })}>
                 <Icon name="picture_as_pdf" className="text-sm" /> Exportar Categorias PDF
               </Button>
             </div>
