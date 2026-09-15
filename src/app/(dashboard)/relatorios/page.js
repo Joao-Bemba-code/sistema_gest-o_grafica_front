@@ -6,6 +6,7 @@ import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Cart
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import KpiCard from "@/components/ui/KpiCard";
 import MultiSelect from "@/components/ui/MultiSelect";
+import FiltroChips from "@/components/ui/FiltroChips";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/Toast";
@@ -46,6 +47,47 @@ function compactKz(v) {
 }
 
 const CORES_DONUT = ["#4338ca", "#0ea5e9", "#14b8a6", "#f59e0b", "#a855f7", "#64748b"];
+
+const ESTADOS_FATURA = [
+  { value: "emitida", label: "Emitida", cor: "#0369a1", icon: "receipt_long" },
+  { value: "parcial", label: "Pagamento parcial", cor: "#b45309", icon: "payments" },
+  { value: "paga", label: "Paga", cor: "#047857", icon: "check_circle" },
+  { value: "cancelada", label: "Cancelada", cor: "#b91c1c", icon: "block" },
+];
+
+const TIPOS_FATURA = [
+  { value: "factura", label: "Fatura", cor: "#4338ca", icon: "receipt_long" },
+  { value: "factura_recibo", label: "Factura-recibo", cor: "#0ea5e9", icon: "receipt" },
+  { value: "recibo", label: "Recibo", cor: "#14b8a6", icon: "request_quote" },
+];
+
+const ESTADOS_ORDEM = [
+  { value: "aguardando", label: "Aguardando", cor: "#f59e0b", icon: "schedule" },
+  { value: "em_producao", label: "Em produção", cor: "#4338ca", icon: "precision_manufacturing" },
+  { value: "finalizado", label: "Finalizado", cor: "#047857", icon: "check_circle" },
+  { value: "entregue", label: "Entregue", cor: "#a855f7", icon: "local_shipping" },
+];
+
+const STATUS_MATERIAL = [
+  { value: "ok", label: "Saudável", cor: "#047857", icon: "check_circle" },
+  { value: "repor", label: "Abaixo do mínimo", cor: "#b45309", icon: "warning" },
+  { value: "esgotado", label: "Esgotado", cor: "#b91c1c", icon: "error" },
+];
+
+function PainelFiltros({ icon, titulo, cor = "#4338ca", children }) {
+  return (
+    <div className="bg-card border border-border rounded-2xl shadow-card overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/70" style={{ background: `${cor}0d` }}>
+        <span className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${cor}1a`, color: cor }}>
+          <Icon name={icon} className="text-sm" />
+        </span>
+        <p className="text-[11px] font-bold uppercase tracking-widest text-foreground">{titulo}</p>
+        <span className="ml-auto h-px flex-1" style={{ background: `${cor}26` }} />
+      </div>
+      <div className="p-3 sm:p-4 space-y-3">{children}</div>
+    </div>
+  );
+}
 
 function ChartTooltip({ active, payload, label, formato }) {
   if (!active || !payload || payload.length === 0) return null;
@@ -150,6 +192,11 @@ export default function RelatoriosPage() {
   const [filtroTipo, setFiltroTipo] = useState("todos");
   const [filtroFamilias, setFiltroFamilias] = useState([]);
   const [filtroGrupos, setFiltroGrupos] = useState([]);
+  const [filtroEstadosFatura, setFiltroEstadosFatura] = useState([]);
+  const [filtroTiposFatura, setFiltroTiposFatura] = useState([]);
+  const [filtroEstadosOrdem, setFiltroEstadosOrdem] = useState([]);
+  const [filtroStatusMaterial, setFiltroStatusMaterial] = useState([]);
+  const [filtroFamiliasMateriais, setFiltroFamiliasMateriais] = useState([]);
   const [busca, setBusca] = useState("");
   const { addToast } = useToast();
 
@@ -184,11 +231,65 @@ export default function RelatoriosPage() {
 
   const ultimosMeses = useMemo(() => getUltimos6Meses(), []);
 
+  const contagemEstadosFatura = useMemo(() => {
+    const m = {};
+    faturas.forEach((f) => { m[f.estado] = (m[f.estado] || 0) + 1; });
+    return m;
+  }, [faturas]);
+
+  const contagemTiposFatura = useMemo(() => {
+    const m = {};
+    faturas.forEach((f) => { m[f.tipo] = (m[f.tipo] || 0) + 1; });
+    return m;
+  }, [faturas]);
+
+  const faturasFiltradas = useMemo(() => {
+    return faturas.filter((f) => {
+      const eOk = filtroEstadosFatura.length === 0 || filtroEstadosFatura.includes(f.estado);
+      const tOk = filtroTiposFatura.length === 0 || filtroTiposFatura.includes(f.tipo);
+      return eOk && tOk;
+    });
+  }, [faturas, filtroEstadosFatura, filtroTiposFatura]);
+
+  const contagemEstadosOrdem = useMemo(() => {
+    const m = {};
+    ordens.forEach((o) => { const e = o.estado || o.status; m[e] = (m[e] || 0) + 1; });
+    return m;
+  }, [ordens]);
+
+  const ordensFiltradas = useMemo(() => {
+    return ordens.filter((o) => filtroEstadosOrdem.length === 0 || filtroEstadosOrdem.includes(o.estado || o.status));
+  }, [ordens, filtroEstadosOrdem]);
+
+  const contagemStatusMaterial = useMemo(() => {
+    const m = {};
+    materiais.forEach((mat) => { m[mat.status] = (m[mat.status] || 0) + 1; });
+    return m;
+  }, [materiais]);
+
+  const opcoesFamiliasMateriais = useMemo(() => {
+    const map = new Map();
+    materiais.forEach((mat) => {
+      const fam = normalizarFamilia(mat.categoria?.familia);
+      const famCfg = familias[fam];
+      if (!map.has(fam)) map.set(fam, { value: fam, label: famCfg?.label || mat.categoria?.familia || fam });
+    });
+    return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, "pt"));
+  }, [materiais]);
+
+  const materiaisFiltrados = useMemo(() => {
+    return materiais.filter((mat) => {
+      const sOk = filtroStatusMaterial.length === 0 || filtroStatusMaterial.includes(mat.status);
+      const fOk = filtroFamiliasMateriais.length === 0 || filtroFamiliasMateriais.includes(normalizarFamilia(mat.categoria?.familia));
+      return sOk && fOk;
+    });
+  }, [materiais, filtroStatusMaterial, filtroFamiliasMateriais]);
+
   const vendasPorMes = useMemo(() => {
     const hoje = new Date();
     const mesesIndices = ultimosMeses.map((m) => m.mes);
     const counts = ultimosMeses.map((m) => ({ mes: m.mes, label: m.label, valor: 0, quantidade: 0 }));
-    faturas.forEach((f) => {
+    faturasFiltradas.forEach((f) => {
       const d = f.data_emissao ? new Date(f.data_emissao) : null;
       if (d && !isNaN(d.getTime()) && d.getFullYear() === hoje.getFullYear() && mesesIndices.includes(d.getMonth())) {
         const idx = ultimosMeses.findIndex((m) => m.mes === d.getMonth());
@@ -197,13 +298,13 @@ export default function RelatoriosPage() {
       }
     });
     return counts;
-  }, [faturas, ultimosMeses]);
+  }, [faturasFiltradas, ultimosMeses]);
 
   const recebidoPorMes = useMemo(() => {
     const hoje = new Date();
     const mesesIndices = ultimosMeses.map((m) => m.mes);
     const counts = ultimosMeses.map((m) => ({ mes: m.mes, label: m.label, valor: 0, quantidade: 0 }));
-    faturas.forEach((f) => {
+    faturasFiltradas.forEach((f) => {
       if (f.estado !== "paga") return;
       const d = f.data_pagamento || f.data_emissao;
       const dt = d ? new Date(d) : null;
@@ -214,29 +315,29 @@ export default function RelatoriosPage() {
       }
     });
     return counts;
-  }, [faturas, ultimosMeses]);
+  }, [faturasFiltradas, ultimosMeses]);
 
   const recebidoHoje = useMemo(() => {
     const hoje = new Date().toISOString().split("T")[0];
-    return faturas
+    return faturasFiltradas
       .filter((f) => f.estado === "paga" && (f.data_pagamento || f.data_emissao) === hoje)
       .reduce((s, f) => s + (Number(f.valor_pago || f.total || f.valor) || 0), 0);
-  }, [faturas]);
+  }, [faturasFiltradas]);
 
   const recebidoMes = useMemo(() => {
     const hoje = new Date();
-    return faturas
+    return faturasFiltradas
       .filter((f) => {
         if (f.estado !== "paga") return false;
         const d = new Date(f.data_pagamento || f.data_emissao);
         return !isNaN(d.getTime()) && d.getFullYear() === hoje.getFullYear() && d.getMonth() === hoje.getMonth();
       })
       .reduce((s, f) => s + (Number(f.valor_pago || f.total || f.valor) || 0), 0);
-  }, [faturas]);
+  }, [faturasFiltradas]);
 
   const clientesTop = useMemo(() => {
     const map = {};
-    faturas.forEach((f) => {
+    faturasFiltradas.forEach((f) => {
       const nome = f.cliente?.nome || f.cliente || "Cliente";
       map[nome] = (map[nome] || 0) + (Number(f.total || f.valor) || 0);
     });
@@ -248,7 +349,7 @@ export default function RelatoriosPage() {
         total,
         cor: ["bg-primary", "bg-primary/70", "bg-primary/50", "bg-primary/30", "bg-primary/15"][i],
       }));
-  }, [faturas]);
+  }, [faturasFiltradas]);
 
   const clientesTotal = useMemo(() => clientesTop.reduce((s, c) => s + c.total, 0), [clientesTop]);
 
@@ -257,7 +358,7 @@ export default function RelatoriosPage() {
     const mesesIndices = ultimosMeses.map((m) => m.mes);
     const result = {};
     mesesIndices.forEach((mesIdx) => {
-      const ordensMes = ordens.filter((o) => {
+      const ordensMes = ordensFiltradas.filter((o) => {
         const d = o.data_entrada ? new Date(o.data_entrada) : null;
         return d && !isNaN(d.getTime()) && d.getFullYear() === hoje.getFullYear() && d.getMonth() === mesIdx;
       });
@@ -266,13 +367,13 @@ export default function RelatoriosPage() {
       result[mesIdx] = { produzidas, entregues, pct: produzidas > 0 ? Math.round((entregues / produzidas) * 100) : 0 };
     });
     return result;
-  }, [ordens, ultimosMeses]);
+  }, [ordensFiltradas, ultimosMeses]);
 
   const opsPorStatus = useMemo(() => ["aguardando", "em_producao", "finalizado", "entregue"].map((s) => ({
     status: s,
     label: s.replace("_", " ").replace(/\b\w/g, l => l.toUpperCase()),
-    quantidade: ordens.filter(o => (o.estado || o.status) === s).length,
-  })), [ordens]);
+    quantidade: ordensFiltradas.filter(o => (o.estado || o.status) === s).length,
+  })), [ordensFiltradas]);
 
   const cadastrosFiltrados = useMemo(() => {
     let lista = clientes;
@@ -326,12 +427,31 @@ export default function RelatoriosPage() {
 
       {aba === "comercial" && (
         <>
+          <PainelFiltros icon="filter_list" titulo="Filtros da Área Comercial" cor="#4338ca">
+            <FiltroChips
+              icon="info"
+              titulo="Estado da Fatura"
+              opcoes={ESTADOS_FATURA.map((o) => ({ ...o, count: contagemEstadosFatura[o.value] || 0 }))}
+              valor={filtroEstadosFatura}
+              onChange={setFiltroEstadosFatura}
+              limparLabel="Todos"
+            />
+            <FiltroChips
+              icon="description"
+              titulo="Tipo de Documento"
+              opcoes={TIPOS_FATURA.map((o) => ({ ...o, count: contagemTiposFatura[o.value] || 0 }))}
+              valor={filtroTiposFatura}
+              onChange={setFiltroTiposFatura}
+              limparLabel="Todos"
+            />
+          </PainelFiltros>
+
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
               { label: "Recebido Hoje", value: `Kz ${recebidoHoje.toLocaleString("pt-AO")}`, icon: "today" },
               { label: "Recebido este Mês", value: `Kz ${recebidoMes.toLocaleString("pt-AO")}`, icon: "payments" },
-              { label: "A Receber", value: `Kz ${faturas.filter((f) => !["paga", "cancelada"].includes(f.estado)).reduce((s, f) => s + (Number(f.total || f.valor) || 0), 0).toLocaleString("pt-AO")}`, icon: "paid" },
-              { label: "Documentos", value: faturas.length, icon: "receipt_long" },
+              { label: "A Receber", value: `Kz ${faturasFiltradas.filter((f) => !["paga", "cancelada"].includes(f.estado)).reduce((s, f) => s + (Number(f.total || f.valor) || 0), 0).toLocaleString("pt-AO")}`, icon: "paid" },
+              { label: "Documentos", value: faturasFiltradas.length, icon: "receipt_long" },
             ].map((kpi) => (
               <KpiCard key={kpi.label} icon={kpi.icon} label={kpi.label} value={kpi.value} />
             ))}
@@ -492,6 +612,17 @@ export default function RelatoriosPage() {
         }));
         return (
           <>
+            <PainelFiltros icon="filter_list" titulo="Filtros de Produção" cor="#4338ca">
+              <FiltroChips
+                icon="info"
+                titulo="Estado da Ordem"
+                opcoes={ESTADOS_ORDEM.map((o) => ({ ...o, count: contagemEstadosOrdem[o.value] || 0 }))}
+                valor={filtroEstadosOrdem}
+                onChange={setFiltroEstadosOrdem}
+                limparLabel="Todos"
+              />
+            </PainelFiltros>
+
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {opsPorStatus.map((s) => (
                 <Card key={s.status}>
@@ -561,7 +692,7 @@ export default function RelatoriosPage() {
 
       {aba === "provisionamento" && (() => {
         const catMap = {};
-        materiais.forEach((m) => {
+        materiaisFiltrados.forEach((m) => {
           const cat = m.categoria?.nome || "Sem categoria";
           const fam = normalizarFamilia(m.categoria?.familia);
           if (!catMap[cat]) catMap[cat] = { qtd: 0, valorTotal: 0, disponivel: 0, itens: 0, familia: fam };
@@ -571,11 +702,11 @@ export default function RelatoriosPage() {
           catMap[cat].valorTotal += toNum(m.quantidade) * toNum(m.custo_unit);
         });
         const catSorted = Object.entries(catMap).sort((a, b) => b[1].valorTotal - a[1].valorTotal);
-        const totalItens = materiais.length;
-        const totalQtd = materiais.reduce((s, m) => s + toNum(m.quantidade), 0);
-        const totalValor = materiais.reduce((s, m) => s + toNum(m.quantidade) * toNum(m.custo_unit), 0);
-        const esgotados = materiais.filter((m) => m.status === "esgotado").length;
-        const abaixoMin = materiais.filter((m) => m.status === "repor").length;
+        const totalItens = materiaisFiltrados.length;
+        const totalQtd = materiaisFiltrados.reduce((s, m) => s + toNum(m.quantidade), 0);
+        const totalValor = materiaisFiltrados.reduce((s, m) => s + toNum(m.quantidade) * toNum(m.custo_unit), 0);
+        const esgotados = materiaisFiltrados.filter((m) => m.status === "esgotado").length;
+        const abaixoMin = materiaisFiltrados.filter((m) => m.status === "repor").length;
         const criticos = esgotados + abaixoMin;
         const donutsCategorias = catSorted.slice(0, 6).map(([nome, d], i) => ({
           name: nome,
@@ -584,8 +715,35 @@ export default function RelatoriosPage() {
         }));
         const donutCategoriasTotal = donutsCategorias.reduce((s, d) => s + d.value, 0);
 
+        const temFiltroMat = filtroStatusMaterial.length > 0 || filtroFamiliasMateriais.length > 0;
+
         return (
           <>
+            <PainelFiltros icon="filter_list" titulo="Filtros de Provisionamento" cor="#b45309">
+              <FiltroChips
+                icon="info"
+                titulo="Estado do Material"
+                opcoes={STATUS_MATERIAL.map((o) => ({ ...o, count: contagemStatusMaterial[o.value] || 0 }))}
+                valor={filtroStatusMaterial}
+                onChange={setFiltroStatusMaterial}
+                limparLabel="Todos"
+              />
+              <MultiSelect
+                icon="folder_open"
+                value={filtroFamiliasMateriais}
+                onChange={setFiltroFamiliasMateriais}
+                options={opcoesFamiliasMateriais}
+                placeholder="Todas as famílias"
+              />
+              {temFiltroMat && (
+                <p className="text-[11px] text-muted-foreground">
+                  A mostrar <span className="text-foreground font-medium">{materiaisFiltrados.length}</span> de {materiais.length} materiais
+                  {filtroStatusMaterial.length > 0 && <> · Estados: <span className="text-foreground">{filtroStatusMaterial.join(", ")}</span></>}
+                  {filtroFamiliasMateriais.length > 0 && <> · Famílias: <span className="text-foreground">{filtroFamiliasMateriais.join(", ")}</span></>}
+                </p>
+              )}
+            </PainelFiltros>
+
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <KpiCard icon="inventory_2" label="Total Materiais" value={totalItens} />
               <KpiCard icon="scale" label="Qtd. em Stock" value={totalQtd.toLocaleString("pt-AO")} />
@@ -665,7 +823,7 @@ export default function RelatoriosPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Card>
                 <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-semibold text-emerald-500">{materiais.filter((m) => m.status === "ok").length}</p>
+                  <p className="text-2xl font-semibold text-emerald-500">{materiaisFiltrados.filter((m) => m.status === "ok").length}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">Saudáveis</p>
                 </CardContent>
               </Card>
@@ -690,7 +848,7 @@ export default function RelatoriosPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    {materiais.filter((m) => m.status === "esgotado" || m.status === "repor").map((m) => (
+                    {materiaisFiltrados.filter((m) => m.status === "esgotado" || m.status === "repor").map((m) => (
                       <div key={m.id} className="flex items-center justify-between px-3 py-2 rounded border">
                         <div className="flex items-center gap-2">
                           <Icon name={m.status === "esgotado" ? "error" : "warning"} className={`text-sm ${m.status === "esgotado" ? "text-red-500" : "text-amber-500"}`} />
@@ -737,6 +895,12 @@ export default function RelatoriosPage() {
           catMap[fam].push(c);
         });
 
+        const idsCatsFiltradas = new Set(categoriasFiltradas.map((c) => String(c.id)));
+        const temFiltro = filtroFamilias.length > 0 || filtroGrupos.length > 0;
+        const itensRecursos = temFiltro
+          ? materiais.filter((m) => idsCatsFiltradas.has(String(m.categoria_id))).length
+          : materiais.length;
+
         // ── Distribuições (Grupo / Família / Subfamília) ──
         const porGrupo = {};
         const porFamilia = {};
@@ -771,12 +935,6 @@ export default function RelatoriosPage() {
         const totalFamilias = listaFamilias.reduce((s, d) => s + d.value, 0);
         const totalSubfamilias = listaSubfamilias.reduce((s, d) => s + d.value, 0);
 
-        const temFiltro = filtroFamilias.length > 0 || filtroGrupos.length > 0;
-        const nomesCatsFiltradas = new Set(categoriasFiltradas.map((c) => c.nome));
-        const materiaisFiltrados = temFiltro
-          ? materiais.filter((m) => nomesCatsFiltradas.has(m.categoria?.nome))
-          : materiais;
-
         const labelDeFam = (k) => opcoesFamilias.find((o) => o.value === k)?.label || k;
 
         return (
@@ -784,15 +942,15 @@ export default function RelatoriosPage() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <KpiCard icon="category" label="Categorias" value={categoriasFiltradas.length} />
               <KpiCard icon="folder_open" label="Famílias" value={Object.keys(catMap).length} />
-              <KpiCard icon="inventory_2" label="Materiais" value={materiaisFiltrados.length} />
               <KpiCard icon="sell" label="Subfamílias" value={listaSubfamilias.length} />
+              <KpiCard icon="inventory_2" label="Itens" value={itensRecursos} />
             </div>
 
-            {/* ─────────── FILTROS (Família / Grupo — multi-seleção) ─────────── */}
+            {/* ─────────── FILTROS (Grupo / Família — multi-seleção) ─────────── */}
             <div className="bg-card border border-border rounded-2xl shadow-card p-3 sm:p-4">
               <div className="flex flex-wrap items-center gap-3">
-                <MultiSelect icon="folder" value={filtroFamilias} onChange={setFiltroFamilias} options={opcoesFamilias} placeholder="Todas as famílias" />
                 <MultiSelect icon="category" value={filtroGrupos} onChange={setFiltroGrupos} options={opcoesGrupos} placeholder="Todos os grupos" />
+                <MultiSelect icon="folder" value={filtroFamilias} onChange={setFiltroFamilias} options={opcoesFamilias} placeholder="Todas as famílias" />
                 {temFiltro && (
                   <button
                     type="button"
@@ -806,8 +964,8 @@ export default function RelatoriosPage() {
               {temFiltro && (
                 <p className="mt-2.5 text-[11px] text-muted-foreground">
                   A mostrar {categoriasFiltradas.length} de {categorias.length} categorias
-                  {filtroFamilias.length > 0 && <> · Famílias: <span className="text-foreground">{filtroFamilias.map(labelDeFam).join(", ")}</span></>}
                   {filtroGrupos.length > 0 && <> · Grupos: <span className="text-foreground">{filtroGrupos.join(", ")}</span></>}
+                  {filtroFamilias.length > 0 && <> · Famílias: <span className="text-foreground">{filtroFamilias.map(labelDeFam).join(", ")}</span></>}
                 </p>
               )}
             </div>
@@ -867,7 +1025,7 @@ export default function RelatoriosPage() {
             {/* Botão de exportação PDF do relatório de categorias */}
             <div className="flex justify-end">
               <Button size="sm" variant="outline" onClick={() => gerarRelatorioCategoriasPDF(categorias, materiais, org, { familias: filtroFamilias.map(labelDeFam), grupos: filtroGrupos })}>
-                <Icon name="picture_as_pdf" className="text-sm" /> Exportar Categorias PDF
+                <Icon name="picture_as_pdf" className="text-sm" /> Exportar
               </Button>
             </div>
           </>
