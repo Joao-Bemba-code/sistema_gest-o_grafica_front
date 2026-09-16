@@ -39,6 +39,10 @@ const metodos = [
   { value: "cheque", label: "Cheque" },
 ];
 
+const categoriasEntrada = [
+  { value: "comissao", label: "Comissão" },
+];
+
 const categoriasSaida = [
   { value: "compra", label: "Compra" },
   { value: "despesa", label: "Despesa" },
@@ -46,11 +50,24 @@ const categoriasSaida = [
   { value: "imposto", label: "Imposto" },
   { value: "aluguel", label: "Aluguel" },
   { value: "utilidades", label: "Utilidades" },
+  { value: "emprestimo", label: "Empréstimo" },
   { value: "levantamento", label: "Levantamento" },
 ];
 
 const categoriasTransferencia = [
   { value: "transferencia_interna", label: "Transferência Interna" },
+];
+
+const categoriasPorTipo = {
+  entrada: categoriasEntrada,
+  saida: categoriasSaida,
+  transferencia: categoriasTransferencia,
+};
+
+const tiposForm = [
+  { tipo: "entrada", ...tipoCfg.entrada },
+  { tipo: "saida", ...tipoCfg.saida },
+  { tipo: "transferencia", ...tipoCfg.transferencia },
 ];
 
 const initialForm = {
@@ -263,24 +280,21 @@ export default function TesourariaTab() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <div>
-          <h2 className="font-sans text-xl font-bold text-foreground tracking-tight flex items-center gap-2">
-            <Icon name="savings" className="text-primary text-[22px]" /> Tesouraria
-          </h2>
-          <p className="text-primary mt-0.5 font-mono text-[10px] uppercase tracking-widest">
-            {movimentos.length} movimentos · {formatKz(resumo.saldoTotal)} — TESOURARIA
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <button onClick={handleExportar} disabled={movimentos.length === 0} className="bg-surface-variant text-on-surface border border-outline-variant px-4 py-2 rounded font-mono flex items-center gap-2 hover:border-primary hover:text-primary transition-all text-[11px] uppercase tracking-wider disabled:opacity-50 disabled:pointer-events-none">
-            <Icon name="download" className="text-[16px]" /> Exportar CSV
-          </button>
-          <button onClick={abrirNovo} className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium shadow-sm hover:bg-primary/90 transition-colors ">
-            <Icon name="add" className="text-[16px]" /> Novo Movimento
-          </button>
-        </div>
+      <div className="flex flex-wrap justify-end gap-3">
+        <button onClick={handleExportar} disabled={movimentos.length === 0} className="bg-surface-variant text-on-surface border border-outline-variant px-4 py-2 rounded font-mono flex items-center gap-2 hover:border-primary hover:text-primary transition-all text-[11px] uppercase tracking-wider disabled:opacity-50 disabled:pointer-events-none">
+          <Icon name="download" className="text-[16px]" /> Exportar CSV
+        </button>
+        <button onClick={abrirNovo} className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium shadow-sm hover:bg-primary/90 transition-colors ">
+          <Icon name="add" className="text-[16px]" /> Novo Movimento
+        </button>
       </div>
+
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+        <KpiCard icon="account_balance" label="Saldo Total" value={formatKz(resumo.saldoTotal)} iconVariant="primary" />
+        <KpiCard icon="trending_up" label="Entradas do Mês" value={formatKz(resumo.entradasMes)} iconVariant="success" />
+        <KpiCard icon="trending_down" label="Saídas do Mês" value={formatKz(resumo.saidasMes)} iconVariant="error" />
+        <KpiCard icon="today" label="Movimentos Hoje" value={resumo.movimentosHoje} iconVariant="info" />
+      </section>
 
       {resumoPorConta.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -322,13 +336,6 @@ export default function TesourariaTab() {
           ))}
         </div>
       )}
-
-      <section className="grid grid-cols-2 lg:grid-cols-4 gap-5">
-        <KpiCard icon="account_balance" label="Saldo Total" value={formatKz(resumo.saldoTotal)} iconVariant="primary" />
-        <KpiCard icon="trending_up" label="Entradas do Mês" value={formatKz(resumo.entradasMes)} iconVariant="success" />
-        <KpiCard icon="trending_down" label="Saídas do Mês" value={formatKz(resumo.saidasMes)} iconVariant="error" />
-        <KpiCard icon="today" label="Movimentos Hoje" value={resumo.movimentosHoje} iconVariant="info" />
-      </section>
 
       <FilterBar
         search={search}
@@ -435,14 +442,13 @@ export default function TesourariaTab() {
         <form id="form-tesouraria" onSubmit={handleSubmit} className="space-y-5">
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Tipo de Movimento *</label>
-            <div className="grid grid-cols-2 gap-2">
-              {[tipoCfg.saida, tipoCfg.transferencia].map((v) => (
-                <button key={v.label} type="button" onClick={() => {
-                  const novoTipo = v.label === "Saída" ? "saida" : "transferencia";
-                  setForm((prev) => ({ ...prev, tipo: novoTipo, categoria: "", conta_destino_id: "" }));
+            <div className="grid grid-cols-3 gap-2">
+              {tiposForm.map((v) => (
+                <button key={v.tipo} type="button" onClick={() => {
+                  setForm((prev) => ({ ...prev, tipo: v.tipo, categoria: "", conta_destino_id: "" }));
                 }}
-                  className={`flex flex-col items-center justify-center gap-1 px-3 py-3 rounded-xl border-2 transition-all text-xs font-bold ${
-                    form.tipo === (v.label === "Saída" ? "saida" : "transferencia")
+                  className={`flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-xl border-2 transition-all text-xs font-bold ${
+                    form.tipo === v.tipo
                       ? "border-primary bg-primary/10 text-primary"
                       : "border-input bg-muted/50 text-muted-foreground"
                   }`}>
@@ -452,7 +458,7 @@ export default function TesourariaTab() {
               ))}
             </div>
             <p className="text-[10px] text-muted-foreground italic">
-              As entradas são registadas automaticamente quando uma fatura é marcada como paga.
+              As vendas são registadas automaticamente quando uma fatura é paga; as comissões podem ser registadas manualmente.
             </p>
           </div>
 
@@ -469,7 +475,7 @@ export default function TesourariaTab() {
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Categoria</label>
               <select name="categoria" value={form.categoria} onChange={handleChange} className={inputCls}>
                 <option value="">Selecione uma categoria</option>
-                {(form.tipo === "saida" ? categoriasSaida : categoriasTransferencia).map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                {(categoriasPorTipo[form.tipo] || []).map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">

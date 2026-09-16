@@ -172,95 +172,79 @@ const TEMA_RELATORIO = {
 };
 
 // ============================================================
-// CABEÇALHO DE RELATÓRIO (faixa preta)
+// CABEÇALHO DE RELATÓRIO (sem faixa preta)
 // ============================================================
 async function desenharCabecalhoRelatorio(doc, org = {}, titulo) {
   const pw = doc.internal.pageSize.getWidth();
   const y = 10;
-  const bandX = MARGEM;
-  const bandW = LARGURA_UTIL;
-  const bandH = 18;
   const box = 12;
-  const boxY = y + (bandH - box) / 2;
+  const boxY = y - 1;
   const logo = await carregarLogo(org);
   const { data, hora } = dataHoraAgora();
 
-  doc.setFillColor(...PRETO);
-  doc.roundedRect(bandX, y, bandW, bandH, 3, 3, "F");
-
-  doc.setFillColor(...BRANCO);
-  doc.roundedRect(bandX + 3, boxY, box, box, 2, 2, "F");
   if (logo && logo.data) {
     const escala = Math.min(box / logo.w, box / logo.h);
     const mmW = logo.w * escala;
     const mmH = logo.h * escala;
-    doc.addImage(logo.data, logo.formato, bandX + 3 + (box - mmW) / 2, boxY + (box - mmH) / 2, mmW, mmH);
-  } else {
-    doc.setTextColor(...PRETO);
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.text((org.nome || "S").charAt(0).toUpperCase(), bandX + 3 + box / 2, boxY + box / 2 + 1, { align: "center" });
+    doc.addImage(logo.data, logo.formato, MARGEM, boxY, mmW, mmH);
   }
 
-  doc.setTextColor(...BRANCO);
+  const textoX = logo && logo.data ? MARGEM + box + 6 : MARGEM;
+  doc.setTextColor(...PRETO);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
-  doc.text(org.nome || "SIGRAF", bandX + box + 8, y + 7.5);
+  doc.text(org.nome || "SIGRAF", textoX, y + 2);
 
-  doc.setTextColor(...CINZA_CLARO);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
-  doc.text(titulo, bandX + box + 8, y + 13.5);
+  doc.setTextColor(...CINZA_ESCURO);
+  doc.text(titulo, textoX, y + 8);
 
   doc.setFontSize(7.5);
-  doc.setTextColor(...CINZA_CLARO);
-  doc.text(`Data: ${data}`, pw - MARGEM - 3, y + 6, { align: "right" });
-  doc.text(`Hora: ${hora}`, pw - MARGEM - 3, y + 11, { align: "right" });
+  doc.setTextColor(...CINZA_MEDIO);
+  doc.text(`Data: ${data}`, pw - MARGEM, y + 2, { align: "right" });
+  doc.text(`Hora: ${hora}`, pw - MARGEM, y + 8, { align: "right" });
 
-  return { linhaY: y + bandH + 5, pw, box };
+  const linhaY = y + 13;
+  doc.setDrawColor(...CINZA_MEDIO);
+  doc.setLineWidth(0.4);
+  doc.line(MARGEM, linhaY, pw - MARGEM, linhaY);
+
+  return { linhaY, pw, box };
 }
 
 // ============================================================
-// KPIs (cartões em cinza)
+// KPIs (apenas texto, sem caixa de fundo)
 // ============================================================
 function desenharKpis(doc, y, kpis) {
   const totalW = LARGURA_UTIL;
-  const gap = 3;
+  const gap = 8;
   const lista = Array.isArray(kpis) && kpis.length > 0 ? kpis : [{ label: "—", value: "—" }];
   const n = lista.length;
   const cardW = (totalW - gap * (n - 1)) / n;
-  const cardH = 14;
 
-  doc.setLineWidth(0.3);
   lista.forEach((k, i) => {
     const x = MARGEM + i * (cardW + gap);
-    doc.setFillColor(...CINZA_CLARO);
-    doc.setDrawColor(...CINZA_MEDIO);
-    doc.roundedRect(x, y, cardW, cardH, 2, 2, "FD");
     doc.setFontSize(6.5);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...CINZA_ESCURO);
-    doc.text(String(k.label || "").toUpperCase(), x + 2.5, y + 4.5, { maxWidth: cardW - 5 });
+    doc.text(String(k.label || "").toUpperCase(), x, y + 2.5, { maxWidth: cardW });
     doc.setFontSize(9.5);
-    doc.setFont("helvetica", "bold");
     doc.setTextColor(...PRETO);
-    doc.text(String(k.value), x + 2.5, y + 11, { maxWidth: cardW - 5 });
+    doc.text(String(k.value), x, y + 8.5, { maxWidth: cardW });
   });
-  return y + cardH + 5;
+  return y + 14;
 }
 
 // ============================================================
 // SECÇÃO
 // ============================================================
 function secaoPdf(doc, y, titulo) {
-  doc.setFontSize(10);
+  doc.setFontSize(9);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...PRETO);
   doc.text(titulo, MARGEM, y);
-  doc.setDrawColor(...PRETO);
-  doc.setLineWidth(0.6);
-  doc.line(MARGEM, y + 1.2, MARGEM + 40, y + 1.2);
-  return y + 5;
+  return y + 4;
 }
 
 // ============================================================
@@ -797,16 +781,12 @@ export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [
       y = 22;
     }
 
-    // ── Faixa de título do GRUPO em CINZA ──
-    doc.setFillColor(...CINZA_CLARO);
-    doc.setDrawColor(...CINZA_MEDIO);
-    doc.setLineWidth(0.2);
-    doc.roundedRect(MARGEM, y - 4, LARGURA_UTIL, 8, 1.5, 1.5, "FD");
-    doc.setTextColor(...PRETO);
+    // ── Título do GRUPO (apenas texto, sem caixa) ──
+    doc.setTextColor(...CINZA_ESCURO);
     doc.setFontSize(9.5);
     doc.setFont("helvetica", "bold");
-    doc.text(grupoLabel.toUpperCase(), MARGEM + 3, y + 1);
-    y += 8;
+    doc.text(grupoLabel.toUpperCase(), MARGEM, y);
+    y += 5;
 
     // ── Linhas: Família (sempre) | Subfamília | Itens ──
     const linhas = [];
