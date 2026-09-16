@@ -2,6 +2,7 @@ export * from "./Badge";
 export * from "./Button";
 export * from "./Card";
 export * from "./CardGrid";
+export * from "./FormField";
 export * from "./FormSection";
 export * from "./Input";
 export * from "./KpiCard";

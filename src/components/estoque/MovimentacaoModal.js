@@ -8,6 +8,7 @@ import Icon from "@/components/Icon";
 import FornecedorSelect from "./FornecedorSelect";
 import NumeroInput from "@/components/ui/NumeroInput";
 import { inputCls, toNum } from "@/lib/estoque";
+import { FormField } from "@/components/ui/FormField";
 
 const formVazio = {
   quantidade: "",
@@ -20,17 +21,6 @@ const formVazio = {
   observacoes: "",
   confirma: false,
 };
-
-function Campo({ label, children, obrigatorio }) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-        {label} {obrigatorio && <span className="text-destructive" aria-hidden="true">*</span>}
-      </span>
-      {children}
-    </label>
-  );
-}
 
 export default function MovimentacaoModal({ open, item, tipo, onClose, onConfirm, clientes, fornecedores, nomeUsuario }) {
   const ehEntrada = tipo === "entrada";
@@ -131,7 +121,7 @@ export default function MovimentacaoModal({ open, item, tipo, onClose, onConfirm
               </p>
             </div>
 
-            <Campo label="Quantidade" obrigatorio>
+            <FormField label="Quantidade" obrigatorio>
               <NumeroInput
                 required
                 aria-required="true"
@@ -141,9 +131,9 @@ export default function MovimentacaoModal({ open, item, tipo, onClose, onConfirm
                 placeholder="Ex: 100"
                 autoFocus
               />
-            </Campo>
+            </FormField>
 
-            <Campo label={ehEntrada ? "Fornecedor" : "Cliente"} obrigatorio>
+            <FormField label={ehEntrada ? "Fornecedor" : "Cliente"} obrigatorio>
               {ehEntrada ? (
                 <FornecedorSelect
                   value={form.fornecedor}
@@ -168,27 +158,27 @@ export default function MovimentacaoModal({ open, item, tipo, onClose, onConfirm
                 </datalist>
                 </>
               )}
-            </Campo>
+            </FormField>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Campo label="Responsável">
+              <FormField label="Responsável">
                 <input value={form.solicitado_por} onChange={set("solicitado_por")} className={inputCls} placeholder="Responsável pela impressão/trabalho" />
-              </Campo>
-              <Campo label="Autorizado por">
+              </FormField>
+              <FormField label="Autorizado por">
                 <input value={form.permitido_por} onChange={set("permitido_por")} className={inputCls} placeholder="Quem autoriza a saída no estoque" />
-              </Campo>
+              </FormField>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Campo label="Lote">
+              <FormField label="Lote">
                 <input value={form.lote} onChange={set("lote")} className={inputCls} placeholder="Ex: LOTE-2026-01" />
-              </Campo>
-              <Campo label="Validade">
+              </FormField>
+              <FormField label="Validade">
                 <input type="date" value={form.validade} onChange={set("validade")} className={inputCls} />
-              </Campo>
+              </FormField>
             </div>
 
-            <Campo label="Observações">
+            <FormField label="Observações">
               <textarea
                 rows={2}
                 value={form.observacoes}
@@ -196,7 +186,7 @@ export default function MovimentacaoModal({ open, item, tipo, onClose, onConfirm
                 className={`${inputCls} resize-none`}
                 placeholder="Observações da movimentação..."
               />
-            </Campo>
+            </FormField>
           </div>
         ) : (
           <div className="space-y-4 animate-slide-up" key="passo2">

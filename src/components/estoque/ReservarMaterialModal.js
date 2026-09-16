@@ -6,19 +6,9 @@ import { Button } from "@/components/ui/Button";
 import Icon from "@/components/Icon";
 import NumeroInput from "@/components/ui/NumeroInput";
 import { inputCls, toNum } from "@/lib/estoque";
+import { FormField } from "@/components/ui/FormField";
 
 const formVazio = { quantidade: "", lote: "", observacoes: "" };
-
-function Campo({ label, children, obrigatorio }) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-        {label} {obrigatorio && <span className="text-destructive">*</span>}
-      </span>
-      {children}
-    </label>
-  );
-}
 
 export default function ReservarMaterialModal({ open, item, onClose, onConfirm }) {
   const [form, setForm] = useState(formVazio);
@@ -53,13 +43,13 @@ export default function ReservarMaterialModal({ open, item, onClose, onConfirm }
           <p className="text-xs text-muted-foreground">Disponível: <strong>{disponivel.toLocaleString("pt-AO")}</strong> {item?.unidade}</p>
         </div>
 
-        <Campo label="Quantidade a Reservar" obrigatorio>
+        <FormField label="Quantidade a Reservar" obrigatorio>
           <NumeroInput required value={form.quantidade} onChange={set("quantidade")} className={inputCls} placeholder="0" autoFocus />
-        </Campo>
+        </FormField>
 
-        <Campo label="Lote (opcional)">
+        <FormField label="Lote (opcional)">
           <input value={form.lote} onChange={set("lote")} className={inputCls} placeholder="Número do lote" />
-        </Campo>
+        </FormField>
 
         {erro && (
           <p className="flex items-center gap-2 text-xs font-semibold text-destructive bg-destructive/10 rounded-xl px-3 py-2.5">

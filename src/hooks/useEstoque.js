@@ -186,9 +186,9 @@ export default function useEstoque() {
     try {
       await movimentar({
         material_id: material_origem_id,
-        tipo: "transferencia",
+        tipo: "saida",
         quantidade: qtd,
-        motivo: `Saída para armazém externo: ${armazem_externo}`,
+        motivo: `Transferência para armazém externo: ${armazem_externo}`,
         solicitado_por: responsavel,
         permitido_por: autorizado_por,
         observacoes: `Destino: ${armazem_externo}${data ? ` | Data: ${data}` : ""}${observacoes ? ` | ${observacoes}` : ""}`,

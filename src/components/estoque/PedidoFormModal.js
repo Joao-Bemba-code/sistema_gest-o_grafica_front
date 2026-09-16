@@ -8,17 +8,7 @@ import FornecedorSelect from "./FornecedorSelect";
 import NumeroInput from "@/components/ui/NumeroInput";
 import { inputCls, toNum } from "@/lib/estoque";
 import { formatKz } from "@/lib/estoque";
-
-function Campo({ label, children, obrigatorio }) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-        {label} {obrigatorio && <span className="text-destructive" aria-hidden="true">*</span>}
-      </span>
-      {children}
-    </label>
-  );
-}
+import { FormField } from "@/components/ui/FormField";
 
 export default function PedidoFormModal({ open, onClose, fornecedores, materiais, materialInicial, nomeUsuario, onConfirm }) {
   const inicial = materialInicial || {};
@@ -106,7 +96,7 @@ export default function PedidoFormModal({ open, onClose, fornecedores, materiais
     >
       <div className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Campo label="Fornecedor" obrigatorio>
+          <FormField label="Fornecedor" obrigatorio>
             <FornecedorSelect
               value={form.fornecedor}
               onChange={(v) => setForm((f) => ({ ...f, fornecedor: v }))}
@@ -114,10 +104,10 @@ export default function PedidoFormModal({ open, onClose, fornecedores, materiais
               placeholder="Procurar fornecedor ou escrever novo..."
               required
             />
-          </Campo>
-          <Campo label="Solicitado por">
+          </FormField>
+          <FormField label="Solicitado por">
             <input value={form.solicitado_por} onChange={(e) => setForm((f) => ({ ...f, solicitado_por: e.target.value }))} className={inputCls} placeholder="Responsável pelo pedido" />
-          </Campo>
+          </FormField>
         </div>
 
         <div className="rounded-xl border border-border/60 overflow-hidden">
@@ -178,7 +168,7 @@ export default function PedidoFormModal({ open, onClose, fornecedores, materiais
           </div>
         </div>
 
-        <Campo label="Observações">
+        <FormField label="Observações">
           <textarea
             rows={2}
             value={form.observacoes}
@@ -186,7 +176,7 @@ export default function PedidoFormModal({ open, onClose, fornecedores, materiais
             className={`${inputCls} resize-none`}
             placeholder="Condições de entrega, notas para o fornecedor..."
           />
-        </Campo>
+        </FormField>
 
         {erro && (
           <p role="alert" className="flex items-center gap-2 text-xs font-semibold text-destructive bg-destructive/10 rounded-xl px-3 py-2.5 animate-msg-in">

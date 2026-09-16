@@ -7,22 +7,12 @@ import { Badge } from "@/components/ui/Badge";
 import Icon from "@/components/Icon";
 import NumeroInput from "@/components/ui/NumeroInput";
 import { inputCls, toNum } from "@/lib/estoque";
+import { FormField } from "@/components/ui/FormField";
 
 const motivoPerda = ["Produção", "Armazenamento", "Transporte", "Validade", "Deterioração", "Erro operacional", "Outro"];
 const motivoDesperdicio = ["Corte", "Sobra de produção", "Amostra", "Teste de qualidade", "Avaria", "Outro"];
 
-const formVazio = { quantidade: "", motivo: "", detalhes: "", confirma: false };
-
-function Campo({ label, children, obrigatorio }) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-        {label} {obrigatorio && <span className="text-destructive">*</span>}
-      </span>
-      {children}
-    </label>
-  );
-}
+const formVazio = { quantidade: "", motivo: "", detalhes: "", observacoes: "", confirma: false };
 
 export default function PerdasDesperdicioModal({ open, item, tipo, onClose, onConfirm }) {
   const ehPerda = tipo === "perda";
@@ -42,7 +32,7 @@ export default function PerdasDesperdicioModal({ open, item, tipo, onClose, onCo
     if (qtd > toNum(item?.estoque_disponivel)) return setErro("Quantidade excede o disponível");
     if (!form.confirma) return setErro(`Confirme o registo de ${ehPerda ? "perda" : "desperdício"}`);
     setSubmetendo(true);
-    const ok = await onConfirm({ tipo, quantidade: qtd, motivo: form.motivo, detalhes: form.detalhes, material_id: item.id });
+    const ok = await onConfirm({ tipo, quantidade: qtd, motivo: form.motivo, detalhes: form.detalhes, observacoes: form.observacoes, material_id: item.id });
     setSubmetendo(false);
     if (ok) { setForm(formVazio); onClose(); }
   };
@@ -68,11 +58,11 @@ export default function PerdasDesperdicioModal({ open, item, tipo, onClose, onCo
           <span className="text-xs text-muted-foreground">Movimento de saída do estoque</span>
         </div>
 
-        <Campo label="Quantidade" obrigatorio>
+        <FormField label="Quantidade" obrigatorio>
           <NumeroInput required value={form.quantidade} onChange={set("quantidade")} className={inputCls} placeholder="0" autoFocus />
-        </Campo>
+        </FormField>
 
-        <Campo label="Motivo" obrigatorio>
+        <FormField label="Motivo" obrigatorio>
           <div className="flex flex-wrap gap-2">
             {motivos.map((m) => (
               <button key={m} type="button" onClick={() => setForm((f) => ({ ...f, motivo: m }))}
@@ -81,17 +71,17 @@ export default function PerdasDesperdicioModal({ open, item, tipo, onClose, onCo
               </button>
             ))}
           </div>
-        </Campo>
+        </FormField>
 
         {form.motivo === "Outro" && (
-          <Campo label="Especificar motivo" obrigatorio>
+          <FormField label="Especificar motivo" obrigatorio>
             <input value={form.detalhes} onChange={set("detalhes")} className={inputCls} placeholder="Descreva o motivo..." />
-          </Campo>
+          </FormField>
         )}
 
-        <Campo label="Observações">
+        <FormField label="Observações">
           <textarea rows={2} value={form.observacoes} onChange={set("observacoes")} className={`${inputCls} resize-none`} placeholder="Detalhes adicionais..." />
-        </Campo>
+        </FormField>
 
         <label className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-all ${ehPerda ? "border-warning/30 bg-warning/5 hover:bg-warning/10" : "border-destructive/30 bg-destructive/5 hover:bg-destructive/10"}`}>
           <input type="checkbox" checked={form.confirma} onChange={(e) => setForm((f) => ({ ...f, confirma: e.target.checked }))} className="mt-0.5 w-4 h-4 rounded accent-primary" />

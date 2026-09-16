@@ -6,15 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import Icon from "@/components/Icon";
 import { inputCls } from "@/lib/estoque";
-
-function Campo({ label, children }) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</span>
-      {children}
-    </label>
-  );
-}
+import { FormField } from "@/components/ui/FormField";
 
 function agoraLocal(offsetMin = 0) {
   const d = new Date(Date.now() + offsetMin * 60000);
@@ -80,7 +72,7 @@ export default function LibertarMaquinaModal({ open, op, maquinas, onClose, onCo
           </p>
         </div>
 
-        <Campo label="Operacional">
+        <FormField label="Operacional">
           <select value={maquinaId} onChange={(e) => setMaquinaId(e.target.value)} className={inputCls}>
             <option value="">Seleccionar operacional disponível...</option>
             {operacionais.map((m) => (
@@ -92,15 +84,15 @@ export default function LibertarMaquinaModal({ open, op, maquinas, onClose, onCo
               Nenhum operacional disponível. Registe a máquina no parque de máquinas.
             </p>
           )}
-        </Campo>
+        </FormField>
 
-        <Campo label="Operador">
+        <FormField label="Operador">
           <input value={operador} onChange={(e) => setOperador(e.target.value)} className={inputCls} placeholder="Nome do operador" />
-        </Campo>
+        </FormField>
 
-        <Campo label="Início previsto">
+        <FormField label="Início previsto">
           <input type="datetime-local" value={inicio} onChange={(e) => setInicio(e.target.value)} className={inputCls} />
-        </Campo>
+        </FormField>
 
         {erro && (
           <p role="alert" className="flex items-center gap-2 text-xs font-semibold text-destructive bg-destructive/10 rounded-xl px-3 py-2.5 animate-msg-in">

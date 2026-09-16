@@ -14,9 +14,9 @@ const badgeVariants = cva(
           "border-error/30 bg-error/15 text-error",
         outline: "text-foreground border-outline-variant bg-surface-variant/40",
         success:
-          "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+          "border-success/30 bg-success/15 text-success",
         warning:
-          "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400",
+          "border-warning/30 bg-warning/15 text-warning",
         info: "border-primary/30 bg-primary/10 text-primary",
       },
     },

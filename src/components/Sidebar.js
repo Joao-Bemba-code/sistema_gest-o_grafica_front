@@ -18,7 +18,7 @@ const grupos = [
     rotulo: "Gestão",
     itens: [
       { icone: "storefront", nome: "Área Comercial", para: "/vendas", perm: ["comercial", "ver"] },
-      { icone: "analytics", nome: "Relatórios", para: "/relatorios", perm: ["relatorios", "ver"] },
+      { icone: "account_balance", nome: "Tesouraria", para: "/tesouraria", perm: ["tesouraria", "ver"] },
     ],
   },
   {
@@ -27,6 +27,7 @@ const grupos = [
       { icone: "factory", nome: "Produção", para: "/producao", perm: ["producao", "ver"] },
       { icone: "inventory_2", nome: "Provisionamento", para: "/estoque", perm: ["estoque", "ver"] },
       { icone: "category", nome: "Recursos", para: "/categorias", perm: ["categorias", "ver"] },
+      { icone: "analytics", nome: "Relatórios", para: "/relatorios", perm: ["relatorios", "ver"] },
     ],
   },
   {

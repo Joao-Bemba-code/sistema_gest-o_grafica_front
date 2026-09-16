@@ -8,6 +8,7 @@ import { podeAtual } from "@/lib/permissoes";
 // O primeiro prefixo que corresponder define a permissão necessária.
 const rotasProtegidas = [
   { prefixo: "/vendas", perm: ["comercial", "ver"] },
+  { prefixo: "/tesouraria", perm: ["tesouraria", "ver"] },
   { prefixo: "/orcamentos", perm: ["comercial", "ver"] },
   { prefixo: "/clientes", perm: ["comercial", "ver"] },
   { prefixo: "/faturacao", perm: ["faturacao", "ver"] },

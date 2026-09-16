@@ -8,6 +8,7 @@ import UnidadeSelect from "@/components/estoque/UnidadeSelect";
 import NumeroInput from "@/components/ui/NumeroInput";
 import { inputCls } from "@/lib/estoque";
 import { blankMaquina, estadoMaquinaOptions } from "@/lib/maquinas";
+import { FormField } from "@/components/ui/FormField";
 
 const tabs = [
   { key: "identificacao", label: "Identificação", icon: "badge" },
@@ -101,7 +102,7 @@ function SecaoManutencao({ form, onChange, onListItem, manutencoes, onChangeManu
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Campo label="Tipo de Manutenção">
+        <FormField label="Tipo de Manutenção">
           <input
             list="maq-tipos-manutencao"
             value={form.manutencao_tipo || ""}
@@ -112,21 +113,21 @@ function SecaoManutencao({ form, onChange, onListItem, manutencoes, onChangeManu
           <datalist id="maq-tipos-manutencao">
             {tiposManutencao.map((o) => <option key={o} value={o} />)}
           </datalist>
-        </Campo>
-        <Campo label="Periodicidade">
+        </FormField>
+        <FormField label="Periodicidade">
           <input
             value={form.manutencao_periodicidade || ""}
             onChange={(e) => onChange("manutencao_periodicidade", e.target.value)}
             className={inputCls}
             placeholder="Ex: Mensal, a cada 500h de uso..."
           />
-        </Campo>
-        <Campo label="Última Manutenção">
+        </FormField>
+        <FormField label="Última Manutenção">
           <input type="date" value={form.ultima_manutencao || ""} onChange={(e) => onChange("ultima_manutencao", e.target.value)} className={inputCls} />
-        </Campo>
-        <Campo label="Próxima Manutenção">
+        </FormField>
+        <FormField label="Próxima Manutenção">
           <input type="date" value={form.proxima_manutencao || ""} onChange={(e) => onChange("proxima_manutencao", e.target.value)} className={inputCls} />
-        </Campo>
+        </FormField>
       </div>
 
       <div>
@@ -223,120 +224,120 @@ export default function MaquinaForm({ formId = "form-maquina", form, onChange, o
       <div role="tabpanel" id={`${formId}-painel-${tab}`} aria-labelledby={id(`tab-${tab}`)} className="animate-scale-in">
         {tab === "identificacao" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Campo label="Código">
+            <FormField label="Código">
               <input value={form.codigo || ""} onChange={(e) => onChange("codigo", e.target.value)} className={inputCls} placeholder="Ex: MAQ-0001" />
-            </Campo>
-            <Campo label="Nome Comum" obrigatorio>
+            </FormField>
+            <FormField label="Nome Comum" obrigatorio>
               <input required aria-required="true" value={form.nome_comum || ""} onChange={(e) => onChange("nome_comum", e.target.value)} className={inputCls} placeholder="Ex: Guilhotina Hidráulica" />
-            </Campo>
-            <Campo label="Nome Técnico">
+            </FormField>
+            <FormField label="Nome Técnico">
               <input value={form.nome_tecnico || ""} onChange={(e) => onChange("nome_tecnico", e.target.value)} className={inputCls} placeholder="Ex: FQ-130 PRO" />
-            </Campo>
-            <Campo label="Categoria">
+            </FormField>
+            <FormField label="Categoria">
               <CategoriaSelect
                 value={form.categoria_id}
                 categorias={catMaquinas}
                 onChange={aoMudarCategoria}
                 placeholder="Pesquisar categoria de maquinaria..."
               />
-            </Campo>
-            <Campo label="Sub-família">
+            </FormField>
+            <FormField label="Sub-família">
               <input value={form.subfamilia || ""} onChange={(e) => onChange("subfamilia", e.target.value)} className={inputCls} placeholder="Ex: Corte, Impressão, Dobra..." />
-            </Campo>
-            <Campo label="Fornecedor">
+            </FormField>
+            <FormField label="Fornecedor">
               <FornecedorSelect
                 value={form.fornecedor || ""}
                 onChange={(v) => onChange("fornecedor", v)}
                 fornecedores={fornecedores}
                 placeholder="Procurar fornecedor ou escrever novo..."
               />
-            </Campo>
-            <Campo label="Unidade">
+            </FormField>
+            <FormField label="Unidade">
               <UnidadeSelect
                 value={form.unidade || ""}
                 unidades={["un", "linha", "conjunto", "sistema"]}
                 onChange={(v) => onChange("unidade", v)}
                 placeholder="Pesquisar unidade..."
               />
-            </Campo>
-            <Campo label="Descrição" full>
+            </FormField>
+            <FormField label="Descrição" full>
               <textarea rows={2} value={form.descricao || ""} onChange={(e) => onChange("descricao", e.target.value)} className={`${inputCls} resize-none`} placeholder="Descrição geral da máquina e da sua função..." />
-            </Campo>
+            </FormField>
           </div>
         )}
 
         {tab === "especificacao" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Campo label="Marca">
+            <FormField label="Marca">
               <input value={form.marca || ""} onChange={(e) => onChange("marca", e.target.value)} className={inputCls} placeholder="Ex: Heidelberg" />
-            </Campo>
-            <Campo label="Modelo">
+            </FormField>
+            <FormField label="Modelo">
               <input value={form.modelo || ""} onChange={(e) => onChange("modelo", e.target.value)} className={inputCls} placeholder="Ex: GTO 52" />
-            </Campo>
-            <Campo label="Nº de Série">
+            </FormField>
+            <FormField label="Nº de Série">
               <input value={form.numero_serie || ""} onChange={(e) => onChange("numero_serie", e.target.value)} className={inputCls} placeholder="Ex: SN-123456" />
-            </Campo>
-            <Campo label="Fabricante">
+            </FormField>
+            <FormField label="Fabricante">
               <input value={form.fabricante || ""} onChange={(e) => onChange("fabricante", e.target.value)} className={inputCls} placeholder="Ex: Heidelberg GmbH" />
-            </Campo>
-            <Campo label="Ano de Fabrico">
+            </FormField>
+            <FormField label="Ano de Fabrico">
               <NumeroInput value={form.ano_fabrico || ""} onChange={(e) => onChange("ano_fabrico", e.target.value)} className={inputCls} placeholder="Ex: 2018" />
-            </Campo>
-            <Campo label="Nº Patrimonial">
+            </FormField>
+            <FormField label="Nº Patrimonial">
               <input value={form.numero_patrimonial || ""} onChange={(e) => onChange("numero_patrimonial", e.target.value)} className={inputCls} placeholder="Ex: PAT-0021" />
-            </Campo>
-            <Campo label="Estado">
+            </FormField>
+            <FormField label="Estado">
               <select value={form.estado || "operacional"} onChange={(e) => onChange("estado", e.target.value)} className={inputCls}>
                 {estadoMaquinaOptions.map((o) => <option key={o.valor} value={o.valor}>{o.label}</option>)}
               </select>
-            </Campo>
+            </FormField>
           </div>
         )}
 
         {tab === "capacidade" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Campo label="Capacidade Nominal" full>
+            <FormField label="Capacidade Nominal" full>
               <div className="flex items-center gap-2">
                 <NumeroInput value={form.capacidade_nominal || ""} onChange={(e) => onChange("capacidade_nominal", e.target.value)} className={inputCls} placeholder="Ex: 15000" />
                 <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap">un/h</span>
               </div>
-            </Campo>
-            <Campo label="Capacidade Prática" full>
+            </FormField>
+            <FormField label="Capacidade Prática" full>
               <div className="flex items-center gap-2">
                 <NumeroInput value={form.capacidade_pratica || ""} onChange={(e) => onChange("capacidade_pratica", e.target.value)} className={inputCls} placeholder="Ex: 12000" />
                 <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap">un/h</span>
               </div>
-            </Campo>
-            <Campo label="Tempo Médio de Setup">
+            </FormField>
+            <FormField label="Tempo Médio de Setup">
               <div className="flex items-center gap-2">
                 <NumeroInput value={form.tempo_medio_setup || ""} onChange={(e) => onChange("tempo_medio_setup", e.target.value)} className={inputCls} placeholder="Ex: 45" />
                 <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap">min</span>
               </div>
-            </Campo>
-            <Campo label="Eficiência Média">
+            </FormField>
+            <FormField label="Eficiência Média">
               <div className="flex items-center gap-2">
                 <NumeroInput value={form.eficiencia_media || ""} onChange={(e) => onChange("eficiencia_media", e.target.value)} className={inputCls} placeholder="Ex: 85" />
                 <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap">%</span>
               </div>
-            </Campo>
-            <Campo label="Horas Disponível/Dia">
+            </FormField>
+            <FormField label="Horas Disponível/Dia">
               <div className="flex items-center gap-2">
                 <NumeroInput value={form.horas_disponiveis_dia || ""} onChange={(e) => onChange("horas_disponiveis_dia", e.target.value)} className={inputCls} placeholder="Ex: 16" />
                 <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap">h</span>
               </div>
-            </Campo>
-            <Campo label="Horas Produtivas/Dia">
+            </FormField>
+            <FormField label="Horas Produtivas/Dia">
               <div className="flex items-center gap-2">
                 <NumeroInput value={form.horas_produtivas_dia || ""} onChange={(e) => onChange("horas_produtivas_dia", e.target.value)} className={inputCls} placeholder="Ex: 12" />
                 <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap">h</span>
               </div>
-            </Campo>
-            <Campo label="Produção Média">
+            </FormField>
+            <FormField label="Produção Média">
               <div className="flex items-center gap-2">
                 <NumeroInput value={form.producao_media || ""} onChange={(e) => onChange("producao_media", e.target.value)} className={inputCls} placeholder="Ex: 9000" />
                 <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap">un/dia</span>
               </div>
-            </Campo>
+            </FormField>
           </div>
         )}
 
@@ -359,21 +360,21 @@ export default function MaquinaForm({ formId = "form-maquina", form, onChange, o
 
         {tab === "estoque" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Campo label="Stock Mínimo">
+            <FormField label="Stock Mínimo">
               <NumeroInput value={form.estoque_min || ""} onChange={(e) => onChange("estoque_min", e.target.value)} className={inputCls} placeholder="Ex: 1" />
-            </Campo>
-            <Campo label="Stock Máximo">
+            </FormField>
+            <FormField label="Stock Máximo">
               <NumeroInput value={form.estoque_max || ""} onChange={(e) => onChange("estoque_max", e.target.value)} className={inputCls} placeholder="Ex: 10" />
-            </Campo>
-            <Campo label="Custo Unitário (Kz)">
+            </FormField>
+            <FormField label="Custo Unitário (Kz)">
               <NumeroInput value={form.custo_unit || ""} onChange={(e) => onChange("custo_unit", e.target.value)} className={inputCls} placeholder="Ex: 2500000" />
-            </Campo>
-            <Campo label="Margem (%)">
+            </FormField>
+            <FormField label="Margem (%)">
               <NumeroInput value={form.margem || ""} onChange={(e) => onChange("margem", e.target.value)} className={inputCls} placeholder="Ex: 20" />
-            </Campo>
-            <Campo label="Localização" full>
+            </FormField>
+            <FormField label="Localização" full>
               <input value={form.localizacao || ""} onChange={(e) => onChange("localizacao", e.target.value)} className={inputCls} placeholder="Ex: Nave A, sector 3" />
-            </Campo>
+            </FormField>
           </div>
         )}
       </div>

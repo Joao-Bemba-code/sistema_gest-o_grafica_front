@@ -6,19 +6,9 @@ import { Button } from "@/components/ui/Button";
 import Icon from "@/components/Icon";
 import NumeroInput from "@/components/ui/NumeroInput";
 import { inputCls, toNum } from "@/lib/estoque";
+import { FormField } from "@/components/ui/FormField";
 
 const formVazio = { quantidade: "", armazem_externo: "", responsavel: "", autorizado_por: "", data: new Date().toISOString().split("T")[0], observacoes: "", confirma: false };
-
-function Campo({ label, children, obrigatorio }) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-        {label} {obrigatorio && <span className="text-destructive">*</span>}
-      </span>
-      {children}
-    </label>
-  );
-}
 
 export default function TransferModal({ open, item, onClose, onConfirm }) {
   const [form, setForm] = useState(formVazio);
@@ -60,30 +50,30 @@ export default function TransferModal({ open, item, onClose, onConfirm }) {
 
         <Icon name="arrow_downward" className="text-xl text-primary mx-auto block" />
 
-        <Campo label="Armazém Externo (Destino)" obrigatorio>
+        <FormField label="Armazém Externo (Destino)" obrigatorio>
           <input required value={form.armazem_externo} onChange={set("armazem_externo")} className={inputCls} placeholder="Ex: Armazém Central, Filial Luanda..." autoFocus />
-        </Campo>
+        </FormField>
 
-        <Campo label="Quantidade" obrigatorio>
+        <FormField label="Quantidade" obrigatorio>
           <NumeroInput required value={form.quantidade} onChange={set("quantidade")} className={inputCls} placeholder="0" />
-        </Campo>
+        </FormField>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Campo label="Responsável" obrigatorio>
+          <FormField label="Responsável" obrigatorio>
             <input required value={form.responsavel} onChange={set("responsavel")} className={inputCls} placeholder="Nome do responsável" />
-          </Campo>
-          <Campo label="Autorizado por" obrigatorio>
+          </FormField>
+          <FormField label="Autorizado por" obrigatorio>
             <input required value={form.autorizado_por} onChange={set("autorizado_por")} className={inputCls} placeholder="Quem autoriza" />
-          </Campo>
+          </FormField>
         </div>
 
-        <Campo label="Data" obrigatorio>
+        <FormField label="Data" obrigatorio>
           <input type="date" required value={form.data} onChange={set("data")} className={inputCls} />
-        </Campo>
+        </FormField>
 
-        <Campo label="Observações">
+        <FormField label="Observações">
           <textarea rows={2} value={form.observacoes} onChange={set("observacoes")} className={`${inputCls} resize-none`} placeholder="Motivo da transferência..." />
-        </Campo>
+        </FormField>
 
         <label className="flex items-start gap-3 rounded-xl border border-primary/30 bg-primary/5 p-3 cursor-pointer hover:bg-primary/10">
           <input type="checkbox" checked={form.confirma} onChange={(e) => setForm((f) => ({ ...f, confirma: e.target.checked }))} className="mt-0.5 w-4 h-4 rounded accent-primary" />

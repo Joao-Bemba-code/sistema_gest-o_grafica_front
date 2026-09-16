@@ -22,9 +22,12 @@ export default function Modal({
   const closeRef = useRef(null);
 
   useEffect(() => {
+    if (open) closeRef.current?.focus();
+  }, [open]);
+
+  useEffect(() => {
     if (!open) return;
     document.body.style.overflow = "hidden";
-    closeRef.current?.focus();
     const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
     document.addEventListener("keydown", onKey);
     return () => {

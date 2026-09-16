@@ -20,7 +20,6 @@ import OrcamentoModal from "@/components/vendas/OrcamentoModal";
 import OrcamentoDetalhesModal from "@/components/vendas/OrcamentoDetalhesModal";
 import FaturaModal from "@/components/vendas/FaturaModal";
 import FaturaDetalhesModal from "@/components/vendas/FaturaDetalhesModal";
-import TesourariaTab from "@/components/vendas/TesourariaTab";
 import OrcamentoPdfModal from "@/components/orcamentos/OrcamentoPdfModal";
 import gerarFaturaPdf from "@/lib/faturacaoPdf";
 
@@ -53,9 +52,9 @@ export default function AreaComercialPage() {
   const [tab, setTab] = useState(() => {
     if (typeof window !== "undefined") {
       const q = new URLSearchParams(window.location.search).get("tab");
-      if (q && ["orcamentos", "faturas", "cadastros", "tesouraria"].includes(q)) return q;
+      if (q && ["cadastros", "orcamentos", "faturas"].includes(q)) return q;
     }
-    return "orcamentos";
+    return "cadastros";
   });
   const [orcamentos, setOrcamentos] = useState([]);
   const [faturas, setFaturas] = useState([]);
@@ -72,7 +71,7 @@ export default function AreaComercialPage() {
 
   const trocarTab = (t) => {
     setTab(t);
-    router.replace(`/vendas${t === "orcamentos" ? "" : `?tab=${t}`}`, { scroll: false });
+    router.replace(`/vendas${t === "cadastros" ? "" : `?tab=${t}`}`, { scroll: false });
   };
 
   useEffect(() => {
@@ -210,12 +209,12 @@ export default function AreaComercialPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Área Comercial</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Orçamentos · facturas · cadastros // COMERCIAL
+            Cadastros · orçamentos · facturas // COMERCIAL
           </p>
         </div>
       </div>
 
-      {tab !== "cadastros" && tab !== "tesouraria" && (
+      {tab !== "cadastros" && (
       <section className="grid grid-cols-2 sm:grid-cols-4 gap-5">
         <KpiCard icon="request_quote" label="Orçamentos" value={orcamentos.length} iconVariant="info" />
         <KpiCard icon="pending" label="Pendentes" value={pendentes} iconVariant="warning" />
@@ -225,16 +224,18 @@ export default function AreaComercialPage() {
       )}
 
       <div className="flex gap-1.5 flex-wrap obsidian-glass cyber-border p-1.5 rounded-xl">
-        {["orcamentos", "faturas", "cadastros", "tesouraria"].map((t) => (
+        {["cadastros", "orcamentos", "faturas"].map((t) => (
           <button key={t} type="button" onClick={() => trocarTab(t)}
             className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all ${
               tab === t ? "nav-pill shadow-none text-primary" : "text-muted-foreground hover:text-foreground"
             }`}>
-            <Icon name={t === "orcamentos" ? "request_quote" : t === "faturas" ? "receipt_long" : t === "tesouraria" ? "account_balance" : "groups"} className="text-lg" />
-            {t === "orcamentos" ? "Orçamentos" : t === "faturas" ? "Facturas" : t === "tesouraria" ? "Tesouraria" : "Cadastros"}
+            <Icon name={t === "orcamentos" ? "request_quote" : t === "faturas" ? "receipt_long" : "groups"} className="text-lg" />
+            {t === "orcamentos" ? "Orçamentos" : t === "faturas" ? "Facturas" : "Cadastros"}
           </button>
         ))}
       </div>
+
+      {tab === "cadastros" && <CadastrosTab />}
 
       {tab === "orcamentos" && (
         <>
@@ -375,10 +376,6 @@ export default function AreaComercialPage() {
         </>
       )}
 
-      {tab === "cadastros" && <CadastrosTab />}
-
-      {tab === "tesouraria" && <TesourariaTab />}
-
       <OrcamentoModal
         open={orcForm.open}
         editingId={orcForm.id}
@@ -432,11 +429,11 @@ export default function AreaComercialPage() {
         <p className="text-sm text-muted-foreground">SIGRAF — Sistema de Gestão para Indústria Gráfica</p>
       </footer>
 
-      {tab !== "cadastros" && tab !== "tesouraria" && (
+      {tab !== "cadastros" && (
         <FloatButton
-          onClick={tab === "orcamentos" ? () => setOrcForm({ open: true, id: null }) : () => setFatFormOpen(true)}
-          label={tab === "orcamentos" ? "Novo Orçamento" : "Nova Fatura"}
-          icon={tab === "orcamentos" ? "request_quote" : "receipt_long"}
+          onClick={tab === "faturas" ? () => setFatFormOpen(true) : () => setOrcForm({ open: true, id: null })}
+          label={tab === "faturas" ? "Nova Fatura" : "Novo Orçamento"}
+          icon={tab === "faturas" ? "receipt_long" : "request_quote"}
         />
       )}
     </div>

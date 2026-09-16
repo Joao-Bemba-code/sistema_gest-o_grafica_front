@@ -10,8 +10,9 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
 import FilterBar, { useFilter } from "@/components/ui/FilterBar";
-import { listarOrdens, libertarMateriais, removerOrdem } from "@/services/producao";
+import { listarOrdens, requisitarMateriais, aprovarMateriais, removerOrdem } from "@/services/producao";
 import { getUsuario } from "@/services/auth";
+import { podeAtual } from "@/lib/permissoes";
 import SaidaMateriaisModal from "@/components/producao/SaidaMateriaisModal";
 import { listar as listarMateriais } from "@/services/materiais";
 
@@ -47,11 +48,13 @@ function derivarProcesso(op) {
 }
 
 function normalizar(op) {
+  const orcamentoDados = op.orcamento && typeof op.orcamento === "object" ? op.orcamento : null;
   return {
     ...op,
     status: op.estado || op.status || "aguardando",
     cliente: op.cliente?.nome || op.cliente || "—",
-    orcamento: op.orcamento?.numero || op.orcamento || "—",
+    orcamento: orcamentoDados?.numero || op.orcamento || "—",
+    orcamentoDados,
     dataEntrada: op.data_entrada || op.dataEntrada || "",
     dataEntrega: op.data_entrega || op.dataEntrega || "",
     processoAtual: op.etapa_atual || op.etapaAtual || derivarProcesso(op),
@@ -65,9 +68,11 @@ export default function OrdensTab() {
   const [loading, setLoading] = useState(true);
   const [materiais, setMateriais] = useState([]);
   const [libertarOp, setLibertarOp] = useState(null);
+  const [aprovarOp, setAprovarOp] = useState(null);
   const [eliminarItem, setEliminarItem] = useState(null);
   const [deletando, setDeletando] = useState(false);
   const { addToast } = useToast();
+  const podeAprovar = podeAtual("producao", "aprovar");
 
   const carregarDados = () => {
     Promise.all([listarOrdens(), listarMateriais()]).then(([ordensData, materiaisData]) => {
@@ -102,17 +107,44 @@ export default function OrdensTab() {
   const handleLibertar = async (dados = {}) => {
     if (!libertarOp) return false;
     try {
-      const atualizada = await libertarMateriais(libertarOp.id, {
+      const todosItens = Array.isArray(dados.itens_materiais) && dados.itens_materiais.length > 0
+        ? dados.itens_materiais
+        : undefined;
+      let atualizada = await requisitarMateriais(libertarOp.id, {
         solicitado_por: dados.solicitado_por,
-        permitido_por: dados.permitido_por,
         observacoes: dados.observacoes,
-        itens_materiais: dados.itens_materiais,
+        itens_materiais: todosItens,
       });
-      setOps((prev) => prev.map((o) => (o.id === libertarOp.id ? normalizar(atualizada) : o)));
-      addToast(`Materiais da OP ${libertarOp.id} libertados — saída de stock registada`, "success");
+      if (podeAprovar) {
+        atualizada = await aprovarMateriais(libertarOp.id, {
+          permitido_por: dados.permitido_por || getUsuario()?.nome,
+          observacoes: dados.observacoes,
+        });
+        setOps((prev) => prev.map((o) => (o.id === libertarOp.id ? normalizar(atualizada) : o)));
+        addToast(`Requisição da OP ${libertarOp.id} submetida e aprovada — saída de stock registada`, "success");
+      } else {
+        setOps((prev) => prev.map((o) => (o.id === libertarOp.id ? normalizar(atualizada) : o)));
+        addToast(`Requisição da OP ${libertarOp.id} submetida — aguarda aprovação no estoque`, "success");
+      }
       return true;
     } catch (err) {
-      addToast(err.response?.data?.erro || "Erro ao libertar materiais", "error");
+      addToast(err.response?.data?.erro || "Erro ao submeter a requisição de materiais", "error");
+      return false;
+    }
+  };
+
+  const handleAprovar = async (dados = {}) => {
+    if (!aprovarOp) return false;
+    try {
+      const atualizada = await aprovarMateriais(aprovarOp.id, {
+        permitido_por: dados.permitido_por || getUsuario()?.nome,
+        observacoes: dados.observacoes,
+      });
+      setOps((prev) => prev.map((o) => (o.id === aprovarOp.id ? normalizar(atualizada) : o)));
+      addToast(`Requisição da OP ${aprovarOp.id} aprovada — saída de stock registada`, "success");
+      return true;
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao aprovar materiais", "error");
       return false;
     }
   };
@@ -186,6 +218,9 @@ export default function OrdensTab() {
                           <Badge variant={sc.variant || "info"} className="text-[10px]">{sc.label}</Badge>
                           {op.requisicao_estado === "pendente" && (
                             <Badge variant="destructive" className="text-[10px]">Aguardando requisição material</Badge>
+                          )}
+                          {op.requisicao_estado === "requisitada" && (
+                            <Badge variant="warning" className="text-[10px]">Aguardando aprovação</Badge>
                           )}
                           {op.maquina && (
                             <Badge variant="outline" className="text-[10px]"><Icon name="print" className="text-[12px]" /> {op.maquina}</Badge>
@@ -271,11 +306,32 @@ export default function OrdensTab() {
                         </div>
                       </div>
                     )}
+                    {op.requisicao_estado === "requisitada" && (
+                      <div className="mt-4 pt-4 border-t">
+                        <div className="flex items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3">
+                          <div className="min-w-0">
+                            <p className="text-xs text-amber-700 dark:text-amber-400">
+                              Requisição submetida por <strong>{op.solicitado_por || "—"}</strong> — aguarda aprovação no estoque. A saída de stock só é registada após aprovação.
+                            </p>
+                            {podeAprovar && (
+                              <p className="text-[11px] text-muted-foreground mt-0.5">
+                                Tem permissão para aprovar esta requisição.
+                              </p>
+                            )}
+                          </div>
+                          {podeAprovar && (
+                            <Button size="sm" variant="success" onClick={(e) => { e.stopPropagation(); setAprovarOp(op); }}>
+                              <Icon name="check_circle" className="text-lg" /> Aprovar requisição
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                     {op.requisicao_estado === "libertada" && (
                       <div className="mt-4 pt-4 border-t">
                         <div className="flex items-center justify-between gap-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 py-3">
                           <p className="text-xs text-emerald-700 dark:text-emerald-400">
-                            Materiais libertados — saída de stock registada. A atribuição da máquina é feita na aba <strong>Processos</strong> (Impressão ou Acabamento).
+                            Materiais libertados — saída de stock registada{op.permitido_por ? <> por <strong>{op.permitido_por}</strong></> : ""}. A atribuição da máquina é feita na aba <strong>Processos</strong> (Impressão ou Acabamento).
                           </p>
                           <Badge variant="success" className="text-[10px]">Pronto para produção</Badge>
                         </div>
@@ -311,6 +367,18 @@ export default function OrdensTab() {
         materiais={materiais}
         onClose={() => setLibertarOp(null)}
         onConfirm={handleLibertar}
+        nomeUsuario={getUsuario()?.nome || ""}
+      />
+
+      <SaidaMateriaisModal
+        key={aprovarOp?.id ?? "nenhum-aprovacao"}
+        modo="aprovacao"
+        open={!!aprovarOp}
+        op={aprovarOp}
+        matPorId={matPorId}
+        materiais={materiais}
+        onClose={() => setAprovarOp(null)}
+        onConfirm={handleAprovar}
         nomeUsuario={getUsuario()?.nome || ""}
       />
 

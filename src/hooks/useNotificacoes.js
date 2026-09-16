@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { listar as listarMateriais } from "@/services/materiais";
 import { listarOrdens } from "@/services/producao";
 import { listarFaturas } from "@/services/faturacao";
+import { listar as listarNotificacoes, marcarLida as marcarLidaApi, marcarTodasLidas as marcarTodasLidasApi } from "@/services/notificacoes";
 import { getUsuario } from "@/services/auth";
 import { podeAtual } from "@/lib/permissoes";
 
@@ -49,6 +50,7 @@ export default function useNotificacoes() {
     if (verEstoque) promessas.push(listarMateriais());
     if (verProducao) promessas.push(listarOrdens());
     if (verComercial) promessas.push(listarFaturas());
+    promessas.push(listarNotificacoes({ limite: 30 }));
 
     Promise.allSettled(promessas)
       .then((resultados) => {
@@ -56,8 +58,27 @@ export default function useNotificacoes() {
         const ordens = verProducao && resultados[verEstoque ? 1 : 0]?.status === "fulfilled" && Array.isArray(resultados[verEstoque ? 1 : 0].value) ? resultados[verEstoque ? 1 : 0].value : [];
         const idxFaturas = (verEstoque ? 1 : 0) + (verProducao ? 1 : 0);
         const faturas = verComercial && resultados[idxFaturas]?.status === "fulfilled" && Array.isArray(resultados[idxFaturas].value) ? resultados[idxFaturas].value : [];
+        const idxNotif = (verEstoque ? 1 : 0) + (verProducao ? 1 : 0) + (verComercial ? 1 : 0);
+        const notifs =
+          resultados[idxNotif]?.status === "fulfilled" && Array.isArray(resultados[idxNotif].value?.notificacoes)
+            ? resultados[idxNotif].value.notificacoes
+            : [];
         const hoje = new Date();
         const nova = [];
+
+        notifs.forEach((n) => {
+          nova.push({
+            id: `notif-${n.id}`,
+            nivel: n.nivel || "info",
+            icon: n.icone || "notifications",
+            titulo: n.titulo,
+            desc: n.descricao || "",
+            tempo: n.createdAt || hoje.toISOString(),
+            link: n.link || "/",
+            lida: n.lida === true,
+            backendId: n.id,
+          });
+        });
 
         if (verEstoque) {
           mats
@@ -155,9 +176,15 @@ export default function useNotificacoes() {
     };
   }, [carregar]);
 
-  const naoLidas = useMemo(() => itens.filter((n) => !lidas[n.id]), [itens, lidas]);
+  const naoLidas = useMemo(
+    () => itens.filter((n) => !lidas[n.id] && !n.lida),
+    [itens, lidas]
+  );
 
   const marcarLida = useCallback((id) => {
+    const item = itens.find((n) => n.id === id);
+    if (item?.backendId) marcarLidaApi(item.backendId).catch(() => {});
+    setItens((prev) => prev.map((n) => (n.id === id ? { ...n, lida: true } : n)));
     setLidas((prev) => {
       if (prev[id]) return prev;
       const proximo = { ...prev, [id]: true };
@@ -166,9 +193,11 @@ export default function useNotificacoes() {
       }
       return proximo;
     });
-  }, []);
+  }, [itens]);
 
   const marcarTodasLidas = useCallback(() => {
+    marcarTodasLidasApi().catch(() => {});
+    setItens((prev) => prev.map((n) => ({ ...n, lida: true })));
     setLidas((prev) => {
       const proximo = { ...prev };
       itens.forEach((n) => {

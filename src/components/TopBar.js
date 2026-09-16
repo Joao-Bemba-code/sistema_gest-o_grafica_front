@@ -14,6 +14,7 @@ import Modal from "./Modal";
 const breadcrumbs = {
   "/": ["Painel"],
   "/vendas": ["Área Comercial"],
+  "/tesouraria": ["Tesouraria"],
   "/orcamentos": ["Área Comercial", "Orçamentos"],
   "/producao/ordens": ["Produção", "Ordens"],
   "/producao": ["Produção"],
