@@ -67,6 +67,8 @@ const initialForm = {
   cliente_id: "",
 };
 
+const POR_PAGINA = 5;
+
 function formatKz(v) { return `Kz ${Number(v || 0).toLocaleString("pt-AO")}`; }
 
 function formatData(v) {
@@ -85,6 +87,7 @@ export default function TesourariaTab() {
   const [salvando, setSalvando] = useState(false);
   const [eliminarItem, setEliminarItem] = useState(null);
   const [deletando, setDeletando] = useState(false);
+  const [pagina, setPagina] = useState(1);
   const { addToast } = useToast();
 
   const carregarResumo = async () => {
@@ -148,6 +151,18 @@ export default function TesourariaTab() {
     searchFields: ["descricao", "referencia", "categoria"],
     filterConfig,
   });
+
+  const mudarBusca = (v) => { setSearch(v); setPagina(1); };
+  const mudarFiltro = (f) => { setActiveFilter(f); setPagina(1); };
+
+  const totalPaginas = Math.max(1, Math.ceil(filtered.length / POR_PAGINA));
+  const paginaAtual = Math.min(pagina, totalPaginas);
+  const inicioMov = (paginaAtual - 1) * POR_PAGINA;
+  const movimentosPaginados = filtered.slice(inicioMov, inicioMov + POR_PAGINA);
+  const paginasVisiveis = [];
+  for (let n = 1; n <= totalPaginas; n++) {
+    if (n === 1 || n === totalPaginas || (n >= paginaAtual - 1 && n <= paginaAtual + 1)) paginasVisiveis.push(n);
+  }
 
   const contasPorId = Object.fromEntries(contas.map((c) => [c.id, c]));
 
@@ -267,13 +282,6 @@ export default function TesourariaTab() {
         </div>
       </div>
 
-      <section className="grid grid-cols-2 lg:grid-cols-4 gap-5">
-        <KpiCard icon="account_balance" label="Saldo Total" value={formatKz(resumo.saldoTotal)} iconVariant="primary" />
-        <KpiCard icon="trending_up" label="Entradas do Mês" value={formatKz(resumo.entradasMes)} iconVariant="success" />
-        <KpiCard icon="trending_down" label="Saídas do Mês" value={formatKz(resumo.saidasMes)} iconVariant="error" />
-        <KpiCard icon="today" label="Movimentos Hoje" value={resumo.movimentosHoje} iconVariant="info" />
-      </section>
-
       {resumoPorConta.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {resumoPorConta.map((c) => (
@@ -315,20 +323,27 @@ export default function TesourariaTab() {
         </div>
       )}
 
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+        <KpiCard icon="account_balance" label="Saldo Total" value={formatKz(resumo.saldoTotal)} iconVariant="primary" />
+        <KpiCard icon="trending_up" label="Entradas do Mês" value={formatKz(resumo.entradasMes)} iconVariant="success" />
+        <KpiCard icon="trending_down" label="Saídas do Mês" value={formatKz(resumo.saidasMes)} iconVariant="error" />
+        <KpiCard icon="today" label="Movimentos Hoje" value={resumo.movimentosHoje} iconVariant="info" />
+      </section>
+
       <FilterBar
         search={search}
-        onSearchChange={setSearch}
+        onSearchChange={mudarBusca}
         placeholder="Pesquisar por descrição, referência ou categoria..."
         filters={filterConfig}
         activeFilter={activeFilter}
-        onFilterChange={setActiveFilter}
+        onFilterChange={mudarFiltro}
         count={total}
         countLabel="movimentos"
       />
 
       {loading ? <ListSkeleton count={6} /> : (
         <div className="space-y-3">
-          {filtered.map((m) => {
+          {movimentosPaginados.map((m) => {
             const tc = tipoCfg[m.tipo] || { label: m.tipo, variant: "outline", icon: "swap_horiz" };
             const ec = estadoCfg[m.estado] || { label: m.estado, variant: "outline" };
             const isEntrada = m.tipo === "entrada";
@@ -376,6 +391,29 @@ export default function TesourariaTab() {
             <div className="text-center p-12 text-muted-foreground">
               <Icon name="savings" className="text-4xl block mx-auto mb-2 opacity-30" />
               <p className="font-medium">Nenhum movimento encontrado</p>
+            </div>
+          )}
+          {filtered.length > 0 && totalPaginas > 1 && (
+            <div className="flex items-center justify-between gap-3 pt-1 flex-wrap">
+              <p className="text-xs text-muted-foreground font-mono">
+                Mostrando {inicioMov + 1}–{Math.min(inicioMov + POR_PAGINA, filtered.length)} de {filtered.length}
+              </p>
+              <div className="flex items-center gap-1.5">
+                <Button type="button" variant="outline" size="sm" disabled={paginaAtual <= 1} onClick={() => setPagina((p) => Math.max(1, p - 1))} className="h-8 w-8 p-0" title="Anterior">
+                  <Icon name="chevron_left" className="text-[14px]" />
+                </Button>
+                {paginasVisiveis.map((n, i) => (
+                  <span key={n} className="flex items-center gap-1.5">
+                    {i > 0 && paginasVisiveis[i - 1] !== n - 1 && <span className="text-muted-foreground text-xs">…</span>}
+                    <Button type="button" variant={n === paginaAtual ? "default" : "outline"} size="sm" onClick={() => setPagina(n)} className="h-8 w-8 p-0 text-xs">
+                      {n}
+                    </Button>
+                  </span>
+                ))}
+                <Button type="button" variant="outline" size="sm" disabled={paginaAtual >= totalPaginas} onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} className="h-8 w-8 p-0" title="Seguinte">
+                  <Icon name="chevron_right" className="text-[14px]" />
+                </Button>
+              </div>
             </div>
           )}
         </div>

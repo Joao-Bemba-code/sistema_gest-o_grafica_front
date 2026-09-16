@@ -658,8 +658,8 @@ return (
               <div key={idx} className="bg-muted/50 rounded-xl p-3 space-y-2">
                 <div className="grid grid-cols-12 gap-2 items-end">
                   <div className="col-span-12 sm:col-span-4 flex flex-col gap-1.5">
-                    {idx === 0 && <span className="cyber-label">Serviço *</span>}
-                    <select required aria-required="true" value={sv.servico_id || ""} onChange={(e) => selecionarServico(idx, e.target.value)} className={inputCls}>
+                    {idx === 0 && <span className="cyber-label">Serviço</span>}
+                    <select value={sv.servico_id || ""} onChange={(e) => selecionarServico(idx, e.target.value)} className={inputCls}>
                       <option value="">Seleccionar serviço...</option>
                       {(servicosCatalogo || []).map((s) => (
                         <option key={s.id} value={s.id}>{s.nome}{s.categoria ? ` (${s.categoria.nome})` : ""}</option>
@@ -670,8 +670,8 @@ return (
                     )}
                   </div>
                   <div className="col-span-6 sm:col-span-2 flex flex-col gap-1.5">
-                    {idx === 0 && <span className="cyber-label">Trabalhadores *</span>}
-                    <NumeroInput required aria-required="true" value={sv.mob} onChange={(e) => setServico(idx, "mob", e.target.value)} className={inputCls} placeholder="1" />
+                    {idx === 0 && <span className="cyber-label">Trabalhadores</span>}
+                    <NumeroInput value={sv.mob} onChange={(e) => setServico(idx, "mob", e.target.value)} className={inputCls} placeholder="1" />
                   </div>
                   <div className="col-span-6 sm:col-span-2 flex flex-col gap-1.5">
                     {idx === 0 && <span className="cyber-label">Prazo</span>}

@@ -95,7 +95,7 @@ export async function carregarLogo(org) {
 // ============================================================
 async function desenharCabecalho(doc, org = {}, titulo) {
   const pw = doc.internal.pageSize.getWidth();
-  const box = 26;
+  const box = 20;
   const logo = await carregarLogo(org);
   const { data, hora } = dataHoraAgora();
 
@@ -103,25 +103,25 @@ async function desenharCabecalho(doc, org = {}, titulo) {
     const escala = Math.min(box / logo.w, box / logo.h);
     const mmW = logo.w * escala;
     const mmH = logo.h * escala;
-    doc.addImage(logo.data, logo.formato, MARGEM, 12 + (box - mmH) / 2, mmW, mmH);
+    doc.addImage(logo.data, logo.formato, MARGEM, 14 + (box - mmH) / 2, mmW, mmH);
   } else {
     doc.setFillColor(...PRETO);
-    doc.roundedRect(MARGEM, 12, box, box, 4, 4, "F");
+    doc.roundedRect(MARGEM, 14, box, box, 4, 4, "F");
     doc.setTextColor(...BRANCO);
-    doc.setFontSize(14);
+    doc.setFontSize(13);
     doc.setFont("helvetica", "bold");
-    doc.text((org.nome || "S").charAt(0).toUpperCase(), MARGEM + box / 2, 12 + box / 2 + 1, { align: "center" });
+    doc.text((org.nome || "S").charAt(0).toUpperCase(), MARGEM + box / 2, 14 + box / 2 + 1, { align: "center" });
   }
 
-  doc.setFontSize(12);
-  doc.setFont("helvetica", "bold");
+  const textoX = MARGEM + box + 6;
   doc.setTextColor(...PRETO);
-  doc.text(org.nome || "SIGRAF", MARGEM, 12 + box + 3);
-
-  const tituloY = 12 + box + 13;
-  doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
-  doc.text(titulo, MARGEM, tituloY);
+  doc.setFontSize(13);
+  doc.text(org.nome || "SIGRAF", textoX, 14 + 8);
+
+  const tituloY = 14 + box + 9;
+  doc.setFontSize(13);
+  doc.text(titulo, textoX, tituloY);
 
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
@@ -180,7 +180,7 @@ async function desenharCabecalhoRelatorio(doc, org = {}, titulo) {
   const bandX = MARGEM;
   const bandW = LARGURA_UTIL;
   const bandH = 18;
-  const box = 14;
+  const box = 12;
   const boxY = y + (bandH - box) / 2;
   const logo = await carregarLogo(org);
   const { data, hora } = dataHoraAgora();
