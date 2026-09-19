@@ -15,7 +15,7 @@ function agoraLocal(offsetMin = 0) {
 }
 
 export default function LibertarMaquinaModal({ open, op, maquinas, onClose, onConfirm, nomeUsuario }) {
-  const [maquinaId, setMaquinaId] = useState("");
+  const [maquinaNome, setMaquinaNome] = useState("");
   const [operador, setOperador] = useState(nomeUsuario || "");
   const [inicio, setInicio] = useState(() => agoraLocal());
   const [erro, setErro] = useState("");
@@ -24,21 +24,21 @@ export default function LibertarMaquinaModal({ open, op, maquinas, onClose, onCo
   const operacionais = (Array.isArray(maquinas) ? maquinas : []).filter((m) => m.estado === "operacional");
 
   const confirmar = async () => {
-    if (!maquinaId) {
+    if (!maquinaNome) {
       setErro("Selecione o operacional para a produção");
       return;
     }
     setErro("");
     setSubmetendo(true);
     const ok = await onConfirm({
-      maquina_id: Number(maquinaId),
+      maquina: maquinaNome,
       operador: operador.trim() || null,
       data_inicio: inicio || new Date().toISOString(),
     });
     setSubmetendo(false);
     if (ok) {
       onClose();
-      setMaquinaId("");
+      setMaquinaNome("");
       setOperador(nomeUsuario || "");
       setInicio(agoraLocal());
     }
@@ -73,10 +73,10 @@ export default function LibertarMaquinaModal({ open, op, maquinas, onClose, onCo
         </div>
 
         <FormField label="Operacional">
-          <select value={maquinaId} onChange={(e) => setMaquinaId(e.target.value)} className={inputCls}>
+          <select value={maquinaNome} onChange={(e) => setMaquinaNome(e.target.value)} className={inputCls}>
             <option value="">Seleccionar operacional disponível...</option>
             {operacionais.map((m) => (
-              <option key={m.id} value={m.id}>{m.nome_comum}{m.localizacao ? ` — ${m.localizacao}` : ""}</option>
+              <option key={m.id} value={m.nome_comum}>{m.nome_comum}{m.localizacao ? ` — ${m.localizacao}` : ""}</option>
             ))}
           </select>
           {operacionais.length === 0 && (

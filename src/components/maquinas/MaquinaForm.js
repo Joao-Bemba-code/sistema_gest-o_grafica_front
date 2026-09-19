@@ -6,7 +6,7 @@ import FornecedorSelect from "@/components/estoque/FornecedorSelect";
 import CategoriaSelect from "@/components/estoque/CategoriaSelect";
 import UnidadeSelect from "@/components/estoque/UnidadeSelect";
 import NumeroInput from "@/components/ui/NumeroInput";
-import { inputCls } from "@/lib/estoque";
+import { inputCls, tiposItem, normalizarTipoItem } from "@/lib/estoque";
 import { blankMaquina, estadoMaquinaOptions } from "@/lib/maquinas";
 import { FormField } from "@/components/ui/FormField";
 
@@ -191,13 +191,31 @@ export default function MaquinaForm({ formId = "form-maquina", form, onChange, o
   const [tab, setTab] = useState("identificacao");
   const id = (sufixo) => `${formId}-${sufixo}`;
   const catMaquinas = (categorias || []).filter((c) => (c.tipo || "").toLowerCase() === "maquina");
+  const catSelecionada = catMaquinas.find((c) => String(c.id) === String(form.categoria_id));
+  const tipoLabel = catSelecionada
+    ? (tiposItem[normalizarTipoItem(catSelecionada.tipo)]?.label || String(catSelecionada.tipo || ""))
+    : "";
+  const subfamiliasSugeridas = (() => {
+    const vistas = new Set();
+    if (catSelecionada && String(catSelecionada.subfamilia || "").trim()) {
+      vistas.add(String(catSelecionada.subfamilia).trim());
+    }
+    for (const c of catMaquinas) {
+      const s = String(c.subfamilia || "").trim();
+      if (s) vistas.add(s);
+    }
+    return [...vistas];
+  })();
 
   const aoMudarCategoria = (novaCatId) => {
     onChange("categoria_id", novaCatId);
     const cat = (categorias || []).find((c) => String(c.id) === String(novaCatId));
-    if (cat && !form.codigo) {
-      const seq = Math.floor(Math.random() * 9000) + 1000;
-      onChange("codigo", `MAQ-${seq}`);
+    if (cat) {
+      if (String(cat.subfamilia || "").trim()) onChange("subfamilia", String(cat.subfamilia).trim());
+      if (!form.codigo) {
+        const seq = Math.floor(Math.random() * 9000) + 1000;
+        onChange("codigo", `MAQ-${seq}`);
+      }
     }
   };
 
@@ -241,8 +259,14 @@ export default function MaquinaForm({ formId = "form-maquina", form, onChange, o
                 placeholder="Pesquisar categoria de maquinaria..."
               />
             </FormField>
+            <FormField label="Grupo">
+              <input value={tipoLabel} readOnly className={`${inputCls} bg-muted/50 cursor-not-allowed`} placeholder={form.categoria_id ? "Carregando grupo..." : "Escolha a categoria"} />
+            </FormField>
             <FormField label="Sub-família">
-              <input value={form.subfamilia || ""} onChange={(e) => onChange("subfamilia", e.target.value)} className={inputCls} placeholder="Ex: Corte, Impressão, Dobra..." />
+              <input list={`${formId}-subfamilias`} value={form.subfamilia || ""} onChange={(e) => onChange("subfamilia", e.target.value)} className={inputCls} placeholder="Ex: Corte, Impressão, Dobra..." />
+              <datalist id={`${formId}-subfamilias`}>
+                {subfamiliasSugeridas.map((s) => <option key={s} value={s} />)}
+              </datalist>
             </FormField>
             <FormField label="Fornecedor">
               <FornecedorSelect

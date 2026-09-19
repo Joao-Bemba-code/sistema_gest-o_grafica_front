@@ -34,7 +34,8 @@ export default function RegistrarEstadoMaquinaModal({ open, maquinas, maquinaIni
   }, [open, maquinaInicialId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const maquina = (Array.isArray(maquinas) ? maquinas : []).find((m) => String(m.id) === String(maquinaId));
+  const reais = (Array.isArray(maquinas) ? maquinas : []).filter((m) => m.origem !== "stock");
+  const maquina = reais.find((m) => String(m.id) === String(maquinaId));
 
   const aoSubmeter = async (e) => {
     e.preventDefault();
@@ -91,7 +92,7 @@ export default function RegistrarEstadoMaquinaModal({ open, maquinas, maquinaIni
           <label className="text-[10px] font-bold text-muted-foreground uppercase">Máquina</label>
           <select value={maquinaId} onChange={(e) => setMaquinaId(e.target.value)} className={inputCls}>
             <option value="">Seleccione a máquina...</option>
-            {(Array.isArray(maquinas) ? maquinas : []).map((m) => (
+            {reais.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.codigo ? `${m.codigo} — ` : ""}{m.nome_comum}{m.localizacao ? ` (${m.localizacao})` : ""}
               </option>

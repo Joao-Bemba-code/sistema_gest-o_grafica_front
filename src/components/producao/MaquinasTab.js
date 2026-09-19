@@ -32,6 +32,8 @@ const estadoIcone = (e) =>
 const estadoCor = (e) =>
   e === "operacional" ? "bg-emerald-500/15 text-emerald-600" : e === "manutencao" ? "bg-amber-500/15 text-amber-600" : e === "avariada" ? "bg-red-500/15 text-red-600" : "bg-on-surface-variant/15 text-on-surface-variant";
 
+const ehStock = (m) => m?.origem === "stock";
+
 function LinhaTempo({ itens, vazio }) {
   if (!itens || itens.length === 0) {
     return <p className="text-[11px] text-muted-foreground">{vazio || "Sem registos."}</p>;
@@ -310,13 +312,19 @@ export default function MaquinasTab({ showHeader = false, registarEstado = false
                               <Button variant="ghost" size="icon" onClick={() => toggleExpansao(m.id)} title="Histórico">
                                 <Icon name={aberto ? "expand_less" : "expand_more"} className="text-[16px]" />
                               </Button>
-                              {registarEstado && (
-                                <Button variant="ghost" size="icon" onClick={() => abrirEstadoModal(m)} title="Registar estado">
-                                  <Icon name="swap_horiz" className="text-[16px] text-primary" />
-                                </Button>
+                              {ehStock(m) ? (
+                                <Badge variant="secondary" className="text-[9px]">Stock</Badge>
+                              ) : (
+                                <>
+                                  {registarEstado && (
+                                    <Button variant="ghost" size="icon" onClick={() => abrirEstadoModal(m)} title="Registar estado">
+                                      <Icon name="swap_horiz" className="text-[16px] text-primary" />
+                                    </Button>
+                                  )}
+                                  <Button variant="ghost" size="icon" onClick={() => abrirEdicao(m)} title="Editar"><Icon name="edit" className="text-[16px]" /></Button>
+                                  <Button variant="ghost" size="icon" onClick={() => setEliminarItem(m)} title="Eliminar" className="text-error hover:text-error"><Icon name="delete" className="text-[16px]" /></Button>
+                                </>
                               )}
-                              <Button variant="ghost" size="icon" onClick={() => abrirEdicao(m)} title="Editar"><Icon name="edit" className="text-[16px]" /></Button>
-                              <Button variant="ghost" size="icon" onClick={() => setEliminarItem(m)} title="Eliminar" className="text-error hover:text-error"><Icon name="delete" className="text-[16px]" /></Button>
                             </div>
                           </td>
                         </tr>
@@ -365,13 +373,19 @@ export default function MaquinasTab({ showHeader = false, registarEstado = false
                     </div>
                     <div className="flex flex-col gap-1 shrink-0">
                       <Button variant="ghost" size="icon" onClick={() => toggleExpansao(m.id)} title="Histórico"><Icon name={expansoes[m.id] ? "expand_less" : "expand_more"} className="text-[14px]" /></Button>
-                      {registarEstado && (
-                        <Button variant="ghost" size="icon" onClick={() => abrirEstadoModal(m)} title="Registar estado">
-                          <Icon name="swap_horiz" className="text-[14px] text-primary" />
-                        </Button>
+                      {ehStock(m) ? (
+                        <Badge variant="secondary" className="text-[9px]">Stock</Badge>
+                      ) : (
+                        <>
+                          {registarEstado && (
+                            <Button variant="ghost" size="icon" onClick={() => abrirEstadoModal(m)} title="Registar estado">
+                              <Icon name="swap_horiz" className="text-[14px] text-primary" />
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="icon" onClick={() => abrirEdicao(m)} title="Editar"><Icon name="edit" className="text-[14px]" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => setEliminarItem(m)} title="Eliminar" className="text-error"><Icon name="delete" className="text-[14px]" /></Button>
+                        </>
                       )}
-                      <Button variant="ghost" size="icon" onClick={() => abrirEdicao(m)} title="Editar"><Icon name="edit" className="text-[14px]" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => setEliminarItem(m)} title="Eliminar" className="text-error"><Icon name="delete" className="text-[14px]" /></Button>
                     </div>
                   </div>
                   {expansoes[m.id] && (

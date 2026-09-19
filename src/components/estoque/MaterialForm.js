@@ -104,10 +104,18 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
 
   const subfamiliasSugeridas = (() => {
     if (!categoria) return [];
-    const fam = normalizarFamilia(categoria.familia);
+    const grupo = normalizarTipoItem(categoria.tipo);
     const vistas = new Set();
+    const subCategoria = String(categoria.subfamilia || "").trim();
+    if (subCategoria) vistas.add(subCategoria);
+    for (const c of categorias) {
+      if (normalizarTipoItem(c.tipo) !== grupo) continue;
+      const s = String(c.subfamilia || "").trim();
+      if (s) vistas.add(s);
+    }
     for (const m of materiais) {
-      if (normalizarFamilia(m.categoria?.familia) !== fam) continue;
+      const g = m.categoria ? normalizarTipoItem(m.categoria.tipo) : normalizarTipoItem(m.tipo);
+      if (g !== grupo) continue;
       const s = String(especificacoesObjeto(m.especificacoes).subfamilia || m.categoria?.subfamilia || "").trim();
       if (s) vistas.add(s);
     }

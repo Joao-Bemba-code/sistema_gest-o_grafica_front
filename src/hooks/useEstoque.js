@@ -47,9 +47,10 @@ async function sincronizarMaquina(dados, id) {
   };
   const maquinas = await listarMaquinas();
   const arr = Array.isArray(maquinas) ? maquinas : maquinas?.data || [];
+  const reais = arr.filter((m) => !m.origem || m.origem !== "stock");
   const alvo =
-    arr.find((m) => m.codigo && m.codigo === maquinaDados.codigo) ||
-    arr.find((m) => m.nome_comum === maquinaDados.nome_comum);
+    reais.find((m) => m.codigo && m.codigo === maquinaDados.codigo) ||
+    reais.find((m) => m.nome_comum === maquinaDados.nome_comum);
   if (alvo) await atualizarMaquina(alvo.id, maquinaDados);
   else await criarMaquina({ ...maquinaDados, estado: "operacional" });
 }
