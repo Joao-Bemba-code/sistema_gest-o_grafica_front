@@ -12,14 +12,14 @@ import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
 import { listarOrdens, salvarImpressao } from "@/services/producao";
-
-const operacionais = ["Heidelberg Speedmaster 52", "Heidelberg CD 102", "Kompac Hydra 66", "ManRoland 700"];
+import { listar as listarMaquinas } from "@/services/maquinas";
 
 const initialForm = { op: "", maquina: "", operador: "", inicio: "", fim: "", produzido: "", rejeitado: "", observacoes: "" };
 
 export default function ImpressaoPage() {
   const [registros, setRegistros] = useState([]);
   const [ordens, setOrdens] = useState([]);
+  const [maquinas, setMaquinas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [modal, setModal] = useState(false);
@@ -29,7 +29,8 @@ export default function ImpressaoPage() {
   const carregarDados = useCallback(async () => {
     setLoading(true);
     try {
-      const ordensData = await listarOrdens();
+      const [ordensData, maquinasData] = await Promise.all([listarOrdens(), listarMaquinas().catch(() => [])]);
+      setMaquinas(Array.isArray(maquinasData) ? maquinasData : maquinasData?.data ?? []);
       const arr = Array.isArray(ordensData) ? ordensData : ordensData?.ordens || [];
       setOrdens(arr);
       const mapped = [];
@@ -104,7 +105,7 @@ export default function ImpressaoPage() {
           { label: "Total Produzido", value: totalProduzido?.toLocaleString() ?? "0", icon: "print", iconVariant: "primary" },
           { label: "Total Rejeitado", value: totalRejeitado?.toLocaleString() ?? "0", icon: "block", iconVariant: "error" },
           { label: "Taxa de Aproveitamento", value: totalProduzido ? `${(((totalProduzido - totalRejeitado) / totalProduzido) * 100).toFixed(1)}%` : "0%", icon: "check_circle", iconVariant: "success" },
-          { label: "Operacionais", value: operacionais.length, icon: "precision_manufacturing", iconVariant: "secondary" },
+          { label: "Operacionais", value: maquinas.length, icon: "precision_manufacturing", iconVariant: "secondary" },
         ].map((kpi) => (
           <KpiCard key={kpi.label} icon={kpi.icon} label={kpi.label} value={kpi.value} iconVariant={kpi.iconVariant} />
         ))}
@@ -153,7 +154,7 @@ export default function ImpressaoPage() {
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Operacional *</label>
               <select required value={form.maquina} onChange={(e) => setForm({ ...form, maquina: e.target.value })} className={inputCls}>
                 <option value="">Seleccionar...</option>
-                {operacionais.map(m => <option key={m}>{m}</option>)}
+                {maquinas.map(m => <option key={m.id} value={m.nome_comum}>{m.nome_comum}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
