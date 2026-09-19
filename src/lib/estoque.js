@@ -305,8 +305,14 @@ export function camposDeCategoria(categoria, unidade) {
   for (const c of camposPadraoPorUnidade[normalizarUnidade(unidade)] || []) {
     porChave.set(c.chave, c);
   }
-  for (const c of camposPadraoPorFamilia[normalizarFamilia(categoria.familia)] || []) {
+  const fam = normalizarFamilia(categoria.familia);
+  for (const c of camposPadraoPorFamilia[fam] || []) {
     if (!porChave.has(c.chave)) porChave.set(c.chave, c);
+  }
+  if (ehEquipamento(categoria) && fam !== "equipamentos") {
+    for (const c of camposPadraoPorFamilia.equipamentos) {
+      if (!porChave.has(c.chave)) porChave.set(c.chave, c);
+    }
   }
   const personalizadas = Array.isArray(categoria.campos_especificacao) ? categoria.campos_especificacao : [];
   for (const c of personalizadas) {
@@ -377,7 +383,7 @@ export function ehEquipamento(categoria) {
   if (!categoria) return false;
   const tipo = String(categoria.tipo || "").toLowerCase();
   const familia = String(categoria.familia || "").toLowerCase();
-  return tipo === "equipamentos" || familia === "equipamentos";
+  return tipo === "maquina" || tipo === "equipamentos" || familia === "equipamentos";
 }
 
 export function moverEstoqueDe(categoria) {
