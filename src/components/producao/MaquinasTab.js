@@ -313,7 +313,14 @@ export default function MaquinasTab({ showHeader = false, registarEstado = false
                                 <Icon name={aberto ? "expand_less" : "expand_more"} className="text-[16px]" />
                               </Button>
                               {ehStock(m) ? (
-                                <Badge variant="secondary" className="text-[9px]">Stock</Badge>
+                                <>
+                                  {registarEstado && (
+                                    <Button variant="ghost" size="icon" onClick={() => abrirEstadoModal(m)} title="Registar estado">
+                                      <Icon name="swap_horiz" className="text-[16px] text-primary" />
+                                    </Button>
+                                  )}
+                                  <Badge variant="secondary" className="text-[9px]">Stock</Badge>
+                                </>
                               ) : (
                                 <>
                                   {registarEstado && (
@@ -374,7 +381,14 @@ export default function MaquinasTab({ showHeader = false, registarEstado = false
                     <div className="flex flex-col gap-1 shrink-0">
                       <Button variant="ghost" size="icon" onClick={() => toggleExpansao(m.id)} title="Histórico"><Icon name={expansoes[m.id] ? "expand_less" : "expand_more"} className="text-[14px]" /></Button>
                       {ehStock(m) ? (
-                        <Badge variant="secondary" className="text-[9px]">Stock</Badge>
+                        <>
+                          {registarEstado && (
+                            <Button variant="ghost" size="icon" onClick={() => abrirEstadoModal(m)} title="Registar estado">
+                              <Icon name="swap_horiz" className="text-[14px] text-primary" />
+                            </Button>
+                          )}
+                          <Badge variant="secondary" className="text-[9px]">Stock</Badge>
+                        </>
                       ) : (
                         <>
                           {registarEstado && (
