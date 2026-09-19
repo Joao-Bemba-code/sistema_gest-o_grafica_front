@@ -1,8 +1,9 @@
 import api from "./api";
 import { listar as listarMateriais } from "./materiais";
+import { listar as listarCategorias } from "./categorias";
 import { ehEquipamento, especificacoesObjeto } from "@/lib/estoque";
 
-function maquinaDeMaterial(m) {
+function maquinaDeMaterial(m, cat) {
   const esp = especificacoesObjeto(m.especificacoes);
   return {
     id: `s${m.id}`,
@@ -13,7 +14,7 @@ function maquinaDeMaterial(m) {
     nome_tecnico: m.nome_tecnico || "",
     descricao: m.descricao || "",
     categoria_id: m.categoria_id || null,
-    subfamilia: esp.subfamilia || m.categoria?.subfamilia || "",
+    subfamilia: esp.subfamilia || cat?.subfamilia || "",
     fornecedor: m.fornecedor || "",
     unidade: m.unidade || "un",
     marca: esp.marca || "",
@@ -30,19 +31,22 @@ function maquinaDeMaterial(m) {
 }
 
 export async function listar() {
-  const [maq, mats] = await Promise.all([api.get("/maquinas"), listarMateriais()]);
+  const [maq, mats, cats] = await Promise.all([api.get("/maquinas"), listarMateriais(), listarCategorias()]);
   const maquinas = Array.isArray(maq.data) ? maq.data : maq.data?.data || [];
   const materiais = Array.isArray(mats) ? mats : mats?.data || [];
+  const categorias = Array.isArray(cats) ? cats : cats?.data || [];
+  const catPorId = new Map(categorias.map((c) => [c.id, c]));
   const vistos = new Set(maquinas.map((m) => String(m.nome_comum || "").trim().toLowerCase()));
   const extra = [];
   for (const m of materiais) {
-    if (!m?.categoria || !ehEquipamento(m.categoria)) continue;
+    const cat = m.categoria || catPorId.get(m.categoria_id);
+    if (!cat || !ehEquipamento(cat)) continue;
     const nome = m.nome;
     if (!nome) continue;
     const chave = String(nome).trim().toLowerCase();
     if (vistos.has(chave)) continue;
     vistos.add(chave);
-    extra.push(maquinaDeMaterial(m));
+    extra.push(maquinaDeMaterial(m, cat));
   }
   return [...maquinas, ...extra];
 }
