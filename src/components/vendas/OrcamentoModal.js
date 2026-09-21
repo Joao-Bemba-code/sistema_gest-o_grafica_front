@@ -70,10 +70,14 @@ export default function OrcamentoModal({ open, editingId, onClose, onSaved }) {
               cliente_id: o.cliente_id ? String(o.cliente_id) : "",
               cliente: o.cliente?.nome || "", empresa: o.cliente?.empresa || "", nif: o.cliente?.nif || "",
               telefone: o.cliente?.telefone || "", email: o.cliente?.email || "",
-              itens: (Array.isArray(o.itens) && o.itens.length ? o.itens : [blankItem]).map((it) => ({
-                descricao: it.descricao || "",
-                quantidade: String(it.quantidade ?? ""),
-                valorUnitario: String(it.valorUnitario ?? ""),
+              itens: (Array.isArray(o.itens) && o.itens.length ? o.itens : [blankItem]).map((it) => {
+                const qtdItem = Number(it.quantidade) || 0;
+                const valU = Number(it.valorUnitario) || 0;
+                return {
+                  descricao: it.descricao || "",
+                  quantidade: String(it.quantidade ?? ""),
+                  valorUnitario: String(it.valorUnitario ?? ""),
+                  total: qtdItem > 0 ? Number((qtdItem * valU).toFixed(2)) : Number(it.total) || 0,
                 materiais: (it.materiais || []).map((m) => {
                   const pecasPorFolha = Number(m.pecas_por_folha) || 1;
                   const usar_parcial = Boolean(m.usar_parcial);
@@ -101,7 +105,7 @@ export default function OrcamentoModal({ open, editingId, onClose, onSaved }) {
                     especificacoes: m.especificacoes || {},
                   };
                 }),
-              })),
+              }}),
               servicos: (Array.isArray(o.servicos) && o.servicos.length ? o.servicos : [blankServico]).map((sv) => ({
                 servico_id: sv.servico_id || "",
                 descricao: sv.descricao || "",
@@ -161,72 +165,76 @@ export default function OrcamentoModal({ open, editingId, onClose, onSaved }) {
   const aoSubmeter = async (e) => {
     e.preventDefault();
     setSalvando(true);
-    const dados = {
-      cliente_id: form.cliente_id,
-      cliente: { nome: form.cliente, empresa: form.empresa, nif: form.nif, telefone: form.telefone, email: form.email },
-      itens: form.itens.map((it) => {
-        const calc = recalcularItem(it);
-        return {
-          descricao: it.descricao,
-          quantidade: Number(it.quantidade),
-          valorUnitario: calc.valorUnitario,
-          total: calc.total,
-          composto: (it.materiais || []).filter((m) => m.material_id).length > 0,
-          margem: 0,
-              materiais: [
-                ...(it.materiais || [])
-                  .map((m) => {
-                    const pecasPorFolha = Number(m.pecas_por_folha) || 1;
-                    const qtdPecas = Number(m.quantidade) || 0;
-                    const qtdFolhas = m.usar_parcial && pecasPorFolha > 1
-                      ? Math.ceil(qtdPecas / pecasPorFolha)
-                      : qtdPecas;
-                    return {
-                      material_id: m.material_id,
-                      descricao: m.descricao,
-                      unidade: m.unidade || "un",
-                      quantidade: qtdFolhas,
-                      custo_unit: Number(m.preco_venda) || 0,
-                      custo_total: Number(m.custo_total) || 0,
-                      mover_estoque: Boolean(m.mover_estoque),
-                      usar_parcial: Boolean(m.usar_parcial),
-                      formato_final: m.formato_final || "",
-                      largura_final: m.largura_final || "",
-                      altura_final: m.altura_final || "",
-                      pecas_por_folha: pecasPorFolha,
-                      preco_folha: Number(m.preco_folha) || Number(m.preco_venda) || 0,
-                      formato: m.formato || "",
-                      largura_mm: m.largura_mm || "",
-                      altura_mm: m.altura_mm || "",
-                      quantidade_folhas: qtdFolhas,
-                      quantidade_pecas: m.usar_parcial && pecasPorFolha > 1 ? qtdPecas : 0,
-                    };
-                  })
-                  .filter((m) => m.material_id),
-              ],
-        };
-      }),
-      servicos: (form.servicos || []).map((sv) => {
-        const calc = recalcularServico(sv);
-        return {
-          servico_id: sv.servico_id || null,
-          descricao: sv.descricao,
-          mob: Number(sv.mob) || 1,
-          prazoExecucao: Number(sv.prazoExecucao) || 1,
-          prazo_unidade: sv.prazoUnidade || "dias",
-          duracaoHoras: calc.duracaoHoras,
-          valor_hora: Number(sv.valorHora) || 0,
-          total: calc.total,
-        };
-      }).filter((sv) => sv.descricao),
-      subtotal: subtotalCalc,
-      desconto: descontoCalc,
-      iva: ivaCalc,
-      prazoExecucao: form.prazoExecucao,
-      condicoesPagamento: form.condicoesPagamento,
-      observacoes: form.observacoes,
-    };
     try {
+      const dados = {
+        cliente_id: form.cliente_id,
+        cliente: { nome: form.cliente, empresa: form.empresa, nif: form.nif, telefone: form.telefone, email: form.email },
+        itens: form.itens.map((it) => {
+          const materiais = (it.materiais || [])
+            .map((m) => {
+              const pecasPorFolha = Number(m.pecas_por_folha) || 1;
+              const qtdPecas = Number(m.quantidade) || 0;
+              const qtdFolhas = m.usar_parcial && pecasPorFolha > 1
+                ? Math.ceil(qtdPecas / pecasPorFolha)
+                : qtdPecas;
+              return {
+                material_id: m.material_id,
+                descricao: m.descricao,
+                unidade: m.unidade || "un",
+                quantidade: qtdFolhas,
+                custo_unit: Number(m.preco_venda) || 0,
+                custo_total: Number(m.custo_total) || 0,
+                mover_estoque: Boolean(m.mover_estoque),
+                usar_parcial: Boolean(m.usar_parcial),
+                formato_final: m.formato_final || "",
+                largura_final: m.largura_final || "",
+                altura_final: m.altura_final || "",
+                pecas_por_folha: pecasPorFolha,
+                preco_folha: Number(m.preco_folha) || Number(m.preco_venda) || 0,
+                formato: m.formato || "",
+                largura_mm: m.largura_mm || "",
+                altura_mm: m.altura_mm || "",
+                quantidade_folhas: qtdFolhas,
+                quantidade_pecas: m.usar_parcial && pecasPorFolha > 1 ? qtdPecas : 0,
+              };
+            })
+            .filter((m) => m.material_id);
+          const calc = recalcularItem(it);
+          const temMateriais = materiais.length > 0;
+          const precoDisplay = Number(it.valorUnitario) || 0;
+          const qtd = Number(it.quantidade) || 0;
+          const valorUnitario = precoDisplay > 0 ? precoDisplay : (temMateriais ? calc.valorUnitario : 0);
+          const total = qtd > 0 ? Number((qtd * valorUnitario).toFixed(2)) : valorUnitario;
+          return {
+            descricao: it.descricao,
+            quantidade: qtd,
+            valorUnitario,
+            total,
+            composto: temMateriais,
+            margem: 0,
+            materiais,
+          };
+        }),
+        servicos: (form.servicos || []).map((sv) => {
+          const calc = recalcularServico(sv);
+          return {
+            servico_id: sv.servico_id || null,
+            descricao: sv.descricao,
+            mob: Number(sv.mob) || 1,
+            prazoExecucao: Number(sv.prazoExecucao) || 1,
+            prazo_unidade: sv.prazoUnidade || "dias",
+            duracaoHoras: calc.duracaoHoras,
+            valor_hora: Number(sv.valorHora) || 0,
+            total: calc.total,
+          };
+        }).filter((sv) => sv.descricao),
+        subtotal: subtotalCalc,
+        desconto: descontoCalc,
+        iva: ivaCalc,
+        prazoExecucao: form.prazoExecucao,
+        condicoesPagamento: form.condicoesPagamento,
+        observacoes: form.observacoes,
+      };
       if (editingId) {
         await atualizar(editingId, dados);
         addToast("Orçamento atualizado com sucesso", "success");
@@ -238,6 +246,7 @@ export default function OrcamentoModal({ open, editingId, onClose, onSaved }) {
       onClose();
     } catch (err) {
       addToast(err.response?.data?.erro || "Erro na operação", "error");
+    } finally {
       setSalvando(false);
     }
   };
