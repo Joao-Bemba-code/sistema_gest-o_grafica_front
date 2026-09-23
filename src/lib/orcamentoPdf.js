@@ -1,7 +1,25 @@
 import jsPDF from "jspdf";
 import { applyPlugin } from "jspdf-autotable";
-import { COR_PRIMARIA, COR_TEXTO, COR_SUAVE, COR_SERVICO, formatKz, formatarData, TEMA_TABELA } from "@/lib/pdfEstilo";
+import {
+  COR_MARCA_TEXTO,
+  COR_MARCA_FUNDO,
+  COR_MARCA_LINHA,
+  COR_MARCA_CINZA,
+  COR_MARCA_PRINCIPAL,
+  COR_MARCA_SECUNDARIO,
+  formatKz,
+  formatarData,
+  TEMA_TABELA_MARCA,
+  desenharCabecalhoMarca,
+  desenharMarcaDeAgua,
+  tituloSecaoMarca,
+  caixaClienteMarca,
+  caixaTotaisMarca,
+  caixaBancariaMarca,
+} from "@/lib/pdfEstilo";
 applyPlugin(jsPDF);
+
+const MARGEM = 14;
 
 const OPCOES_PADRAO = {
   mostrarQtd: true,
@@ -19,7 +37,22 @@ function juntarOpcoes(opcoes) {
   return { ...OPCOES_PADRAO, ...(opcoes || {}) };
 }
 
-export default function gerarOrcamentoPdf(orcamento, empresa = {}, opcoesEntrada) {
+function desenharObservacoes(doc, texto, x, y, w) {
+  if (!texto) return y;
+  doc.setFontSize(8.5);
+  doc.setFont("helvetica", "italic");
+  doc.setTextColor(...COR_MARCA_TEXTO);
+  const obs = doc.splitTextToSize(texto, w);
+  doc.text(`Observações: ${obs[0]}`, x, y);
+  y += 5;
+  for (let i = 1; i < obs.length; i++) {
+    doc.text(obs[i], x + 10, y);
+    y += 4.5;
+  }
+  return y;
+}
+
+export default async function gerarOrcamentoPdf(orcamento, empresa = {}, opcoesEntrada) {
   const opcoes = juntarOpcoes(opcoesEntrada);
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
@@ -29,57 +62,45 @@ export default function gerarOrcamentoPdf(orcamento, empresa = {}, opcoesEntrada
   const servicos = orcamento.servicos || [];
   const specs = orcamento.especificacao || {};
 
-  doc.setFillColor(...COR_PRIMARIA);
-  doc.rect(0, 0, pw, 40, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(18); doc.setFont("helvetica", "bold");
-  doc.text(empresa.nome || "SIGRAF", 14, 16);
-  doc.setFontSize(8); doc.setFont("helvetica", "normal");
-  const contacto = [
-    empresa.endereco || "",
-    `NIF: ${empresa.nif || "—"}  |  Tel: ${empresa.telefone || "—"}  |  Email: ${empresa.email || "—"}`,
-  ].filter(Boolean);
-  contacto.forEach((linha, i) => doc.text(linha, 14, 23 + i * 5));
+  const { logo } = await desenharCabecalhoMarca(doc, {
+    titulo: "ORÇAMENTO",
+    empresa,
+    direitos: [
+      `Nº: ${orcamento.numero || "—"}`,
+      `Emissão: ${formatarData(orcamento.data)}`,
+      orcamento.validade ? `Validade: ${orcamento.validade} dias` : null,
+    ].filter(Boolean),
+  });
+  desenharMarcaDeAgua(doc, logo);
 
-  doc.setFontSize(15); doc.setFont("helvetica", "bold");
-  doc.text("ORÇAMENTO", pw - 14, 16, { align: "right" });
-  doc.setFontSize(9); doc.setFont("helvetica", "normal");
-  doc.text(`Nº: ${orcamento.numero || "—"}`, pw - 14, 23, { align: "right" });
-  doc.text(`Emissão: ${formatarData(orcamento.data)}`, pw - 14, 28, { align: "right" });
-  if (orcamento.validade) doc.text(`Validade: ${orcamento.validade} dias`, pw - 14, 33, { align: "right" });
+  let y = 52;
 
-  doc.setTextColor(...COR_TEXTO);
-  let y = 50;
-  doc.setFillColor(...COR_SUAVE);
-  doc.roundedRect(14, y, pw - 28, 28, 2, 2, "F");
-  doc.setFontSize(8); doc.setFont("helvetica", "bold");
-  doc.text("DADOS DO CLIENTE", 18, y + 6);
-  doc.setFontSize(9); doc.setFont("helvetica", "normal");
-  doc.text(`${cli.nome || "—"}${cli.empresa ? `  •  ${cli.empresa}` : ""}`, 18, y + 13);
-  const linhaNif = [];
-  if (cli.nif) linhaNif.push(`NIF: ${cli.nif}`);
-  if (cli.telefone) linhaNif.push(`Tel: ${cli.telefone}`);
-  if (cli.email) linhaNif.push(`Email: ${cli.email}`);
-  doc.text(linhaNif.join("   |   "), 18, y + 19);
-  doc.text(`${cli.endereco || ""}`, 18, y + 25);
-  y += 36;
+  // ===== Cliente =====
+  y += caixaClienteMarca(doc, MARGEM, y, pw - 28, cli) + 8;
 
+  // ===== Especificação Técnica =====
   const specEntradas = Object.entries(specs).filter(([k, v]) => k && v && k !== "produto");
   if (specEntradas.length > 0) {
-    doc.setFillColor(...COR_SUAVE);
-    doc.roundedRect(14, y, pw - 28, 8 + specEntradas.length * 5, 2, 2, "F");
-    doc.setFontSize(8); doc.setFont("helvetica", "bold");
-    doc.text("ESPECIFICAÇÃO TÉCNICA", 18, y + 6);
-    doc.setFontSize(8); doc.setFont("helvetica", "normal");
+    const hSpec = 8 + specEntradas.length * 5 + 4;
+    doc.setFillColor(...COR_MARCA_FUNDO);
+    doc.roundedRect(MARGEM, y, pw - 28, hSpec, 2.5, 2.5, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.8);
+    doc.setTextColor(...COR_MARCA_PRINCIPAL);
+    doc.text("ESPECIFICAÇÃO TÉCNICA", 20, y + 6);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.3);
+    doc.setTextColor(...COR_MARCA_TEXTO);
     specEntradas.forEach(([k, v], i) => {
-      doc.text(`${k}: ${v}`, 18, y + 12 + i * 5);
+      const texto = doc.splitTextToSize(`${k}: ${v}`, pw - 40);
+      doc.text(texto[0], 20, y + 12 + i * 5);
     });
-    y += 8 + specEntradas.length * 5 + 4;
+    y += hSpec + 6;
   }
 
+  // ===== Itens / Produtos =====
   if (itens.length > 0) {
-    doc.setFontSize(10); doc.setFont("helvetica", "bold");
-    doc.text("ARTIGOS / PRODUTOS", 14, y); y += 4;
+    y = tituloSecaoMarca(doc, "Artigos / Produtos", MARGEM, y) + 2;
     const headItens = ["Artigo/Produto"];
     const colunasItens = [];
     if (opcoes.mostrarQtd) { headItens.push("Qtd"); colunasItens.push("qtd"); }
@@ -96,11 +117,11 @@ export default function gerarOrcamentoPdf(orcamento, empresa = {}, opcoesEntrada
       startY: y,
       head: [headItens],
       body: bodyItens,
-      ...TEMA_TABELA,
+      ...TEMA_TABELA_MARCA,
       columnStyles: colunasItens.reduce((acc, c, i) => {
         if (c === "qtd") acc[i + 1] = { halign: "center" };
         else if (c === "preco") acc[i + 1] = { halign: "right" };
-        else if (c === "total") acc[i + 1] = { halign: "right", fontStyle: "bold" };
+        else if (c === "total") acc[i + 1] = { halign: "right", fontStyle: "bold", textColor: COR_MARCA_SECUNDARIO };
         return acc;
       }, {}),
     });
@@ -108,8 +129,7 @@ export default function gerarOrcamentoPdf(orcamento, empresa = {}, opcoesEntrada
 
     const itensComMaterial = itens.filter((it) => (it.materiais || []).length > 0);
     if (itensComMaterial.length > 0 && opcoes.mostrarMateriais) {
-      doc.setFontSize(9); doc.setFont("helvetica", "bold");
-      doc.text("Materiais", 14, y); y += 3;
+      y = tituloSecaoMarca(doc, "Materiais", MARGEM, y) + 2;
       const materialRows = [];
       itensComMaterial.forEach((it) => {
         (it.materiais || []).forEach((m) => {
@@ -120,18 +140,18 @@ export default function gerarOrcamentoPdf(orcamento, empresa = {}, opcoesEntrada
         startY: y,
         head: [["Produto", "Material", "Qtd", "Valor Unit.", "Total"]],
         body: materialRows,
-        ...TEMA_TABELA,
-        headStyles: { ...TEMA_TABELA.headStyles, fillColor: COR_SUAVE, textColor: COR_TEXTO, fontSize: 7 },
-        bodyStyles: { fontSize: 7 },
+        ...TEMA_TABELA_MARCA,
+        headStyles: { ...TEMA_TABELA_MARCA.headStyles, fillColor: COR_MARCA_SECUNDARIO, textColor: COR_MARCA_PRINCIPAL, fontSize: 7 },
+        bodyStyles: { fontSize: 7.2 },
         columnStyles: { 0: { fontStyle: "bold" }, 2: { halign: "center" }, 3: { halign: "right" }, 4: { halign: "right", fontStyle: "bold" } },
       });
       y = doc.lastAutoTable.finalY + 6;
     }
   }
 
+  // ===== Serviços =====
   if (servicos.length > 0) {
-    doc.setFontSize(10); doc.setFont("helvetica", "bold");
-    doc.text("SERVIÇOS", 14, y); y += 4;
+    y = tituloSecaoMarca(doc, "Serviços", MARGEM, y) + 2;
     const headServicos = ["Descrição"];
     const colunasServicos = [];
     if (opcoes.mostrarMob) { headServicos.push("Trabalhadores"); colunasServicos.push("mob"); }
@@ -157,18 +177,19 @@ export default function gerarOrcamentoPdf(orcamento, empresa = {}, opcoesEntrada
       startY: y,
       head: [headServicos],
       body: bodyServicos,
-      ...TEMA_TABELA,
-      headStyles: { ...TEMA_TABELA.headStyles, fillColor: COR_SERVICO },
+      ...TEMA_TABELA_MARCA,
+      headStyles: { ...TEMA_TABELA_MARCA.headStyles, fillColor: COR_MARCA_SECUNDARIO, textColor: COR_MARCA_PRINCIPAL },
       columnStyles: colunasServicos.reduce((acc, c, i) => {
         if (c === "mob" || c === "prazo" || c === "duracao") acc[i + 1] = { halign: "center" };
         else if (c === "valorHora") acc[i + 1] = { halign: "right" };
-        else if (c === "total") acc[i + 1] = { halign: "right", fontStyle: "bold" };
+        else if (c === "total") acc[i + 1] = { halign: "right", fontStyle: "bold", textColor: COR_MARCA_SECUNDARIO };
         return acc;
       }, {}),
     });
     y = doc.lastAutoTable.finalY + 8;
   }
 
+  // ===== Totais =====
   const subtotalItens = itens.reduce((s, it) => s + (Number(it.total) || 0), 0);
   const subtotalServicos = servicos.reduce((s, sv) => s + (Number(sv.total) || 0), 0);
   const subtotal = orcamento.subtotal || (subtotalItens + subtotalServicos);
@@ -178,103 +199,64 @@ export default function gerarOrcamentoPdf(orcamento, empresa = {}, opcoesEntrada
   const valorIva = Number(orcamento.valorIva) || (totalPosDesconto * ivaPct / 100);
   const total = orcamento.total || (totalPosDesconto + valorIva);
 
-  const boxX = pw - 92;
-  const boxW = 78;
-  let boxH = 24;
-  if (ivaPct > 0) boxH += 7;
-  if (desconto > 0) boxH += 7;
-  if (servicos.length > 0) boxH += 7;
-  if (itens.length > 0) boxH += 7;
+  const linhasTotais = [];
+  if (itens.length > 0) linhasTotais.push({ label: "Subtotal Itens", value: formatKz(subtotalItens) });
+  if (servicos.length > 0) linhasTotais.push({ label: "Subtotal Serviços", value: formatKz(subtotalServicos) });
+  linhasTotais.push({ label: "Subtotal", value: formatKz(subtotal), bold: true });
+  if (desconto > 0) linhasTotais.push({ label: "Desconto", value: `-${formatKz(desconto)}` });
+  if (ivaPct > 0) linhasTotais.push({ label: `IVA (${ivaPct}%)`, value: formatKz(valorIva), bold: true });
+  const hTotais = caixaTotaisMarca(doc, pw - 92, y, 78, {
+    linhas: linhasTotais,
+    totalLabel: "TOTAL:",
+    total: formatKz(total),
+  });
+  y += hTotais + 8;
 
-  doc.setFillColor(255, 255, 255);
-  doc.setDrawColor(...COR_PRIMARIA);
-  doc.roundedRect(boxX, y, boxW, boxH, 2, 2, "FD");
-  doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.setTextColor(...COR_TEXTO);
-  let ty = y + 8;
-
-  if (itens.length > 0) {
-    doc.text("Subtotal Itens:", boxX + 5, ty);
-    doc.text(formatKz(subtotalItens), boxX + boxW - 5, ty, { align: "right" });
-    ty += 7;
-  }
-  if (servicos.length > 0) {
-    doc.text("Subtotal Serviços:", boxX + 5, ty);
-    doc.text(formatKz(subtotalServicos), boxX + boxW - 5, ty, { align: "right" });
-    ty += 7;
-  }
-  doc.text("Subtotal:", boxX + 5, ty);
-  doc.text(formatKz(subtotal), boxX + boxW - 5, ty, { align: "right" });
-  ty += 7;
-
-  if (desconto > 0) {
-    doc.text("Desconto:", boxX + 5, ty);
-    doc.text(`-${formatKz(desconto)}`, boxX + boxW - 5, ty, { align: "right" });
-    ty += 7;
-  }
-
-  if (ivaPct > 0) {
-    doc.text(`IVA (${ivaPct}%):`, boxX + 5, ty);
-    doc.text(formatKz(valorIva), boxX + boxW - 5, ty, { align: "right" });
-    ty += 7;
-  }
-
-  doc.setDrawColor(...COR_PRIMARIA);
-  doc.line(boxX, ty, boxX + boxW, ty);
-  ty += 6;
-  doc.setFontSize(11); doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COR_PRIMARIA);
-  doc.text("TOTAL:", boxX + 5, ty);
-  doc.text(formatKz(total), boxX + boxW - 5, ty, { align: "right" });
-  y = y + boxH + 8;
-
-  doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.setTextColor(...COR_TEXTO);
+  // ===== Condições Gerais =====
   const infoExtra = [];
   if (orcamento.prazoExecucao) infoExtra.push({ label: "Prazo de Execução", value: orcamento.prazoExecucao });
   if (orcamento.condicoesPagamento) infoExtra.push({ label: "Condições de Pagamento", value: orcamento.condicoesPagamento });
   if (infoExtra.length > 0) {
-    doc.setFillColor(...COR_SUAVE);
-    doc.roundedRect(14, y, pw - 28, 8 + infoExtra.length * 6, 2, 2, "F");
-    doc.setFontSize(8); doc.setFont("helvetica", "bold");
-    doc.text("CONDIÇÕES GERAIS", 18, y + 6);
-    doc.setFontSize(8); doc.setFont("helvetica", "normal");
+    const hCond = 8 + infoExtra.length * 6 + 4;
+    doc.setFillColor(...COR_MARCA_FUNDO);
+    doc.roundedRect(MARGEM, y, pw - 28, hCond, 2.5, 2.5, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.8);
+    doc.setTextColor(...COR_MARCA_PRINCIPAL);
+    doc.text("CONDIÇÕES GERAIS", 20, y + 6);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.3);
+    doc.setTextColor(...COR_MARCA_TEXTO);
     infoExtra.forEach((item, i) => {
-      doc.text(`${item.label}: ${item.value}`, 18, y + 12 + i * 6);
+      doc.text(`${item.label}: ${item.value}`, 20, y + 12 + i * 6);
     });
-    y += 8 + infoExtra.length * 6 + 4;
+    y += hCond + 6;
   }
 
-  if (orcamento.observacoes) {
-    doc.setFontSize(9); doc.setFont("helvetica", "italic"); doc.setTextColor(...COR_TEXTO);
-    doc.text(`Observações: ${orcamento.observacoes}`, 14, y);
-    y += 6;
-  }
+  // ===== Observações =====
+  y = desenharObservacoes(doc, orcamento.observacoes, MARGEM, y, pw - 28) + (orcamento.observacoes ? 4 : 0);
 
-  const temBanco = empresa.banco_nome || empresa.banco_iban || empresa.banco_conta;
-  if (temBanco) {
-    doc.setFillColor(...COR_SUAVE);
-    doc.roundedRect(14, y, pw - 28, 24, 2, 2, "F");
-    doc.setFontSize(8); doc.setFont("helvetica", "bold");
-    doc.text("DADOS PARA PAGAMENTO", 18, y + 6);
-    doc.setFontSize(8); doc.setFont("helvetica", "normal");
-    const linhasBanco = [];
-    if (empresa.banco_nome) linhasBanco.push(`Banco: ${empresa.banco_nome}`);
-    if (empresa.banco_conta) linhasBanco.push(`Conta: ${empresa.banco_conta}`);
-    if (empresa.banco_iban) linhasBanco.push(`IBAN: ${empresa.banco_iban}`);
-    doc.text(linhasBanco.join("   |   "), 18, y + 13);
-    doc.text("Transferência BIM, Multicaixa ou outro meio de pagamento.", 18, y + 19);
-    y += 24;
-  }
+  // ===== Dados Bancários =====
+  const hBanco = caixaBancariaMarca(doc, MARGEM, y, pw - 28, empresa);
+  y += hBanco ? hBanco + 8 : 0;
 
-  y = Math.max(y + 12, ph - 40);
-  doc.setDrawColor(180, 190, 200);
-  doc.line(14, y, pw / 2 - 10, y);
-  doc.line(pw / 2 + 10, y, pw - 14, y);
-  doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.setTextColor(120, 130, 140);
-  doc.text("Assinatura do Responsável", pw / 4 + 5, y + 5, { align: "center" });
-  doc.text("Assinatura do Cliente", pw * 3 / 4 - 5, y + 5, { align: "center" });
+  // ===== Agradecimento =====
+  y = Math.max(y + 4, ph - 50);
+  doc.setDrawColor(...COR_MARCA_LINHA);
+  doc.line(MARGEM, y, pw - MARGEM, y);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10.5);
+  doc.setTextColor(...COR_MARCA_PRINCIPAL);
+  doc.text("Obrigado pela sua preferência!", pw / 2, y + 8, { align: "center" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...COR_MARCA_CINZA);
+  doc.text(`${(empresa.nome || "SIGRAF").toUpperCase()}   ·   ${empresa.email || "—"}   ·   ${empresa.telefone || "—"}`, pw / 2, y + 14, { align: "center" });
 
-  doc.setTextColor(160, 170, 180); doc.setFontSize(7);
-  doc.text(`Documento gerado por SIGRAF em ${formatarData(new Date())}`, pw / 2, ph - 10, { align: "center" });
+  // ===== Rodapé =====
+  doc.setFontSize(7);
+  doc.setTextColor(...COR_MARCA_CINZA);
+  doc.text(`Documento gerado por SIGRAF em ${formatarData(new Date())}`, pw / 2, ph - 9, { align: "center" });
 
   doc.save(`Orcamento_${orcamento.numero || orcamento.id || "documento"}.pdf`);
 }

@@ -1,7 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { formatKz, familias, normalizarFamilia, tiposItem, normalizarTipoItem, entradasEspecificacao } from "./estoque";
-import { TEMA_TABELA, formatNumero } from "./pdfEstilo";
+import { TEMA_TABELA, formatNumero, carregarLogo } from "./pdfEstilo";
 
 // ─────────────────────────────────────────────────────────────
 // PALETA MONOCROMÁTICA (preto / branco / cinzas)
@@ -47,47 +47,12 @@ function colunasProporcionais(pesos, opcoes = {}) {
 
 const MARGEM_TABELA = { left: MARGEM, right: MARGEM, top: 22, bottom: 18 };
 
-function origemApi() {
-  return (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api").replace(/\/api$/, "");
-}
-
 function dataHoraAgora() {
   const agora = new Date();
   return {
     data: agora.toLocaleDateString("pt-PT"),
     hora: agora.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }),
   };
-}
-
-// ============================================================
-// LOGO
-// ============================================================
-export async function carregarLogo(org) {
-  if (!org?.logo_url) return null;
-  try {
-    const resp = await fetch(`${origemApi()}${org.logo_url}`);
-    if (!resp.ok) return null;
-    const blob = await resp.blob();
-    if (!blob.type.startsWith("image")) return null;
-    const data = await new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
-    });
-    if (!data) return null;
-    const formato = data.startsWith("data:image/jpeg") ? "JPEG" : "PNG";
-    const dims = await new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => resolve({ w: img.width, h: img.height });
-      img.onerror = () => resolve(null);
-      img.src = data;
-    });
-    if (!dims?.w || !dims?.h) return null;
-    return { data, formato, w: dims.w, h: dims.h };
-  } catch {
-    return null;
-  }
 }
 
 // ============================================================

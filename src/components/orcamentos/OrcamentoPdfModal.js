@@ -53,9 +53,9 @@ export default function OrcamentoPdfModal({ open, orcamento, empresa = {}, onClo
 
   const alternar = (chave) => setOpcoes((p) => ({ ...p, [chave]: !p[chave] }));
 
-  const gerar = () => {
+  const gerar = async () => {
     try {
-      gerarOrcamentoPdf(orcamento, empresa || {}, opcoes);
+      await gerarOrcamentoPdf(orcamento, empresa || {}, opcoes);
       onClose();
     } catch {
       addToast("Erro ao gerar PDF", "error");

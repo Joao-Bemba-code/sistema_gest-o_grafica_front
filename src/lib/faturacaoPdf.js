@@ -1,7 +1,25 @@
 import jsPDF from "jspdf";
 import { applyPlugin } from "jspdf-autotable";
-import { COR_PRIMARIA, COR_TEXTO, COR_SUAVE, formatKz, formatarData, TEMA_TABELA } from "@/lib/pdfEstilo";
+import QRCode from "qrcode";
+import {
+  COR_MARCA_TEXTO,
+  COR_MARCA_LINHA,
+  COR_MARCA_CINZA,
+  COR_MARCA_PRINCIPAL,
+  COR_MARCA_SECUNDARIO,
+  formatKz,
+  formatarData,
+  TEMA_TABELA_MARCA,
+  desenharCabecalhoMarca,
+  desenharMarcaDeAgua,
+  tituloSecaoMarca,
+  caixaClienteMarca,
+  caixaTotaisMarca,
+  caixaBancariaMarca,
+} from "@/lib/pdfEstilo";
 applyPlugin(jsPDF);
+
+const MARGEM = 14;
 
 function tituloTipo(tipo) {
   switch (tipo) {
@@ -26,7 +44,15 @@ function rotuloMetodo(m) {
   return mapa[m] || m || "—";
 }
 
-export default function gerarPDF(fatura, empresa = {}) {
+const corEstado = {
+  emitida: [180, 140, 20],
+  paga: COR_MARCA_SECUNDARIO,
+  parcial: [72, 120, 200],
+  vencida: [200, 60, 60],
+  cancelada: COR_MARCA_CINZA,
+};
+
+export default async function gerarPDF(fatura, empresa = {}) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
   const ph = doc.internal.pageSize.getHeight();
@@ -39,137 +65,136 @@ export default function gerarPDF(fatura, empresa = {}) {
   const totalFat = Number(fatura.total || fatura.valor) || 0;
   const pagoFat = Number(fatura.valor_pago) || 0;
 
-  // ===== Cabeçalho =====
-  doc.setFillColor(...COR_PRIMARIA);
-  doc.rect(0, 0, pw, 40, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(18); doc.setFont("helvetica", "bold");
-  doc.text(empresa.nome || "SIGRAF", 14, 16);
-  doc.setFontSize(8); doc.setFont("helvetica", "normal");
-  const contacto = [
-    empresa.endereco || "",
-    `NIF: ${empresa.nif || "—"}  |  Tel: ${empresa.telefone || "—"}  |  Email: ${empresa.email || "—"}`,
-  ].filter(Boolean);
-  contacto.forEach((linha, i) => doc.text(linha, 14, 23 + i * 5));
+  // ===== Cabeçalho de marca (logo real + dados reais da empresa) =====
+  const { logo } = await desenharCabecalhoMarca(doc, {
+    titulo: tituloTipo(tipo),
+    empresa,
+    direitos: [
+      `Nº: ${fatura.numero || "—"}`,
+      `Emissão: ${formatarData(fatura.data_emissao)}`,
+      fatura.data_vencimento ? `Vencimento: ${formatarData(fatura.data_vencimento)}` : null,
+    ].filter(Boolean),
+  });
+  desenharMarcaDeAgua(doc, logo);
 
-  doc.setFontSize(15); doc.setFont("helvetica", "bold");
-  doc.text(tituloTipo(tipo), pw - 14, 16, { align: "right" });
-  doc.setFontSize(9); doc.setFont("helvetica", "normal");
-  doc.text(`Nº: ${fatura.numero || "—"}`, pw - 14, 23, { align: "right" });
-  doc.text(`Emissão: ${formatarData(fatura.data_emissao)}`, pw - 14, 28, { align: "right" });
-  if (fatura.data_vencimento) doc.text(`Vencimento: ${formatarData(fatura.data_vencimento)}`, pw - 14, 33, { align: "right" });
+  let y = 52;
 
   // ===== Cliente =====
-  doc.setTextColor(...COR_TEXTO);
-  let y = 50;
-  doc.setFillColor(...COR_SUAVE);
-  doc.roundedRect(14, y, pw - 28, 28, 2, 2, "F");
-  doc.setFontSize(8); doc.setFont("helvetica", "bold");
-  doc.text("DADOS DO CLIENTE", 18, y + 6);
-  doc.setFontSize(9); doc.setFont("helvetica", "normal");
-  doc.text(`${cli.nome || "—"}${cli.empresa ? `  •  ${cli.empresa}` : ""}`, 18, y + 13);
-  const linhaNif = [];
-  if (cli.nif) linhaNif.push(`NIF: ${cli.nif}`);
-  if (cli.telefone) linhaNif.push(`Tel: ${cli.telefone}`);
-  if (cli.email) linhaNif.push(`Email: ${cli.email}`);
-  doc.text(linhaNif.join("   |   "), 18, y + 19);
-  doc.text(`${cli.endereco || ""}`, 18, y + 25);
-  y += 36;
+  y += caixaClienteMarca(doc, 14, y, pw - 28, cli) + 8;
 
   // ===== Itens =====
-  doc.setFontSize(10); doc.setFont("helvetica", "bold");
-  doc.text("DESCRIÇÃO DOS SERVIÇOS", 14, y); y += 4;
+  y = tituloSecaoMarca(doc, "Descrição dos serviços", 14, y) + 2;
   doc.autoTable({
     startY: y,
     head: [["Descrição", "Qtd", "Valor Unit.", "Total"]],
     body: (fatura.itens || []).map((it) => [it.descricao || "", String(it.quantidade), formatKz(it.preco_unit), formatKz(it.total)]),
-    ...TEMA_TABELA,
-    columnStyles: { 1: { halign: "center" }, 2: { halign: "right" }, 3: { halign: "right", fontStyle: "bold" } },
+    ...TEMA_TABELA_MARCA,
+    columnStyles: { 0: { halign: "left", fontStyle: "bold" }, 1: { halign: "center" }, 2: { halign: "right" }, 3: { halign: "right", fontStyle: "bold" } },
   });
+  y = doc.lastAutoTable.finalY + 8;
 
   // ===== Totais =====
-  y = doc.lastAutoTable.finalY + 8;
-  const boxX = pw - 92;
-  const boxW = 78;
-  const boxH = 30;
-  doc.setFillColor(255, 255, 255);
-  doc.setDrawColor(...COR_PRIMARIA);
-  doc.roundedRect(boxX, y, boxW, boxH, 2, 2, "FD");
-  doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.setTextColor(...COR_TEXTO);
-  doc.text("Subtotal:", boxX + 5, y + 8); doc.text(formatKz(fatura.subtotal), boxX + boxW - 5, y + 8, { align: "right" });
-  if (Number(fatura.iva) > 0) {
-    doc.text(`IVA (${Number(fatura.iva)}%):`, boxX + 5, y + 15); doc.text(formatKz(fatura.valor_iva), boxX + boxW - 5, y + 15, { align: "right" });
-  }
-  doc.setDrawColor(...COR_PRIMARIA);
-  doc.line(boxX, y + 20, boxX + boxW, y + 20);
-  doc.setFontSize(11); doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COR_PRIMARIA);
-  doc.text(ehRecibo ? "TOTAL PAGO:" : "TOTAL:", boxX + 5, y + 26); doc.text(formatKz(totalFat), boxX + boxW - 5, y + 26, { align: "right" });
+  const linhasTotais = [{ label: "Subtotal", value: formatKz(fatura.subtotal) }];
+  if (Number(fatura.iva) > 0) linhasTotais.push({ label: `IVA (${Number(fatura.iva)}%)`, value: formatKz(fatura.valor_iva) });
+  const hTotais = caixaTotaisMarca(doc, pw - 92, y, 78, {
+    linhas: linhasTotais,
+    totalLabel: ehRecibo ? "TOTAL PAGO:" : "TOTAL:",
+    total: formatKz(totalFat),
+  });
+  y += hTotais + 8;
 
   // ===== Estado do pagamento =====
-  y += boxH + 8;
-  doc.setFont("helvetica", "normal"); doc.setTextColor(...COR_TEXTO);
   if (ehRecibo) {
-    const tamBox = orcRef ? 34 : 24;
-    doc.setFillColor(...COR_SUAVE);
-    doc.setDrawColor(150, 210, 185);
-    doc.roundedRect(14, y, pw - 28, tamBox, 2, 2, "FD");
-    doc.setTextColor(...COR_PRIMARIA); doc.setFontSize(10); doc.setFont("helvetica", "bold");
-    doc.text("Pagamento recebido integralmente.", 18, y + 8);
-    doc.setFontSize(8); doc.setFont("helvetica", "normal");
-    doc.text(`Método: ${rotuloMetodo(fatura.metodo_pagamento)}${fatura.data_pagamento ? `   |   Data: ${formatarData(fatura.data_pagamento)}` : ""}`, 18, y + 15);
-    if (orcRef) doc.text(`Documento de origem — Orçamento ${orcRef}: ${formatKz(orcTotal)}`, 18, y + 22);
-    y += tamBox + 6;
+    const hPag = orcRef ? 33 : 25;
+    doc.setFillColor(...COR_MARCA_PRINCIPAL);
+    doc.roundedRect(14, y, pw - 28, hPag, 2.5, 2.5, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("Pagamento recebido integralmente.", 20, y + 8);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text(`Método: ${rotuloMetodo(fatura.metodo_pagamento)}${fatura.data_pagamento ? `   ·   Data: ${formatarData(fatura.data_pagamento)}` : ""}`, 20, y + 15);
+    if (orcRef) doc.text(`Documento de origem — Orçamento ${orcRef}: ${formatKz(orcTotal)}`, 20, y + 22);
+    y += hPag + 8;
   } else {
+    const estado = fatura.estado || "—";
+    const corEst = corEstado[estado] || COR_MARCA_CINZA;
     doc.setFillColor(255, 255, 255);
-    doc.setDrawColor(200, 210, 220);
-    doc.roundedRect(14, y, pw - 28, 26, 2, 2, "FD");
-    doc.setFontSize(8); doc.setFont("helvetica", "bold");
-    doc.text("ESTADO DO PAGAMENTO", 18, y + 6);
-    doc.setFontSize(9); doc.setFont("helvetica", "normal");
-    doc.text(`Estado: ${fatura.estado || "—"}`, 18, y + 13);
-    doc.text(pagoFat > 0 ? `Valor pago: ${formatKz(pagoFat)}` : "Valor pago: Kz 0", pw - 100, y + 13, { align: "right" });
+    doc.setDrawColor(...COR_MARCA_LINHA);
+    doc.roundedRect(14, y, pw - 28, 24, 2.5, 2.5, "FD");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.8);
+    doc.setTextColor(...COR_MARCA_PRINCIPAL);
+    doc.text("ESTADO DO PAGAMENTO", 20, y + 7);
+    doc.setFontSize(9);
+    doc.setTextColor(...corEst);
+    doc.text(`Estado: ${estado}`, 20, y + 14);
+    doc.setTextColor(...COR_MARCA_TEXTO);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Valor pago: ${pagoFat > 0 ? formatKz(pagoFat) : "Kz 0"}`, pw - 20, y + 13, { align: "right" });
     if (totalFat > pagoFat) {
-      doc.setTextColor(200, 100, 40); doc.setFont("helvetica", "bold");
-      doc.text(`Em dívida a liquidar: ${formatKz(totalFat - pagoFat)}`, pw - 100, y + 20, { align: "right" });
+      doc.setTextColor(200, 100, 40);
+      doc.setFont("helvetica", "bold");
+      doc.text(`Em dívida a liquidar: ${formatKz(totalFat - pagoFat)}`, pw - 20, y + 19, { align: "right" });
     }
     y += 32;
   }
 
   // ===== Observações =====
   if (fatura.observacoes) {
-    doc.setFontSize(9); doc.setFont("helvetica", "italic"); doc.setTextColor(...COR_TEXTO);
-    doc.text(`Observações: ${fatura.observacoes}`, 14, y);
-    y += 6;
+    doc.setFontSize(8.5);
+    doc.setFont("helvetica", "italic");
+    doc.setTextColor(...COR_MARCA_TEXTO);
+    const obs = doc.splitTextToSize(fatura.observacoes, pw - 28);
+    doc.text(`Observações: ${obs[0]}`, 14, y);
+    y += 5;
+    for (let i = 1; i < obs.length; i++) {
+      doc.text(obs[i], 24, y);
+      y += 4.5;
+    }
   }
 
   // ===== Dados Bancários =====
-  const temBanco = empresa.banco_nome || empresa.banco_iban || empresa.banco_conta;
-  if (temBanco) {
-    doc.setFillColor(...COR_SUAVE);
-    doc.roundedRect(14, y, pw - 28, 24, 2, 2, "F");
-    doc.setFontSize(8); doc.setFont("helvetica", "bold");
-    doc.text("DADOS PARA PAGAMENTO", 18, y + 6);
-    doc.setFontSize(8); doc.setFont("helvetica", "normal");
-    const linhasBanco = [];
-    if (empresa.banco_nome) linhasBanco.push(`Banco: ${empresa.banco_nome}`);
-    if (empresa.banco_conta) linhasBanco.push(`Conta: ${empresa.banco_conta}`);
-    if (empresa.banco_iban) linhasBanco.push(`IBAN: ${empresa.banco_iban}`);
-    doc.text(linhasBanco.join("   |   "), 18, y + 13);
-    doc.text("Transferência BIM, Multicaixa ou outro meio de pagamento.", 18, y + 19);
-    y += 24;
+  const hBanco = caixaBancariaMarca(doc, 14, y, pw - 28, empresa);
+  y += hBanco ? hBanco + 8 : 0;
+
+  // ===== QR Code AGT =====
+  if (fatura.agt_document_no && empresa.nif) {
+    try {
+      const urlQR = `https://quiosqueagt.minfin.gov.ao/facturacao-eletronica/consultar-fe?emissor=${String(empresa.nif).trim()}&document=${String(fatura.agt_document_no).replace(/ /g, "%20")}`;
+      const dataUrlQR = await QRCode.toDataURL(urlQR, { errorCorrectionLevel: "M", margin: 1, width: 350, color: { dark: "#1B5E3A", light: "#ffffff" } });
+      const qrSize = 24;
+      const qx = pw - 14 - qrSize;
+      doc.setDrawColor(...COR_MARCA_LINHA);
+      doc.roundedRect(qx - 1, y - 1, qrSize + 2, qrSize + 2, 1, 1, "S");
+      doc.addImage(dataUrlQR, "PNG", qx, y, qrSize, qrSize, undefined, "FAST");
+      doc.setFontSize(6.5);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...COR_MARCA_CINZA);
+      doc.text("Valide esta fatura na AGT", qx + qrSize / 2, y + qrSize + 4, { align: "center" });
+      y += 34;
+    } catch (e) {
+    }
   }
 
-  // ===== Assinaturas =====
-  y = Math.max(y + 12, ph - 40);
-  doc.setDrawColor(180, 190, 200);
-  doc.line(14, y, pw / 2 - 10, y);
-  doc.line(pw / 2 + 10, y, pw - 14, y);
-  doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.setTextColor(120, 130, 140);
-  doc.text("Assinatura do Responsável", pw / 2, y + 5, { align: "center" });
+  // ===== Agradecimento =====
+  y = Math.max(y + 6, ph - 50);
+  doc.setDrawColor(...COR_MARCA_LINHA);
+  doc.line(MARGEM, y, pw - MARGEM, y);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10.5);
+  doc.setTextColor(...COR_MARCA_PRINCIPAL);
+  doc.text("Obrigado pela sua preferência!", pw / 2, y + 8, { align: "center" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...COR_MARCA_CINZA);
+  doc.text(`${(empresa.nome || "SIGRAF").toUpperCase()}   ·   ${empresa.email || "—"}   ·   ${empresa.telefone || "—"}`, pw / 2, y + 14, { align: "center" });
 
-  doc.setTextColor(160, 170, 180); doc.setFontSize(7);
-  doc.text(`Documento gerado por SIGRAF em ${formatarData(new Date())}`, pw / 2, ph - 10, { align: "center" });
+  // ===== Rodapé =====
+  doc.setFontSize(7);
+  doc.setTextColor(...COR_MARCA_CINZA);
+  doc.text(`Documento gerado por SIGRAF em ${formatarData(new Date())}`, pw / 2, ph - 9, { align: "center" });
 
   doc.save(`${tituloTipo(tipo).replace(/\s+/g, "_")}_${fatura.numero || fatura.id}.pdf`);
 }
