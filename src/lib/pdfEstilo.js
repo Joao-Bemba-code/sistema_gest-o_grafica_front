@@ -7,17 +7,16 @@ export const COR_LINHA = [204, 212, 220];
 export const COR_FUNDO_ALTERNADO = [247, 250, 249];
 
 // ─────────────────────────────────────────────────────────────
-// PALETA DE MARCA — CENFLOR
-// Verde escuro #1B5E3A | Verde claro #4CAF7D | Cinza #2E2E2E
-// Fundo #F4F6F5 | Branco #FFFFFF | Cartão #EAF6EE
+// PALETA DE MARCA — MONOCROMÁTICA (preto e branco)
+// Usada nos documentos de faturação e orçamentos.
 // ─────────────────────────────────────────────────────────────
-export const COR_MARCA_PRINCIPAL = [27, 94, 58];
-export const COR_MARCA_SECUNDARIO = [76, 175, 125];
+export const COR_MARCA_PRINCIPAL = [26, 26, 26];
+export const COR_MARCA_SECUNDARIO = [110, 110, 110];
 export const COR_MARCA_TEXTO = [46, 46, 46];
-export const COR_MARCA_FUNDO = [244, 246, 245];
-export const COR_MARCA_CARTAO = [234, 246, 238];
-export const COR_MARCA_LINHA = [222, 231, 226];
-export const COR_MARCA_CINZA = [122, 132, 126];
+export const COR_MARCA_FUNDO = [244, 244, 244];
+export const COR_MARCA_CARTAO = [247, 247, 247];
+export const COR_MARCA_LINHA = [205, 205, 205];
+export const COR_MARCA_CINZA = [125, 125, 125];
 export const MARGEM_MARCA = 14;
 export const COR_BRANCO = [255, 255, 255];
 
@@ -351,21 +350,21 @@ export function caixaClienteMarca(doc, x, y, w, cli) {
 export function caixaBancariaMarca(doc, x, y, w, empresa) {
   const tem = empresa.banco_nome || empresa.banco_iban || empresa.banco_conta;
   if (!tem) return 0;
-  const h = 24;
+  const h = 32;
   doc.setFillColor(...COR_MARCA_FUNDO);
   doc.roundedRect(x, y, w, h, 2.5, 2.5, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.8);
   doc.setTextColor(...COR_MARCA_PRINCIPAL);
-  doc.text("DADOS PARA PAGAMENTO", x + 6, y + 6);
+  doc.text("DADOS PARA PAGAMENTO", x + 6, y + 8);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
+  doc.setFontSize(8.3);
   doc.setTextColor(...COR_MARCA_TEXTO);
   const linhas = [];
   if (empresa.banco_nome) linhas.push(`Banco: ${empresa.banco_nome}`);
   if (empresa.banco_conta) linhas.push(`Conta: ${empresa.banco_conta}`);
   if (empresa.banco_iban) linhas.push(`IBAN: ${empresa.banco_iban}`);
-  doc.text(linhas.join("   ·   "), x + 6, y + 13);
-  doc.text("Transferência BIM, Multicaixa ou outro meio de pagamento.", x + 6, y + 19);
+  doc.text(linhas.join("   ·   "), x + 6, y + 16);
+  doc.text("Transferência BIM, Multicaixa ou outro meio de pagamento.", x + 6, y + 24);
   return h;
 }

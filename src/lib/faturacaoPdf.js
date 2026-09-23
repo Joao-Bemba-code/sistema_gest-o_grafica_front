@@ -45,10 +45,10 @@ function rotuloMetodo(m) {
 }
 
 const corEstado = {
-  emitida: [180, 140, 20],
+  emitida: [115, 115, 115],
   paga: COR_MARCA_SECUNDARIO,
-  parcial: [72, 120, 200],
-  vencida: [200, 60, 60],
+  parcial: [140, 140, 140],
+  vencida: [60, 60, 60],
   cancelada: COR_MARCA_CINZA,
 };
 
@@ -80,7 +80,7 @@ export default async function gerarPDF(fatura, empresa = {}) {
   let y = 52;
 
   // ===== Cliente =====
-  y += caixaClienteMarca(doc, 14, y, pw - 28, cli) + 8;
+  y += caixaClienteMarca(doc, 14, y, pw - 28, cli) + 10;
 
   // ===== Itens =====
   y = tituloSecaoMarca(doc, "Descrição dos serviços", 14, y) + 2;
@@ -116,7 +116,7 @@ export default async function gerarPDF(fatura, empresa = {}) {
     doc.setFontSize(8);
     doc.text(`Método: ${rotuloMetodo(fatura.metodo_pagamento)}${fatura.data_pagamento ? `   ·   Data: ${formatarData(fatura.data_pagamento)}` : ""}`, 20, y + 15);
     if (orcRef) doc.text(`Documento de origem — Orçamento ${orcRef}: ${formatKz(orcTotal)}`, 20, y + 22);
-    y += hPag + 8;
+    y += hPag + 10;
   } else {
     const estado = fatura.estado || "—";
     const corEst = corEstado[estado] || COR_MARCA_CINZA;
@@ -134,36 +134,39 @@ export default async function gerarPDF(fatura, empresa = {}) {
     doc.setFont("helvetica", "normal");
     doc.text(`Valor pago: ${pagoFat > 0 ? formatKz(pagoFat) : "Kz 0"}`, pw - 20, y + 13, { align: "right" });
     if (totalFat > pagoFat) {
-      doc.setTextColor(200, 100, 40);
+      doc.setTextColor(60, 60, 60);
       doc.setFont("helvetica", "bold");
       doc.text(`Em dívida a liquidar: ${formatKz(totalFat - pagoFat)}`, pw - 20, y + 19, { align: "right" });
     }
-    y += 32;
+    y += 34;
   }
 
   // ===== Observações =====
+  let obsY = y;
   if (fatura.observacoes) {
     doc.setFontSize(8.5);
     doc.setFont("helvetica", "italic");
     doc.setTextColor(...COR_MARCA_TEXTO);
     const obs = doc.splitTextToSize(fatura.observacoes, pw - 28);
-    doc.text(`Observações: ${obs[0]}`, 14, y);
-    y += 5;
+    doc.text(`Observações: ${obs[0]}`, 14, obsY);
+    obsY += 5;
     for (let i = 1; i < obs.length; i++) {
-      doc.text(obs[i], 24, y);
-      y += 4.5;
+      doc.text(obs[i], 24, obsY);
+      obsY += 4.5;
     }
+    obsY += 6;
   }
+  y = obsY;
 
   // ===== Dados Bancários =====
   const hBanco = caixaBancariaMarca(doc, 14, y, pw - 28, empresa);
-  y += hBanco ? hBanco + 8 : 0;
+  y += hBanco ? hBanco + 12 : 0;
 
   // ===== QR Code AGT =====
   if (fatura.agt_document_no && empresa.nif) {
     try {
       const urlQR = `https://quiosqueagt.minfin.gov.ao/facturacao-eletronica/consultar-fe?emissor=${String(empresa.nif).trim()}&document=${String(fatura.agt_document_no).replace(/ /g, "%20")}`;
-      const dataUrlQR = await QRCode.toDataURL(urlQR, { errorCorrectionLevel: "M", margin: 1, width: 350, color: { dark: "#1B5E3A", light: "#ffffff" } });
+      const dataUrlQR = await QRCode.toDataURL(urlQR, { errorCorrectionLevel: "M", margin: 1, width: 350, color: { dark: "#1a1a1a", light: "#ffffff" } });
       const qrSize = 24;
       const qx = pw - 14 - qrSize;
       doc.setDrawColor(...COR_MARCA_LINHA);

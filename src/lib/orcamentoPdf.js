@@ -76,26 +76,26 @@ export default async function gerarOrcamentoPdf(orcamento, empresa = {}, opcoesE
   let y = 52;
 
   // ===== Cliente =====
-  y += caixaClienteMarca(doc, MARGEM, y, pw - 28, cli) + 8;
+  y += caixaClienteMarca(doc, MARGEM, y, pw - 28, cli) + 10;
 
   // ===== Especificação Técnica =====
   const specEntradas = Object.entries(specs).filter(([k, v]) => k && v && k !== "produto");
   if (specEntradas.length > 0) {
-    const hSpec = 8 + specEntradas.length * 5 + 4;
+    const hSpec = 10 + specEntradas.length * 6 + 6;
     doc.setFillColor(...COR_MARCA_FUNDO);
     doc.roundedRect(MARGEM, y, pw - 28, hSpec, 2.5, 2.5, "F");
     doc.setFont("helvetica", "bold");
     doc.setFontSize(7.8);
     doc.setTextColor(...COR_MARCA_PRINCIPAL);
-    doc.text("ESPECIFICAÇÃO TÉCNICA", 20, y + 6);
+    doc.text("ESPECIFICAÇÃO TÉCNICA", 20, y + 8);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.3);
+    doc.setFontSize(8.5);
     doc.setTextColor(...COR_MARCA_TEXTO);
     specEntradas.forEach(([k, v], i) => {
       const texto = doc.splitTextToSize(`${k}: ${v}`, pw - 40);
-      doc.text(texto[0], 20, y + 12 + i * 5);
+      doc.text(texto[0], 20, y + 14 + i * 6);
     });
-    y += hSpec + 6;
+    y += hSpec + 10;
   }
 
   // ===== Itens / Produtos =====
@@ -217,28 +217,28 @@ export default async function gerarOrcamentoPdf(orcamento, empresa = {}, opcoesE
   if (orcamento.prazoExecucao) infoExtra.push({ label: "Prazo de Execução", value: orcamento.prazoExecucao });
   if (orcamento.condicoesPagamento) infoExtra.push({ label: "Condições de Pagamento", value: orcamento.condicoesPagamento });
   if (infoExtra.length > 0) {
-    const hCond = 8 + infoExtra.length * 6 + 4;
+    const hCond = 10 + infoExtra.length * 7 + 6;
     doc.setFillColor(...COR_MARCA_FUNDO);
     doc.roundedRect(MARGEM, y, pw - 28, hCond, 2.5, 2.5, "F");
     doc.setFont("helvetica", "bold");
     doc.setFontSize(7.8);
     doc.setTextColor(...COR_MARCA_PRINCIPAL);
-    doc.text("CONDIÇÕES GERAIS", 20, y + 6);
+    doc.text("CONDIÇÕES GERAIS", 20, y + 8);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.3);
+    doc.setFontSize(8.5);
     doc.setTextColor(...COR_MARCA_TEXTO);
     infoExtra.forEach((item, i) => {
-      doc.text(`${item.label}: ${item.value}`, 20, y + 12 + i * 6);
+      doc.text(`${item.label}: ${item.value}`, 20, y + 14 + i * 7);
     });
-    y += hCond + 6;
+    y += hCond + 10;
   }
 
   // ===== Observações =====
-  y = desenharObservacoes(doc, orcamento.observacoes, MARGEM, y, pw - 28) + (orcamento.observacoes ? 4 : 0);
+  y = desenharObservacoes(doc, orcamento.observacoes, MARGEM, y, pw - 28) + (orcamento.observacoes ? 6 : 0);
 
   // ===== Dados Bancários =====
   const hBanco = caixaBancariaMarca(doc, MARGEM, y, pw - 28, empresa);
-  y += hBanco ? hBanco + 8 : 0;
+  y += hBanco ? hBanco + 12 : 0;
 
   // ===== Agradecimento =====
   y = Math.max(y + 4, ph - 50);
