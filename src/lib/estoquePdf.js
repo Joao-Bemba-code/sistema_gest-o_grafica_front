@@ -70,9 +70,11 @@ async function desenharCabecalho(doc, org = {}, titulo) {
     const mmH = logo.h * escala;
     doc.addImage(logo.data, logo.formato, MARGEM, 14 + (box - mmH) / 2, mmW, mmH);
   } else {
-    doc.setFillColor(...PRETO);
-    doc.roundedRect(MARGEM, 14, box, box, 4, 4, "F");
-    doc.setTextColor(...BRANCO);
+    doc.setFillColor(...BRANCO);
+    doc.setDrawColor(...CINZA_MEDIO);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(MARGEM, 14, box, box, 4, 4, "FD");
+    doc.setTextColor(...PRETO);
     doc.setFontSize(13);
     doc.setFont("helvetica", "bold");
     doc.text((org.nome || "S").charAt(0).toUpperCase(), MARGEM + box / 2, 14 + box / 2 + 1, { align: "center" });
@@ -108,13 +110,13 @@ async function desenharCabecalho(doc, org = {}, titulo) {
 const TEMA_RELATORIO = {
   theme: "grid",
   headStyles: {
-    fillColor: PRETO,
-    textColor: BRANCO,
+    fillColor: CINZA_CLARO,
+    textColor: PRETO,
     fontStyle: "bold",
     fontSize: 8,
     cellPadding: 2,
     halign: "left",
-    lineColor: PRETO,
+    lineColor: CINZA_CLARO,
     lineWidth: 0.1,
   },
   bodyStyles: {

@@ -141,6 +141,17 @@ export function rodape(doc, texto = "Documento gerado por SIGRAF") {
   doc.text(texto, 14, ph - 8);
 }
 
+// Rodapé monocromático de marca (usado nos relatórios)
+export function rodapeMarca(doc, texto = "Documento gerado por SIGRAF") {
+  const pw = doc.internal.pageSize.getWidth();
+  const ph = doc.internal.pageSize.getHeight();
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...COR_MARCA_CINZA);
+  doc.text(`Página ${doc.internal.getNumberOfPages()}`, pw - MARGEM_MARCA, ph - 8, { align: "right" });
+  doc.text(texto, MARGEM_MARCA, ph - 8);
+}
+
 // ─────────────────────────────────────────────────────────────
 // LOGO
 // ─────────────────────────────────────────────────────────────

@@ -1,6 +1,14 @@
 import jsPDF from "jspdf";
 import { applyPlugin } from "jspdf-autotable";
-import { COR_PRIMARIA, COR_TEXTO, TEMA_TABELA, rodape as rodapeGeral } from "@/lib/pdfEstilo";
+import {
+  COR_MARCA_TEXTO,
+  COR_MARCA_CINZA,
+  formatarData,
+  TEMA_TABELA_MARCA,
+  desenharCabecalhoMarca,
+  tituloSecaoMarca,
+  rodapeMarca,
+} from "@/lib/pdfEstilo";
 applyPlugin(jsPDF);
 
 const ESTADO_LABEL = {
@@ -10,7 +18,7 @@ const ESTADO_LABEL = {
   desativada: "Desativada",
 };
 
-function formatarData(d) {
+function formatarDataHora(d) {
   if (!d) return "—";
   try {
     return new Date(d).toLocaleString("pt-AO", { dateStyle: "short", timeStyle: "short" });
@@ -19,59 +27,38 @@ function formatarData(d) {
   }
 }
 
-function cabecalho(doc, pw, empresa, titulo, subtitulo) {
-  doc.setFillColor(...COR_PRIMARIA);
-  doc.rect(0, 0, pw, 34, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(16); doc.setFont("helvetica", "bold");
-  doc.text(empresa.nome || "SIGRAF", 14, 14);
-  doc.setFontSize(8); doc.setFont("helvetica", "normal");
-  const contacto = [empresa.endereco || "", `NIF: ${empresa.nif || "—"}  |  Tel: ${empresa.telefone || "—"}  |  Email: ${empresa.email || "—"}`].filter(Boolean);
-  contacto.forEach((linha, i) => doc.text(linha, 14, 20 + i * 4));
-
-  doc.setFontSize(13); doc.setFont("helvetica", "bold");
-  doc.text(titulo, pw - 14, 13, { align: "right" });
-  doc.setFontSize(8); doc.setFont("helvetica", "normal");
-  doc.text(subtitulo, pw - 14, 19, { align: "right" });
-  doc.text(`Gerado em: ${formatarData(new Date().toISOString())}`, pw - 14, 24, { align: "right" });
-
-  doc.setTextColor(...COR_TEXTO);
-  doc.setDrawColor(...COR_PRIMARIA);
-  doc.setLineWidth(0.6);
-  doc.line(0, 35, pw, 35);
-}
-
-export default function gerarRelatorioMaquinas(maquinas, ordens = [], empresa = {}) {
+export default async function gerarRelatorioMaquinas(maquinas, ordens = [], empresa = {}) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
   const ph = doc.internal.pageSize.getHeight();
   const lista = Array.isArray(maquinas) ? maquinas : [];
 
-  cabecalho(doc, pw, empresa, "RELATÓRIO DE MÁQUINAS", `${lista.length} máquinas · Produção`);
+  const { yInicio } = await desenharCabecalhoMarca(doc, {
+    titulo: "RELATÓRIO DE MÁQUINAS",
+    empresa,
+    direitos: [`${lista.length} máquinas · Produção`, `Gerado em: ${formatarDataHora(new Date().toISOString())}`],
+  });
 
   const operacionais = lista.filter((m) => m.estado === "operacional").length;
   const manutencao = lista.filter((m) => m.estado === "manutencao" || m.estado === "avariada").length;
 
   // ===== Resumo =====
-  doc.setFontSize(11); doc.setFont("helvetica", "bold");
-  doc.text("Resumo", 14, 42);
+  let y = tituloSecaoMarca(doc, "Resumo", 14, yInicio) + 2;
   doc.autoTable({
-    startY: 45,
+    startY: y,
     head: [["Métrica", "Valor"]],
     body: [
       ["Total de máquinas", String(lista.length)],
       ["Operacionais", String(operacionais)],
       ["Em manutenção / avaria", String(manutencao)],
     ],
-    ...TEMA_TABELA,
+    ...TEMA_TABELA_MARCA,
   });
 
   // ===== Tabela de máquinas =====
-  let y = doc.lastAutoTable.finalY + 8;
-  doc.setFontSize(11); doc.setFont("helvetica", "bold");
-  doc.text("Máquinas e estados", 14, y);
+  y = tituloSecaoMarca(doc, "Máquinas e estados", 14, doc.lastAutoTable.finalY + 6) + 2;
   doc.autoTable({
-    startY: y + 3,
+    startY: y,
     head: [["Código", "Máquina", "Marca / Modelo", "Localização", "Estado", "Última manutenção", "Próxima manutenção"]],
     body: lista.map((m) => [
       m.codigo || "—",
@@ -82,21 +69,18 @@ export default function gerarRelatorioMaquinas(maquinas, ordens = [], empresa = 
       m.ultima_manutencao || "—",
       m.proxima_manutencao || "—",
     ]),
-    ...TEMA_TABELA,
-    headStyles: { ...TEMA_TABELA.headStyles, fontSize: 7.5 },
-    bodyStyles: { ...TEMA_TABELA.bodyStyles, fontSize: 7.5 },
+    ...TEMA_TABELA_MARCA,
+    headStyles: { ...TEMA_TABELA_MARCA.headStyles, fontSize: 7.5 },
+    bodyStyles: { ...TEMA_TABELA_MARCA.styles, fontSize: 7.5 },
     columnStyles: { 0: { halign: "center" }, 4: { halign: "center" } },
   });
 
   // ===== Detalhe por máquina =====
   for (const m of lista) {
-    y = doc.lastAutoTable.finalY + 8;
+    y = doc.lastAutoTable.finalY + 6;
     if (y > ph - 30) { doc.addPage(); y = 20; }
 
-    doc.setFontSize(10); doc.setFont("helvetica", "bold");
-    doc.setTextColor(...COR_PRIMARIA);
-    doc.text(`${m.codigo ? m.codigo + " — " : ""}${m.nome_comum || "Máquina"}`, 14, y);
-    doc.setTextColor(...COR_TEXTO);
+    y = tituloSecaoMarca(doc, `${m.codigo ? m.codigo + " — " : ""}${m.nome_comum || "Máquina"}`, 14, y) + 2;
 
     const estados = Array.isArray(m.historico_estados) ? m.historico_estados : [];
     const manutencoes = Array.isArray(m.manutencoes) ? m.manutencoes : [];
@@ -111,14 +95,14 @@ export default function gerarRelatorioMaquinas(maquinas, ordens = [], empresa = 
     });
 
     const linhasEstados = estados.map((e) => [
-      formatarData(e.data),
+      formatarDataHora(e.data),
       ESTADO_LABEL[e.estado] || e.estado || "—",
       e.motivo || "—",
       e.tempo_estimado ? (String(e.tempo_estimado) + (e.tecnico ? ` · Téc.: ${e.tecnico}` : "")) : (e.tecnico || "—"),
     ]);
 
     const linhasManut = manutencoes.map((x) => [
-      formatarData(x.data || x.data_manutencao),
+      formatarDataHora(x.data || x.data_manutencao),
       x.intervencao || x.descricao || "—",
       x.tecnico || "—",
       x.tipo || "—",
@@ -127,7 +111,7 @@ export default function gerarRelatorioMaquinas(maquinas, ordens = [], empresa = 
 
     const linhasUso = uso.map((u) => [
       `OP ${u.op.numero || u.op.id}`,
-      formatarData(u.reg.data_inicio || u.reg.inicio || u.reg.horaInicio || ""),
+      formatarDataHora(u.reg.data_inicio || u.reg.inicio || u.reg.horaInicio || ""),
       u.reg.operador || "—",
       u.reg.quantidade_produzida != null ? String(u.reg.quantidade_produzida) : "—",
       u.reg.quantidade_rejeitada != null ? String(u.reg.quantidade_rejeitada) : "—",
@@ -139,9 +123,9 @@ export default function gerarRelatorioMaquinas(maquinas, ordens = [], empresa = 
         startY: y,
         head: [["Data", "Estado", "Motivo", "Tempo / Técnico"]],
         body: linhasEstados,
-        ...TEMA_TABELA,
-        headStyles: { ...TEMA_TABELA.headStyles, fillColor: [90, 110, 130], fontSize: 7 },
-        bodyStyles: { ...TEMA_TABELA.bodyStyles, fontSize: 7 },
+        ...TEMA_TABELA_MARCA,
+        headStyles: { ...TEMA_TABELA_MARCA.headStyles, fontSize: 7 },
+        bodyStyles: { ...TEMA_TABELA_MARCA.styles, fontSize: 7 },
       });
       y = doc.lastAutoTable.finalY + 4;
     }
@@ -151,9 +135,9 @@ export default function gerarRelatorioMaquinas(maquinas, ordens = [], empresa = 
         startY: y,
         head: [["Data", "Intervenção", "Técnico", "Tipo", "Paragem"]],
         body: linhasManut,
-        ...TEMA_TABELA,
-        headStyles: { ...TEMA_TABELA.headStyles, fillColor: [217, 119, 6], fontSize: 7 },
-        bodyStyles: { ...TEMA_TABELA.bodyStyles, fontSize: 7 },
+        ...TEMA_TABELA_MARCA,
+        headStyles: { ...TEMA_TABELA_MARCA.headStyles, fontSize: 7 },
+        bodyStyles: { ...TEMA_TABELA_MARCA.styles, fontSize: 7 },
       });
       y = doc.lastAutoTable.finalY + 4;
     }
@@ -164,22 +148,23 @@ export default function gerarRelatorioMaquinas(maquinas, ordens = [], empresa = 
         startY: y,
         head: [["OP", "Data", "Operador", "Produzido", "Rejeitado"]],
         body: linhasUso,
-        ...TEMA_TABELA,
-        headStyles: { ...TEMA_TABELA.headStyles, fillColor: [59, 130, 246], fontSize: 7 },
-        bodyStyles: { ...TEMA_TABELA.bodyStyles, fontSize: 7 },
+        ...TEMA_TABELA_MARCA,
+        headStyles: { ...TEMA_TABELA_MARCA.headStyles, fontSize: 7 },
+        bodyStyles: { ...TEMA_TABELA_MARCA.styles, fontSize: 7 },
         columnStyles: { 0: { halign: "center" }, 3: { halign: "center" }, 4: { halign: "center" } },
       });
       y = doc.lastAutoTable.finalY + 6;
     } else {
       y += 3;
       doc.setFontSize(7.5);
-      doc.setTextColor(130, 140, 150);
+      doc.setFont("helvetica", "italic");
+      doc.setTextColor(...COR_MARCA_CINZA);
       doc.text("Sem registos de utilização em produção.", 14, y);
-      doc.setTextColor(...COR_TEXTO);
+      doc.setTextColor(...COR_MARCA_TEXTO);
       y += 6;
     }
   }
 
-  rodapeGeral(doc);
+  rodapeMarca(doc);
   doc.save(`relatorio-maquinas-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
