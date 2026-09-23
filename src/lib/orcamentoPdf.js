@@ -82,21 +82,21 @@ export default async function gerarOrcamentoPdf(orcamento, empresa = {}, opcoesE
   // ===== Especificação Técnica =====
   const specEntradas = Object.entries(specs).filter(([k, v]) => k && v && k !== "produto");
   if (specEntradas.length > 0) {
-    const hSpec = 10 + specEntradas.length * 6 + 6;
+    const hSpec = 8 + specEntradas.length * 5.5 + 4;
     doc.setFillColor(...COR_MARCA_FUNDO);
     doc.roundedRect(MARGEM, y, pw - 28, hSpec, 2.5, 2.5, "F");
     doc.setFont("helvetica", "bold");
     doc.setFontSize(7.8);
     doc.setTextColor(...COR_MARCA_PRINCIPAL);
-    doc.text("ESPECIFICAÇÃO TÉCNICA", 20, y + 8);
+    doc.text("ESPECIFICAÇÃO TÉCNICA", 20, y + 7);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.5);
     doc.setTextColor(...COR_MARCA_TEXTO);
     specEntradas.forEach(([k, v], i) => {
       const texto = doc.splitTextToSize(`${k}: ${v}`, pw - 40);
-      doc.text(texto[0], 20, y + 14 + i * 6);
+      doc.text(texto[0], 20, y + 12.5 + i * 5.5);
     });
-    y += hSpec + 8;
+    y += hSpec + 6;
   }
 
   // ===== Itens / Produtos =====
@@ -187,7 +187,7 @@ export default async function gerarOrcamentoPdf(orcamento, empresa = {}, opcoesE
         return acc;
       }, {}),
     });
-    y = doc.lastAutoTable.finalY + 8;
+    y = doc.lastAutoTable.finalY + 6;
   }
 
   // ===== Totais =====
@@ -211,40 +211,40 @@ export default async function gerarOrcamentoPdf(orcamento, empresa = {}, opcoesE
     totalLabel: "TOTAL:",
     total: formatKz(total),
   });
-  y += hTotais + 8;
+  y += hTotais + 6;
 
   // ===== Condições Gerais =====
   const infoExtra = [];
   if (orcamento.prazoExecucao) infoExtra.push({ label: "Prazo de Execução", value: orcamento.prazoExecucao });
   if (orcamento.condicoesPagamento) infoExtra.push({ label: "Condições de Pagamento", value: orcamento.condicoesPagamento });
   if (infoExtra.length > 0) {
-    const hCond = 10 + infoExtra.length * 7 + 6;
+    const hCond = 8 + infoExtra.length * 6 + 4;
     doc.setFillColor(...COR_MARCA_FUNDO);
     doc.roundedRect(MARGEM, y, pw - 28, hCond, 2.5, 2.5, "F");
     doc.setFont("helvetica", "bold");
     doc.setFontSize(7.8);
     doc.setTextColor(...COR_MARCA_PRINCIPAL);
-    doc.text("CONDIÇÕES GERAIS", 20, y + 8);
+    doc.text("CONDIÇÕES GERAIS", 20, y + 7);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.5);
     doc.setTextColor(...COR_MARCA_TEXTO);
     infoExtra.forEach((item, i) => {
-      doc.text(`${item.label}: ${item.value}`, 20, y + 14 + i * 7);
+      doc.text(`${item.label}: ${item.value}`, 20, y + 12.5 + i * 6);
     });
-    y += hCond + 8;
+    y += hCond + 6;
   }
 
   // ===== Observações =====
-  y = desenharObservacoes(doc, orcamento.observacoes, MARGEM, y, pw - 28) + (orcamento.observacoes ? 6 : 0);
+  y = desenharObservacoes(doc, orcamento.observacoes, MARGEM, y, pw - 28) + (orcamento.observacoes ? 5 : 0);
 
   // ===== Dados Bancários =====
   const hBanco = caixaBancariaMarca(doc, MARGEM, y, pw - 28, empresa);
-  y += hBanco + 10;
+  y += hBanco + 8;
 
   // ===== Assinaturas =====
-  const yAssin = Math.max(y + 2, ph - 66);
+  const yAssin = Math.max(y + 2, ph - 62);
   assinaturaMarca(doc, yAssin);
-  y = Math.max(yAssin + 12, ph - 50);
+  y = Math.max(yAssin + 11, ph - 46);
 
   // ===== Agradecimento =====
   doc.setDrawColor(...COR_MARCA_LINHA);

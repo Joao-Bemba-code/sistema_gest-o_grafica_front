@@ -102,7 +102,7 @@ export default async function gerarPDF(fatura, empresa = {}) {
     totalLabel: ehRecibo ? "TOTAL PAGO:" : "TOTAL:",
     total: formatKz(totalFat),
   });
-  y += hTotais + 8;
+  y += hTotais + 6;
 
   // ===== Estado do pagamento =====
   if (ehRecibo) {
@@ -141,7 +141,7 @@ export default async function gerarPDF(fatura, empresa = {}) {
       doc.setFont("helvetica", "bold");
       doc.text(`Em dívida a liquidar: ${formatKz(totalFat - pagoFat)}`, pw - 20, y + 19, { align: "right" });
     }
-    y += 30;
+    y += 28;
   }
 
   // ===== Observações =====
@@ -157,13 +157,13 @@ export default async function gerarPDF(fatura, empresa = {}) {
       doc.text(obs[i], 24, obsY);
       obsY += 4.5;
     }
-    obsY += 6;
+    obsY += 5;
   }
   y = obsY;
 
   // ===== Dados Bancários =====
   const hBanco = caixaBancariaMarca(doc, 14, y, pw - 28, empresa);
-  y += hBanco + 10;
+  y += hBanco + 8;
 
   // ===== QR Code AGT =====
   if (fatura.agt_document_no && empresa.nif) {
@@ -179,15 +179,15 @@ export default async function gerarPDF(fatura, empresa = {}) {
       doc.setFont("helvetica", "normal");
       doc.setTextColor(...COR_MARCA_CINZA);
       doc.text("Valide esta fatura na AGT", qx + qrSize / 2, y + qrSize + 4, { align: "center" });
-      y += 32;
+      y += 30;
     } catch (e) {
     }
   }
 
   // ===== Assinaturas =====
-  const yAssin = Math.max(y + 2, ph - 66);
+  const yAssin = Math.max(y + 2, ph - 62);
   assinaturaMarca(doc, yAssin);
-  y = Math.max(yAssin + 12, ph - 50);
+  y = Math.max(yAssin + 11, ph - 46);
 
   // ===== Agradecimento =====
   doc.setDrawColor(...COR_MARCA_LINHA);

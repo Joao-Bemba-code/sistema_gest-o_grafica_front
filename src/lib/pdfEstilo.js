@@ -62,13 +62,13 @@ export const TEMA_TABELA = {
   margin: { left: 14, right: 14 },
 };
 
-// Tema de tabela da marca (cabeçalho verde escuro, linhas alternadas)
+// Tema de tabela da marca (preenchimento claro, linhas alternadas suaves)
 export const TEMA_TABELA_MARCA = {
   theme: "striped",
   styles: {
-    fontSize: 8.5,
+    fontSize: 7.8,
     textColor: COR_MARCA_TEXTO,
-    cellPadding: 2.8,
+    cellPadding: 2.2,
     valign: "middle",
     lineColor: COR_MARCA_LINHA,
     lineWidth: 0.15,
@@ -78,13 +78,13 @@ export const TEMA_TABELA_MARCA = {
     fillColor: COR_MARCA_FUNDO,
     textColor: COR_MARCA_PRINCIPAL,
     fontStyle: "bold",
-    fontSize: 8.3,
+    fontSize: 7.8,
     halign: "center",
     valign: "middle",
-    cellPadding: 3,
+    cellPadding: 2.5,
   },
   alternateRowStyles: { fillColor: [250, 250, 250] },
-  margin: { left: 14, right: 14, top: 22, bottom: 18 },
+  margin: { left: 14, right: 14, top: 8, bottom: 8 },
   didDrawPage: (data) => {
     const d = data.doc;
     const pw = d.internal.pageSize.getWidth();
@@ -285,41 +285,41 @@ export function tituloSecaoMarca(doc, texto, x, y) {
 
 // Caixa de totais (cartão com destaque no total)
 export function caixaTotaisMarca(doc, x, y, w, { linhas = [], rotulo = "RESUMO", totalLabel = "TOTAL:", total = "" }) {
-  const h = 10 + linhas.length * 7 + 16;
+  const h = 8 + linhas.length * 6 + 14;
   doc.setFillColor(...COR_MARCA_CARTAO);
   doc.setDrawColor(...COR_MARCA_SECUNDARIO);
   doc.roundedRect(x, y, w, h, 3, 3, "FD");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.4);
   doc.setTextColor(...COR_MARCA_SECUNDARIO);
-  doc.text(rotulo.toUpperCase(), x + 6, y + 6.5);
-  let ty = y + 13.5;
+  doc.text(rotulo.toUpperCase(), x + 6, y + 5.5);
+  let ty = y + 11.5;
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9.5);
+  doc.setFontSize(9.3);
   doc.setTextColor(...COR_MARCA_TEXTO);
   for (const r of linhas) {
     doc.setFont(r.bold ? "helvetica" : "helvetica", r.bold ? "bold" : "normal");
     doc.text(r.label, x + 6, ty);
     doc.setFont("helvetica", "bold");
     doc.text(r.value, x + w - 6, ty, { align: "right" });
-    ty += 7;
+    ty += 6;
   }
-  const linhaTotal = y + h - 13;
+  const linhaTotal = y + h - 11;
   doc.setDrawColor(...COR_MARCA_SECUNDARIO);
-  doc.line(x + 5, linhaTotal - 2.5, x + w - 5, linhaTotal - 2.5);
+  doc.line(x + 5, linhaTotal - 2, x + w - 5, linhaTotal - 2);
   doc.setFillColor(255, 255, 255);
-  doc.roundedRect(x + 3, linhaTotal, w - 6, 11, 2, 2, "FD");
+  doc.roundedRect(x + 3, linhaTotal, w - 6, 10, 2, 2, "FD");
   doc.setTextColor(...COR_MARCA_PRINCIPAL);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(10.5);
-  doc.text(totalLabel, x + 6, linhaTotal + 7.5);
-  doc.text(total, x + w - 6, linhaTotal + 7.5, { align: "right" });
+  doc.setFontSize(10);
+  doc.text(totalLabel, x + 6, linhaTotal + 7);
+  doc.text(total, x + w - 6, linhaTotal + 7, { align: "right" });
   return h;
 }
 
 // Caixa de dados do cliente
 export function caixaClienteMarca(doc, x, y, w, cli) {
-  const h = 32;
+  const h = 28;
   doc.setFillColor(255, 255, 255);
   doc.setDrawColor(...COR_MARCA_LINHA);
   doc.roundedRect(x, y, w, h, 2.5, 2.5, "FD");
@@ -328,25 +328,25 @@ export function caixaClienteMarca(doc, x, y, w, cli) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
   doc.setTextColor(...COR_MARCA_SECUNDARIO);
-  doc.text("DADOS DO CLIENTE", x + 9, y + 7);
+  doc.text("DADOS DO CLIENTE", x + 9, y + 6.5);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(11.5);
+  doc.setFontSize(11);
   doc.setTextColor(...COR_MARCA_TEXTO);
   const nome = `${cli.nome || "—"}${cli.empresa ? `   ·   ${cli.empresa}` : ""}`;
   const nomeLinha = doc.splitTextToSize(nome, w - 20);
-  doc.text(nomeLinha[0], x + 9, y + 14.5);
+  doc.text(nomeLinha[0], x + 9, y + 12.5);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.3);
-  let cy = y + 21;
+  doc.setFontSize(8.2);
+  let cy = y + 18.5;
   const info = [cli.nif && `NIF: ${cli.nif}`, cli.telefone && `Tel: ${cli.telefone}`, cli.email && `Email: ${cli.email}`].filter(Boolean);
   if (info.length) {
     doc.text(info.join("   ·   "), x + 9, cy);
-    cy += 4.8;
+    cy += 4.5;
   }
   if (cli.endereco) {
     doc.splitTextToSize(cli.endereco, w - 20).slice(0, 1).forEach((p) => {
       doc.text(p, x + 9, cy);
-      cy += 4.8;
+      cy += 4.5;
     });
   }
   return h;
@@ -354,13 +354,13 @@ export function caixaClienteMarca(doc, x, y, w, cli) {
 
 // Caixa de dados bancários
 export function caixaBancariaMarca(doc, x, y, w, empresa) {
-  const h = 30;
+  const h = 26;
   doc.setFillColor(...COR_MARCA_FUNDO);
   doc.roundedRect(x, y, w, h, 2.5, 2.5, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.8);
   doc.setTextColor(...COR_MARCA_PRINCIPAL);
-  doc.text("DADOS PARA PAGAMENTO", x + 6, y + 8);
+  doc.text("DADOS PARA PAGAMENTO", x + 6, y + 7);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.3);
   doc.setTextColor(...COR_MARCA_TEXTO);
@@ -368,8 +368,8 @@ export function caixaBancariaMarca(doc, x, y, w, empresa) {
   if (empresa.banco_nome) linhas.push(`Banco: ${empresa.banco_nome}`);
   if (empresa.banco_conta) linhas.push(`Conta: ${empresa.banco_conta}`);
   if (empresa.banco_iban) linhas.push(`IBAN: ${empresa.banco_iban}`);
-  doc.text(linhas.length ? linhas.join("   ·   ") : "Dados bancários disponíveis mediante solicitação.", x + 6, y + 15.5);
-  doc.text("Transferência BIM, Multicaixa ou outro meio de pagamento.", x + 6, y + 22.5);
+  doc.text(linhas.length ? linhas.join("   ·   ") : "Dados bancários disponíveis mediante solicitação.", x + 6, y + 13.5);
+  doc.text("Transferência BIM, Multicaixa ou outro meio de pagamento.", x + 6, y + 20);
   return h;
 }
 
