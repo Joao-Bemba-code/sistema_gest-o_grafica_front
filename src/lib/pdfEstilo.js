@@ -75,15 +75,15 @@ export const TEMA_TABELA_MARCA = {
     overflow: "linebreak",
   },
   headStyles: {
-    fillColor: COR_MARCA_PRINCIPAL,
-    textColor: [255, 255, 255],
+    fillColor: COR_MARCA_FUNDO,
+    textColor: COR_MARCA_PRINCIPAL,
     fontStyle: "bold",
     fontSize: 8.3,
     halign: "center",
     valign: "middle",
     cellPadding: 3,
   },
-  alternateRowStyles: { fillColor: [247, 250, 248] },
+  alternateRowStyles: { fillColor: [250, 250, 250] },
   margin: { left: 14, right: 14, top: 22, bottom: 18 },
   didDrawPage: (data) => {
     const d = data.doc;
@@ -271,10 +271,11 @@ export function desenharMarcaDeAgua(doc, logo) {
   doc.setGState(new doc.GState({ opacity: 1 }));
 }
 
-// Título de secção (marcador + texto)
+// Título de secção (marcador de contorno + texto)
 export function tituloSecaoMarca(doc, texto, x, y) {
-  doc.setFillColor(...COR_MARCA_SECUNDARIO);
-  doc.roundedRect(x, y - 3, 4.4, 4.4, 0.8, 0.8, "F");
+  doc.setDrawColor(...COR_MARCA_SECUNDARIO);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(x, y - 3, 4.4, 4.4, 0.8, 0.8, "S");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.6);
   doc.setTextColor(...COR_MARCA_PRINCIPAL);
@@ -322,7 +323,7 @@ export function caixaClienteMarca(doc, x, y, w, cli) {
   doc.setFillColor(255, 255, 255);
   doc.setDrawColor(...COR_MARCA_LINHA);
   doc.roundedRect(x, y, w, h, 2.5, 2.5, "FD");
-  doc.setFillColor(...COR_MARCA_LINHA);
+  doc.setFillColor(...COR_MARCA_FUNDO);
   doc.roundedRect(x, y, 2.4, h, 1, 1, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);

@@ -142,7 +142,7 @@ export default async function gerarOrcamentoPdf(orcamento, empresa = {}, opcoesE
         head: [["Produto", "Material", "Qtd", "Valor Unit.", "Total"]],
         body: materialRows,
         ...TEMA_TABELA_MARCA,
-        headStyles: { ...TEMA_TABELA_MARCA.headStyles, fillColor: COR_MARCA_SECUNDARIO, textColor: COR_MARCA_PRINCIPAL, fontSize: 7 },
+        headStyles: { ...TEMA_TABELA_MARCA.headStyles, fillColor: COR_MARCA_FUNDO, textColor: COR_MARCA_PRINCIPAL, fontSize: 7 },
         bodyStyles: { fontSize: 7.2 },
         columnStyles: { 0: { fontStyle: "bold" }, 2: { halign: "center" }, 3: { halign: "right" }, 4: { halign: "right", fontStyle: "bold" } },
       });
@@ -179,7 +179,7 @@ export default async function gerarOrcamentoPdf(orcamento, empresa = {}, opcoesE
       head: [headServicos],
       body: bodyServicos,
       ...TEMA_TABELA_MARCA,
-      headStyles: { ...TEMA_TABELA_MARCA.headStyles, fillColor: COR_MARCA_SECUNDARIO, textColor: COR_MARCA_PRINCIPAL },
+      headStyles: { ...TEMA_TABELA_MARCA.headStyles, fillColor: COR_MARCA_FUNDO, textColor: COR_MARCA_PRINCIPAL },
       columnStyles: colunasServicos.reduce((acc, c, i) => {
         if (c === "mob" || c === "prazo" || c === "duracao") acc[i + 1] = { halign: "center" };
         else if (c === "valorHora") acc[i + 1] = { halign: "right" };
