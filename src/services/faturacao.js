@@ -59,3 +59,28 @@ export async function exportarFaturas(params) {
   const { data } = await api.get("/faturacao/exportar", { params, responseType: "blob" });
   return data;
 }
+
+export async function buscarConfigAGT() {
+  const { data } = await api.get("/faturacao/agt/config");
+  return data;
+}
+
+export async function solicitarSerieAGT(dados) {
+  const { data } = await api.post("/faturacao/agt/serie", dados);
+  return data;
+}
+
+export async function listarSeriesAGT(params) {
+  const { data } = await api.get("/faturacao/agt/series", { params });
+  return data;
+}
+
+export async function consultarEstadoAGT(id) {
+  const { data } = await api.post(`/faturacao/agt/consultar/${id}`);
+  return data;
+}
+
+export async function enviarFaturaAGT(id) {
+  const { data } = await api.post(`/faturacao/agt/enviar/${id}`);
+  return data;
+}

@@ -14,7 +14,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
 import FilterBar, { useFilter } from "@/components/ui/FilterBar";
-import { criarFatura, listarFaturas, exportarFaturas, marcarPaga, buscarFatura, removerFatura } from "@/services/faturacao";
+import { criarFatura, listarFaturas, exportarFaturas, marcarPaga, buscarFatura, removerFatura, consultarEstadoAGT, enviarFaturaAGT } from "@/services/faturacao";
 import { listar as listarOrcamentos } from "@/services/orcamentos";
 import { listarOrdens } from "@/services/producao";
 import { listar as listarClientes } from "@/services/clientes";
@@ -44,6 +44,12 @@ const faturaEstados = {
   parcial: { label: "Parcial", variant: "info" },
   vencida: { label: "Vencida", variant: "destructive" },
   cancelada: { label: "Cancelada", variant: "outline" },
+};
+
+const agtEstados = {
+  pendente: { label: "AGT: Pendente", variant: "warning" },
+  valida: { label: "AGT: Validada", variant: "success" },
+  invalida: { label: "AGT: Inválida", variant: "destructive" },
 };
 
 const hoje = new Date().toISOString().split("T")[0];
@@ -265,6 +271,47 @@ export default function FaturacaoPage() {
     }
   };
 
+  const [agtAcao, setAgtAcao] = useState(null);
+
+  const aplicarAGT = (resposta) => {
+    if (!resposta?.id) return;
+    setSelectedFatura(resposta);
+    setFaturas((prev) => prev.map((x) => (x.id === resposta.id ? resposta : x)));
+  };
+
+  const handleConsultarAGT = async () => {
+    const f = selectedFatura;
+    if (!f) return;
+    setAgtAcao(f.id);
+    try {
+      const resp = await consultarEstadoAGT(f.id);
+      aplicarAGT(resp);
+      if (resp.agt_status === "valida") addToast("Fatura validada pela AGT", "success");
+      else if (resp.agt_status === "invalida") addToast("Fatura rejeitada pela AGT", "error");
+      else addToast("Estado AGT ainda em processamento", "info");
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao consultar estado na AGT", "error");
+    } finally {
+      setAgtAcao(null);
+    }
+  };
+
+  const handleEnviarAGT = async () => {
+    const f = selectedFatura;
+    if (!f) return;
+    setAgtAcao(f.id);
+    try {
+      const resp = await enviarFaturaAGT(f.id);
+      aplicarAGT(resp);
+      if (resp.agt_status === "pendente") addToast("Fatura submetida à AGT", "success");
+      else addToast("Fatura enviada à AGT", "success");
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao enviar fatura à AGT", "error");
+    } finally {
+      setAgtAcao(null);
+    }
+  };
+
   const handleExportar = async () => {
     try {
       const blob = await exportarFaturas({ estado: activeFilter === "todas" ? undefined : activeFilter });
@@ -355,9 +402,15 @@ export default function FaturacaoPage() {
                           <Badge variant={faturaEstados[f.estado]?.variant || "outline"} className="text-[10px]">
                             {faturaEstados[f.estado]?.label || f.estado}
                           </Badge>
+                          {f.agt_status && (
+                            <Badge variant={agtEstados[f.agt_status]?.variant || "outline"} className="text-[10px]">
+                              {agtEstados[f.agt_status]?.label || f.agt_status}
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-xs text-muted-foreground">
                           {f.cliente?.nome || "—"}
+                          {f.agt_document_no ? " • " + f.agt_document_no : ""}
                           {f.estado === "paga" && f.data_pagamento
                             ? ` • Pago em ${new Date(f.data_pagamento).toLocaleDateString("pt-BR")}`
                             : f.data_vencimento ? ` • Venc: ${new Date(f.data_vencimento).toLocaleDateString("pt-BR")}` : ""}
@@ -578,6 +631,16 @@ export default function FaturacaoPage() {
                 </div>
               )}
               <div className="flex flex-wrap items-center justify-end gap-3">
+                {selectedFatura.tipo === "fatura" && (
+                  <>
+                    <Button type="button" variant="outline" disabled={agtAcao === selectedFatura.id || !selectedFatura.agt_request_id} onClick={handleConsultarAGT}>
+                      <Icon name="sync" className="text-sm" /> {agtAcao === selectedFatura.id ? "A consultar..." : "Consultar AGT"}
+                    </Button>
+                    <Button type="button" variant="outline" disabled={agtAcao === selectedFatura.id} onClick={handleEnviarAGT}>
+                      <Icon name="send" className="text-sm" /> Enviar à AGT
+                    </Button>
+                  </>
+                )}
                 <Button type="button" variant="outline" onClick={() => gerarPDF(selectedFatura, empresa)}><Icon name="download" className="text-sm" /> Baixar PDF</Button>
                 <Button type="button" onClick={() => setSelectedFatura(null)}>Fechar</Button>
               </div>
@@ -674,6 +737,44 @@ export default function FaturacaoPage() {
                 )}
               </div>
             </div>
+
+            {selectedFatura.tipo === "fatura" && (
+              <div className="rounded-xl border p-4 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Comunicação à AGT</p>
+                  {selectedFatura.agt_status && (
+                    <Badge variant={agtEstados[selectedFatura.agt_status]?.variant || "outline"} className="text-[10px]">
+                      {agtEstados[selectedFatura.agt_status]?.label || selectedFatura.agt_status}
+                    </Badge>
+                  )}
+                </div>
+                {selectedFatura.agt_document_no && (
+                  <p className="text-xs text-muted-foreground">
+                    Nº documento AGT: <span className="font-semibold text-foreground">{selectedFatura.agt_document_no}</span>
+                  </p>
+                )}
+                {selectedFatura.agt_request_id && (
+                  <p className="text-xs text-muted-foreground">
+                    Request ID: <span className="font-mono text-foreground">{selectedFatura.agt_request_id}</span>
+                  </p>
+                )}
+                {Array.isArray(selectedFatura.agt_erros) && selectedFatura.agt_erros.length > 0 && (
+                  <div className="text-[11px] text-destructive space-y-0.5">
+                    {selectedFatura.agt_erros.map((erro, i) => (
+                      <p key={i}>{erro?.errorCode || erro?.idError || "Erro"}: {erro?.errorDescription || erro?.descriptionError}</p>
+                    ))}
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Button size="sm" variant="outline" disabled={agtAcao === selectedFatura.id || !selectedFatura.agt_request_id} onClick={handleConsultarAGT}>
+                    <Icon name="sync" className="text-sm" /> {agtAcao === selectedFatura.id ? "A consultar..." : "Consultar AGT"}
+                  </Button>
+                  <Button size="sm" variant="outline" disabled={agtAcao === selectedFatura.id} onClick={handleEnviarAGT}>
+                    <Icon name="send" className="text-sm" /> Enviar à AGT
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {selectedFatura.observacoes && (
               <div className="bg-muted/50 rounded-xl p-3">
