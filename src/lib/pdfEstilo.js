@@ -89,12 +89,12 @@ export const TEMA_TABELA_MARCA = {
     const d = data.doc;
     const pw = d.internal.pageSize.getWidth();
     if (data.pageNumber > 1) {
-      d.setFillColor(...COR_MARCA_PRINCIPAL);
+      d.setFillColor(...COR_MARCA_FUNDO);
       d.rect(0, 0, pw, 12, "F");
-      d.setFillColor(...COR_MARCA_SECUNDARIO);
-      d.rect(0, 12, pw, 2, "F");
+      d.setDrawColor(...COR_MARCA_LINHA);
+      d.line(0, 12, pw, 12);
       if (d.marcaNome) {
-        d.setTextColor(255, 255, 255);
+        d.setTextColor(...COR_MARCA_PRINCIPAL);
         d.setFont("helvetica", "bold");
         d.setFontSize(8.5);
         d.text(d.marcaNome, 14, 9);
@@ -177,15 +177,10 @@ export async function carregarLogo(org) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// CABEÇALHO DE MARCA (faixa verde + logotipo + título)
+// CABEÇALHO DE MARCA (claro/preto: logotipo + título)
 // ─────────────────────────────────────────────────────────────
 export async function desenharCabecalhoMarca(doc, { titulo = "", empresa = {}, direitos = [] }) {
   const pw = doc.internal.pageSize.getWidth();
-
-  doc.setFillColor(...COR_MARCA_PRINCIPAL);
-  doc.rect(0, 0, pw, 46, "F");
-  doc.setFillColor(...COR_MARCA_SECUNDARIO);
-  doc.rect(0, 46, pw, 3.2, "F");
 
   let logo = null;
   try {
@@ -194,60 +189,70 @@ export async function desenharCabecalhoMarca(doc, { titulo = "", empresa = {}, d
     logo = null;
   }
 
-  // Logo à esquerda (com fallback: inicial em círculo quadrado)
-  const box = 22;
+  // Logo à esquerda (com fallback: inicial em caixa com contorno)
+  const box = 20;
   const boxX = MARGEM_MARCA;
-  const boxY = 12;
+  const boxY = 10;
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(...COR_MARCA_SECUNDARIO);
+  doc.roundedRect(boxX, boxY, box, box, 2.5, 2.5, "FD");
+  doc.setLineWidth(0.2);
   if (logo && logo.data) {
-    const escala = Math.min(box / logo.w, box / logo.h);
+    const escala = Math.min((box - 4) / logo.w, (box - 4) / logo.h);
     const lw = logo.w * escala;
     const lh = logo.h * escala;
     doc.addImage(logo.data, logo.formato, boxX + (box - lw) / 2, boxY + (box - lh) / 2, lw, lh);
   } else {
-    doc.setFillColor(255, 255, 255);
-    doc.roundedRect(boxX, boxY, box, box, 3, 3, "F");
     doc.setTextColor(...COR_MARCA_PRINCIPAL);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.text((empresa.nome || "C").trim().charAt(0).toUpperCase(), boxX + box / 2, boxY + box / 2 + 5.5, { align: "center" });
+    doc.setFontSize(15);
+    doc.text((empresa.nome || "C").trim().charAt(0).toUpperCase(), boxX + box / 2, boxY + box / 2 + 5, { align: "center" });
   }
 
   // Nome e contactos da empresa
-  const textoX = boxX + box + 7;
+  const textoX = boxX + box + 8;
   doc.marcaNome = empresa.nome || "SIGRAF";
-  doc.setTextColor(255, 255, 255);
+  doc.setTextColor(...COR_MARCA_PRINCIPAL);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(15.5);
-  doc.text(empresa.nome || "SIGRAF", textoX, 22);
+  doc.setFontSize(15);
+  doc.text(empresa.nome || "SIGRAF", textoX, 18);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.3);
-  let ty = 29;
+  doc.setFontSize(7.6);
+  doc.setTextColor(...COR_MARCA_TEXTO);
+  let ty = 25;
   const info = [
     empresa.endereco,
     `NIF: ${empresa.nif || "—"}   ·   Tel: ${empresa.telefone || "—"}   ·   Email: ${empresa.email || "—"}`,
   ].filter(Boolean);
   for (const l in info) {
-    const partes = doc.splitTextToSize(info[l], 80);
+    const partes = doc.splitTextToSize(info[l], 82);
     for (const p of partes.slice(0, 2)) {
-      if (ty > 40) break;
+      if (ty > 38) break;
       doc.text(p, textoX, ty);
-      ty += 4.4;
+      ty += 4.3;
     }
   }
 
   // Título do documento + metadados à direita
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16.5);
+  doc.setTextColor(...COR_MARCA_PRINCIPAL);
   doc.text(titulo.toUpperCase(), pw - MARGEM_MARCA, 18, { align: "right" });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.6);
+  doc.setTextColor(...COR_MARCA_TEXTO);
   let ry = 26;
   (direitos || []).slice(0, 3).forEach((l) => {
     doc.text(l, pw - MARGEM_MARCA, ry, { align: "right" });
     ry += 5.4;
   });
 
-  return { yInicio: 52, logo };
+  // Linha de separação
+  doc.setDrawColor(...COR_MARCA_PRINCIPAL);
+  doc.setLineWidth(0.7);
+  doc.line(0, 44, pw, 44);
+
+  return { yInicio: 50, logo };
 }
 
 // Marca de água suave com o logotipo
@@ -266,9 +271,9 @@ export function desenharMarcaDeAgua(doc, logo) {
   doc.setGState(new doc.GState({ opacity: 1 }));
 }
 
-// Título de secção (barra verde + texto)
+// Título de secção (marcador + texto)
 export function tituloSecaoMarca(doc, texto, x, y) {
-  doc.setFillColor(...COR_MARCA_PRINCIPAL);
+  doc.setFillColor(...COR_MARCA_SECUNDARIO);
   doc.roundedRect(x, y - 3, 4.4, 4.4, 0.8, 0.8, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.6);
@@ -301,9 +306,9 @@ export function caixaTotaisMarca(doc, x, y, w, { linhas = [], rotulo = "RESUMO",
   const linhaTotal = y + h - 13;
   doc.setDrawColor(...COR_MARCA_SECUNDARIO);
   doc.line(x + 5, linhaTotal - 2.5, x + w - 5, linhaTotal - 2.5);
-  doc.setFillColor(...COR_MARCA_PRINCIPAL);
-  doc.roundedRect(x + 3, linhaTotal, w - 6, 11, 2, 2, "F");
-  doc.setTextColor(255, 255, 255);
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(x + 3, linhaTotal, w - 6, 11, 2, 2, "FD");
+  doc.setTextColor(...COR_MARCA_PRINCIPAL);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10.5);
   doc.text(totalLabel, x + 6, linhaTotal + 7.5);
@@ -317,7 +322,7 @@ export function caixaClienteMarca(doc, x, y, w, cli) {
   doc.setFillColor(255, 255, 255);
   doc.setDrawColor(...COR_MARCA_LINHA);
   doc.roundedRect(x, y, w, h, 2.5, 2.5, "FD");
-  doc.setFillColor(...COR_MARCA_PRINCIPAL);
+  doc.setFillColor(...COR_MARCA_LINHA);
   doc.roundedRect(x, y, 2.4, h, 1, 1, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
@@ -348,9 +353,7 @@ export function caixaClienteMarca(doc, x, y, w, cli) {
 
 // Caixa de dados bancários
 export function caixaBancariaMarca(doc, x, y, w, empresa) {
-  const tem = empresa.banco_nome || empresa.banco_iban || empresa.banco_conta;
-  if (!tem) return 0;
-  const h = 32;
+  const h = 30;
   doc.setFillColor(...COR_MARCA_FUNDO);
   doc.roundedRect(x, y, w, h, 2.5, 2.5, "F");
   doc.setFont("helvetica", "bold");
@@ -364,7 +367,23 @@ export function caixaBancariaMarca(doc, x, y, w, empresa) {
   if (empresa.banco_nome) linhas.push(`Banco: ${empresa.banco_nome}`);
   if (empresa.banco_conta) linhas.push(`Conta: ${empresa.banco_conta}`);
   if (empresa.banco_iban) linhas.push(`IBAN: ${empresa.banco_iban}`);
-  doc.text(linhas.join("   ·   "), x + 6, y + 16);
-  doc.text("Transferência BIM, Multicaixa ou outro meio de pagamento.", x + 6, y + 24);
+  doc.text(linhas.length ? linhas.join("   ·   ") : "Dados bancários disponíveis mediante solicitação.", x + 6, y + 15.5);
+  doc.text("Transferência BIM, Multicaixa ou outro meio de pagamento.", x + 6, y + 22.5);
   return h;
+}
+
+// Linhas de assinatura (responsável + cliente)
+export function assinaturaMarca(doc, y, rotulos = ["Assinatura do Responsável", "Assinatura do Cliente"]) {
+  const pw = doc.internal.pageSize.getWidth();
+  const meio = pw / 2;
+  doc.setDrawColor(...COR_MARCA_LINHA);
+  doc.line(MARGEM_MARCA, y, meio - 15, y);
+  doc.line(meio + 15, y, pw - MARGEM_MARCA, y);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.6);
+  doc.setTextColor(...COR_MARCA_CINZA);
+  const esquerda = MARGEM_MARCA + (meio - 15 - MARGEM_MARCA) / 2;
+  const direita = meio + 15 + (pw - MARGEM_MARCA - (meio + 15)) / 2;
+  doc.text(rotulos[0] || "", esquerda, y + 4.5, { align: "center" });
+  doc.text(rotulos[1] || "", direita, y + 4.5, { align: "center" });
 }

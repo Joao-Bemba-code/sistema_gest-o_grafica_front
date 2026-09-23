@@ -16,6 +16,7 @@ import {
   caixaClienteMarca,
   caixaTotaisMarca,
   caixaBancariaMarca,
+  assinaturaMarca,
 } from "@/lib/pdfEstilo";
 applyPlugin(jsPDF);
 
@@ -77,10 +78,10 @@ export default async function gerarPDF(fatura, empresa = {}) {
   });
   desenharMarcaDeAgua(doc, logo);
 
-  let y = 52;
+  let y = 50;
 
   // ===== Cliente =====
-  y += caixaClienteMarca(doc, 14, y, pw - 28, cli) + 10;
+  y += caixaClienteMarca(doc, 14, y, pw - 28, cli) + 8;
 
   // ===== Itens =====
   y = tituloSecaoMarca(doc, "Descrição dos serviços", 14, y) + 2;
@@ -106,17 +107,19 @@ export default async function gerarPDF(fatura, empresa = {}) {
   // ===== Estado do pagamento =====
   if (ehRecibo) {
     const hPag = orcRef ? 33 : 25;
-    doc.setFillColor(...COR_MARCA_PRINCIPAL);
-    doc.roundedRect(14, y, pw - 28, hPag, 2.5, 2.5, "F");
-    doc.setTextColor(255, 255, 255);
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(...COR_MARCA_LINHA);
+    doc.roundedRect(14, y, pw - 28, hPag, 2.5, 2.5, "FD");
+    doc.setTextColor(...COR_MARCA_PRINCIPAL);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
     doc.text("Pagamento recebido integralmente.", 20, y + 8);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
+    doc.setTextColor(...COR_MARCA_TEXTO);
     doc.text(`Método: ${rotuloMetodo(fatura.metodo_pagamento)}${fatura.data_pagamento ? `   ·   Data: ${formatarData(fatura.data_pagamento)}` : ""}`, 20, y + 15);
     if (orcRef) doc.text(`Documento de origem — Orçamento ${orcRef}: ${formatKz(orcTotal)}`, 20, y + 22);
-    y += hPag + 10;
+    y += hPag + 8;
   } else {
     const estado = fatura.estado || "—";
     const corEst = corEstado[estado] || COR_MARCA_CINZA;
@@ -138,7 +141,7 @@ export default async function gerarPDF(fatura, empresa = {}) {
       doc.setFont("helvetica", "bold");
       doc.text(`Em dívida a liquidar: ${formatKz(totalFat - pagoFat)}`, pw - 20, y + 19, { align: "right" });
     }
-    y += 34;
+    y += 30;
   }
 
   // ===== Observações =====
@@ -160,7 +163,7 @@ export default async function gerarPDF(fatura, empresa = {}) {
 
   // ===== Dados Bancários =====
   const hBanco = caixaBancariaMarca(doc, 14, y, pw - 28, empresa);
-  y += hBanco ? hBanco + 12 : 0;
+  y += hBanco + 10;
 
   // ===== QR Code AGT =====
   if (fatura.agt_document_no && empresa.nif) {
@@ -176,13 +179,17 @@ export default async function gerarPDF(fatura, empresa = {}) {
       doc.setFont("helvetica", "normal");
       doc.setTextColor(...COR_MARCA_CINZA);
       doc.text("Valide esta fatura na AGT", qx + qrSize / 2, y + qrSize + 4, { align: "center" });
-      y += 34;
+      y += 32;
     } catch (e) {
     }
   }
 
+  // ===== Assinaturas =====
+  const yAssin = Math.max(y + 2, ph - 66);
+  assinaturaMarca(doc, yAssin);
+  y = Math.max(yAssin + 12, ph - 50);
+
   // ===== Agradecimento =====
-  y = Math.max(y + 6, ph - 50);
   doc.setDrawColor(...COR_MARCA_LINHA);
   doc.line(MARGEM, y, pw - MARGEM, y);
   doc.setFont("helvetica", "bold");

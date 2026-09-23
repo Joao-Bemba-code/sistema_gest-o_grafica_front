@@ -16,6 +16,7 @@ import {
   caixaClienteMarca,
   caixaTotaisMarca,
   caixaBancariaMarca,
+  assinaturaMarca,
 } from "@/lib/pdfEstilo";
 applyPlugin(jsPDF);
 
@@ -73,10 +74,10 @@ export default async function gerarOrcamentoPdf(orcamento, empresa = {}, opcoesE
   });
   desenharMarcaDeAgua(doc, logo);
 
-  let y = 52;
+  let y = 50;
 
   // ===== Cliente =====
-  y += caixaClienteMarca(doc, MARGEM, y, pw - 28, cli) + 10;
+  y += caixaClienteMarca(doc, MARGEM, y, pw - 28, cli) + 8;
 
   // ===== Especificação Técnica =====
   const specEntradas = Object.entries(specs).filter(([k, v]) => k && v && k !== "produto");
@@ -95,7 +96,7 @@ export default async function gerarOrcamentoPdf(orcamento, empresa = {}, opcoesE
       const texto = doc.splitTextToSize(`${k}: ${v}`, pw - 40);
       doc.text(texto[0], 20, y + 14 + i * 6);
     });
-    y += hSpec + 10;
+    y += hSpec + 8;
   }
 
   // ===== Itens / Produtos =====
@@ -230,7 +231,7 @@ export default async function gerarOrcamentoPdf(orcamento, empresa = {}, opcoesE
     infoExtra.forEach((item, i) => {
       doc.text(`${item.label}: ${item.value}`, 20, y + 14 + i * 7);
     });
-    y += hCond + 10;
+    y += hCond + 8;
   }
 
   // ===== Observações =====
@@ -238,10 +239,14 @@ export default async function gerarOrcamentoPdf(orcamento, empresa = {}, opcoesE
 
   // ===== Dados Bancários =====
   const hBanco = caixaBancariaMarca(doc, MARGEM, y, pw - 28, empresa);
-  y += hBanco ? hBanco + 12 : 0;
+  y += hBanco + 10;
+
+  // ===== Assinaturas =====
+  const yAssin = Math.max(y + 2, ph - 66);
+  assinaturaMarca(doc, yAssin);
+  y = Math.max(yAssin + 12, ph - 50);
 
   // ===== Agradecimento =====
-  y = Math.max(y + 4, ph - 50);
   doc.setDrawColor(...COR_MARCA_LINHA);
   doc.line(MARGEM, y, pw - MARGEM, y);
   doc.setFont("helvetica", "bold");
