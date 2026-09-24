@@ -5,10 +5,12 @@ import Icon from "@/components/Icon";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
-import { listarOrdens, salvarPreImpressao, salvarImpressao, salvarAcabamento, salvarQualidade, atualizarOrdem } from "@/services/producao";
+import { listarOrdens, salvarPreImpressao, salvarImpressao, salvarAcabamento, salvarQualidade, atualizarOrdem, finalizarProducao } from "@/services/producao";
 import { listar as listarMaquinas } from "@/services/maquinas";
+import { descricaoErroApi } from "@/services/api";
 
 const processos = [
   { id: "pre_impressao", label: "Pré-Impressão", icon: "rule" },
@@ -172,18 +174,30 @@ export default function ProcessosTab() {
   const [jobs, setJobs] = useState([]);
   const [activeProcesso, setActiveProcesso] = useState("pre_impressao");
   const [selectedJob, setSelectedJob] = useState(null);
+  const [finalizarJob, setFinalizarJob] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [maquinas, setMaquinas] = useState([]);
   const { addToast } = useToast();
 
   const carregarDados = () => {
-    Promise.all([listarOrdens(), listarMaquinas()]).then(([data, maquinasData]) => {
+    Promise.allSettled([listarOrdens(), listarMaquinas()]).then(([ordensRes, maquinasRes]) => {
+      if (ordensRes.status === "rejected") {
+        addToast(`Erro ao carregar ordens — ${descricaoErroApi(ordensRes.reason, "ordens")}`, "error");
+        return;
+      }
+      const data = ordensRes.value;
       const arr = (Array.isArray(data) ? data : data?.ordens || []).map(normalizar);
       setJobs(arr);
       setSelectedJob((prev) => prev ?? arr[0]?.id ?? null);
-      setMaquinas(Array.isArray(maquinasData) ? maquinasData : maquinasData?.data || []);
-    }).catch(() => addToast("Erro ao carregar ordens", "error")).finally(() => setLoading(false));
+      if (maquinasRes.status === "rejected") {
+        setMaquinas([]);
+        addToast(`Aviso: máquinas indisponíveis — ${descricaoErroApi(maquinasRes.reason, "máquinas")}`, "warning");
+      } else {
+        const maquinasData = maquinasRes.value;
+        setMaquinas(Array.isArray(maquinasData) ? maquinasData : maquinasData?.data || []);
+      }
+    }).finally(() => setLoading(false));
   };
 
   useEffect(() => {
@@ -225,7 +239,8 @@ export default function ProcessosTab() {
   const handleSave = async (jobId) => {
     const job = jobs.find(j => j.id === jobId);
     if (!job) return;
-    if (job.requisicao_estado === "pendente" && job.status === "aguardando" && activeProcesso !== "entrega") {
+    const temMateriais = Array.isArray(job.reserva_estoques) && job.reserva_estoques.length > 0;
+    if (temMateriais && job.requisicao_estado === "pendente" && job.status === "aguardando" && activeProcesso !== "entrega") {
       addToast("Primeiro liberte os materiais da OP (saída de stock) para avançar", "error");
       return;
     }
@@ -234,10 +249,24 @@ export default function ProcessosTab() {
       else if (activeProcesso === "impressao") await salvarImpressao(jobId, job.impressao);
       else if (activeProcesso === "acabamento") await salvarAcabamento(jobId, job.acabamento);
       else if (activeProcesso === "qualidade") await salvarQualidade(jobId, job.qualidade);
-      else if (activeProcesso === "entrega") await atualizarOrdem(jobId, { status: "entregue" });
+      else if (activeProcesso === "entrega") {
+        const atualizada = await atualizarOrdem(jobId, { status: "entregue" });
+        setJobs(jobs.map(j => j.id === jobId ? normalizar(atualizada) : j));
+      }
       addToast("Operação realizada com sucesso", "success");
     } catch (err) {
       addToast(err.response?.data?.erro || "Erro na operação", "error");
+    }
+  };
+
+  const handleFinalizar = async (jobId) => {
+    try {
+      const atualizada = await finalizarProducao(jobId);
+      setJobs(jobs.map(j => j.id === jobId ? normalizar(atualizada) : j));
+      setFinalizarJob(null);
+      addToast("Produção finalizada com sucesso", "success");
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao finalizar produção", "error");
     }
   };
 
@@ -283,7 +312,7 @@ export default function ProcessosTab() {
                     <span className="font-bold text-sm text-foreground">{job.id}</span>
                     <Badge variant={statusColors[job.status] || "outline"} className="text-[10px]">{statusLabels[job.status] || job.status}</Badge>
                     <Badge variant="outline" className="text-[10px]">{processoLabels[job.processoAtual]}</Badge>
-                    {job.requisicao_estado === "pendente" && (
+                    {["aguardando", "em_producao"].includes(job.status) && Array.isArray(job.reserva_estoques) && job.reserva_estoques.length > 0 && job.requisicao_estado === "pendente" && (
                       <Badge variant="destructive" className="text-[10px]">Aguardando saída de materiais</Badge>
                     )}
                   </div>
@@ -295,13 +324,24 @@ export default function ProcessosTab() {
 
             {selectedJob === job.id && (
               <div className="border-t p-5 space-y-4">
-                {job.requisicao_estado === "pendente" && (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-bold text-foreground">OP #{job.id}</span>
+                    {job.produto ? <> — {job.produto}</> : ""} · Qtd: <strong>{job.quantidade}</strong>
+                  </p>
+                  {!["finalizado", "entregue"].includes(job.status) && (!Array.isArray(job.reserva_estoques) || job.reserva_estoques.length === 0) && (
+                    <Button size="sm" variant="success" onClick={() => setFinalizarJob(job)}>
+                      <Icon name="check_circle" className="text-lg" /> Finalizar produção
+                    </Button>
+                  )}
+                </div>
+                {Array.isArray(job.reserva_estoques) && job.reserva_estoques.length > 0 && job.requisicao_estado === "pendente" && (
                   <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
                     <Icon name="inventory" className="text-[20px] text-amber-600 shrink-0" />
                     <div>
                       <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Aguardando libertação de materiais</p>
                       <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-0.5">
-                        Esta OP ainda não teve a requisição de material confirmada pelo armazém. Só depois da libertação é que pode avançar para produção. Vá à aba &quot;Ordens&quot; → &quot;Requisição material&quot;.
+                        Esta OP não teve a saída de material confirmada pelo armazém. Só após a libertação é que pode avançar para produção. Vá à aba &quot;Ordens&quot; → &quot;Requisição material&quot;.
                       </p>
                     </div>
                   </div>
@@ -441,6 +481,13 @@ export default function ProcessosTab() {
                       <Icon name="local_shipping" className="text-4xl text-muted-foreground/30 block mb-2" />
                       <p className="text-sm text-muted-foreground">Estado da entrega: <strong className="text-foreground">{job.status === "entregue" ? "Concluído" : "Pendente"}</strong></p>
                     </div>
+                    {job.status !== "entregue" && (
+                      <div className="flex justify-end">
+                        <Button size="sm" variant="success" onClick={() => handleSave(job.id)}>
+                          <Icon name="local_shipping" className="text-[16px]" /> Marcar como entregue
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -458,6 +505,18 @@ export default function ProcessosTab() {
           <p className="text-xs mt-1">Aprove um orçamento na Área Comercial para gerar a OP automaticamente.</p>
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(finalizarJob)}
+        onClose={() => setFinalizarJob(null)}
+        onConfirm={() => handleFinalizar(finalizarJob?.id)}
+        title="Finalizar produção"
+        description={finalizarJob ? `Confirmar que a OP #${finalizarJob.id} (${finalizarJob.produto || "produção"}) foi concluída? O estado passará diretamente para Finalizado${Array.isArray(finalizarJob.reserva_estoques) && finalizarJob.reserva_estoques.length ? " e as reservas de material serão baixadas do estoque" : ""}.` : ""}
+        confirmLabel="Finalizar"
+        cancelLabel="Cancelar"
+        icon="check_circle"
+        tone="success"
+      />
     </div>
   );
 }

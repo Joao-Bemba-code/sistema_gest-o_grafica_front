@@ -10,6 +10,7 @@ import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
 import { listarOrdens, salvarImpressao, libertarParaMaquina } from "@/services/producao";
 import { listar as listarMaquinas } from "@/services/maquinas";
+import { descricaoErroApi } from "@/services/api";
 import LibertarMaquinaModal from "@/components/producao/LibertarMaquinaModal";
 import MaquinasTab from "@/components/producao/MaquinasTab";
 import { getUsuario } from "@/services/auth";
@@ -66,11 +67,15 @@ export default function OperacionalTab() {
   const [subTab, setSubTab] = useState("maquinas");
 
   const carregarDados = useCallback(() => {
-    Promise.all([listarOrdens(), listarMaquinas()])
-      .then(([ordensData, maquinasData]) => {
+    Promise.allSettled([listarOrdens(), listarMaquinas()])
+      .then(([ordensRes, maquinasRes]) => {
+        if (ordensRes.status === "rejected") {
+          addToast(`Erro ao carregar o operacional — ${descricaoErroApi(ordensRes.reason, "ordens")}`, "error");
+          return;
+        }
+        const ordensData = ordensRes.value;
         const arr = (Array.isArray(ordensData) ? ordensData : ordensData?.ordens || []).map(normalizar);
         setOps(arr);
-        setMaquinas(Array.isArray(maquinasData) ? maquinasData : maquinasData?.data || []);
         setRegisto(Object.fromEntries(arr.map((o) => [o.id, {
           operador: o.operador || "",
           dataInicio: o.dataInicio || "",
@@ -79,8 +84,14 @@ export default function OperacionalTab() {
           quantidadeRejeitada: o.quantidadeRejeitada ?? "",
           observacoes: o.observacoes || "",
         }])));
+        if (maquinasRes.status === "rejected") {
+          setMaquinas([]);
+          addToast(`Aviso: máquinas indisponíveis — ${descricaoErroApi(maquinasRes.reason, "máquinas")}`, "warning");
+        } else {
+          const maquinasData = maquinasRes.value;
+          setMaquinas(Array.isArray(maquinasData) ? maquinasData : maquinasData?.data || []);
+        }
       })
-      .catch(() => addToast("Erro ao carregar o operacional", "error"))
       .finally(() => setLoading(false));
   }, [addToast]);
 

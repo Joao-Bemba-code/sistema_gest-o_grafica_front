@@ -34,4 +34,13 @@ api.interceptors.response.use(
   }
 );
 
+export function descricaoErroApi(err, padrao = "Erro na operação") {
+  if (!err) return padrao;
+  const url = err?.config?.url || "";
+  const status = err?.response?.status;
+  const detalhe = err?.response?.data?.erro || err?.message || "";
+  const base = `${url}${status ? ` → ${status}` : ""}`;
+  return base ? `${base}: ${detalhe || padrao}` : detalhe || padrao;
+}
+
 export default api;

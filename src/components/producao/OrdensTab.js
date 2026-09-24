@@ -10,8 +10,9 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
 import FilterBar, { useFilter } from "@/components/ui/FilterBar";
-import { listarOrdens, requisitarMateriais, aprovarMateriais, removerOrdem } from "@/services/producao";
+import { listarOrdens, requisitarMateriais, aprovarMateriais, finalizarProducao, removerOrdem } from "@/services/producao";
 import { getUsuario } from "@/services/auth";
+import { descricaoErroApi } from "@/services/api";
 import { podeAtual } from "@/lib/permissoes";
 import SaidaMateriaisModal from "@/components/producao/SaidaMateriaisModal";
 import { listar as listarMateriais } from "@/services/materiais";
@@ -69,16 +70,29 @@ export default function OrdensTab() {
   const [materiais, setMateriais] = useState([]);
   const [libertarOp, setLibertarOp] = useState(null);
   const [aprovarOp, setAprovarOp] = useState(null);
+  const [finalizarOp, setFinalizarOp] = useState(null);
   const [eliminarItem, setEliminarItem] = useState(null);
   const [deletando, setDeletando] = useState(false);
   const { addToast } = useToast();
   const podeAprovar = podeAtual("producao", "aprovar");
+  const podeEditar = podeAtual("producao", "editar");
 
   const carregarDados = () => {
-    Promise.all([listarOrdens(), listarMateriais()]).then(([ordensData, materiaisData]) => {
+    Promise.allSettled([listarOrdens(), listarMateriais()]).then(([ordensRes, materiaisRes]) => {
+      if (ordensRes.status === "rejected") {
+        addToast(`Erro ao carregar ordens — ${descricaoErroApi(ordensRes.reason, "ordens")}`, "error");
+        return;
+      }
+      const ordensData = ordensRes.value;
       setOps((Array.isArray(ordensData) ? ordensData : ordensData?.ordens || []).map(normalizar));
-      setMateriais(Array.isArray(materiaisData) ? materiaisData : materiaisData?.materiais || []);
-    }).catch(() => addToast("Erro ao carregar ordens de produção", "error")).finally(() => setLoading(false));
+      if (materiaisRes.status === "rejected") {
+        setMateriais([]);
+        addToast(`Aviso: materiais indisponíveis — ${descricaoErroApi(materiaisRes.reason, "materiais")}`, "warning");
+      } else {
+        const materiaisData = materiaisRes.value;
+        setMateriais(Array.isArray(materiaisData) ? materiaisData : materiaisData?.materiais || []);
+      }
+    }).finally(() => setLoading(false));
   };
 
   useEffect(() => {
@@ -149,6 +163,18 @@ export default function OrdensTab() {
     }
   };
 
+  const confirmarFinalizacao = async () => {
+    if (!finalizarOp) return;
+    try {
+      const atualizada = await finalizarProducao(finalizarOp.id);
+      setOps((prev) => prev.map((o) => (o.id === finalizarOp.id ? normalizar(atualizada) : o)));
+      addToast(`OP ${finalizarOp.id} finalizada com sucesso — estado atualizado para Finalizado`, "success");
+      setFinalizarOp(null);
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao finalizar produção", "error");
+    }
+  };
+
   const confirmarEliminacao = async () => {
     if (!eliminarItem) return;
     setDeletando(true);
@@ -216,10 +242,10 @@ export default function OrdensTab() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-bold text-sm text-foreground">{op.id}</span>
                           <Badge variant={sc.variant || "info"} className="text-[10px]">{sc.label}</Badge>
-                          {op.requisicao_estado === "pendente" && (
+                          {["aguardando", "em_producao"].includes(op.status) && Array.isArray(op.reserva_estoques) && op.reserva_estoques.length > 0 && op.requisicao_estado === "pendente" && (
                             <Badge variant="destructive" className="text-[10px]">Aguardando requisição material</Badge>
                           )}
-                          {op.requisicao_estado === "requisitada" && (
+                          {["aguardando", "em_producao"].includes(op.status) && op.requisicao_estado === "requisitada" && (
                             <Badge variant="warning" className="text-[10px]">Aguardando aprovação</Badge>
                           )}
                           {op.maquina && (
@@ -289,24 +315,25 @@ export default function OrdensTab() {
                         </div>
                       </div>
                     )}
-                    {op.requisicao_estado === "pendente" && (
+                    {["aguardando", "em_producao"].includes(op.status) && op.requisicao_estado === "pendente" && (
                       <div className="mt-4 pt-4 border-t">
-                        {(!Array.isArray(op.reserva_estoques) || op.reserva_estoques.length === 0) && (
-                          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                            Nenhum material reservado — adicione os materiais na saída
+                        {Array.isArray(op.reserva_estoques) && op.reserva_estoques.length > 0 ? (
+                          <div className="flex items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3">
+                            <p className="text-xs text-amber-700 dark:text-amber-400">
+                              Requisição de material pendente — só depois de libertada a OP pode avançar para produção.
+                            </p>
+                            <Button size="sm" onClick={(e) => { e.stopPropagation(); setLibertarOp(op); }}>
+                              <Icon name="inventory" className="text-lg" /> Requisição material
+                            </Button>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground bg-muted/40 border border-border/60 rounded-lg px-4 py-3">
+                            Esta OP utiliza apenas produto acabado, sem materiais de estoque — pode finalizar diretamente com o botão <strong>Finalizar produção</strong>.
                           </p>
                         )}
-                        <div className="flex items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3">
-                          <p className="text-xs text-amber-700 dark:text-amber-400">
-                            Requisição de material pendente — só depois de libertada a OP pode avançar para produção.
-                          </p>
-                          <Button size="sm" onClick={(e) => { e.stopPropagation(); setLibertarOp(op); }}>
-                            <Icon name="inventory" className="text-lg" /> Requisição material
-                          </Button>
-                        </div>
                       </div>
                     )}
-                    {op.requisicao_estado === "requisitada" && (
+                    {["aguardando", "em_producao"].includes(op.status) && op.requisicao_estado === "requisitada" && (
                       <div className="mt-4 pt-4 border-t">
                         <div className="flex items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3">
                           <div className="min-w-0">
@@ -327,7 +354,7 @@ export default function OrdensTab() {
                         </div>
                       </div>
                     )}
-                    {op.requisicao_estado === "libertada" && (
+                    {["aguardando", "em_producao"].includes(op.status) && op.requisicao_estado === "libertada" && (
                       <div className="mt-4 pt-4 border-t">
                         <div className="flex items-center justify-between gap-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 py-3">
                           <p className="text-xs text-emerald-700 dark:text-emerald-400">
@@ -338,6 +365,11 @@ export default function OrdensTab() {
                       </div>
                     )}
                     <div className="flex items-center gap-2 mt-4 pt-4 border-t">
+                      {!["finalizado", "entregue"].includes(op.status) && podeEditar && (!Array.isArray(op.reserva_estoques) || op.reserva_estoques.length === 0) && (
+                        <Button variant="success" size="sm" onClick={(e) => { e.stopPropagation(); setFinalizarOp(op); }}>
+                          <Icon name="check_circle" className="text-[16px]" /> Finalizar produção
+                        </Button>
+                      )}
                       <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); setEliminarItem(op); }}>
                         <Icon name="delete" className="text-[16px]" /> Remover OP
                       </Button>
@@ -380,6 +412,18 @@ export default function OrdensTab() {
         onClose={() => setAprovarOp(null)}
         onConfirm={handleAprovar}
         nomeUsuario={getUsuario()?.nome || ""}
+      />
+
+      <ConfirmDialog
+        open={Boolean(finalizarOp)}
+        onClose={() => setFinalizarOp(null)}
+        onConfirm={confirmarFinalizacao}
+        title="Finalizar produção"
+        description={finalizarOp ? `Confirmar que a OP #${finalizarOp.id} (${finalizarOp.produto || "produção"}) foi concluída? O estado passará diretamente para Finalizado${Array.isArray(finalizarOp.reserva_estoques) && finalizarOp.reserva_estoques.length ? " e as reservas de material serão baixadas do estoque" : ""}.` : ""}
+        confirmLabel="Finalizar"
+        cancelLabel="Cancelar"
+        icon="check_circle"
+        tone="success"
       />
 
       <ConfirmDialog

@@ -39,6 +39,12 @@ export async function aprovarMateriais(id, dados = {}) {
   return data;
 }
 
+// ─── Finalizar produção (passa diretamente para "finalizado") ───
+export async function finalizarProducao(id, dados = {}) {
+  const { data } = await api.post(`/producao/ordens/${id}/finalizar`, dados);
+  return data;
+}
+
 // ─── Libertar para máquina (rota correta do backend) ───
 export async function libertarParaMaquina(id, dados = {}) {
   const { data } = await api.post(`/producao/ordens/${id}/libertar-maquina`, dados);
