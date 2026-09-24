@@ -1,7 +1,6 @@
 import jsPDF from "jspdf";
 import { applyPlugin } from "jspdf-autotable";
 import {
-  COR_MARCA_LINHA,
   COR_MARCA_CINZA,
   COR_MARCA_FUNDO,
   COR_MARCA_PRINCIPAL,
@@ -44,10 +43,9 @@ export default async function gerarRelatorioTesourariaPdf(movimentos = [], empre
   const boxH = 22;
 
   doc.setFillColor(255, 255, 255);
-  doc.setDrawColor(...COR_MARCA_LINHA);
-  doc.roundedRect(14, y, boxW, boxH, 2, 2, "FD");
-  doc.roundedRect(14 + boxW + 4, y, boxW, boxH, 2, 2, "FD");
-  doc.roundedRect(14 + 2 * (boxW + 4), y, boxW, boxH, 2, 2, "FD");
+  doc.roundedRect(14, y, boxW, boxH, 2, 2, "F");
+  doc.roundedRect(14 + boxW + 4, y, boxW, boxH, 2, 2, "F");
+  doc.roundedRect(14 + 2 * (boxW + 4), y, boxW, boxH, 2, 2, "F");
 
   doc.setFontSize(8);
   doc.setFont("helvetica", "bold");

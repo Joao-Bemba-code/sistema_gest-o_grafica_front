@@ -3,7 +3,6 @@ import { applyPlugin } from "jspdf-autotable";
 import QRCode from "qrcode";
 import {
   COR_MARCA_TEXTO,
-  COR_MARCA_LINHA,
   COR_MARCA_CINZA,
   COR_MARCA_PRINCIPAL,
   COR_MARCA_SECUNDARIO,
@@ -108,8 +107,7 @@ export default async function gerarPDF(fatura, empresa = {}) {
   if (ehRecibo) {
     const hPag = orcRef ? 33 : 25;
     doc.setFillColor(255, 255, 255);
-    doc.setDrawColor(...COR_MARCA_LINHA);
-    doc.roundedRect(14, y, pw - 28, hPag, 2.5, 2.5, "FD");
+    doc.roundedRect(14, y, pw - 28, hPag, 2.5, 2.5, "F");
     doc.setTextColor(...COR_MARCA_PRINCIPAL);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
@@ -124,8 +122,7 @@ export default async function gerarPDF(fatura, empresa = {}) {
     const estado = fatura.estado || "—";
     const corEst = corEstado[estado] || COR_MARCA_CINZA;
     doc.setFillColor(255, 255, 255);
-    doc.setDrawColor(...COR_MARCA_LINHA);
-    doc.roundedRect(14, y, pw - 28, 24, 2.5, 2.5, "FD");
+    doc.roundedRect(14, y, pw - 28, 24, 2.5, 2.5, "F");
     doc.setFont("helvetica", "bold");
     doc.setFontSize(7.8);
     doc.setTextColor(...COR_MARCA_PRINCIPAL);
@@ -172,8 +169,6 @@ export default async function gerarPDF(fatura, empresa = {}) {
       const dataUrlQR = await QRCode.toDataURL(urlQR, { errorCorrectionLevel: "M", margin: 1, width: 350, color: { dark: "#1a1a1a", light: "#ffffff" } });
       const qrSize = 24;
       const qx = pw - 14 - qrSize;
-      doc.setDrawColor(...COR_MARCA_LINHA);
-      doc.roundedRect(qx - 1, y - 1, qrSize + 2, qrSize + 2, 1, 1, "S");
       doc.addImage(dataUrlQR, "PNG", qx, y, qrSize, qrSize, undefined, "FAST");
       doc.setFontSize(6.5);
       doc.setFont("helvetica", "normal");
@@ -190,8 +185,6 @@ export default async function gerarPDF(fatura, empresa = {}) {
   y = Math.max(yAssin + 11, ph - 46);
 
   // ===== Agradecimento =====
-  doc.setDrawColor(...COR_MARCA_LINHA);
-  doc.line(MARGEM, y, pw - MARGEM, y);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10.5);
   doc.setTextColor(...COR_MARCA_PRINCIPAL);

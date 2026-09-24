@@ -39,14 +39,12 @@ export function formatarData(d) {
 }
 
 export const TEMA_TABELA = {
-  theme: "grid",
+  theme: "plain",
   styles: {
     fontSize: 8,
     textColor: COR_TEXTO,
     cellPadding: 2.5,
     valign: "middle",
-    lineColor: COR_LINHA,
-    lineWidth: 0.15,
     overflow: "linebreak",
   },
   headStyles: {
@@ -64,14 +62,12 @@ export const TEMA_TABELA = {
 
 // Tema de tabela da marca (preenchimento claro, linhas alternadas suaves)
 export const TEMA_TABELA_MARCA = {
-  theme: "striped",
+  theme: "plain",
   styles: {
     fontSize: 7.8,
     textColor: COR_MARCA_TEXTO,
     cellPadding: 2.2,
     valign: "middle",
-    lineColor: COR_MARCA_LINHA,
-    lineWidth: 0.15,
     overflow: "linebreak",
   },
   headStyles: {
@@ -91,8 +87,6 @@ export const TEMA_TABELA_MARCA = {
     if (data.pageNumber > 1) {
       d.setFillColor(...COR_MARCA_FUNDO);
       d.rect(0, 0, pw, 12, "F");
-      d.setDrawColor(...COR_MARCA_LINHA);
-      d.line(0, 12, pw, 12);
       if (d.marcaNome) {
         d.setTextColor(...COR_MARCA_PRINCIPAL);
         d.setFont("helvetica", "bold");
@@ -205,9 +199,7 @@ export async function desenharCabecalhoMarca(doc, { titulo = "", empresa = {}, d
   const boxX = MARGEM_MARCA;
   const boxY = 10;
   doc.setFillColor(255, 255, 255);
-  doc.setDrawColor(...COR_MARCA_SECUNDARIO);
-  doc.roundedRect(boxX, boxY, box, box, 2.5, 2.5, "FD");
-  doc.setLineWidth(0.2);
+  doc.roundedRect(boxX, boxY, box, box, 2.5, 2.5, "F");
   if (logo && logo.data) {
     const escala = Math.min((box - 4) / logo.w, (box - 4) / logo.h);
     const lw = logo.w * escala;
@@ -258,11 +250,6 @@ export async function desenharCabecalhoMarca(doc, { titulo = "", empresa = {}, d
     ry += 5.4;
   });
 
-  // Linha de separação
-  doc.setDrawColor(...COR_MARCA_PRINCIPAL);
-  doc.setLineWidth(0.7);
-  doc.line(0, 44, pw, 44);
-
   return { yInicio: 50, logo };
 }
 
@@ -284,9 +271,6 @@ export function desenharMarcaDeAgua(doc, logo) {
 
 // Título de secção (marcador de contorno + texto)
 export function tituloSecaoMarca(doc, texto, x, y) {
-  doc.setDrawColor(...COR_MARCA_SECUNDARIO);
-  doc.setLineWidth(0.2);
-  doc.roundedRect(x, y - 3, 4.4, 4.4, 0.8, 0.8, "S");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.6);
   doc.setTextColor(...COR_MARCA_PRINCIPAL);
@@ -298,8 +282,7 @@ export function tituloSecaoMarca(doc, texto, x, y) {
 export function caixaTotaisMarca(doc, x, y, w, { linhas = [], rotulo = "RESUMO", totalLabel = "TOTAL:", total = "" }) {
   const h = 8 + linhas.length * 6 + 14;
   doc.setFillColor(...COR_MARCA_CARTAO);
-  doc.setDrawColor(...COR_MARCA_SECUNDARIO);
-  doc.roundedRect(x, y, w, h, 3, 3, "FD");
+  doc.roundedRect(x, y, w, h, 3, 3, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.4);
   doc.setTextColor(...COR_MARCA_SECUNDARIO);
@@ -316,10 +299,8 @@ export function caixaTotaisMarca(doc, x, y, w, { linhas = [], rotulo = "RESUMO",
     ty += 6;
   }
   const linhaTotal = y + h - 11;
-  doc.setDrawColor(...COR_MARCA_SECUNDARIO);
-  doc.line(x + 5, linhaTotal - 2, x + w - 5, linhaTotal - 2);
   doc.setFillColor(255, 255, 255);
-  doc.roundedRect(x + 3, linhaTotal, w - 6, 10, 2, 2, "FD");
+  doc.roundedRect(x + 3, linhaTotal, w - 6, 10, 2, 2, "F");
   doc.setTextColor(...COR_MARCA_PRINCIPAL);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
@@ -332,8 +313,7 @@ export function caixaTotaisMarca(doc, x, y, w, { linhas = [], rotulo = "RESUMO",
 export function caixaClienteMarca(doc, x, y, w, cli) {
   const h = 28;
   doc.setFillColor(255, 255, 255);
-  doc.setDrawColor(...COR_MARCA_LINHA);
-  doc.roundedRect(x, y, w, h, 2.5, 2.5, "FD");
+  doc.roundedRect(x, y, w, h, 2.5, 2.5, "F");
   doc.setFillColor(...COR_MARCA_FUNDO);
   doc.roundedRect(x, y, 2.4, h, 1, 1, "F");
   doc.setFont("helvetica", "bold");

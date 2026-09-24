@@ -3,7 +3,6 @@ import { applyPlugin } from "jspdf-autotable";
 import {
   COR_MARCA_TEXTO,
   COR_MARCA_FUNDO,
-  COR_MARCA_LINHA,
   COR_MARCA_CINZA,
   COR_MARCA_PRINCIPAL,
   COR_MARCA_SECUNDARIO,
@@ -247,8 +246,6 @@ export default async function gerarOrcamentoPdf(orcamento, empresa = {}, opcoesE
   y = Math.max(yAssin + 11, ph - 46);
 
   // ===== Agradecimento =====
-  doc.setDrawColor(...COR_MARCA_LINHA);
-  doc.line(MARGEM, y, pw - MARGEM, y);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10.5);
   doc.setTextColor(...COR_MARCA_PRINCIPAL);

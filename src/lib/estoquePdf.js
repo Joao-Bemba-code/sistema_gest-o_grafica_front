@@ -71,9 +71,7 @@ async function desenharCabecalho(doc, org = {}, titulo) {
     doc.addImage(logo.data, logo.formato, MARGEM, 14 + (box - mmH) / 2, mmW, mmH);
   } else {
     doc.setFillColor(...BRANCO);
-    doc.setDrawColor(...CINZA_MEDIO);
-    doc.setLineWidth(0.3);
-    doc.roundedRect(MARGEM, 14, box, box, 4, 4, "FD");
+    doc.roundedRect(MARGEM, 14, box, box, 4, 4, "F");
     doc.setTextColor(...PRETO);
     doc.setFontSize(13);
     doc.setFont("helvetica", "bold");
@@ -97,10 +95,6 @@ async function desenharCabecalho(doc, org = {}, titulo) {
   doc.text(`Hora: ${hora}`, pw - MARGEM, tituloY + 1.5, { align: "right" });
 
   const linhaY = tituloY + 5;
-  doc.setDrawColor(...PRETO);
-  doc.setLineWidth(0.6);
-  doc.line(MARGEM, linhaY, pw - MARGEM, linhaY);
-
   return { tituloY, linhaY, pw, box };
 }
 
@@ -108,7 +102,7 @@ async function desenharCabecalho(doc, org = {}, titulo) {
 // TEMA DE TABELA PADRÃO (preto e branco)
 // ============================================================
 const TEMA_RELATORIO = {
-  theme: "grid",
+  theme: "plain",
   headStyles: {
     fillColor: CINZA_CLARO,
     textColor: PRETO,
@@ -173,10 +167,6 @@ async function desenharCabecalhoRelatorio(doc, org = {}, titulo) {
   doc.text(`Hora: ${hora}`, pw - MARGEM, y + 8, { align: "right" });
 
   const linhaY = y + 13;
-  doc.setDrawColor(...CINZA_MEDIO);
-  doc.setLineWidth(0.4);
-  doc.line(MARGEM, linhaY, pw - MARGEM, linhaY);
-
   return { linhaY, pw, box };
 }
 
@@ -221,10 +211,6 @@ function desenharRodapePagina(doc, paginaAtual, totalPaginas) {
   const pw = doc.internal.pageSize.getWidth();
   const ph = doc.internal.pageSize.getHeight();
   const { data, hora } = dataHoraAgora();
-
-  doc.setDrawColor(...CINZA_CLARO);
-  doc.setLineWidth(0.3);
-  doc.line(MARGEM, ph - 10, pw - MARGEM, ph - 10);
 
   doc.setTextColor(...CINZA_MEDIO);
   doc.setFontSize(6.5);
