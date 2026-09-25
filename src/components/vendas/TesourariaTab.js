@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { listarMovimentos, criarMovimento, removerMovimento, resumoTesouraria, exportarTesouraria } from "@/services/tesouraria";
-import { listarContas } from "@/services/contasBancarias";
+import { listarContas, criarConta } from "@/services/contasBancarias";
 import Icon from "@/components/Icon";
 import { Card, CardContent } from "@/components/ui/Card";
 import KpiCard from "@/components/ui/KpiCard";
@@ -94,6 +94,10 @@ function formatData(v) {
   return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("pt-BR");
 }
 
+function rotuloConta(conta) {
+  return `${conta.banco_nome}${conta.numero_conta ? ` — Conta ${conta.numero_conta}` : ""}`;
+}
+
 export default function TesourariaTab() {
   const [movimentos, setMovimentos] = useState([]);
   const [contas, setContas] = useState([]);
@@ -102,6 +106,7 @@ export default function TesourariaTab() {
   const [modalNovo, setModalNovo] = useState(false);
   const [form, setForm] = useState(initialForm);
   const [salvando, setSalvando] = useState(false);
+  const [criandoCaixa, setCriandoCaixa] = useState(false);
   const [eliminarItem, setEliminarItem] = useState(null);
   const [deletando, setDeletando] = useState(false);
   const [pagina, setPagina] = useState(1);
@@ -181,14 +186,15 @@ export default function TesourariaTab() {
     if (n === 1 || n === totalPaginas || (n >= paginaAtual - 1 && n <= paginaAtual + 1)) paginasVisiveis.push(n);
   }
 
-  const contasPorId = Object.fromEntries(contas.map((c) => [c.id, c]));
+  const contasAtivas = contas.filter((c) => c.ativo !== false);
+  const contasPorId = Object.fromEntries(contas.map((c) => [String(c.id), c]));
 
-  const resumoPorConta = contas.map((c) => {
-    const ms = movimentos.filter((m) => m.conta_bancaria_id === c.id);
+  const resumoPorConta = contasAtivas.map((c) => {
+    const ms = movimentos.filter((m) => String(m.conta_bancaria_id) === String(c.id));
     const entradas = ms.filter((m) => m.tipo === "entrada").reduce((s, m) => s + Number(m.valor || 0), 0);
     const saidas = ms.filter((m) => m.tipo === "saida" || (m.tipo === "transferencia" && String(m.conta_destino_id) !== String(c.id))).reduce((s, m) => s + Number(m.valor || 0), 0);
     const ultimo = movimentos
-      .filter((m) => m.conta_bancaria_id === c.id)
+      .filter((m) => String(m.conta_bancaria_id) === String(c.id))
       .sort((a, b) => new Date(b.data_movimento || 0) - new Date(a.data_movimento || 0))[0];
     return { ...c, entradas, saidas, ultimo };
   });
@@ -198,7 +204,37 @@ export default function TesourariaTab() {
     setModalNovo(true);
   };
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const handleChange = (e) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+
+  const handleContaChange = (e) => {
+    const conta = contasAtivas.find((c) => String(c.id) === String(e.target.value));
+    const contaPrincipal = e.target.name === "conta_bancaria_id";
+    setForm((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+      ...(contaPrincipal ? { conta_destino_id: "" } : {}),
+      ...(contaPrincipal && prev.tipo === "entrada" && conta?.tipo_conta === "caixa" ? { metodo_pagamento: "dinheiro" } : {}),
+    }));
+  };
+
+  const criarCaixa = async () => {
+    setCriandoCaixa(true);
+    try {
+      const caixa = await criarConta({ banco_nome: "Caixa Principal", tipo_conta: "caixa", numero_conta: null, iban: null, titular: null });
+      setContas((prev) => [...prev, caixa]);
+      setForm((prev) => ({
+        ...prev,
+        conta_bancaria_id: String(caixa.id),
+        conta_destino_id: "",
+        ...(prev.tipo === "entrada" ? { metodo_pagamento: "dinheiro" } : {}),
+      }));
+      addToast("Caixa criado e selecionado", "success");
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao criar Caixa", "error");
+    } finally {
+      setCriandoCaixa(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -208,15 +244,15 @@ export default function TesourariaTab() {
     }
     if (form.tipo === "transferencia") {
       if (!form.conta_bancaria_id) {
-        addToast("Selecione a conta de origem", "error");
+        addToast("Selecione a conta de origem ou Caixa", "error");
         return;
       }
       if (!form.conta_destino_id) {
-        addToast("Selecione a conta de destino", "error");
+        addToast("Selecione a conta de destino ou Caixa", "error");
         return;
       }
     } else if (!form.conta_bancaria_id) {
-      addToast("Selecione a conta bancária para esta operação", "error");
+      addToast(form.tipo === "entrada" ? "Selecione a conta de recebimento ou Caixa" : "Selecione a conta de origem ou Caixa", "error");
       return;
     }
     setSalvando(true);
@@ -227,8 +263,8 @@ export default function TesourariaTab() {
         descricao: form.descricao,
         valor: Number(form.valor),
         data_movimento: form.data_movimento,
-        conta_bancaria_id: form.conta_bancaria_id || undefined,
-        conta_destino_id: form.tipo === "transferencia" ? form.conta_destino_id || undefined : undefined,
+        conta_bancaria_id: Number(form.conta_bancaria_id),
+        conta_destino_id: form.tipo === "transferencia" ? Number(form.conta_destino_id) : undefined,
         metodo_pagamento: form.metodo_pagamento,
         referencia: form.referencia,
         observacoes: form.observacoes,
@@ -308,7 +344,7 @@ export default function TesourariaTab() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-bold text-foreground truncate">{c.banco_nome || "Conta"}</p>
-                      <p className="text-[10px] text-muted-foreground truncate">{c.numero_conta ? `Conta ${c.numero_conta}` : "—"}{c.iban ? ` · ${c.iban}` : ""}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">{c.tipo_conta === "caixa" ? "Dinheiro em espécie" : `${c.numero_conta ? `Conta ${c.numero_conta}` : "—"}${c.iban ? ` · ${c.iban}` : ""}`}</p>
                     </div>
                   </div>
                   <div className="text-right shrink-0">
@@ -355,7 +391,7 @@ export default function TesourariaTab() {
             const ec = estadoCfg[m.estado] || { label: m.estado, variant: "outline" };
             const isEntrada = m.tipo === "entrada";
             const isSaida = m.tipo === "saida";
-            const conta = contasPorId[m.conta_bancaria_id];
+            const conta = contasPorId[String(m.conta_bancaria_id)];
             return (
               <Card key={m.id} className="hover-lift">
                 <CardContent className="p-5">
@@ -374,7 +410,7 @@ export default function TesourariaTab() {
                         </div>
                         <p className="text-xs text-muted-foreground truncate mt-0.5">
                           {m.categoria || "—"}
-                          {conta ? ` • ${conta.banco_nome || ""}${conta.numero_conta ? ` (${conta.numero_conta})` : ""}` : ""}
+                          {conta ? ` • ${rotuloConta(conta)}` : ""}
                           {m.metodo_pagamento ? ` • ${m.metodo_pagamento}` : ""}
                           {m.referencia ? ` • Ref: ${m.referencia}` : ""}
                         </p>
@@ -489,21 +525,31 @@ export default function TesourariaTab() {
               <input required name="descricao" value={form.descricao} onChange={handleChange} className={inputCls} placeholder="Ex: Pagamento da fatura nº 1005" />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Conta Bancária</label>
-              <select name="conta_bancaria_id" value={form.conta_bancaria_id} onChange={handleChange} className={inputCls}>
-                <option value="">Selecione a conta</option>
-                {contas.map((c) => (
-                  <option key={c.id} value={c.id}>{c.banco_nome}{c.numero_conta ? ` — Conta ${c.numero_conta}` : ""}</option>
+              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                {form.tipo === "entrada" ? "Conta de Recebimento / Caixa" : "Conta de Origem / Caixa"}
+              </label>
+              <select name="conta_bancaria_id" value={form.conta_bancaria_id} onChange={handleContaChange} className={inputCls}>
+                <option value="">Selecione a conta bancária ou Caixa</option>
+                {contasAtivas.map((c) => (
+                  <option key={c.id} value={c.id}>{rotuloConta(c)}</option>
                 ))}
               </select>
+              {!contasAtivas.some((c) => c.tipo_conta === "caixa") && (
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[10px] text-muted-foreground">O dinheiro em espécie pode ficar separado num Caixa.</p>
+                  <Button type="button" variant="ghost" size="sm" onClick={criarCaixa} loading={criandoCaixa} className="shrink-0">
+                    <Icon name="add" className="text-[14px]" /> Criar Caixa
+                  </Button>
+                </div>
+              )}
             </div>
             {form.tipo === "transferencia" && (
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Conta de Destino *</label>
-                <select name="conta_destino_id" value={form.conta_destino_id} onChange={handleChange} className={inputCls}>
-                  <option value="">Selecione a conta destino</option>
-                  {contas.filter((c) => String(c.id) !== String(form.conta_bancaria_id)).map((c) => (
-                    <option key={c.id} value={c.id}>{c.banco_nome}{c.numero_conta ? ` — Conta ${c.numero_conta}` : ""}</option>
+                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Conta de Destino / Caixa *</label>
+                <select name="conta_destino_id" value={form.conta_destino_id} onChange={handleContaChange} className={inputCls}>
+                  <option value="">Selecione o destino do dinheiro</option>
+                  {contasAtivas.filter((c) => String(c.id) !== String(form.conta_bancaria_id)).map((c) => (
+                    <option key={c.id} value={c.id}>{rotuloConta(c)}</option>
                   ))}
                 </select>
               </div>

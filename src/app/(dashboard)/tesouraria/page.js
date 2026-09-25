@@ -14,7 +14,7 @@ export default function TesourariaPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Tesouraria</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Movimentos financeiros · contas bancárias // TES
+            Movimentos financeiros · contas e caixa // TES
           </p>
         </div>
       </div>
@@ -22,7 +22,7 @@ export default function TesourariaPage() {
       <div className="flex gap-1.5 flex-wrap obsidian-glass cyber-border p-1.5 rounded-xl">
         {[
           { id: "movimentos", label: "Movimentos", icon: "swap_horiz" },
-          { id: "contas", label: "Contas Bancárias", icon: "account_balance" },
+          { id: "contas", label: "Contas e Caixa", icon: "account_balance" },
         ].map((t) => (
           <button
             key={t.id}
