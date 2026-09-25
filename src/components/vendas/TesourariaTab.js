@@ -493,7 +493,7 @@ export default function TesourariaTab() {
               <select name="conta_bancaria_id" value={form.conta_bancaria_id} onChange={handleChange} className={inputCls}>
                 <option value="">Selecione a conta</option>
                 {contas.map((c) => (
-                  <option key={c.id} value={c.id}>{c.nome || c.banco || c.numero || c.id}</option>
+                  <option key={c.id} value={c.id}>{c.banco_nome}</option>
                 ))}
               </select>
             </div>
@@ -503,7 +503,7 @@ export default function TesourariaTab() {
                 <select name="conta_destino_id" value={form.conta_destino_id} onChange={handleChange} className={inputCls}>
                   <option value="">Selecione a conta destino</option>
                   {contas.filter((c) => String(c.id) !== String(form.conta_bancaria_id)).map((c) => (
-                    <option key={c.id} value={c.id}>{c.nome || c.banco || c.numero || c.id}</option>
+                    <option key={c.id} value={c.id}>{c.banco_nome}</option>
                   ))}
                 </select>
               </div>
