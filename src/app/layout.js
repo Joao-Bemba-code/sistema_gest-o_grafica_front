@@ -3,7 +3,11 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
 const jetBrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jbmono" });
 
 export const metadata = {
@@ -39,6 +43,13 @@ export default function RootLayout({ children }) {
     <html lang="pt-br" className={`${inter.variable} ${jetBrainsMono.variable} antialiased`} suppressHydrationWarning>
       <head>
         <link rel="stylesheet" href="/fonts/material-symbols-outlined.css" />
+        {/* Aplica o tema guardado antes do primeiro paint para evitar flash
+            e manter o <html> coerente com o estado do ThemeContext. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("sigraf-theme");if(t==="light"){document.documentElement.classList.remove("dark")}else{document.documentElement.classList.add("dark")}}catch(e){}})()`,
+          }}
+        />
       </head>
       <body className="bg-surface-container-lowest text-on-surface min-h-screen">
         <ThemeProvider>

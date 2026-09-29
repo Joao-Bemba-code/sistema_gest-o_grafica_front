@@ -137,7 +137,7 @@ export default function CadastrosTab() {
         </button>
       </div>
 
-      <section className="grid grid-cols-2 sm:grid-cols-3 gap-5">
+      <section className="grid grid-cols-1 min-[480px]:grid-cols-2 sm:grid-cols-3 gap-4 md:gap-5">
         {[
           { label: "Total Cadastros", value: clientes.length, icon: "badge", iconVariant: "primary" },
           { label: "Clientes", value: totalClientes, icon: "person", iconVariant: "secondary" },

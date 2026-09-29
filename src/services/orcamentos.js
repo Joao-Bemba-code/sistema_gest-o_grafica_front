@@ -25,7 +25,12 @@ export async function remover(id) {
   return data;
 }
 
-export async function mudarEstado(id, estado) {
-  const { data } = await api.put(`/orcamentos/${id}`, { estado });
+export async function mudarEstado(id, estado, dados) {
+  const { data } = await api.put(`/orcamentos/${id}`, { estado, ...dados });
+  return data;
+}
+
+export async function enviarProducao(id) {
+  const { data } = await api.post(`/orcamentos/${id}/enviar-producao`);
   return data;
 }

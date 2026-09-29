@@ -190,7 +190,7 @@ export default function MovimentacaoModal({ open, item, tipo, onClose, onConfirm
           </div>
         ) : (
           <div className="space-y-4 animate-slide-up" key="passo2">
-            <div className="obsidian-glass cyber-border rounded-2xl p-4 space-y-3">
+            <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Resumo da movimentação</p>
               <Linha label="Material" valor={item?.nome || "—"} />
               <div className="flex items-center justify-between gap-3">

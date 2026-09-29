@@ -89,7 +89,7 @@ export default function Modal({
           <div className={`flex flex-col flex-1 min-h-0 ${arrastavel ? "animate-modal-fade" : ""}`}>
             <div
               onMouseDown={onHeaderMouseDown}
-              className={`flex items-center justify-between gap-3 px-5 py-3.5 border-b border-border bg-card shrink-0 ${
+              className={`flex items-center justify-between gap-3 px-4 sm:px-5 py-3.5 border-b border-border bg-card shrink-0 ${
                 arrastavel ? (dragging ? "cursor-grabbing" : "cursor-grab") : ""
               }`}
             >
@@ -113,10 +113,10 @@ export default function Modal({
               </button>
             </div>
 
-            <div className="p-5 overflow-y-auto flex-1 min-h-0 custom-scrollbar">{children}</div>
+            <div className="p-4 sm:p-5 overflow-y-auto flex-1 min-h-0 custom-scrollbar">{children}</div>
 
             {footer && (
-              <div className="px-5 py-3.5 border-t border-border bg-muted/30 flex flex-wrap justify-end gap-2 shrink-0">
+              <div className="px-4 sm:px-5 py-3.5 border-t border-border bg-muted/30 flex flex-wrap justify-end gap-2 shrink-0">
                 {footer}
               </div>
             )}

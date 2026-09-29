@@ -182,6 +182,8 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  letter-spacing: -0.011em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -829,14 +831,47 @@ body {
 /* ---- Nav item ativo (pill com gradiente de marca) ---- */
 .nav-pill {
   border-radius: 999px;
-  background-image: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 55%, var(--tertiary)));
+  background-color: var(--primary);
   color: var(--primary-foreground);
-  box-shadow: var(--shadow-card-hover);
+  box-shadow: none;
 }
 .dark .nav-pill {
-  background-image: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 45%, var(--tertiary)));
+  background-color: var(--primary);
   color: #ffffff;
-  box-shadow: var(--shadow-card-hover);
+  box-shadow: none;
+}
+
+/* Controlo segmentado (abas) */
+.seg-track {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  background: var(--muted);
+}
+.seg-tab {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.seg-tab:hover {
+  color: var(--foreground);
+}
+.seg-tab.is-active {
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: var(--shadow-sm);
 }
 
 /* ---- Fundo (login / hero) — plano clean ---- */

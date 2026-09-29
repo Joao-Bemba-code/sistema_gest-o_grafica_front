@@ -100,7 +100,7 @@ export default function ImpressaoPage() {
         </div>
       </div>
 
-      <section className="grid grid-cols-2 sm:grid-cols-4 gap-5">
+      <section className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
         {[
           { label: "Total Produzido", value: totalProduzido?.toLocaleString() ?? "0", icon: "print", iconVariant: "primary" },
           { label: "Total Rejeitado", value: totalRejeitado?.toLocaleString() ?? "0", icon: "block", iconVariant: "error" },

@@ -151,6 +151,16 @@ function materiaisDaOrdem(op, matPorId) {
   }));
 }
 
+// Serviços do orçamento ligado à OP, para a grelha do PDF
+function servicosDaOrdem(op) {
+  const servicos = Array.isArray(op?.orcamentoDados?.servicos) ? op.orcamentoDados.servicos : [];
+  return servicos.map((s) => ({
+    descricao: texto(s.descricao),
+    quantidade: s.mob != null && s.mob !== "" ? formatNumero(s.mob) : "",
+    observacao: "",
+  }));
+}
+
 /**
  * Gera a folha da Ordem de Produção em PDF, simplificada e sempre numa página:
  * apenas o nome do serviço/produto (com quantidade) e a lista de materiais.
@@ -180,10 +190,26 @@ export default async function gerarOrdemProducaoPdf(op, org = {}, matPorId = {})
   // ─── Serviço / Produto ───
   y = tituloSecaoMarca(doc, "Serviço / Produto", x, y) + 2;
   y = blocoProduto(doc, x, y, w, op?.produto);
+  campo(doc, x, y, w, "Cliente", texto(op?.cliente), { preenchivel: false, altura: 10 });
+  y += 10 + 2;
   const meia = (w - 6) / 2;
   campo(doc, x, y, meia, "OP / Encomenda", numero, { preenchivel: false });
   campo(doc, x + meia + 6, y, meia, "Quantidade", op?.quantidade, { preenchivel: false });
   y += ALTURA_CAMPOS + 6;
+
+  // ─── Serviços ───
+  // Só é desenhada se o orçamento tiver serviços; o espaço restante da página
+  // é dividido entre esta grelha e a dos materiais para caber sempre numa página.
+  const servicos = servicosDaOrdem(op);
+  if (servicos.length) {
+    y = tituloSecaoMarca(doc, "Serviços", x, y) + 2;
+    const maxLinhasServ = Math.max(3, Math.floor((ph - 14 - y - ALTURA_CABECALHO) / ALTURA_LINHA));
+    const hServ = grelhaItens(doc, x, y, w, servicos, {
+      minLinhas: Math.min(3, maxLinhasServ),
+      maxLinhas: maxLinhasServ,
+    });
+    y += hServ + 4;
+  }
 
   // ─── Materiais ───
   // A grelha usa todo o espaço restante para caber sempre numa página;

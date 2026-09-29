@@ -305,7 +305,7 @@ export default function SaidaMateriaisModal({ open, op, matPorId, materiais, onC
           </div>
         ) : (
           <div className="space-y-4 animate-slide-up" key="passo2">
-            <div className="obsidian-glass cyber-border rounded-2xl p-4 space-y-3">
+            <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Resumo da {ehAprovacao ? "aprovação" : ehComplemento ? "pedida de material" : "requisição"}</p>
               <Linha label="OP" valor={`#${op?.id} — ${op?.produto || "—"}`} />
               <Linha label="Cliente" valor={op?.cliente || "—"} />

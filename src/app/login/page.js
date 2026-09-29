@@ -32,7 +32,7 @@ function mensagemDeErro(err) {
 // das utilitárias com a mesma especificidade, anula o `pl-10` — o texto do input
 // encosta ao ícone.
 const campoCls =
-  "flex h-11 w-full rounded-xl border border-input bg-background py-2 pr-3.5 pl-10 text-sm text-foreground " +
+  "flex h-11 w-full rounded-lg border border-input bg-background py-2 pr-3.5 pl-10 text-sm text-foreground " +
   "placeholder:text-muted-foreground/60 transition-all duration-200 ease-in-out " +
   "focus-visible:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 " +
   "disabled:cursor-not-allowed disabled:opacity-60";
@@ -80,22 +80,20 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[1.05fr_1fr]">
       {/* Painel de marca */}
-      <aside className="relative hidden lg:flex flex-col overflow-hidden gradient-hero p-10 xl:p-14">
-        <span className="wave-overlay" aria-hidden="true" />
-
+      <aside className="relative hidden lg:flex flex-col overflow-hidden bg-muted/40 border-r border-border p-10 xl:p-14">
         <div className="relative flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl gradient-brand text-primary-foreground">
-            <Icon name="precision_manufacturing" className="text-2xl ms-fill" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+            <Icon name="precision_manufacturing" className="text-xl ms-fill" />
           </div>
           <div className="min-w-0">
-            <p className="text-lg font-bold leading-none tracking-tight text-foreground">SIGRAF</p>
+            <p className="text-[15px] font-semibold leading-none tracking-tight text-foreground">SIGRAF</p>
             <p className="mt-1 text-[11px] text-muted-foreground">Gestão de Gráfica</p>
           </div>
         </div>
 
         <div className="relative my-auto max-w-md py-10">
-          <p className="text-caption text-primary">Sistema integrado de gestão</p>
-          <h2 className="mt-4 text-headline-md text-foreground">
+          <p className="text-xs font-medium text-primary">Sistema integrado de gestão</p>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-foreground leading-tight">
             Toda a sua gráfica,
             <br />
             num só sistema.
@@ -106,7 +104,7 @@ export default function LoginPage() {
 
           <ul className="mt-8 space-y-2.5">
             {DESTAQUES.map((d) => (
-              <li key={d.titulo} className="flex items-start gap-3 rounded-xl border border-border/70 bg-card/60 p-3.5">
+              <li key={d.titulo} className="flex items-start gap-3 rounded-xl border border-border bg-card p-3.5">
                 <span className="chip-icon-grad h-9 w-9 shrink-0">
                   <Icon name={d.icone} className="text-lg" />
                 </span>
@@ -138,7 +136,7 @@ export default function LoginPage() {
 
         <div className="w-full max-w-sm">
           <div className="mb-8 flex flex-col items-center lg:hidden">
-            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl gradient-brand text-primary-foreground">
+            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <Icon name="precision_manufacturing" className="text-2xl ms-fill" />
             </div>
             <p className="text-xl font-bold tracking-tight text-foreground">SIGRAF</p>
@@ -146,7 +144,7 @@ export default function LoginPage() {
           </div>
 
           <div className="mb-7">
-            <h1 className="text-headline-sm text-foreground">Bem-vindo de volta</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Bem-vindo de volta</h1>
             <p className="mt-1.5 text-sm text-muted-foreground">
               Entre com as suas credenciais para aceder ao sistema.
             </p>
@@ -218,7 +216,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-11 gradient-brand hover:opacity-90 disabled:opacity-60 text-primary-foreground text-sm font-semibold rounded-xl flex items-center justify-center gap-2 focus-ring-soft transition-opacity"
+              className="w-full h-11 bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground text-sm font-medium rounded-lg flex items-center justify-center gap-2 focus-ring-soft transition-colors"
             >
               {loading ? (
                 <>

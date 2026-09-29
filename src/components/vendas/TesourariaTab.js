@@ -37,6 +37,7 @@ const metodos = [
   { value: "multicaixa", label: "Multicaixa" },
   { value: "referencia", label: "Referência" },
   { value: "cheque", label: "Cheque" },
+  { value: "tpa", label: "TPA" },
 ];
 
 const categoriasEntrada = [
@@ -192,6 +193,33 @@ export default function TesourariaTab() {
   const contasAtivas = contas.filter((c) => c.ativo !== false);
   const contasPorId = Object.fromEntries(contas.map((c) => [String(c.id), c]));
 
+  // Categorias já usadas em movimentos anteriores, para sugerir no formulário
+  const categoriasUsadas = useMemo(() => {
+    const unicas = new Set();
+    movimentos.forEach((m) => {
+      const c = String(m.categoria || "").trim();
+      if (c) unicas.add(c);
+    });
+    return [...unicas].sort((a, b) => a.localeCompare(b, "pt"));
+  }, [movimentos]);
+
+  // Sugestões do campo Categoria: categorias fixas do tipo atual + todas as já usadas
+  const categoriasSugeridas = useMemo(() => {
+    const vistos = new Set();
+    const lista = [];
+    (categoriasPorTipo[form.tipo] || []).forEach((c) => {
+      vistos.add(c.value.toLowerCase());
+      lista.push(c);
+    });
+    categoriasUsadas.forEach((c) => {
+      if (!vistos.has(c.toLowerCase())) {
+        vistos.add(c.toLowerCase());
+        lista.push({ value: c, label: c });
+      }
+    });
+    return lista;
+  }, [form.tipo, categoriasUsadas]);
+
   const resumoPorConta = contasAtivas.map((c) => {
     const ms = movimentos.filter((m) => String(m.conta_bancaria_id) === String(c.id));
     const entradas = ms.filter((m) => m.tipo === "entrada").reduce((s, m) => s + Number(m.valor || 0), 0);
@@ -328,7 +356,7 @@ export default function TesourariaTab() {
         </button>
       </div>
 
-      <section className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+      <section className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
         <KpiCard icon="account_balance" label="Saldo Total" value={formatKz(resumo.saldoTotal)} iconVariant="primary" />
         <KpiCard icon="trending_up" label="Entradas do Mês" value={formatKz(resumo.entradasMes)} iconVariant="success" />
         <KpiCard icon="trending_down" label="Saídas do Mês" value={formatKz(resumo.saidasMes)} iconVariant="error" />
@@ -522,7 +550,7 @@ export default function TesourariaTab() {
                 autoComplete="off"
               />
               <datalist id="categorias-tesouraria">
-                {(categoriasPorTipo[form.tipo] || []).map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                {categoriasSugeridas.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
               </datalist>
             </div>
             <div className="flex flex-col gap-1.5">

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Icon from "@/components/Icon";
+import PageHeader from "@/components/ui/PageHeader";
 import OrdensTab from "@/components/producao/OrdensTab";
 import OperacionalTab from "@/components/producao/OperacionalTab";
 import ProcessosTab from "@/components/producao/ProcessosTab";
@@ -28,24 +29,15 @@ export default function ProducaoPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Produção</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Ordens de produção, processos e operacional
-          </p>
-        </div>
-      </div>
+      <PageHeader title="Produção" description="Ordens de produção, processos e operacional" />
 
-      <div className="flex gap-1.5 flex-wrap rounded-xl border border-border bg-card p-1.5">
+      <div className="seg-track">
         {abasVisiveis.map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
-            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-bold ${
-              abaAtual === t.id ? "nav-pill text-primary" : "text-muted-foreground hover:text-foreground"
-            }`}
+            className={`seg-tab ${abaAtual === t.id ? "is-active" : ""}`}
           >
             <Icon name={t.icon} className="text-lg" />
             {t.label}

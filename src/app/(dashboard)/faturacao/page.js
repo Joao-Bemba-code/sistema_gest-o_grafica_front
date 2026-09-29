@@ -362,7 +362,7 @@ export default function FaturacaoPage() {
 
       {tab === "faturas" && (
         <>
-          <section className="grid grid-cols-2 sm:grid-cols-4 gap-5">
+          <section className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
             {[
               { label: "Total a Receber", value: formatKz(totalReceber), icon: "paid", iconVariant: "warning" },
               { label: "Total Recebido", value: formatKz(totalRecebido), icon: "payments", iconVariant: "success" },

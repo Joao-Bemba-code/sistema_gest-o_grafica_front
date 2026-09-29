@@ -239,7 +239,7 @@ export default function MaquinasTab({ showHeader = false, registarEstado = false
         </div>
       )}
 
-      <section className="grid grid-cols-2 sm:grid-cols-3 gap-5">
+      <section className="grid grid-cols-1 min-[480px]:grid-cols-2 sm:grid-cols-3 gap-4 md:gap-5">
         <KpiCard icon="precision_manufacturing" label="Total Máquinas" value={maquinas.length} iconVariant="primary" />
         <KpiCard icon="check_circle" label="Operacionais" value={totalOperacionais} iconVariant="success" />
         <KpiCard icon="handyman" label="Manutenção / Avaria" value={totalManutencao} iconVariant="warning" />

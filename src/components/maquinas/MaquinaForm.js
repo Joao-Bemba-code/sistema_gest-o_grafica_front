@@ -221,7 +221,7 @@ export default function MaquinaForm({ formId = "form-maquina", form, onChange, o
 
   return (
     <form id={formId} onSubmit={onSubmit} className="space-y-5">
-      <div role="tablist" aria-label="Secções da máquina" className="flex gap-1.5 flex-wrap obsidian-glass cyber-border p-1.5 rounded-xl">
+      <div role="tablist" aria-label="Secções da máquina" className="seg-track">
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -231,7 +231,7 @@ export default function MaquinaForm({ formId = "form-maquina", form, onChange, o
             aria-controls={`${formId}-painel-${t.key}`}
             id={id(`tab-${t.key}`)}
             onClick={() => setTab(t.key)}
-            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${tab === t.key ? "nav-pill shadow-none text-primary" : "text-muted-foreground hover:text-foreground"}`}
+            className={`seg-tab ${tab === t.key ? "is-active" : ""}`}
           >
             <Icon name={t.icon} className="text-lg" />
             <span className="hidden lg:inline">{t.label}</span>

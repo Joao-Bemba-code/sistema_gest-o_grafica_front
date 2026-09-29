@@ -19,26 +19,32 @@ const VARIANTS = {
 export default function ComboKpiCard({ icon, title, subtitle, stats, iconVariant = "primary", className, style }) {
   const v = VARIANTS[iconVariant] || VARIANTS.primary;
   return (
-    <Card style={style} className={cn("relative overflow-hidden", className)}>
-      <div className={cn("absolute inset-x-0 top-0 h-0.5", v.bar)} aria-hidden="true" />
+    <Card
+      style={style}
+      className={cn(
+        "relative overflow-hidden rounded-2xl transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg",
+        className
+      )}
+    >
+      <div className={cn("absolute inset-x-0 top-0 h-1", v.bar)} aria-hidden="true" />
       <CardContent className="p-5 sm:p-6">
-        <div className="flex items-center gap-3 mb-5">
-          <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border", v.chip)}>
-            <Icon name={icon} className="text-lg" />
+        <div className="flex items-center gap-3.5 mb-5">
+          <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border", v.chip)}>
+            <Icon name={icon} className="text-xl" />
           </div>
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{title}</p>
-            {subtitle && <p className="text-[10px] text-muted-foreground/70 truncate">{subtitle}</p>}
+            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">{title}</p>
+            {subtitle && <p className="text-[10px] text-muted-foreground/70 truncate mt-0.5">{subtitle}</p>}
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:gap-4">
           {stats.map((s) => (
-            <div key={s.label} className="flex flex-col border border-border/60 rounded-lg bg-muted/40 p-3 min-w-0">
+            <div key={s.label} className="flex flex-col rounded-xl bg-muted/60 p-3.5 min-w-0">
               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider truncate" title={s.label}>{s.label}</p>
-              <p className="text-xl sm:text-2xl font-bold text-foreground tracking-tight leading-tight mt-1.5 break-words" title={String(s.value)}>
+              <p className="text-[1.35rem] sm:text-2xl font-bold text-foreground tracking-tight leading-tight mt-2 break-words" title={String(s.value)}>
                 {s.value}
               </p>
-              {s.sublabel && <p className={cn("text-[10px] font-medium mt-1 truncate", v.accent)}>{s.sublabel}</p>}
+              {s.sublabel && <p className={cn("text-[10px] font-medium mt-1.5 truncate", v.accent)}>{s.sublabel}</p>}
             </div>
           ))}
         </div>

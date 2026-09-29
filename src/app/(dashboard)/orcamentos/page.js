@@ -14,9 +14,10 @@ import { useToast } from "@/components/Toast";
 import { ListSkeleton } from "@/components/Skeleton";
 import FilterBar, { useFilter } from "@/components/ui/FilterBar";
 import { entradasEspecificacao } from "@/lib/estoque";
-import { listar, remover, mudarEstado } from "@/services/orcamentos";
+import { listar, remover, mudarEstado, enviarProducao } from "@/services/orcamentos";
 import { buscarOrganizacao } from "@/services/configuracoes";
 import OrcamentoPdfModal from "@/components/orcamentos/OrcamentoPdfModal";
+import AprovarOrcamentoDialog from "@/components/orcamentos/AprovarOrcamentoDialog";
 
 const estadoColors = {
   aprovado: "success",
@@ -93,6 +94,8 @@ export default function OrcamentosPage() {
   const [selected, setSelected] = useState(null);
   const [eliminarItem, setEliminarItem] = useState(null);
   const [deletando, setDeletando] = useState(false);
+  const [aprovarAlvo, setAprovarAlvo] = useState(null);
+  const [aprovando, setAprovando] = useState(false);
   const { addToast } = useToast();
 
   const filterConfig = useMemo(() => [
@@ -120,28 +123,34 @@ export default function OrcamentosPage() {
     sortOptions,
   });
 
-  async function carregarDados() {
-    setCarregando(true);
-    setErro(null);
-    try {
-      const [orcData, empData] = await Promise.all([listar(), buscarOrganizacao().catch(() => null)]);
-      setOrcamentos((Array.isArray(orcData) ? orcData : orcData?.data ?? []).map(normalizarOrcamento));
-      if (empData) setEmpresa(empData);
-    } catch (err) {
-      addToast(err.response?.data?.erro || "Erro na operação", "error");
-    } finally {
-      setCarregando(false);
-    }
-  }
-
   useEffect(() => {
-    carregarDados();
+    let ativo = true;
+    (async () => {
+      setCarregando(true);
+      setErro(null);
+      try {
+        const [orcData, empData] = await Promise.all([listar(), buscarOrganizacao().catch(() => null)]);
+        if (!ativo) return;
+        setOrcamentos((Array.isArray(orcData) ? orcData : orcData?.data ?? []).map(normalizarOrcamento));
+        if (empData) setEmpresa(empData);
+      } catch (err) {
+        if (!ativo) return;
+        addToast(err.response?.data?.erro || "Erro na operação", "error");
+      } finally {
+        if (ativo) setCarregando(false);
+      }
+    })();
+    return () => { ativo = false; };
   }, [addToast]);
 
   const irParaEdicao = (o) => router.push(`/orcamentos/novo?id=${o.id}`);
 
   const handleMudarEstado = async (o, novoEstado) => {
     if (!novoEstado || novoEstado === o.estado) return;
+    if (novoEstado === "aprovado") {
+      setAprovarAlvo(o);
+      return;
+    }
     const antigo = o.estado;
     try {
       const atualizado = await mudarEstado(o.id, novoEstado);
@@ -150,6 +159,37 @@ export default function OrcamentosPage() {
     } catch (err) {
       addToast(err.response?.data?.erro || "Erro ao mudar o estado", "error");
       if (selected === o.id) setOrcamentos((prev) => prev.map((x) => (x.id === o.id ? { ...x, estado: antigo } : x)));
+    }
+  };
+
+  const confirmarAprovacao = async (comProducao) => {
+    const o = aprovarAlvo;
+    if (!o) return;
+    setAprovando(true);
+    try {
+      const atualizado = await mudarEstado(o.id, "aprovado", comProducao ? { gerar_op: true } : undefined);
+      setOrcamentos((prev) => prev.map((x) => (x.id === o.id ? normalizarOrcamento({ ...x, ...atualizado }) : x)));
+      addToast(
+        comProducao
+          ? `Orçamento ${o.numero || o.id} aprovado e enviado para produção`
+          : `Orçamento ${o.numero || o.id} aprovado`,
+        "success"
+      );
+      setAprovarAlvo(null);
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao aprovar o orçamento", "error");
+    } finally {
+      setAprovando(false);
+    }
+  };
+
+  const enviarParaProducao = async (o) => {
+    try {
+      const r = await enviarProducao(o.id);
+      setOrcamentos((prev) => prev.map((x) => (x.id === o.id && r.ordem ? { ...x, ordem_producao: r.ordem } : x)));
+      addToast(r.mensagem || "Orçamento enviado para produção", "success");
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao enviar para produção", "error");
     }
   };
 
@@ -231,7 +271,7 @@ export default function OrcamentosPage() {
         </div>
       )}
 
-      <section className="grid grid-cols-2 sm:grid-cols-4 gap-5">
+      <section className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
         {[
           { label: "Total Orçamentos", value: orcamentos.length, icon: "request_quote", iconVariant: "primary" },
           { label: "Valor Total", value: formatKz(totalValor), icon: "paid", iconVariant: "success" },
@@ -376,6 +416,11 @@ export default function OrcamentosPage() {
                     >
                       {ESTADOS.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
                     </select>
+                    {o.estado === "aprovado" && !o.ordem_producao?.id && (
+                      <Button variant="outline" size="sm" onClick={() => enviarParaProducao(o)}>
+                        <Icon name="factory" className="text-sm" /> Produção
+                      </Button>
+                    )}
                     <Button variant="ghost" size="sm" onClick={() => irParaEdicao(o)}><Icon name="edit" className="text-sm" /> Editar</Button>
                     <Button variant="ghost" size="sm" onClick={() => handleGerarPdf(o)}><Icon name="picture_as_pdf" className="text-sm" /></Button>
                     <Button variant="ghost" size="sm" onClick={() => setEliminarItem(o)} className="text-error"><Icon name="delete" className="text-sm" /></Button>
@@ -394,7 +439,12 @@ export default function OrcamentosPage() {
           <Card>
             <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <CardTitle className="flex items-center gap-2"><Icon name="description" className="text-primary" /> Detalhes — {o.numero || o.id}</CardTitle>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
+                {o.estado === "aprovado" && !o.ordem_producao?.id && (
+                  <Button variant="outline" size="sm" onClick={() => enviarParaProducao(o)}>
+                    <Icon name="factory" className="text-[16px]" /> Enviar para Produção
+                  </Button>
+                )}
                 <Button variant="outline" size="sm" onClick={() => handleGerarPdf(o)}><Icon name="picture_as_pdf" className="text-[16px]" /> PDF</Button>
                 <Button variant="outline" size="sm" onClick={() => handleWhatsApp(o)}><Icon name="chat" className="text-[16px]" /> WhatsApp</Button>
               </div>
@@ -585,6 +635,14 @@ export default function OrcamentosPage() {
         orcamento={pdfOrcamento}
         empresa={empresa}
         onClose={() => setPdfOrcamento(null)}
+      />
+
+      <AprovarOrcamentoDialog
+        open={Boolean(aprovarAlvo)}
+        orcamento={aprovarAlvo}
+        onClose={() => setAprovarAlvo(null)}
+        onConfirmar={confirmarAprovacao}
+        carregando={aprovando}
       />
 
       <ConfirmDialog

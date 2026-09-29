@@ -235,7 +235,7 @@ export default function OrdensTab() {
         </div>
       </div>
 
-      <section className="grid grid-cols-2 lg:grid-cols-5 gap-5">
+      <section className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-5">
         {[
           ["aguardando", "schedule", "warning"],
           ["em_producao", "construction", "info"],

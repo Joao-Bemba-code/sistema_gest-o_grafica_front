@@ -304,7 +304,7 @@ materiais={materiais}
           </div>
         </div>
 
-        <aside className="lg:col-span-1 obsidian-glass cyber-border rounded-xl p-5 lg:sticky lg:top-24 space-y-4" aria-label="Pré-visualização do orçamento">
+        <aside className="lg:col-span-1 bg-card border border-border rounded-xl p-5 lg:sticky lg:top-24 space-y-4" aria-label="Pré-visualização do orçamento">
           <div className="flex items-center justify-between">
             <p className="cyber-label flex items-center gap-1.5">
               <Icon name="visibility" className="text-sm text-primary" /> Pré-visualização
@@ -312,7 +312,7 @@ materiais={materiais}
             <span className="w-2 h-2 rounded-full bg-success animate-pulse" aria-hidden="true" />
           </div>
 
-          <div className="relative w-24 h-24 rounded-2xl obsidian-glass cyber-border flex items-center justify-center mx-auto">
+          <div className="relative w-24 h-24 rounded-2xl bg-card border border-border flex items-center justify-center mx-auto">
             <Icon name="request_quote" className="text-4xl text-primary" />
             <span className="absolute -top-2 -right-2 w-6 h-6 rounded-lg bg-success flex items-center justify-center">
               <Icon name="check" className="text-sm text-on-success" />

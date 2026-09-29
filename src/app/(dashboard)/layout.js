@@ -10,12 +10,11 @@ export default function DashboardLayout({ children }) {
   return (
     <RouteGuard>
       <ToastProvider>
-        <div className="flex min-h-screen overflow-x-clip">
-          <div className="scanlines" aria-hidden="true" />
+        <div className="flex min-h-screen overflow-x-clip bg-background">
           <Sidebar />
           <div className="flex-1 flex flex-col min-w-0 md:ml-64">
             <TopBar />
-            <main className="flex-1 w-full max-w-[1680px] mx-auto p-4 sm:p-6 lg:p-8 xl:px-8">
+            <main className="flex-1 w-full max-w-[1440px] mx-auto p-4 sm:p-6 lg:p-8 pb-16">
               <div key={pathname} className="animate-page-fade">
                 {children}
               </div>

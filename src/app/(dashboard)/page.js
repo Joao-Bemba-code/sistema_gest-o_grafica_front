@@ -105,14 +105,17 @@ function agregarOrdens(ordens, periodo) {
 function BarChart({ dados }) {
   const max = Math.max(...dados.map((b) => b.value), 1);
   return (
-    <div className="flex items-end gap-1.5 h-44 px-1">
+    <div className="flex items-end gap-2 h-44">
       {dados.map((b, i) => (
-        <div key={i} className="flex flex-col items-center justify-end flex-1 h-full gap-1.5" title={`${b.label}: ${b.value}`}>
-          <span className="text-[9px] font-bold text-foreground">{b.value || ""}</span>
-          <div
-            className="w-full max-w-[38px] rounded-t-md bg-primary transition-colors duration-500"
-            style={{ height: `${Math.max((b.value / max) * 100, 3)}%` }}
-          />
+        <div key={i} className="group flex flex-1 flex-col items-center justify-end h-full gap-1.5" title={`${b.label}: ${b.value}`}>
+          <span className="text-[10px] font-semibold text-foreground">{b.value}</span>
+          <div className="relative w-full max-w-[34px] flex-1 flex items-end">
+            <div className="absolute inset-0 rounded-full bg-muted/50" aria-hidden="true" />
+            <div
+              className="relative w-full rounded-full bg-gradient-to-t from-primary/60 to-primary transition-all duration-500 group-hover:from-primary group-hover:to-primary"
+              style={{ height: `${Math.max((b.value / max) * 100, 4)}%` }}
+            />
+          </div>
           <span className="text-[9px] font-semibold text-muted-foreground uppercase">{b.label}</span>
         </div>
       ))}
@@ -299,9 +302,9 @@ export default function DashboardPage() {
       }
     });
     return [
-      { name: "Crítico", value: critico, fill: "#FF5252" },
-      { name: "A Repor", value: repor, fill: "#FFC107" },
-      { name: "Bom", value: bom, fill: "#4CAF50" }
+      { name: "Crítico", value: critico, fill: "var(--error)" },
+      { name: "A Repor", value: repor, fill: "var(--warning)" },
+      { name: "Bom", value: bom, fill: "var(--success)" }
     ];
   }, [materiais]);
 
@@ -412,16 +415,21 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{dataLonga}</p>
-          <h1 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-            {saudacao}, <span className="text-gradient">{primeiroNome}</span>
+      {/* Cabeçalho de boas-vindas */}
+      <section className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-primary/[0.07] via-background to-background p-6 sm:p-8">
+        <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-primary/10 blur-3xl" aria-hidden="true" />
+        <div className="relative min-w-0">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-primary">{dataLonga}</p>
+          <h1 className="mt-2 text-2xl sm:text-[2rem] font-bold tracking-tight text-foreground leading-tight">
+            {saudacao}, {primeiroNome}
           </h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">Visão geral da operação · {mesLabel}</p>
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+            Visão geral da operação · {mesLabel}. Acompanhe orçamentos, produção, faturação e stock num só lugar.
+          </p>
         </div>
-      </div>
+      </section>
 
+      {/* KPIs */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 md:gap-6">
         {kpis.map((kpi, i) => (
           <ComboKpiCard
@@ -438,9 +446,9 @@ export default function DashboardPage() {
       </section>
 
       {/* Row 1: Status de Materiais + Volume de Produção */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 md:gap-6">
         {/* Card 1: Status de Materiais */}
-        <Card>
+        <Card className="rounded-2xl">
           <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <CardTitle>Status de Materiais</CardTitle>
@@ -448,40 +456,68 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie 
-                  data={statusMateriais} 
-                  dataKey="value" 
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={80}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                >
-                  {statusMateriais.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
+            {totalMateriais === 0 ? (
+              <div className="flex h-[250px] flex-col items-center justify-center gap-2 text-center">
+                <Icon name="inventory_2" className="text-3xl text-muted-foreground/40" />
+                <p className="text-xs text-muted-foreground">Sem materiais registados</p>
+              </div>
+            ) : (
+              <>
+                <ResponsiveContainer width="100%" height={210}>
+                  <PieChart>
+                    <Pie
+                      data={statusMateriais}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={55}
+                      outerRadius={80}
+                      paddingAngle={3}
+                      strokeWidth={0}
+                    >
+                      {statusMateriais.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => `${value} materiais`} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="mt-4 space-y-2">
+                  {statusMateriais.map((s) => (
+                    <div key={s.name} className="flex items-center justify-between text-xs">
+                      <span className="flex items-center gap-2 text-muted-foreground">
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.fill }} />
+                        {s.name}
+                      </span>
+                      <span className="font-semibold text-foreground">{s.value}</span>
+                    </div>
                   ))}
-                </Pie>
-                <Tooltip formatter={(value) => `${value} materiais`} />
-              </PieChart>
-            </ResponsiveContainer>
-            <p className="text-[10px] text-muted-foreground mt-3 px-1 text-center">
-              Total de materiais: <strong className="text-foreground">{totalMateriais}</strong>
-            </p>
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-3 px-1 text-center">
+                  Total de materiais: <strong className="text-foreground">{totalMateriais}</strong>
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 
         {/* Card 2: Volume de Produção */}
-        <Card>
+        <Card className="rounded-2xl">
           <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <CardTitle>Volume de Produção</CardTitle>
               <CardDescription>Ordens por período</CardDescription>
             </div>
-            <div className="flex gap-1">
+            <div className="flex gap-0.5 rounded-lg bg-muted/70 p-0.5">
               {[["semanal", "Sem"], ["mensal", "Mes"], ["anual", "Ano"]].map(([key, label]) => (
-                <Button key={key} variant={periodo === key ? "default" : "outline"} size="sm" onClick={() => setPeriodo(key)}>
+                <Button
+                  key={key}
+                  variant={periodo === key ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setPeriodo(key)}
+                  className={periodo === key ? "shadow-sm" : ""}
+                >
                   {label}
                 </Button>
               ))}
@@ -497,20 +533,20 @@ export default function DashboardPage() {
       </div>
 
       {/* Row 2: Insumos e Produção */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6">
+        <Card className="rounded-2xl">
           <CardHeader>
             <CardTitle>Insumos e Produção</CardTitle>
             <CardDescription>Status atual do estoque e produção</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3.5">
             {/* Materiais em falta */}
             {materiaisBaixo.length > 0 ? (
               materiaisBaixo.map((m) => (
-                <div key={m.id} className="bg-destructive/10 border border-destructive/30 p-3 rounded-xl flex items-center justify-between">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-8 h-8 rounded-lg bg-destructive/15 flex items-center justify-center text-destructive shrink-0">
-                      <Icon name="inventory_2" className="text-base" />
+                <div key={m.id} className="bg-destructive/10 border border-destructive/30 p-3.5 rounded-xl flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-destructive/15 flex items-center justify-center text-destructive shrink-0">
+                      <Icon name="inventory_2" className="text-lg" />
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-foreground truncate">{m.nome}</p>
@@ -523,9 +559,9 @@ export default function DashboardPage() {
                 </div>
               ))
             ) : (
-              <div className="bg-emerald-500/10 border border-emerald-500/30 p-3 rounded-xl flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center text-emerald-600 shrink-0">
-                  <Icon name="check_circle" className="text-base" />
+              <div className="bg-emerald-500/10 border border-emerald-500/30 p-3.5 rounded-xl flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center text-emerald-600 shrink-0">
+                  <Icon name="check_circle" className="text-lg" />
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-foreground">Estoque em dia</p>
@@ -536,23 +572,23 @@ export default function DashboardPage() {
 
             {/* Consumo e Produção */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-muted/50 p-3 rounded-xl flex flex-col justify-center border">
-                <Icon name="imagesearch_roller" className="text-primary mb-1 text-base" />
+              <div className="bg-muted/50 p-4 rounded-xl flex flex-col justify-center border">
+                <Icon name="imagesearch_roller" className="text-primary mb-1.5 text-lg" />
                 <p className="text-[9px] uppercase font-semibold text-muted-foreground">Consumo Mês</p>
-                <p className="text-base font-bold text-foreground">{formatNum(consumoMes)}</p>
+                <p className="text-base font-bold text-foreground mt-0.5">{formatNum(consumoMes)}</p>
                 <p className="text-[9px] text-muted-foreground">{saidasTotal} saídas</p>
               </div>
-              <div className="bg-muted/50 p-3 rounded-xl flex flex-col justify-center border">
-                <Icon name="settings_input_component" className="text-primary mb-1 text-base" />
+              <div className="bg-muted/50 p-4 rounded-xl flex flex-col justify-center border">
+                <Icon name="settings_input_component" className="text-primary mb-1.5 text-lg" />
                 <p className="text-[9px] uppercase font-semibold text-muted-foreground">Produção</p>
-                <p className="text-base font-bold text-foreground">{producao}</p>
+                <p className="text-base font-bold text-foreground mt-0.5">{producao}</p>
                 <p className="text-[9px] font-semibold text-emerald-600">Em produção</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="rounded-2xl">
           <CardHeader>
             <CardTitle>Consumo Recente</CardTitle>
           </CardHeader>
@@ -563,12 +599,14 @@ export default function DashboardPage() {
                 Ver tudo
               </Button>
             </div>
-            <div className="space-y-2">
+            <div className="divide-y divide-border/60">
               {consumoRecente.slice(0, 6).map((item, i) => (
-                <div key={i} className="flex items-center justify-between text-xs gap-2 p-2 rounded-lg hover:bg-muted/40 transition-colors">
-                  <span className="flex items-center gap-2 text-muted-foreground min-w-0">
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                    <span className="truncate">{item.nome}</span>
+                <div key={i} className="flex items-center justify-between gap-3 py-2.5 px-1 text-xs rounded-lg hover:bg-muted/40 transition-colors">
+                  <span className="flex items-center gap-2.5 text-muted-foreground min-w-0">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted">
+                      <Icon name="inventory_2" className="text-sm text-muted-foreground" />
+                    </span>
+                    <span className="truncate font-medium text-foreground/80">{item.nome}</span>
                   </span>
                   <span className="text-muted-foreground/60 text-[10px] shrink-0 text-right">
                     {item.detalhe} · {item.hora}
@@ -576,7 +614,10 @@ export default function DashboardPage() {
                 </div>
               ))}
               {consumoRecente.length === 0 && (
-                <p className="text-[10px] text-muted-foreground text-center py-1">Nenhum consumo recente</p>
+                <div className="flex flex-col items-center gap-2 py-6 text-center">
+                  <Icon name="inventory_2" className="text-2xl text-muted-foreground/40" />
+                  <p className="text-[10px] text-muted-foreground">Nenhum consumo recente</p>
+                </div>
               )}
             </div>
           </CardContent>
@@ -584,8 +625,8 @@ export default function DashboardPage() {
       </div>
 
       {/* Atividades e Agenda */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        <Card className="xl:col-span-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 md:gap-6">
+        <Card className="rounded-2xl xl:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Atividades da Produção</CardTitle>
             <Button variant="ghost" size="sm" onClick={() => setHistAberto(true)} className="shrink-0 gap-1.5">
@@ -594,35 +635,40 @@ export default function DashboardPage() {
             </Button>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {atividades.map((activity, idx) => (
-                <div key={idx} className="flex gap-4 group">
-                  <div className="flex flex-col items-center">
-                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center overflow-hidden border-2 border-primary/30">
-                      <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground">
+            {atividades.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-8 text-center">
+                <Icon name="description" className="text-3xl text-muted-foreground/40" />
+                <p className="text-xs text-muted-foreground">Sem atividades registadas</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {atividades.map((activity, idx) => (
+                  <div key={idx} className="flex gap-4 group">
+                    <div className="flex flex-col items-center">
+                      <div className="w-11 h-11 rounded-2xl bg-primary/10 border border-primary/10 flex items-center justify-center text-primary shrink-0">
                         <Icon name="description" className="text-lg" />
                       </div>
+                      {idx < atividades.length - 1 && <div className="w-px h-full bg-border mt-2" />}
                     </div>
-                    {idx < atividades.length - 1 && <div className="w-px h-full bg-border mt-2" />}
-                  </div>
-                  <div className={`flex-1 ${idx < atividades.length - 1 ? "pb-4" : ""}`}>
-                    <div className="flex justify-between items-start gap-2">
-                      <p className="text-sm font-semibold text-foreground">
-                        {activity.name}{" "}
-                        <span className="font-normal text-muted-foreground">{activity.action}</span>
-                      </p>
-                      <Badge variant="secondary" className="text-[10px] uppercase shrink-0">{activity.tag}</Badge>
+                    <div className={`flex-1 ${idx < atividades.length - 1 ? "pb-4" : ""}`}>
+                      <div className="flex justify-between items-start gap-2">
+                        <p className="text-sm font-semibold text-foreground">
+                          {activity.name}{" "}
+                          <span className="font-normal text-muted-foreground">{activity.action}</span>
+                        </p>
+                        <Badge variant="secondary" className="text-[10px] uppercase shrink-0">{activity.tag}</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">{activity.description}</p>
+                      <p className="text-[11px] text-primary font-medium mt-2">{activity.time}</p>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-1">{activity.description}</p>
-                    <p className="text-[11px] text-primary font-medium mt-2">{activity.time}</p>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="rounded-2xl">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Agenda</CardTitle>
             <div className="flex items-center gap-1">
@@ -647,7 +693,7 @@ export default function DashboardPage() {
                 const eHoje = eMesAtual && day === hoje.getDate();
                 return (
                   <div key={day} className="relative">
-                    <span className={`inline-flex items-center justify-center w-8 h-8 text-xs rounded-lg cursor-pointer transition-all
+                    <span className={`inline-flex items-center justify-center w-9 h-9 text-xs rounded-xl cursor-pointer transition-all
                       ${eHoje ? "bg-primary text-on-primary font-bold shadow-sm" : "hover:bg-primary/10 text-foreground"}`}>
                       {day}
                     </span>
@@ -658,7 +704,7 @@ export default function DashboardPage() {
             </div>
             <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-1">
               {entregasMes.map(({ o, d }) => (
-                <div key={o.id} className="p-3 bg-muted/50 rounded-xl border-l-4 border-primary flex gap-4 items-center">
+                <div key={o.id} className="p-3.5 bg-muted/50 rounded-xl border-l-4 border-primary flex gap-4 items-center">
                   <div className="text-center leading-tight">
                     <p className="text-[10px] font-semibold uppercase text-muted-foreground">
                       {d.toLocaleDateString("pt-BR", { month: "short" })}

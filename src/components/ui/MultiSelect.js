@@ -18,15 +18,20 @@ export default function MultiSelect({ value = [], options = [], onChange, placeh
   useEffect(() => {
     if (!aberto) return;
     const fechar = (e) => {
-      if (rootRef.current && !rootRef.current.contains(e.target)) setAberto(false);
+      if (rootRef.current && !rootRef.current.contains(e.target)) {
+        setAberto(false);
+        setBusca("");
+      }
     };
     document.addEventListener("mousedown", fechar);
     return () => document.removeEventListener("mousedown", fechar);
   }, [aberto]);
 
-  useEffect(() => {
-    if (!aberto) setBusca("");
-  }, [aberto]);
+  const abrirFechar = () => {
+    if (aberto) setBusca("");
+    setAberto(!aberto);
+    if (!aberto) setTimeout(() => inputRef.current?.focus(), 50);
+  };
 
   const alternar = (v) => {
     onChange(value.includes(v) ? value.filter((x) => x !== v) : [...value, v]);
@@ -42,7 +47,7 @@ export default function MultiSelect({ value = [], options = [], onChange, placeh
     <div ref={rootRef} className="relative min-w-0">
       <button
         type="button"
-        onClick={() => { setAberto(!aberto); setTimeout(() => inputRef.current?.focus(), 50); }}
+        onClick={abrirFechar}
         aria-expanded={aberto}
         className={`flex items-center gap-2 w-full px-3 py-2 rounded-xl border text-xs shadow-card transition-colors ${
           aberto ? "border-primary bg-primary/5 text-foreground" : "border-border bg-card text-foreground hover:border-primary/40"
@@ -57,7 +62,7 @@ export default function MultiSelect({ value = [], options = [], onChange, placeh
       </button>
 
       {aberto && (
-        <div className="absolute z-50 mt-2 w-72 left-0 obsidian-glass cyber-border rounded-2xl shadow-lg overflow-hidden animate-scale-in">
+        <div className="absolute z-50 mt-2 w-72 max-w-[calc(100vw-2rem)] left-0 bg-card border border-border rounded-2xl shadow-lg overflow-hidden animate-scale-in">
           <div className="p-2 border-b border-border/60">
             <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2">
               <Icon name="search" className="text-sm text-muted-foreground shrink-0" />

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
+import PageHeader from "@/components/ui/PageHeader";
 import KpiCard from "@/components/ui/KpiCard";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -12,12 +13,13 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import { ListSkeleton } from "@/components/Skeleton";
 import FilterBar, { useFilter } from "@/components/ui/FilterBar";
-import { listar as listarOrcamentos, remover as removerOrcamento, mudarEstado } from "@/services/orcamentos";
+import { listar as listarOrcamentos, remover as removerOrcamento, mudarEstado, enviarProducao } from "@/services/orcamentos";
 import { listarFaturas, removerFatura, buscarFatura } from "@/services/faturacao";
 import { buscarOrganizacao } from "@/services/configuracoes";
 import CadastrosTab from "@/components/vendas/CadastrosTab";
 import OrcamentoModal from "@/components/vendas/OrcamentoModal";
 import OrcamentoDetalhesModal from "@/components/vendas/OrcamentoDetalhesModal";
+import AprovarOrcamentoDialog from "@/components/orcamentos/AprovarOrcamentoDialog";
 import FaturaModal from "@/components/vendas/FaturaModal";
 import FaturaDetalhesModal from "@/components/vendas/FaturaDetalhesModal";
 import OrcamentoPdfModal from "@/components/orcamentos/OrcamentoPdfModal";
@@ -67,6 +69,8 @@ export default function AreaComercialPage() {
   const [pdfOrcamento, setPdfOrcamento] = useState(null);
   const [fatFormOpen, setFatFormOpen] = useState(false);
   const [fatDetalhe, setFatDetalhe] = useState(null);
+  const [aprovarAlvo, setAprovarAlvo] = useState(null);
+  const [aprovando, setAprovando] = useState(false);
   const { addToast } = useToast();
 
   const trocarTab = (t) => {
@@ -121,6 +125,10 @@ export default function AreaComercialPage() {
 
   const mudarEstadoOrc = async (o, novoEstado) => {
     if (!novoEstado || novoEstado === o.estado) return;
+    if (novoEstado === "aprovado") {
+      setAprovarAlvo(o);
+      return;
+    }
     try {
       const atualizado = await mudarEstado(o.id, novoEstado);
       setOrcamentos((prev) => prev.map((x) => (x.id === o.id ? { ...x, ...atualizado } : x)));
@@ -128,6 +136,39 @@ export default function AreaComercialPage() {
       addToast(`Orçamento ${o.numero || o.id} marcado como ${novoEstado}`, "success");
     } catch (err) {
       addToast(err.response?.data?.erro || "Erro ao mudar o estado", "error");
+    }
+  };
+
+  const confirmarAprovacao = async (comProducao) => {
+    const o = aprovarAlvo;
+    if (!o) return;
+    setAprovando(true);
+    try {
+      const atualizado = await mudarEstado(o.id, "aprovado", comProducao ? { gerar_op: true } : undefined);
+      setOrcamentos((prev) => prev.map((x) => (x.id === o.id ? { ...x, ...atualizado } : x)));
+      setOrcDetalhe((prev) => (prev && prev.id === o.id ? { ...prev, ...atualizado } : prev));
+      addToast(
+        comProducao
+          ? `Orçamento ${o.numero || o.id} aprovado e enviado para produção`
+          : `Orçamento ${o.numero || o.id} aprovado`,
+        "success"
+      );
+      setAprovarAlvo(null);
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao aprovar o orçamento", "error");
+    } finally {
+      setAprovando(false);
+    }
+  };
+
+  const enviarOrcParaProducao = async (o) => {
+    try {
+      const r = await enviarProducao(o.id);
+      setOrcamentos((prev) => prev.map((x) => (x.id === o.id && r.ordem ? { ...x, ordem_producao: r.ordem } : x)));
+      setOrcDetalhe((prev) => (prev && prev.id === o.id && r.ordem ? { ...prev, ordem_producao: r.ordem } : prev));
+      addToast(r.mensagem || "Orçamento enviado para produção", "success");
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao enviar para produção", "error");
     }
   };
 
@@ -205,17 +246,10 @@ export default function AreaComercialPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Área Comercial</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Cadastros, orçamentos e facturas
-          </p>
-        </div>
-      </div>
+      <PageHeader title="Área Comercial" description="Cadastros, orçamentos e facturas" />
 
       {tab !== "cadastros" && (
-      <section className="grid grid-cols-2 sm:grid-cols-4 gap-5">
+      <section className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
         <KpiCard icon="request_quote" label="Orçamentos" value={orcamentos.length} iconVariant="info" />
         <KpiCard icon="pending" label="Pendentes" value={pendentes} iconVariant="warning" />
         <KpiCard icon="paid" label="Total Facturado" value={formatKz(totalFat)} iconVariant="success" />
@@ -223,12 +257,10 @@ export default function AreaComercialPage() {
       </section>
       )}
 
-      <div className="flex gap-1.5 flex-wrap obsidian-glass cyber-border p-1.5 rounded-xl">
+      <div className="seg-track">
         {["cadastros", "orcamentos", "faturas"].map((t) => (
           <button key={t} type="button" onClick={() => trocarTab(t)}
-            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all ${
-              tab === t ? "nav-pill shadow-none text-primary" : "text-muted-foreground hover:text-foreground"
-            }`}>
+            className={`seg-tab ${tab === t ? "is-active" : ""}`}>
             <Icon name={t === "orcamentos" ? "request_quote" : t === "faturas" ? "receipt_long" : "groups"} className="text-lg" />
             {t === "orcamentos" ? "Orçamentos" : t === "faturas" ? "Facturas" : "Cadastros"}
           </button>
@@ -390,6 +422,15 @@ export default function AreaComercialPage() {
         onEditar={abrirEdicaoOrc}
         onEliminar={(o) => { setOrcDetalhe(null); setEliminarItem({ ...o, _tipo: "orcamento" }); }}
         onEstado={mudarEstadoOrc}
+        onEnviarProducao={enviarOrcParaProducao}
+      />
+
+      <AprovarOrcamentoDialog
+        open={Boolean(aprovarAlvo)}
+        orcamento={aprovarAlvo}
+        onClose={() => setAprovarAlvo(null)}
+        onConfirmar={confirmarAprovacao}
+        carregando={aprovando}
       />
 
       <OrcamentoPdfModal

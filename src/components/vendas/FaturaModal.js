@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Modal from "@/components/Modal";
 import Icon from "@/components/Icon";
 import { inputCls } from "@/lib/estoque";
 import NumeroInput from "@/components/ui/NumeroInput";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/Toast";
-import { criarFatura } from "@/services/faturacao";
+import { criarFatura, listarFaturas } from "@/services/faturacao";
 import { listar as listarOrcamentos } from "@/services/orcamentos";
 import { listarOrdens } from "@/services/producao";
 import { listar as listarClientes } from "@/services/clientes";
@@ -26,7 +26,7 @@ const metodos = {
 const hoje = new Date().toISOString().split("T")[0];
 const blankItem = { descricao: "", quantidade: "", preco_unit: "" };
 const blankFaturaForm = {
-  tipo: "fatura", cliente_id: "", orcamento_id: "", op: "", data_emissao: hoje, data_vencimento: "", iva: 14,
+  tipo: "fatura", cliente_id: "", orcamentos_ids: [], op: "", data_emissao: hoje, data_vencimento: "", iva: 14,
   metodo: "transferencia", conta_bancaria_id: "", itens: [{ ...blankItem }], observacoes: "", valor_pago: "",
 };
 
@@ -37,6 +37,7 @@ export default function FaturaModal({ open, onClose, onSaved }) {
   const [clientes, setClientes] = useState([]);
   const [ordens, setOrdens] = useState([]);
   const [orcamentos, setOrcamentos] = useState([]);
+  const [faturas, setFaturas] = useState([]);
   const [contas, setContas] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [faturaForm, setFaturaForm] = useState(blankFaturaForm);
@@ -47,12 +48,13 @@ export default function FaturaModal({ open, onClose, onSaved }) {
     (async () => {
       setCarregando(true);
       setFaturaForm(blankFaturaForm);
-      Promise.all([listarClientes({ tipo: "cliente" }), listarOrdens(), listarOrcamentos(), listarContas().catch(() => [])])
-        .then(([c, o, orcData, cb]) => {
+      Promise.all([listarClientes({ tipo: "cliente" }), listarOrdens(), listarOrcamentos(), listarContas().catch(() => []), listarFaturas().catch(() => [])])
+        .then(([c, o, orcData, cb, fd]) => {
           if (!ativo) return;
           setClientes(Array.isArray(c) ? c : c?.data || []);
           setOrdens(Array.isArray(o) ? o : o?.ordens || []);
           setOrcamentos((Array.isArray(orcData) ? orcData : orcData?.data || []).map((orc) => ({ ...orc, cliente_id: Number(orc.cliente_id) || Number(orc.cliente?.id) || null })));
+          setFaturas(Array.isArray(fd) ? fd : fd?.data || []);
           setContas(Array.isArray(cb) ? cb : []);
         })
         .catch((err) => {
@@ -68,6 +70,17 @@ export default function FaturaModal({ open, onClose, onSaved }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // Orçamentos já ligados a faturas não canceladas (não podem ser facturados de novo).
+  const billedIds = useMemo(() => {
+    const ids = new Set();
+    for (const f of faturas) {
+      if (f.estado === "cancelada") continue;
+      if (f.orcamento_id) ids.add(Number(f.orcamento_id));
+      for (const vid of Array.isArray(f.orcamentos_ids) ? f.orcamentos_ids : []) ids.add(Number(vid));
+    }
+    return ids;
+  }, [faturas]);
+
   const setFaturaItem = (idx, key, val) => {
     setFaturaForm((p) => {
       const itens = [...p.itens];
@@ -79,25 +92,27 @@ export default function FaturaModal({ open, onClose, onSaved }) {
   const addFaturaItem = () => setFaturaForm((p) => ({ ...p, itens: [...p.itens, { ...blankItem }] }));
   const removeFaturaItem = (idx) => setFaturaForm((p) => (p.itens.length <= 1 ? p : { ...p, itens: p.itens.filter((_, i) => i !== idx) }));
 
-  const orcamentosDoCliente = faturaForm.cliente_id
-    ? orcamentos.filter((o) => String(o.cliente_id) === String(faturaForm.cliente_id) && (o.estado === "aprovado" || o.estado === "pendente"))
-    : orcamentos.filter((o) => o.estado === "aprovado" || o.estado === "pendente");
+  // Orçamentos do cliente elegíveis: aprovados/pendentes e ainda não facturados.
+  const orcamentosDisponiveis = faturaForm.cliente_id
+    ? orcamentos.filter((o) => String(o.cliente_id) === String(faturaForm.cliente_id) && (o.estado === "aprovado" || o.estado === "pendente") && !billedIds.has(Number(o.id)))
+    : [];
 
-  const handleOrcamentoSelect = (e) => {
-    const id = e.target.value;
-    const o = orcamentos.find((x) => String(x.id) === id);
-    if (!o) {
-      setFaturaForm((p) => ({ ...p, orcamento_id: "" }));
-      return;
-    }
-    setFaturaForm((p) => ({
-      ...p,
-      orcamento_id: o.id,
-      cliente_id: p.cliente_id || o.cliente_id,
-      itens: (o.itens || []).length
-        ? o.itens.map((it) => ({ descricao: it.descricao || "", quantidade: Number(it.quantidade) || 0, preco_unit: Number(it.preco_unit != null ? it.preco_unit : it.valorUnitario) || 0 }))
-        : [{ ...blankItem }],
-    }));
+  // Selecciona/desmarca um orçamento e reconstrói os itens a partir da selecção.
+  const toggleOrcamento = (o) => {
+    setFaturaForm((p) => {
+      const idStr = String(o.id);
+      const selecionados = p.orcamentos_ids.includes(idStr)
+        ? p.orcamentos_ids.filter((x) => x !== idStr)
+        : [...p.orcamentos_ids, idStr];
+      const itens = orcamentos
+        .filter((x) => selecionados.includes(String(x.id)))
+        .flatMap((x) => (x.itens || []).map((it) => ({
+          descricao: it.descricao || "",
+          quantidade: Number(it.quantidade) || 0,
+          preco_unit: Number(it.preco_unit != null ? it.preco_unit : it.valorUnitario) || 0,
+        })));
+      return { ...p, orcamentos_ids: selecionados, itens: itens.length ? itens : [{ ...blankItem }] };
+    });
   };
 
   const faturaSubtotal = faturaForm.itens.reduce((s, i) => s + (Number(i.quantidade) || 0) * (Number(i.preco_unit) || 0), 0);
@@ -119,7 +134,7 @@ export default function FaturaModal({ open, onClose, onSaved }) {
       const criado = await criarFatura({
         tipo: faturaForm.tipo || "fatura",
         cliente_id: Number(faturaForm.cliente_id) || null,
-        orcamento_id: Number(faturaForm.orcamento_id) || null,
+        orcamentos_ids: faturaForm.orcamentos_ids.map(Number).filter((n) => Number.isInteger(n) && n > 0),
         op: Number(faturaForm.op) || null,
         data_emissao: faturaForm.data_emissao,
         data_vencimento: faturaForm.data_vencimento || undefined,
@@ -167,20 +182,44 @@ export default function FaturaModal({ open, onClose, onSaved }) {
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Cliente *</label>
-              <select required value={faturaForm.cliente_id} onChange={(e) => setFaturaForm({ ...faturaForm, cliente_id: e.target.value, orcamento_id: "" })} className={inputCls}>
+              <select required value={faturaForm.cliente_id} onChange={(e) => setFaturaForm({ ...faturaForm, cliente_id: e.target.value, orcamentos_ids: [], itens: [{ ...blankItem }] })} className={inputCls}>
                 <option value="">Seleccionar...</option>
                 {clientes.map((c) => <option key={c.id} value={c.id}>{c.nome || c.razao_social}</option>)}
               </select>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Orçamento</label>
-              <select value={faturaForm.orcamento_id || ""} onChange={handleOrcamentoSelect} className={inputCls} disabled={!faturaForm.cliente_id}>
-                <option value="">Seleccionar orçamento...</option>
-                {orcamentosDoCliente.map((o) => (
-                  <option key={o.id} value={o.id}>{o.numero || o.id} — {formatKz(o.total || o.subtotal + o.valorIva)}</option>
-                ))}
-              </select>
-            </div>
+            {faturaForm.cliente_id && (
+              <div className="flex flex-col gap-1.5 sm:col-span-2">
+                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Orçamentos do Cliente</label>
+                {orcamentosDisponiveis.length === 0 ? (
+                  <p className="px-3 py-2.5 rounded-xl border border-dashed border-input text-[11px] text-muted-foreground bg-muted/30">
+                    Sem orçamentos disponíveis (aprovados/pendentes e ainda não facturados).
+                  </p>
+                ) : (
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto rounded-xl border bg-muted/30 p-2">
+                    {orcamentosDisponiveis.map((o) => {
+                      const marcado = faturaForm.orcamentos_ids.includes(String(o.id));
+                      return (
+                        <label key={o.id} className={`flex items-center gap-2.5 rounded-lg border px-2.5 py-2 cursor-pointer transition-colors ${marcado ? "border-primary/60 bg-primary/5" : "bg-background border-input hover:border-primary/40"}`}>
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 shrink-0 accent-primary cursor-pointer"
+                            checked={marcado}
+                            onChange={() => toggleOrcamento(o)}
+                          />
+                          <span className="flex-1 min-w-0">
+                            <span className="block text-xs font-semibold text-foreground truncate">{o.numero || o.id} · {formatKz(o.total || o.subtotal + o.valorIva)}</span>
+                            <span className="block text-[10px] text-muted-foreground truncate">{(o.itens || []).map((it) => it.descricao).filter(Boolean).join(", ") || "Sem descrição"}</span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+                {faturaForm.orcamentos_ids.length > 0 && (
+                  <p className="text-[10px] font-medium text-primary">{faturaForm.orcamentos_ids.length} orçamento(s) selecionado(s) — os itens foram somados abaixo.</p>
+                )}
+              </div>
+            )}
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Ordem de Produção</label>
               <select value={faturaForm.op} onChange={(e) => setFaturaForm({ ...faturaForm, op: e.target.value })} className={inputCls}>
