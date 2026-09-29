@@ -9,12 +9,13 @@ function ConfirmDialog({
   onClose,
   onConfirm,
   title = "Confirmar eliminação",
-  description = "Esta ação não pode ser desfeita.",
+  description = "Esta acção não pode ser desfeita.",
   confirmLabel = "Eliminar",
   cancelLabel = "Cancelar",
   loading = false,
   icon = "delete_forever",
   tone = "destructive",
+  children,
 }) {
   return (
     <Modal
@@ -41,11 +42,14 @@ function ConfirmDialog({
     >
       <div className="flex items-start gap-3.5">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-error/10 text-error">
-          <Icon name="delete_forever" className="text-xl" />
+          <Icon name={icon} className="text-xl" />
         </span>
-        <p className="pt-1.5 text-sm leading-relaxed text-muted-foreground">
-          {description}
-        </p>
+        <div className="flex-1 min-w-0 space-y-3">
+          <p className="pt-1.5 text-sm leading-relaxed text-muted-foreground">
+            {description}
+          </p>
+          {children}
+        </div>
       </div>
     </Modal>
   );

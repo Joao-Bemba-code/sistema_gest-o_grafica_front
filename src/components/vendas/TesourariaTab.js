@@ -41,6 +41,9 @@ const metodos = [
 
 const categoriasEntrada = [
   { value: "comissao", label: "Comissão" },
+  { value: "venda", label: "Venda" },
+  { value: "emprestimo", label: "Empréstimo" },
+  { value: "outras receitas", label: "Outras receitas" },
 ];
 
 const categoriasSaida = [
@@ -259,7 +262,7 @@ export default function TesourariaTab() {
     try {
       const payload = {
         tipo: form.tipo,
-        categoria: form.categoria,
+        categoria: String(form.categoria || "").trim(),
         descricao: form.descricao,
         valor: Number(form.valor),
         data_movimento: form.data_movimento,
@@ -494,7 +497,7 @@ export default function TesourariaTab() {
               ))}
             </div>
             <p className="text-[10px] text-muted-foreground italic">
-              As vendas são registadas automaticamente quando uma fatura é paga; as comissões podem ser registadas manualmente.
+              As vendas entram automaticamente quando uma fatura é paga; entradas manuais aceitam qualquer categoria.
             </p>
           </div>
 
@@ -509,10 +512,18 @@ export default function TesourariaTab() {
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Categoria</label>
-              <select name="categoria" value={form.categoria} onChange={handleChange} className={inputCls}>
-                <option value="">Selecione uma categoria</option>
+              <input
+                name="categoria"
+                value={form.categoria}
+                onChange={handleChange}
+                className={inputCls}
+                list="categorias-tesouraria"
+                placeholder="Escreva ou escolha uma categoria"
+                autoComplete="off"
+              />
+              <datalist id="categorias-tesouraria">
                 {(categoriasPorTipo[form.tipo] || []).map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-              </select>
+              </datalist>
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Método de Pagamento *</label>

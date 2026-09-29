@@ -80,7 +80,7 @@ function calcularMatriz(largura, altura, alvoLargura, alvoAltura, margem, gramag
 function Campo({ label, valor, onChange, hint }) {
   return (
     <div className="input-glow bg-surface-variant/30 rounded-lg p-3 border-b-2 border-outline/30 transition-all duration-300">
-      <label className="block font-mono text-[10px] uppercase tracking-widest text-on-surface-variant mb-1">
+      <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
         {label}
         {hint && <span className="ml-1 normal-case tracking-normal text-[9px] opacity-70">{hint}</span>}
       </label>

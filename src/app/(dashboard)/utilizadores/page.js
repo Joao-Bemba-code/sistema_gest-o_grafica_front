@@ -234,11 +234,11 @@ export default function UtilizadoresPage() {
   })();
 
   return (
-    <div className="space-y-5">
-      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Utilizadores</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Gestão de utilizadores e permissões // USR · {usuarios.length} utilizadores</p>
+          <p className="mt-1 text-sm text-muted-foreground">Gestão de utilizadores e permissões · {usuarios.length} utilizadores</p>
         </div>
         {admin && (
           <Button onClick={abrirNovo}>

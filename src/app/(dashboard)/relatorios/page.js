@@ -407,7 +407,7 @@ export default function RelatoriosPage() {
         </span>
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Relatórios</h1>
-          <p className="text-sm text-muted-foreground">Visão geral do desempenho da produção</p>
+          <p className="mt-1 text-sm text-muted-foreground">Visão geral do desempenho da produção</p>
         </div>
       </div>
 
@@ -1056,8 +1056,8 @@ export default function RelatoriosPage() {
         );
       })()}
 
-      <footer className="pt-4 text-center border-t">
-        <p className="text-xs text-muted-foreground">SIGRAF — Sistema de Gestão para Indústria Gráfica</p>
+      <footer className="border-t pt-6 pb-2 text-center">
+        <p className="text-[11px] text-muted-foreground">SIGRAF · Sistema de Gestão para Indústria Gráfica</p>
       </footer>
     </div>
   );

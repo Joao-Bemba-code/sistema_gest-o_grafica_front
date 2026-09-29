@@ -95,11 +95,11 @@ export default function AcabamentoPage() {
   if (error) return <div className="bg-destructive/10 text-destructive rounded-2xl p-6 text-center font-semibold">{error}</div>;
 
   return (
-    <div className="space-y-5">
-      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Acabamento</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Acompanhamento dos serviços de acabamento // ACB</p>
+          <p className="mt-1 text-sm text-muted-foreground">Acompanhamento dos serviços de acabamento</p>
         </div>
       </div>
 
@@ -202,8 +202,8 @@ export default function AcabamentoPage() {
         </form>
       </Modal>
 
-      <footer className="p-6 text-center border-t bg-muted/30 rounded-2xl">
-        <p className="text-sm text-muted-foreground">SIGRAF — Sistema de Gestão para Indústria Gráfica</p>
+      <footer className="border-t pt-6 pb-2 text-center">
+        <p className="text-[11px] text-muted-foreground">SIGRAF · Sistema de Gestão para Indústria Gráfica</p>
       </footer>
     </div>
   );

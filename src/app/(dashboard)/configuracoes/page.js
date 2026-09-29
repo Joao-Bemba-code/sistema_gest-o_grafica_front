@@ -189,10 +189,10 @@ export default function ConfiguracoesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Configurações</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Parâmetros e definições do sistema // CFG</p>
+          <p className="mt-1 text-sm text-muted-foreground">Parâmetros e definições do sistema</p>
         </div>
       </div>
 

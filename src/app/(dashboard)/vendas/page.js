@@ -204,12 +204,12 @@ export default function AreaComercialPage() {
   if (loading) return <ListSkeleton lines={8} />;
 
   return (
-    <div className="space-y-5">
-      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Área Comercial</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Cadastros · orçamentos · facturas // COMERCIAL
+            Cadastros, orçamentos e facturas
           </p>
         </div>
       </div>
@@ -244,8 +244,8 @@ export default function AreaComercialPage() {
               <h2 className="font-sans text-xl font-bold text-foreground tracking-tight flex items-center gap-2">
                 <Icon name="request_quote" className="text-primary text-[22px]" /> Orçamentos
               </h2>
-              <p className="text-primary mt-0.5 font-mono text-[10px] uppercase tracking-widest">
-                {orcamentos.length} orçamentos · {pendentes} pendentes // {formatKz(totalOrc)}
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {orcamentos.length} orçamentos · {pendentes} pendentes · {formatKz(totalOrc)}
               </p>
             </div>
             <button onClick={() => setOrcForm({ open: true, id: null })} className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium shadow-sm hover:bg-primary/90 transition-colors ">
@@ -316,7 +316,7 @@ export default function AreaComercialPage() {
               <h2 className="font-sans text-xl font-bold text-foreground tracking-tight flex items-center gap-2">
                 <Icon name="receipt_long" className="text-primary text-[22px]" /> Facturas
               </h2>
-              <p className="text-primary mt-0.5 font-mono text-[10px] uppercase tracking-widest">
+              <p className="mt-0.5 text-xs text-muted-foreground">
                 {faturas.length} facturas · {totalReceber > 0 ? `${formatKz(totalReceber)} a receber` : formatKz(totalFat)}
               </p>
             </div>
@@ -425,8 +425,8 @@ export default function AreaComercialPage() {
         description={eliminarItem ? `Tem a certeza que deseja remover ${eliminarItem._tipo === "orcamento" ? `o orçamento "${eliminarItem.numero}"` : `a fatura "${eliminarItem.numero}"`}? Esta ação não pode ser desfeita.` : ""}
       />
 
-      <footer className="p-6 text-center border-t bg-muted/30 rounded-2xl">
-        <p className="text-sm text-muted-foreground">SIGRAF — Sistema de Gestão para Indústria Gráfica</p>
+      <footer className="border-t pt-6 pb-2 text-center">
+        <p className="text-[11px] text-muted-foreground">SIGRAF · Sistema de Gestão para Indústria Gráfica</p>
       </footer>
 
       {tab !== "cadastros" && (

@@ -264,7 +264,7 @@ function NovoOrcamentoInner() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">{editandoId ? "Editar Orçamento" : "Novo Orçamento"}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {editandoId ? `Atualizar orçamento #${editandoId}` : "Criar orçamento para cliente // ORC"}
+              {editandoId ? `Atualizar orçamento #${editandoId}` : "Criar orçamento para cliente"}
             </p>
           </div>
         </div>

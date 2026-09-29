@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
@@ -9,7 +9,6 @@ import { getInitials } from "@/lib/utils";
 import { podeAtual } from "@/lib/permissoes";
 import useNotificacoes from "@/hooks/useNotificacoes";
 import Icon from "./Icon";
-import Modal from "./Modal";
 
 const breadcrumbs = {
   "/": ["Painel"],
@@ -46,20 +45,36 @@ export default function TopBar() {
   const [notifAberto, setNotifAberto] = useState(false);
   const { notificacoes, carregando, naoLidas, marcarLida, marcarTodasLidas } = useNotificacoes();
   const naoLidasIds = new Set(naoLidas.map((n) => n.id));
-  const bellRef = useRef(null);
+  const sinoRef = useRef(null);
+
+  useEffect(() => {
+    if (!notifAberto) return;
+    const fecharFora = (e) => {
+      if (sinoRef.current && !sinoRef.current.contains(e.target)) setNotifAberto(false);
+    };
+    const fecharTecla = (e) => {
+      if (e.key === "Escape") setNotifAberto(false);
+    };
+    document.addEventListener("mousedown", fecharFora);
+    document.addEventListener("keydown", fecharTecla);
+    return () => {
+      document.removeEventListener("mousedown", fecharFora);
+      document.removeEventListener("keydown", fecharTecla);
+    };
+  }, [notifAberto]);
 
   return (
-    <header className="w-full sticky top-0 z-40 bg-background border-b border-border flex items-center gap-4 pl-14 pr-3 sm:pr-6 md:pl-6 h-14 sm:h-16">
+    <header className="w-full sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/60 flex items-center gap-4 pl-14 pr-3 sm:pr-6 md:pl-6 h-14 sm:h-16">
       <div className="min-w-0 flex-1">
         <Breadcrumbs />
       </div>
       <div className="flex items-center gap-1 sm:gap-2">
-        <div className="relative">
+        <div className="relative" ref={sinoRef}>
             <button
-              ref={bellRef}
               onClick={() => setNotifAberto(!notifAberto)}
               aria-label={naoLidas.length > 0 ? `Notificações (${naoLidas.length} por ler)` : "Notificações"}
-              className="relative p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-accent transition-all duration-200 ease-in-out"
+              aria-expanded={notifAberto}
+              className="relative p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-accent"
             >
               <Icon name="notifications" className="text-muted-foreground" />
               {naoLidas.length > 0 && (
@@ -68,60 +83,56 @@ export default function TopBar() {
                 </span>
               )}
             </button>
-            <Modal
-              open={notifAberto}
-              onClose={() => setNotifAberto(false)}
-              title="Notificações"
-              icon="notifications"
-              size="sm"
-            >
-              {naoLidas.length > 0 && (
-                <button
-                  onClick={marcarTodasLidas}
-                  className="flex items-center gap-1 text-[10px] font-semibold text-primary hover:text-primary/80 transition-colors mb-3 ml-auto"
-                >
-                  <Icon name="mark_email_read" className="text-sm" /> Marcar como lidas
-                </button>
-              )}
-              {carregando && notificacoes.length === 0 ? (
-                <div className="flex items-center justify-center gap-2 py-8 text-xs text-muted-foreground">
-                  <span className="spinner" aria-hidden="true" /> A carregar...
+            {notifAberto && (
+              <div className="absolute right-0 top-full z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-card shadow-modal">
+                <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+                  <p className="text-sm font-semibold text-foreground">Notificações</p>
+                  {naoLidas.length > 0 && (
+                    <button
+                      onClick={marcarTodasLidas}
+                      className="flex items-center gap-1 text-[10px] font-semibold text-primary hover:text-primary/80"
+                    >
+                      <Icon name="mark_email_read" className="text-sm" /> Marcar como lidas
+                    </button>
+                  )}
                 </div>
-              ) : notificacoes.length === 0 ? (
-                <div className="py-8 text-center">
-                  <Icon name="notifications_off" className="text-2xl text-muted-foreground/50 mx-auto mb-2" />
-                  <p className="text-xs text-muted-foreground">Sem notificações</p>
+                <div className="max-h-[60vh] overflow-y-auto p-2">
+                  {carregando && notificacoes.length === 0 ? (
+                    <p className="py-8 text-center text-xs text-muted-foreground">A carregar...</p>
+                  ) : notificacoes.length === 0 ? (
+                    <div className="py-8 text-center">
+                      <Icon name="notifications_off" className="text-2xl text-muted-foreground/50 mx-auto mb-2" />
+                      <p className="text-xs text-muted-foreground">Sem notificações</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      {notificacoes.map((n) => {
+                        const unread = naoLidasIds.has(n.id);
+                        return (
+                          <Link
+                            key={n.id}
+                            href={n.link}
+                            onClick={() => { marcarLida(n.id); setNotifAberto(false); }}
+                            className={`flex w-full items-start gap-3 rounded-lg p-3 text-left hover:bg-accent ${unread ? "" : "opacity-60"}`}
+                          >
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                              <Icon name={n.icon} className={`${COR_NIVEL[n.nivel] || "text-primary"} text-base`} />
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className={`truncate text-xs font-bold ${unread ? "text-foreground" : "text-muted-foreground"}`}>{n.titulo}</p>
+                                {unread && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-label="Não lida" />}
+                              </div>
+                              <p className="truncate text-[10px] text-muted-foreground">{n.desc}</p>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="space-y-1">
-                  {notificacoes.map((n) => {
-                    const unread = naoLidasIds.has(n.id);
-                    return (
-                      <Link
-                        key={n.id}
-                        href={n.link}
-                        onClick={() => { marcarLida(n.id); setNotifAberto(false); }}
-                        className={`w-full flex items-start gap-3 p-3.5 transition-all text-left border-b last:border-0 group ${unread ? "hover:bg-accent" : "opacity-55 hover:opacity-100 hover:bg-accent"}`}
-                      >
-                        <span className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                          <Icon name={n.icon} className={`${COR_NIVEL[n.nivel] || "text-primary"} text-base`} />
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className={`text-xs font-bold truncate ${unread ? "text-foreground" : "text-muted-foreground"}`}>{n.titulo}</p>
-                            {unread && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" aria-label="Não lida" />}
-                          </div>
-                          <p className="text-[10px] text-muted-foreground truncate">{n.desc}</p>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                  <p className="text-[10px] text-center text-muted-foreground pt-3">
-                    Alerta em tempo real a partir dos dados
-                  </p>
-                </div>
-              )}
-            </Modal>
+              </div>
+            )}
           </div>
           {podeAtual("configuracao", "ver") && (
             <Link

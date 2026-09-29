@@ -34,6 +34,12 @@ export async function requisitarMateriais(id, dados = {}) {
   return data;
 }
 
+// Acrescenta material extra a uma OP que já tem requisição (durante a produção)
+export async function complementarMateriais(id, dados = {}) {
+  const { data } = await api.post(`/producao/ordens/${id}/complementar-materiais`, dados);
+  return data;
+}
+
 export async function aprovarMateriais(id, dados = {}) {
   const { data } = await api.post(`/producao/ordens/${id}/aprovar-materiais`, dados);
   return data;

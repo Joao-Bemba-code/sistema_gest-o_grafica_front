@@ -42,13 +42,15 @@ function materiaisDoOrcamento(op) {
 }
 
 export default function SaidaMateriaisModal({ open, op, matPorId, materiais, onClose, onConfirm, nomeUsuario, modo = "requisicao" }) {
+  const ehComplemento = modo === "complemento";
+  const ehAprovacao = modo === "aprovacao";
   const [passo, setPasso] = useState(1);
   const [form, setForm] = useState(() => ({ ...formVazio, solicitado_por: nomeUsuario || "", permitido_por: nomeUsuario || "" }));
   const [erro, setErro] = useState("");
   const [submetendo, setSubmetendo] = useState(false);
   const reservas = Array.isArray(op?.reserva_estoques) ? op.reserva_estoques : [];
   const [itensExtras, setItensExtras] = useState(() => {
-    if (modo === "aprovacao" || reservas.length > 0) return [];
+    if (ehAprovacao || reservas.length > 0) return [];
     const sugeridos = materiaisDoOrcamento(op);
     const existentes = new Set(reservas.map((r) => Number(r.material_id)));
     return sugeridos.filter((s) => !existentes.has(Number(s.material_id)));
@@ -56,7 +58,7 @@ export default function SaidaMateriaisModal({ open, op, matPorId, materiais, onC
   const [selMaterial, setSelMaterial] = useState("");
   const [selQtd, setSelQtd] = useState("");
   const [selLote, setSelLote] = useState("");
-  const extras = modo === "aprovacao" ? [] : itensExtras.map((i) => ({
+  const extras = ehAprovacao ? [] : itensExtras.map((i) => ({
     material_id: i.material_id,
     quantidade_reservada: i.quantidade,
     lote: i.lote,
@@ -71,7 +73,10 @@ export default function SaidaMateriaisModal({ open, op, matPorId, materiais, onC
     })),
     ...extras,
   ];
-  const total = linhas.reduce((acc, l) => acc + (Number(l.quantidade_reservada) || 0), 0);
+  // No complemento só são resumidos os materiais agora pedidos,
+  // não as reservas já existentes na OP.
+  const resumoLinhas = ehComplemento ? extras : linhas;
+  const total = resumoLinhas.reduce((acc, l) => acc + (Number(l.quantidade_reservada) || 0), 0);
 
   const opcoes = Array.isArray(materiais) && materiais.length ? materiais : Object.values(matPorId || {});
 
@@ -82,7 +87,9 @@ export default function SaidaMateriaisModal({ open, op, matPorId, materiais, onC
       setErro("Selecione o material e indique a quantidade");
       return;
     }
-    if (reservas.some((r) => Number(r.material_id) === mid)) {
+    // No complemento é permitido pedir mais de um material já reservado
+    // (a reserva existente é aumentada); nos restantes modos é bloqueado.
+    if (!ehComplemento && reservas.some((r) => Number(r.material_id) === mid)) {
       setErro("Este material já está reservado nesta OP");
       return;
     }
@@ -100,11 +107,18 @@ export default function SaidaMateriaisModal({ open, op, matPorId, materiais, onC
   const removerExtra = (idx) => setItensExtras(itensExtras.filter((_, i) => i !== idx));
 
   const validaPasso1 = () => {
+    if (ehComplemento) {
+      if (itensExtras.length === 0) {
+        setErro("Indique pelo menos um material a pedir ao estoque");
+        return false;
+      }
+      return true;
+    }
     if (linhas.length === 0) {
       setErro("Adicione pelo menos um material para fazer a requisição no estoque");
       return false;
     }
-    if (modo === "aprovacao" && !form.permitido_por.trim()) {
+    if (ehAprovacao && !form.permitido_por.trim()) {
       setErro("Informe quem autoriza a saída no estoque");
       return false;
     }
@@ -126,7 +140,7 @@ export default function SaidaMateriaisModal({ open, op, matPorId, materiais, onC
     setErro("");
     setSubmetendo(true);
     const ok = await onConfirm(
-      modo === "aprovacao"
+      ehAprovacao
         ? {
             permitido_por: form.permitido_por.trim() || nomeUsuario || null,
             observacoes: form.observacoes.trim() || null,
@@ -152,7 +166,7 @@ export default function SaidaMateriaisModal({ open, op, matPorId, materiais, onC
     <Modal
       open={open}
       onClose={onClose}
-      title={modo === "aprovacao" ? "Aprovar requisição" : "Requisição material"}
+      title={ehAprovacao ? "Aprovar requisição" : ehComplemento ? "Pedir material extra" : "Requisição material"}
       icon="inventory"
       size="lg"
       footer={
@@ -165,9 +179,9 @@ export default function SaidaMateriaisModal({ open, op, matPorId, materiais, onC
               <Icon name="arrow_forward" className="text-lg" /> Continuar
             </Button>
           ) : (
-            <Button variant={modo === "aprovacao" ? "default" : "destructive"} onClick={confirmar} loading={submetendo}>
-              <Icon name={modo === "aprovacao" ? "check_circle" : "send"} className="text-lg" />
-              {modo === "aprovacao" ? "Aprovar e libertar" : "Submeter requisição"}
+            <Button variant={ehAprovacao ? "default" : "destructive"} onClick={confirmar} loading={submetendo}>
+              <Icon name={ehAprovacao ? "check_circle" : "send"} className="text-lg" />
+              {ehAprovacao ? "Aprovar e libertar" : ehComplemento ? "Pedir material" : "Submeter requisição"}
             </Button>
           )}
         </>
@@ -195,21 +209,28 @@ export default function SaidaMateriaisModal({ open, op, matPorId, materiais, onC
             <div className="bg-muted/50 rounded-xl p-4 space-y-1 border border-border/60">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">OP #{op?.id}</p>
-                <Badge variant={modo === "aprovacao" ? "warning" : "info"}>{modo === "aprovacao" ? "Aguardando aprovação" : "Requisição"}</Badge>
+                <Badge variant={ehAprovacao ? "warning" : "info"}>{ehAprovacao ? "Aguardando aprovação" : ehComplemento ? "Material adicional" : "Requisição"}</Badge>
               </div>
               <p className="text-base font-bold text-foreground">{op?.produto || "—"}</p>
               <p className="text-xs text-muted-foreground">
                 Cliente: <strong>{op?.cliente || "—"}</strong> • Quantidade: <strong>{op?.quantidade || "—"}</strong>
               </p>
-              {modo === "aprovacao" && (
+              {ehAprovacao && (
                 <p className="text-xs text-muted-foreground pt-1 border-t border-border/60 mt-1">
                   Solicitado por (produção): <strong className="text-foreground">{op?.solicitado_por || "—"}</strong>
+                </p>
+              )}
+              {ehComplemento && (
+                <p className="text-xs text-muted-foreground pt-1 border-t border-border/60 mt-1">
+                  Materiais já registados nesta OP: <strong className="text-foreground">{reservas.length}</strong>. Indique abaixo apenas o que falta.
                 </p>
               )}
             </div>
 
             <div className="space-y-2">
-              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Materiais para saída</p>
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                {ehComplemento ? "Materiais já reservados nesta OP" : "Materiais para saída"}
+              </p>
               {linhas.length > 0 && (
                 <div className="space-y-1.5">
                   {linhas.map((l, i) => (
@@ -221,7 +242,7 @@ export default function SaidaMateriaisModal({ open, op, matPorId, materiais, onC
                       <div className="flex items-center gap-3 shrink-0">
                         <span className="text-muted-foreground">
                           {Number(l.quantidade_reservada).toLocaleString("pt-AO")} {l.unidade}
-                          {l.id ? " reservado" : " (novo)"}
+                          {l.id ? " reservado" : ehComplemento ? " adicional" : " (novo)"}
                         </span>
                         {!l.id && (
                           <button type="button" onClick={() => removerExtra(i - reservas.length)} className="text-red-500 hover:text-red-700 transition-colors" title="Remover"><Icon name="delete" /></button>
@@ -233,12 +254,12 @@ export default function SaidaMateriaisModal({ open, op, matPorId, materiais, onC
               )}
               {reservas.length === 0 && itensExtras.length === 0 && (
                 <p className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2">
-                  {modo === "aprovacao"
+                  {ehAprovacao
                     ? "Esta OP não tem materiais reservados para aprovar."
                     : "Esta OP ainda não tem materiais reservados. Selecione abaixo os materiais a dar saída — a reserva é criada automaticamente."}
                 </p>
               )}
-              {modo !== "aprovacao" && (
+              {!ehAprovacao && (
                 <div className="flex flex-col sm:flex-row gap-2">
                   <select value={selMaterial} onChange={(e) => setSelMaterial(e.target.value)} className={`${inputCls} flex-1`}>
                     <option value="">Seleccionar material...</option>
@@ -253,14 +274,14 @@ export default function SaidaMateriaisModal({ open, op, matPorId, materiais, onC
                   <Button type="button" size="sm" onClick={adicionarExtra}><Icon name="add" className="text-lg" /> Adicionar</Button>
                 </div>
               )}
-              {modo !== "aprovacao" && selMaterial && matPorId?.[Number(selMaterial)]?.percentual_quebra > 0 && (
+              {!ehAprovacao && selMaterial && matPorId?.[Number(selMaterial)]?.percentual_quebra > 0 && (
                 <p className="text-[10px] text-amber-600">
                   Quebra técnica de {matPorId[Number(selMaterial)].percentual_quebra}% será adicionada à quantidade.
                 </p>
               )}
             </div>
 
-            {modo === "aprovacao" ? (
+            {ehAprovacao ? (
               <>
                 <FormField label="Autorizado por" obrigatorio>
                   <input value={form.permitido_por} onChange={set("permitido_por")} className={inputCls} placeholder="Quem autoriza a saída no estoque" />
@@ -285,17 +306,17 @@ export default function SaidaMateriaisModal({ open, op, matPorId, materiais, onC
         ) : (
           <div className="space-y-4 animate-slide-up" key="passo2">
             <div className="obsidian-glass cyber-border rounded-2xl p-4 space-y-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Resumo da {modo === "aprovacao" ? "aprovação" : "requisição"}</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Resumo da {ehAprovacao ? "aprovação" : ehComplemento ? "pedida de material" : "requisição"}</p>
               <Linha label="OP" valor={`#${op?.id} — ${op?.produto || "—"}`} />
               <Linha label="Cliente" valor={op?.cliente || "—"} />
-              {modo === "aprovacao" ? (
+              {ehAprovacao ? (
                 <Linha label="Autorizado por" valor={form.permitido_por || "—"} />
               ) : (
                 <Linha label="Responsável" valor={form.solicitado_por || "—"} />
               )}
               {form.observacoes && <Linha label="Observações" valor={form.observacoes} />}
               <div className="border-t border-border/60 pt-2 space-y-2">
-                {linhas.map((l, i) => (
+                {resumoLinhas.map((l, i) => (
                   <div key={l.id || `extra-${i}`} className="flex items-center justify-between gap-3 text-sm">
                     <span className="text-xs text-foreground truncate">{l.nome}</span>
                     <span className="font-bold text-foreground shrink-0">
@@ -305,8 +326,12 @@ export default function SaidaMateriaisModal({ open, op, matPorId, materiais, onC
                 ))}
               </div>
               <div className="border-t border-border/60 pt-3 flex items-center justify-between gap-3">
-                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Total ({linhas.length} materiais)</span>
-                <span className="text-xl font-extrabold text-primary">{total.toLocaleString("pt-AO")} <span className="text-xs text-muted-foreground font-semibold">un</span></span>
+                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  Total ({resumoLinhas.length} materiais)
+                </span>
+                <span className="text-xl font-extrabold text-primary">
+                  {total.toLocaleString("pt-AO")} <span className="text-xs text-muted-foreground font-semibold">un</span>
+                </span>
               </div>
             </div>
 
@@ -320,10 +345,11 @@ export default function SaidaMateriaisModal({ open, op, matPorId, materiais, onC
                 className="mt-0.5 w-4 h-4 rounded accent-primary"
               />
               <span className="text-xs text-foreground">
-                {modo === "aprovacao" ? (
+                {ehAprovacao ? (
                   <>Confirmo a aprovação e a saída destes <strong>{linhas.length}</strong> materiais do estoque. A OP ficará libertada para produção.</>
-                ) : (
-                  <>Confirmo o envio da requisição destes <strong>{linhas.length}</strong> materiais ao estoque. A saída só é registada após aprovação.</>
+                ) : ehComplemento ? (
+                  <>Confirmo que preciso de mais <strong>{extras.length}</strong> material(ais) durante a produção. O estoque é notificado e a saída só é registada após aprovação.</>
+                ) : (                  <>Confirmo o envio da requisição destes <strong>{linhas.length}</strong> materiais ao estoque. A saída só é registada após aprovação.</>
                 )}
               </span>
             </label>

@@ -128,8 +128,8 @@ export default function CadastrosTab() {
           <h2 className="font-sans text-xl font-bold text-foreground tracking-tight flex items-center gap-2">
             <Icon name="badge" className="text-primary text-[22px]" /> Cadastros
           </h2>
-          <p className="text-primary mt-0.5 font-mono text-[10px] uppercase tracking-widest">
-            Clientes e fornecedores // CLT · {clientes.length} registos ({totalClientes} clientes, {totalFornecedores} fornecedores)
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Clientes e fornecedores · {clientes.length} registos ({totalClientes} clientes, {totalFornecedores} fornecedores)
           </p>
         </div>
         <button onClick={abrirNovo} className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium shadow-sm hover:bg-primary/90 transition-colors ">

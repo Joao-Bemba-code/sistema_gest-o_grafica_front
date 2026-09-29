@@ -165,6 +165,13 @@ export default function DashboardPage() {
   }, []);
 
   const hoje = new Date();
+
+  const hora = hoje.getHours();
+  const saudacao = hora < 12 ? "Bom dia" : hora < 19 ? "Boa tarde" : "Boa noite";
+  const primeiroNome = (nomeUsuario || "Utilizador").trim().split(/\s+/)[0];
+  const dataLongaBruta = hoje.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const dataLonga = dataLongaBruta.charAt(0).toUpperCase() + dataLongaBruta.slice(1);
+
   const orcamentosHoje = orcamentos.filter((o) => {
     const d = o.data_emissao || o.data;
     return d ? new Date(d).toDateString() === hoje.toDateString() : false;
@@ -405,15 +412,18 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Painel de Controlo</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Painel de controlo // DASH · Visão geral · {mesLabel}</p>
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{dataLonga}</p>
+          <h1 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+            {saudacao}, <span className="text-gradient">{primeiroNome}</span>
+          </h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">Visão geral da operação · {mesLabel}</p>
         </div>
       </div>
 
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 md:gap-6">
-        {kpis.map((kpi) => (
+        {kpis.map((kpi, i) => (
           <ComboKpiCard
             key={kpi.title}
             icon={kpi.icon}
@@ -421,7 +431,8 @@ export default function DashboardPage() {
             subtitle={kpi.subtitle}
             stats={kpi.stats}
             iconVariant={kpi.iconVariant}
-            className="group relative overflow-hidden"
+            className="group relative overflow-hidden animate-card-in"
+            style={{ "--stagger": `${i * 70}ms` }}
           />
         ))}
       </section>
@@ -893,8 +904,10 @@ export default function DashboardPage() {
         </div>
       </Modal>
 
-      <footer className="p-6 text-center border-t bg-muted/30 rounded-2xl">
-        <p className="text-sm text-muted-foreground">SIGRAF — Sistema de Gestão para Indústria Gráfica</p>
+      <footer className="border-t pt-6 pb-2 text-center">
+        <p className="text-[11px] text-muted-foreground">
+          SIGRAF · Sistema de Gestão para Indústria Gráfica · {mesLabel}
+        </p>
       </footer>
     </div>
   );

@@ -22,10 +22,13 @@ import EmptyState from "@/components/estoque/EmptyState";
 import PedidosModal from "@/components/estoque/PedidosModal";
 import PedidoFormModal from "@/components/estoque/PedidoFormModal";
 import PedidoReceberModal from "@/components/estoque/PedidoReceberModal";
+import RequisicoesMaterialModal from "@/components/estoque/RequisicoesMaterialModal";
+import { listar as listarRequisicoes, aprovar as aprovarRequisicao, rejeitar as rejeitarRequisicao } from "@/services/requisicoesMaterial";
 import { familias, normalizarFamilia, normalizarTipoItem } from "@/lib/estoque";
 import { gerarFichaMaterialPDF, gerarPedidoPDF } from "@/lib/estoquePdf";
 import { listar as listarPedidos, criar as criarPedido, cancelar as cancelarPedido, receber as apiReceberPedido } from "@/services/pedidos";
 import { remover as removerMaterial } from "@/services/materiais";
+import { podeAtual } from "@/lib/permissoes";
 import { useToast } from "@/components/Toast";
 
 const TIPO_META = {
@@ -68,6 +71,15 @@ export default function EstoquePage() {
 
   const [pedidos, setPedidos] = useState([]);
   const [pedOpen, setPedOpen] = useState(false);
+  const [requisicoes, setRequisicoes] = useState([]);
+  const [reqCarregando, setReqCarregando] = useState(false);
+  const [reqOpen, setReqOpen] = useState(false);
+  // Índice de materiais por id para o modal das requisições. Memoizado: sem
+  // isto, cada render criava um objeto novo e a lista inteira re-renderizava.
+  const materiaisPorId = useMemo(
+    () => Object.fromEntries(materiais.map((x) => [x.id, x])),
+    [materiais]
+  );
   const [pedCarregando, setPedCarregando] = useState(false);
   const [novoPedido, setNovoPedido] = useState({ open: false, materialInicial: null, sessao: 0 });
   const [receberPedido, setReceberPedido] = useState({ open: false, pedido: null, sessao: 0 });
@@ -259,6 +271,68 @@ export default function EstoquePage() {
     }
   }, []);
 
+  const recarregarRequisicoes = useCallback(async () => {
+    try {
+      const data = await listarRequisicoes();
+      setRequisicoes(Array.isArray(data) ? data : []);
+    } catch {
+      // silencioso: o modal mostra o estado anterior
+    }
+  }, []);
+
+  const abrirRequisicoes = useCallback(async () => {
+    setReqOpen(true);
+    setReqCarregando(true);
+    try {
+      const data = await listarRequisicoes();
+      setRequisicoes(Array.isArray(data) ? data : []);
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao carregar as requisições", "error");
+    } finally {
+      setReqCarregando(false);
+    }
+  }, [addToast]);
+
+  const confirmarAprovacaoRequisicao = useCallback(
+    async (requisicao) => {
+      try {
+        await aprovarRequisicao(requisicao.id);
+        await Promise.all([recarregarRequisicoes(), carregar()]);
+        addToast(`Requisição ${requisicao.numero} aprovada — material com saída do stock registada`, "success");
+      } catch (err) {
+        const proibido = err.response?.status === 403;
+        addToast(
+          proibido
+            ? "Não tem permissão para aprovar requisições de material"
+            : err.response?.data?.erro || "Erro ao aprovar a requisição",
+          "error"
+        );
+      }
+    },
+    [recarregarRequisicoes, carregar, addToast]
+  );
+
+  const confirmarRejeicaoRequisicao = useCallback(
+    async (requisicao, motivo) => {
+      try {
+        await rejeitarRequisicao(requisicao.id, motivo);
+        await recarregarRequisicoes();
+        addToast(`Requisição ${requisicao.numero} rejeitada`, "success");
+        return true;
+      } catch (err) {
+        const proibido = err.response?.status === 403;
+        addToast(
+          proibido
+            ? "Não tem permissão para rejeitar requisições de material"
+            : err.response?.data?.erro || "Erro ao rejeitar a requisição",
+          "error"
+        );
+        return false;
+      }
+    },
+    [recarregarRequisicoes, addToast]
+  );
+
   const abrirPedidos = useCallback(async () => {
     setPedOpen(true);
     setPedCarregando(true);
@@ -357,7 +431,7 @@ export default function EstoquePage() {
           </span>
           <div>
             <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className="font-sans text-2xl font-semibold text-foreground tracking-tight">Provisionamento</h1>
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">Provisionamento</h1>
               <span className="pill pill-primary">
                 <Icon name="inventory" className="text-sm" /> {total} {total === 1 ? "material" : "materiais"}
               </span>
@@ -368,6 +442,9 @@ export default function EstoquePage() {
         <div className="relative flex flex-wrap gap-2">
           <button onClick={abrirPedidos} className="pill pill-muted hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors">
             <Icon name="shopping_cart" className="text-[16px]" /> Pedidos
+          </button>
+          <button onClick={abrirRequisicoes} className="pill pill-muted hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors">
+            <Icon name="inventory_2" className="text-[16px]" /> Requisições
           </button>
           <button onClick={movs.abrir} className="pill pill-muted hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors">
             <Icon name="sync_alt" className="text-[16px]" /> Movimentações
@@ -577,6 +654,17 @@ export default function EstoquePage() {
         onConfirm={confirmarCriacao}
       />
 
+      <RequisicoesMaterialModal
+        open={reqOpen}
+        onClose={() => setReqOpen(false)}
+        requisicoes={requisicoes}
+        carregando={reqCarregando}
+        materiaisPorId={materiaisPorId}
+        podeAprovar={podeAtual("estoque", "editar")}
+        onAprovar={confirmarAprovacaoRequisicao}
+        onRejeitar={confirmarRejeicaoRequisicao}
+      />
+
       <PedidoReceberModal
         key={`receber-${receberPedido.sessao}`}
         open={receberPedido.open}
@@ -639,8 +727,8 @@ export default function EstoquePage() {
         description={eliminar ? `Tem a certeza que deseja remover o material "${eliminar.nome}"? Esta ação não pode ser desfeita.` : ""}
       />
 
-      <footer className="p-6 text-center border-t bg-muted/30 rounded-2xl">
-        <p className="text-sm text-muted-foreground">SIGRAF — Sistema de Gestão para Indústria Gráfica</p>
+      <footer className="border-t pt-6 pb-2 text-center">
+        <p className="text-[11px] text-muted-foreground">SIGRAF · Sistema de Gestão para Indústria Gráfica</p>
       </footer>
 
       <FloatButton href="/estoque/novo" label="Novo Item" icon="inventory_2" />

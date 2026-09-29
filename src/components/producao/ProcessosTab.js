@@ -5,10 +5,11 @@ import Icon from "@/components/Icon";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
-import { listarOrdens, salvarPreImpressao, salvarImpressao, salvarAcabamento, salvarQualidade, atualizarOrdem, finalizarProducao } from "@/services/producao";
+import Paginacao, { usePaginacao } from "@/components/ui/Paginacao";
+import { situacaoOP, situacaoMaterial, bloqueadaPorMaterial, SITUACAO_MATERIAL } from "@/lib/producaoStatus";
+import { listarOrdens, salvarPreImpressao, salvarImpressao, salvarAcabamento, salvarQualidade, atualizarOrdem } from "@/services/producao";
 import { listar as listarMaquinas } from "@/services/maquinas";
 import { descricaoErroApi } from "@/services/api";
 
@@ -20,8 +21,6 @@ const processos = [
   { id: "entrega", label: "Entrega", icon: "local_shipping" },
 ];
 
-const statusColors = { aguardando: "warning", em_producao: "info", finalizado: "success", entregue: "secondary" };
-const statusLabels = { aguardando: "Aguardando", em_producao: "Em Produção", finalizado: "Finalizado", entregue: "Entregue" };
 const processoStatusOptions = ["pendente", "em_execucao", "concluido"];
 const processoStatusLabels = { pendente: "Pendente", em_execucao: "Em Execução", concluido: "Concluído" };
 const processoStatusVariants = { pendente: "outline", em_execucao: "warning", concluido: "success" };
@@ -174,9 +173,9 @@ export default function ProcessosTab() {
   const [jobs, setJobs] = useState([]);
   const [activeProcesso, setActiveProcesso] = useState("pre_impressao");
   const [selectedJob, setSelectedJob] = useState(null);
-  const [finalizarJob, setFinalizarJob] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [filtro, setFiltro] = useState("em_curso");
   const [maquinas, setMaquinas] = useState([]);
   const { addToast } = useToast();
 
@@ -205,15 +204,38 @@ export default function ProcessosTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const filteredJobs = useMemo(() => {
-    if (!search.trim()) return jobs;
-    const q = search.toLowerCase();
-    return jobs.filter((j) =>
-      j.cliente?.toLowerCase().includes(q) ||
-      j.produto?.toLowerCase().includes(q) ||
-      String(j.id).includes(q)
-    );
-  }, [jobs, search]);
+  // Com milhares de OPs não dá para mostrar tudo: filtra-se primeiro pelo
+  // que interessa ao operador (o que está a decorrer e o que está parado por
+  // falta de material) e só depois se pagina o resto.
+  const filtroConfig = useMemo(() => [
+    { value: "em_curso", label: "Em curso", icon: "pending_actions", test: (j) => ["aguardando", "em_producao"].includes(j.status) },
+    { value: "bloqueadas", label: "Paradas por material", icon: "lock_clock", test: (j) => bloqueadaPorMaterial(j) },
+    { value: "liberadas", label: "Com material", icon: "check_circle", test: (j) => j.status !== "aguardando" && j.status !== "em_producao" ? true : situacaoMaterial(j) === SITUACAO_MATERIAL.material_liberado || situacaoMaterial(j) === SITUACAO_MATERIAL.sem_material },
+    { value: "concluidas", label: "Concluídas", icon: "task_alt", test: (j) => ["finalizado", "entregue"].includes(j.status) },
+    { value: "todos", label: "Todas", icon: "filter_list", test: () => true },
+  ], []);
+
+  const filtrados = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    const cfg = filtroConfig.find((f) => f.value === filtro) || filtroConfig[0];
+    return jobs.filter((j) => {
+      if (!cfg.test(j)) return false;
+      if (!q) return true;
+      return (
+        String(j.cliente || "").toLowerCase().includes(q) ||
+        String(j.produto || "").toLowerCase().includes(q) ||
+        String(j.id).includes(q)
+      );
+    });
+  }, [jobs, search, filtro, filtroConfig]);
+
+  const contagens = useMemo(() => {
+    const c = {};
+    for (const f of filtroConfig) c[f.value] = jobs.filter(f.test).length;
+    return c;
+  }, [jobs, filtroConfig]);
+
+  const { visiveis, ...pag } = usePaginacao({ items: filtrados });
 
   const updateJob = (jobId, section, key, value) => {
     setJobs(jobs.map(j => j.id === jobId ? { ...j, [section]: { ...j[section], [key]: value } } : j));
@@ -239,8 +261,10 @@ export default function ProcessosTab() {
   const handleSave = async (jobId) => {
     const job = jobs.find(j => j.id === jobId);
     if (!job) return;
-    const temMateriais = Array.isArray(job.reserva_estoques) && job.reserva_estoques.length > 0;
-    if (temMateriais && job.requisicao_estado === "pendente" && job.status === "aguardando" && activeProcesso !== "entrega") {
+    // Espelha `podeAvancar` no backend: com material reservado, a OP fica
+    // parada até `requisicao_estado === "libertada"`. Qualquer estado
+    // anterior deixava o utilizador gravar e receber 422 do servidor.
+    if (bloqueadaPorMaterial(job) && activeProcesso !== "entrega") {
       addToast("Primeiro liberte os materiais da OP (saída de stock) para avançar", "error");
       return;
     }
@@ -256,17 +280,6 @@ export default function ProcessosTab() {
       addToast("Operação realizada com sucesso", "success");
     } catch (err) {
       addToast(err.response?.data?.erro || "Erro na operação", "error");
-    }
-  };
-
-  const handleFinalizar = async (jobId) => {
-    try {
-      const atualizada = await finalizarProducao(jobId);
-      setJobs(jobs.map(j => j.id === jobId ? normalizar(atualizada) : j));
-      setFinalizarJob(null);
-      addToast("Produção finalizada com sucesso", "success");
-    } catch (err) {
-      addToast(err.response?.data?.erro || "Erro ao finalizar produção", "error");
     }
   };
 
@@ -286,40 +299,75 @@ export default function ProcessosTab() {
       <div className="relative">
         <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[18px]" />
         <input
-          type="text"
+          type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Pesquisar por cliente, produto, nº da OP..."
-          className="w-full pl-10 pr-4 py-2.5 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30"
+          className="w-full pl-10 pr-10 py-2.5 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30"
         />
         {search && (
-          <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+          <button
+            type="button"
+            onClick={() => setSearch("")}
+            aria-label="Limpar pesquisa"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
             <Icon name="close" className="text-[16px]" />
           </button>
         )}
       </div>
 
+      <div className="flex gap-1.5 flex-wrap items-center">
+        {filtroConfig.map((f) => (
+          <button
+            key={f.value}
+            type="button"
+            onClick={() => setFiltro(f.value)}
+            aria-pressed={filtro === f.value}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-200 ease-in-out border ${
+              filtro === f.value
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-outline-variant/30 bg-background/40 text-muted-foreground hover:border-outline-variant hover:text-foreground"
+            }`}
+          >
+            <Icon name={f.icon} className="text-xs" />
+            {f.label}
+            <span className={`ml-0.5 px-1.5 py-0.5 rounded text-[9px] ${filtro === f.value ? "bg-primary/20" : "bg-muted"}`}>
+              {contagens[f.value] ?? 0}
+            </span>
+          </button>
+        ))}
+        <span className="ml-auto text-[10px] font-mono text-muted-foreground">
+          {filtrados.length} de {jobs.length}
+        </span>
+      </div>
+
       <div className="space-y-3">
-        {filteredJobs.map((job) => (
+        {visiveis.map((job) => {
+          const sc = situacaoOP(job);
+          const matSit = situacaoMaterial(job);
+          return (
           <Card key={job.id}>
             <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setSelectedJob(selectedJob === job.id ? null : job.id)}>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                   <Icon name="construction" className="text-primary text-[20px]" />
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-foreground">{job.id}</span>
-                    <Badge variant={statusColors[job.status] || "outline"} className="text-[10px]">{statusLabels[job.status] || job.status}</Badge>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-sm text-foreground">OP #{job.id}</span>
+                    <Badge variant={sc.variant || "outline"} className="text-[10px]">{sc.label}</Badge>
                     <Badge variant="outline" className="text-[10px]">{processoLabels[job.processoAtual]}</Badge>
-                    {["aguardando", "em_producao"].includes(job.status) && Array.isArray(job.reserva_estoques) && job.reserva_estoques.length > 0 && job.requisicao_estado === "pendente" && (
-                      <Badge variant="destructive" className="text-[10px]">Aguardando saída de materiais</Badge>
+                    {matSit && matSit.bloqueia && (
+                      <Badge variant="destructive" className="text-[10px]">
+                        <Icon name="inventory_2" className="text-[12px]" /> Material por libertar
+                      </Badge>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">{job.cliente} — {job.produto}</p>
+                  <p className="text-xs text-muted-foreground truncate">{job.cliente} — {job.produto}</p>
                 </div>
               </div>
-              <span className="text-xs text-muted-foreground">{job.quantidade}</span>
+              <span className="text-xs text-muted-foreground shrink-0">Qtd: {job.quantidade}</span>
             </div>
 
             {selectedJob === job.id && (
@@ -329,19 +377,25 @@ export default function ProcessosTab() {
                     <span className="font-bold text-foreground">OP #{job.id}</span>
                     {job.produto ? <> — {job.produto}</> : ""} · Qtd: <strong>{job.quantidade}</strong>
                   </p>
-                  {!["finalizado", "entregue"].includes(job.status) && (!Array.isArray(job.reserva_estoques) || job.reserva_estoques.length === 0) && (
-                    <Button size="sm" variant="success" onClick={() => setFinalizarJob(job)}>
-                      <Icon name="check_circle" className="text-lg" /> Finalizar produção
-                    </Button>
+                  {!["finalizado", "entregue"].includes(job.status) && (
+                    <p className="text-xs text-muted-foreground">
+                      Conclua todos os processos — a OP passa a <strong>Finalizada</strong> automaticamente quando a <strong>qualidade</strong> for aprovada.
+                    </p>
                   )}
                 </div>
-                {Array.isArray(job.reserva_estoques) && job.reserva_estoques.length > 0 && job.requisicao_estado === "pendente" && (
+                {matSit && matSit.bloqueia && (
                   <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
                     <Icon name="inventory" className="text-[20px] text-amber-600 shrink-0" />
                     <div>
-                      <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Aguardando libertação de materiais</p>
+                      <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+                        {matSit === SITUACAO_MATERIAL.aguardando_liberacao
+                          ? "Aguardando libertação de material"
+                          : "Aguardando libertação de materiais"}
+                      </p>
                       <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-0.5">
-                        Esta OP não teve a saída de material confirmada pelo armazém. Só após a libertação é que pode avançar para produção. Vá à aba &quot;Ordens&quot; → &quot;Requisição material&quot;.
+                        {matSit === SITUACAO_MATERIAL.aguardando_liberacao
+                          ? "A requisição de material já foi submetida, mas o armazém ainda não deu a saída. Só após a libertação é que a OP pode avançar para produção. Vá à aba \"Ordens\" para aprovar."
+                          : "Esta OP não tem a saída de material confirmada pelo armazém. Só após a libertação é que pode avançar para produção. Vá à aba \"Ordens\" → \"Requisição material\"."}
                       </p>
                     </div>
                   </div>
@@ -495,7 +549,8 @@ export default function ProcessosTab() {
               </div>
             )}
           </Card>
-        ))}
+          );
+        })}
       </div>
 
       {jobs.length === 0 && !loading && (
@@ -506,17 +561,15 @@ export default function ProcessosTab() {
         </div>
       )}
 
-      <ConfirmDialog
-        open={Boolean(finalizarJob)}
-        onClose={() => setFinalizarJob(null)}
-        onConfirm={() => handleFinalizar(finalizarJob?.id)}
-        title="Finalizar produção"
-        description={finalizarJob ? `Confirmar que a OP #${finalizarJob.id} (${finalizarJob.produto || "produção"}) foi concluída? O estado passará diretamente para Finalizado${Array.isArray(finalizarJob.reserva_estoques) && finalizarJob.reserva_estoques.length ? " e as reservas de material serão baixadas do estoque" : ""}.` : ""}
-        confirmLabel="Finalizar"
-        cancelLabel="Cancelar"
-        icon="check_circle"
-        tone="success"
-      />
+      {jobs.length > 0 && filtrados.length === 0 && (
+        <div className="text-center p-12 text-muted-foreground">
+          <Icon name="search_off" className="text-4xl block mx-auto mb-2 opacity-30" />
+          <p className="font-medium">Nenhuma OP neste filtro</p>
+          <p className="text-xs mt-1">Ajuste a pesquisa ou mude o filtro acima.</p>
+        </div>
+      )}
+
+      {filtrados.length > 0 && <Paginacao {...pag} label="OPs" />}
     </div>
   );
 }

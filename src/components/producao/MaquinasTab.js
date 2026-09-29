@@ -221,12 +221,12 @@ export default function MaquinasTab({ showHeader = false, registarEstado = false
   const abrirEstadoModal = (m) => setEstadoModal({ aberto: true, id: m ? m.id : null });
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {showHeader && (
-        <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">Maquinária</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Gestão de máquinas e equipamentos // MAQ · {maquinas.length} máquinas</p>
+            <p className="mt-1 text-sm text-muted-foreground">Gestão de máquinas e equipamentos · {maquinas.length} máquinas</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <button

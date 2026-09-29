@@ -460,6 +460,16 @@ input[type="radio"] {
 }
 
 /* ===== Page Transitions ===== */
+/* Nota: apenas opacidade — transform persistente criaria um bloco de
+   contenção que quebraria os modais (fixed inline, sem portal). */
+@keyframes page-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-page-fade {
+  animation: page-fade 0.3s ease-out;
+}
+
 .page-enter {
   opacity: 0;
   transform: translateY(8px);

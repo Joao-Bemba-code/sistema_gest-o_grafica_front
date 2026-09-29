@@ -445,9 +445,10 @@ export default function CategoriasPage() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-card border border-border rounded-xl p-5 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="bg-card border border-border rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="font-sans text-2xl font-semibold text-foreground tracking-tight">Categorias</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Categorias</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Organização de materiais e serviços por família e grupo</p>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" onClick={abrirGerirServicos}>
@@ -782,8 +783,8 @@ export default function CategoriasPage() {
       <ConfirmDialog open={Boolean(eliminarServico)} onClose={() => setEliminarServico(null)} onConfirm={confirmarEliminarServico} title="Remover serviço"
         description={eliminarServico ? `Remover "${eliminarServico.nome}"?` : ""} />
 
-      <footer className="p-6 text-center border-t bg-muted/30 rounded-xl">
-        <p className="text-sm text-muted-foreground">SIGRAF — Sistema de Gestão para Indústria Gráfica</p>
+      <footer className="border-t pt-6 pb-2 text-center">
+        <p className="text-[11px] text-muted-foreground">SIGRAF · Sistema de Gestão para Indústria Gráfica</p>
       </footer>
     </div>
   );

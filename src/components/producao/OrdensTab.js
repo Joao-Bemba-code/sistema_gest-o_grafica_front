@@ -10,12 +10,16 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
 import FilterBar, { useFilter } from "@/components/ui/FilterBar";
-import { listarOrdens, requisitarMateriais, aprovarMateriais, finalizarProducao, removerOrdem } from "@/services/producao";
+import Paginacao, { usePaginacao } from "@/components/ui/Paginacao";
+import { listarOrdens, requisitarMateriais, aprovarMateriais, removerOrdem } from "@/services/producao";
 import { getUsuario } from "@/services/auth";
 import { descricaoErroApi } from "@/services/api";
 import { podeAtual } from "@/lib/permissoes";
+import { situacaoOP, situacaoMaterial, SITUACAO_MATERIAL, temReservas } from "@/lib/producaoStatus";
 import SaidaMateriaisModal from "@/components/producao/SaidaMateriaisModal";
 import { listar as listarMateriais } from "@/services/materiais";
+import { buscarOrganizacao } from "@/services/configuracoes";
+import gerarOrdemProducaoPdf from "@/lib/producaoPdf";
 
 const statusConfig = {
   aguardando: { label: "Aguardando", variant: "warning" },
@@ -70,15 +74,16 @@ export default function OrdensTab() {
   const [materiais, setMateriais] = useState([]);
   const [libertarOp, setLibertarOp] = useState(null);
   const [aprovarOp, setAprovarOp] = useState(null);
-  const [finalizarOp, setFinalizarOp] = useState(null);
   const [eliminarItem, setEliminarItem] = useState(null);
   const [deletando, setDeletando] = useState(false);
+  const [pdfGerandoId, setPdfGerandoId] = useState(null);
+  const [empresa, setEmpresa] = useState({});
   const { addToast } = useToast();
   const podeAprovar = podeAtual("producao", "aprovar");
   const podeEditar = podeAtual("producao", "editar");
 
   const carregarDados = () => {
-    Promise.allSettled([listarOrdens(), listarMateriais()]).then(([ordensRes, materiaisRes]) => {
+    Promise.allSettled([listarOrdens(), listarMateriais(), buscarOrganizacao().catch(() => null)]).then(([ordensRes, materiaisRes, orgRes]) => {
       if (ordensRes.status === "rejected") {
         addToast(`Erro ao carregar ordens — ${descricaoErroApi(ordensRes.reason, "ordens")}`, "error");
         return;
@@ -91,6 +96,9 @@ export default function OrdensTab() {
       } else {
         const materiaisData = materiaisRes.value;
         setMateriais(Array.isArray(materiaisData) ? materiaisData : materiaisData?.materiais || []);
+      }
+      if (orgRes.status === "fulfilled" && orgRes.value) {
+        setEmpresa(orgRes.value?.organizacao || orgRes.value || {});
       }
     }).finally(() => setLoading(false));
   };
@@ -110,13 +118,39 @@ export default function OrdensTab() {
       field: "status",
       count: ops.filter((o) => o.status === k).length,
     })),
+    {
+      value: "mat_requisicao",
+      label: "Por requisitar",
+      icon: "inventory_2",
+      predicate: (o) => situacaoMaterial(o) === SITUACAO_MATERIAL.aguardando_requisicao,
+      count: ops.filter((o) => situacaoMaterial(o) === SITUACAO_MATERIAL.aguardando_requisicao).length,
+    },
+    {
+      value: "mat_liberacao",
+      label: "A libertar",
+      icon: "lock_clock",
+      predicate: (o) => situacaoMaterial(o) === SITUACAO_MATERIAL.aguardando_liberacao,
+      count: ops.filter((o) => situacaoMaterial(o) === SITUACAO_MATERIAL.aguardando_liberacao).length,
+    },
   ], [ops]);
 
-  const { search, setSearch, activeFilter, setActiveFilter, filtered, total } = useFilter({
+  const sortOptions = useMemo(() => [
+    { value: "", label: "Ordem de entrada" },
+    { value: "entrada_desc", label: "Entrada (mais recente)", compare: (a, b) => new Date(b.dataEntrada || 0) - new Date(a.dataEntrada || 0) },
+    { value: "entrada_asc", label: "Entrada (mais antiga)", compare: (a, b) => new Date(a.dataEntrada || 0) - new Date(b.dataEntrada || 0) },
+    { value: "entrega_asc", label: "Entrega (mais próxima)", compare: (a, b) => new Date(a.dataEntrega || 0) - new Date(b.dataEntrega || 0) },
+  ], []);
+
+  const { search, setSearch, activeFilter, setActiveFilter, filtered, total, sortBy, setSortBy } = useFilter({
     items: ops,
-    searchFields: ["cliente", "produto", "orcamento", "empresa"],
+    searchFields: ["cliente", "produto", "orcamento", "empresa", "numero"],
     filterConfig,
+    sortOptions,
   });
+
+  const bloqueadas = useMemo(() => ops.filter((o) => situacaoMaterial(o)?.bloqueia).length, [ops]);
+
+  const { visiveis, ...pag } = usePaginacao({ items: filtered });
 
   const handleLibertar = async (dados = {}) => {
     if (!libertarOp) return false;
@@ -163,15 +197,14 @@ export default function OrdensTab() {
     }
   };
 
-  const confirmarFinalizacao = async () => {
-    if (!finalizarOp) return;
+  const handlePdf = async (op) => {
+    setPdfGerandoId(op.id);
     try {
-      const atualizada = await finalizarProducao(finalizarOp.id);
-      setOps((prev) => prev.map((o) => (o.id === finalizarOp.id ? normalizar(atualizada) : o)));
-      addToast(`OP ${finalizarOp.id} finalizada com sucesso — estado atualizado para Finalizado`, "success");
-      setFinalizarOp(null);
-    } catch (err) {
-      addToast(err.response?.data?.erro || "Erro ao finalizar produção", "error");
+      await gerarOrdemProducaoPdf(op, empresa, matPorId);
+    } catch {
+      addToast("Erro ao gerar o PDF da ordem de produção", "error");
+    } finally {
+      setPdfGerandoId(null);
     }
   };
 
@@ -202,7 +235,7 @@ export default function OrdensTab() {
         </div>
       </div>
 
-      <section className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+      <section className="grid grid-cols-2 lg:grid-cols-5 gap-5">
         {[
           ["aguardando", "schedule", "warning"],
           ["em_producao", "construction", "info"],
@@ -211,6 +244,14 @@ export default function OrdensTab() {
         ].map(([key, icon, iconVariant]) => (
           <KpiCard key={key} icon={icon} iconVariant={iconVariant} label={statusConfig[key].label} value={ops.filter((o) => o.status === key).length} />
         ))}
+        <KpiCard
+          icon="lock_clock"
+          iconVariant="warning"
+          label="Bloqueadas"
+          value={bloqueadas}
+          onClick={() => setActiveFilter("mat_liberacao")}
+          active={activeFilter === "mat_liberacao"}
+        />
       </section>
 
       <FilterBar
@@ -220,14 +261,18 @@ export default function OrdensTab() {
         filters={filterConfig}
         activeFilter={activeFilter}
         onFilterChange={setActiveFilter}
+        sortBy={sortBy}
+        onSortChange={setSortBy}
+        sortOptions={sortOptions}
         count={total}
         countLabel="OPs"
       />
 
       {loading ? <CardSkeleton lines={6} /> : (
         <div className="space-y-3">
-          {filtered.map((op) => {
-            const sc = statusConfig[op.status];
+          {visiveis.map((op) => {
+            const sc = situacaoOP(op);
+            const matSit = situacaoMaterial(op);
             const processos = Object.keys(processoLabels);
             const processoIdx = processos.indexOf(op.processoAtual);
             return (
@@ -240,17 +285,25 @@ export default function OrdensTab() {
                       </div>
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-sm text-foreground">{op.id}</span>
+                          <span className="font-bold text-sm text-foreground">{op.numero || op.id}</span>
                           <Badge variant={sc.variant || "info"} className="text-[10px]">{sc.label}</Badge>
-                          {["aguardando", "em_producao"].includes(op.status) && Array.isArray(op.reserva_estoques) && op.reserva_estoques.length > 0 && op.requisicao_estado === "pendente" && (
-                            <Badge variant="destructive" className="text-[10px]">Aguardando requisição material</Badge>
-                          )}
-                          {["aguardando", "em_producao"].includes(op.status) && op.requisicao_estado === "requisitada" && (
-                            <Badge variant="warning" className="text-[10px]">Aguardando aprovação</Badge>
+                          {matSit && matSit !== SITUACAO_MATERIAL.sem_material && matSit !== SITUACAO_MATERIAL.material_liberado && (
+                            <Badge variant="destructive" className="text-[10px] animate-msg-in">
+                              <Icon name="inventory_2" className="text-[12px]" /> Material por libertar
+                            </Badge>
                           )}
                           {op.maquina && (
                             <Badge variant="outline" className="text-[10px]"><Icon name="print" className="text-[12px]" /> {op.maquina}</Badge>
                           )}
+                          <button
+                            type="button"
+                            title="Descarregar a folha de trabalho em PDF"
+                            onClick={(e) => { e.stopPropagation(); handlePdf(op); }}
+                            className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground hover:text-primary transition-colors px-1.5 py-0.5 rounded border border-border/60 hover:border-primary/40"
+                          >
+                            <Icon name={pdfGerandoId === op.id ? "hourglass_top" : "picture_as_pdf"} className="text-[13px]" />
+                            PDF
+                          </button>
                         </div>
                         <p className="text-xs text-muted-foreground">{op.cliente} — {op.produto} ({op.quantidade})</p>
                       </div>
@@ -315,30 +368,27 @@ export default function OrdensTab() {
                         </div>
                       </div>
                     )}
-                    {["aguardando", "em_producao"].includes(op.status) && op.requisicao_estado === "pendente" && (
+                    {matSit === SITUACAO_MATERIAL.aguardando_requisicao && (
                       <div className="mt-4 pt-4 border-t">
-                        {Array.isArray(op.reserva_estoques) && op.reserva_estoques.length > 0 ? (
-                          <div className="flex items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3">
-                            <p className="text-xs text-amber-700 dark:text-amber-400">
-                              Requisição de material pendente — só depois de libertada a OP pode avançar para produção.
-                            </p>
-                            <Button size="sm" onClick={(e) => { e.stopPropagation(); setLibertarOp(op); }}>
-                              <Icon name="inventory" className="text-lg" /> Requisição material
-                            </Button>
-                          </div>
-                        ) : (
-                          <p className="text-xs text-muted-foreground bg-muted/40 border border-border/60 rounded-lg px-4 py-3">
-                            Esta OP utiliza apenas produto acabado, sem materiais de estoque — pode finalizar diretamente com o botão <strong>Finalizar produção</strong>.
+                        <div className="flex items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3">
+                          <p className="text-xs text-amber-700 dark:text-amber-400">
+                            {temReservas(op)
+                              ? "Requisição de material pendente — só depois de libertada a OP pode avançar para produção."
+                              : "Nenhum material reservado ainda — submeta a requisição para o estoque autorizar a saída."}
                           </p>
-                        )}
+                          <Button size="sm" onClick={(e) => { e.stopPropagation(); setLibertarOp(op); }}>
+                            <Icon name="inventory" className="text-lg" /> Requisição material
+                          </Button>
+                        </div>
                       </div>
                     )}
-                    {["aguardando", "em_producao"].includes(op.status) && op.requisicao_estado === "requisitada" && (
+                    {matSit === SITUACAO_MATERIAL.aguardando_liberacao && (
                       <div className="mt-4 pt-4 border-t">
                         <div className="flex items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3">
                           <div className="min-w-0">
                             <p className="text-xs text-amber-700 dark:text-amber-400">
-                              Requisição submetida por <strong>{op.solicitado_por || "—"}</strong> — aguarda aprovação no estoque. A saída de stock só é registada após aprovação.
+                              <strong>Aguardando libertação de material.</strong> Requisição submetida por{" "}
+                              <strong>{op.solicitado_por || "—"}</strong> — a saída de stock só é registada após aprovação no estoque.
                             </p>
                             {podeAprovar && (
                               <p className="text-[11px] text-muted-foreground mt-0.5">
@@ -354,7 +404,7 @@ export default function OrdensTab() {
                         </div>
                       </div>
                     )}
-                    {["aguardando", "em_producao"].includes(op.status) && op.requisicao_estado === "libertada" && (
+                    {matSit === SITUACAO_MATERIAL.material_liberado && (
                       <div className="mt-4 pt-4 border-t">
                         <div className="flex items-center justify-between gap-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 py-3">
                           <p className="text-xs text-emerald-700 dark:text-emerald-400">
@@ -364,12 +414,10 @@ export default function OrdensTab() {
                         </div>
                       </div>
                     )}
-                    <div className="flex items-center gap-2 mt-4 pt-4 border-t">
-                      {!["finalizado", "entregue"].includes(op.status) && podeEditar && (!Array.isArray(op.reserva_estoques) || op.reserva_estoques.length === 0) && (
-                        <Button variant="success" size="sm" onClick={(e) => { e.stopPropagation(); setFinalizarOp(op); }}>
-                          <Icon name="check_circle" className="text-[16px]" /> Finalizar produção
-                        </Button>
-                      )}
+                    <div className="flex items-center gap-2 mt-4 pt-4 border-t flex-wrap">
+                      <Button variant="secondary" size="sm" onClick={(e) => { e.stopPropagation(); handlePdf(op); }}>
+                        <Icon name="picture_as_pdf" className="text-[16px]" /> Folha de trabalho (PDF)
+                      </Button>
                       <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); setEliminarItem(op); }}>
                         <Icon name="delete" className="text-[16px]" /> Remover OP
                       </Button>
@@ -390,6 +438,16 @@ export default function OrdensTab() {
           <p className="text-xs mt-1">Aprove um orçamento na Área Comercial e a OP será criada automaticamente.</p>
         </div>
       )}
+
+      {!loading && ops.length > 0 && filtered.length === 0 && (
+        <div className="text-center p-12 text-muted-foreground">
+          <Icon name="search_off" className="text-4xl block mx-auto mb-2 opacity-30" />
+          <p className="font-medium">Nenhuma OP corresponde ao filtro</p>
+          <p className="text-xs mt-1">Ajuste a pesquisa ou volte ao filtro &quot;Todos&quot;.</p>
+        </div>
+      )}
+
+      {filtered.length > 0 && <Paginacao {...pag} label="OPs" />}
 
       <SaidaMateriaisModal
         key={libertarOp?.id ?? "nenhum-saida"}
@@ -412,18 +470,6 @@ export default function OrdensTab() {
         onClose={() => setAprovarOp(null)}
         onConfirm={handleAprovar}
         nomeUsuario={getUsuario()?.nome || ""}
-      />
-
-      <ConfirmDialog
-        open={Boolean(finalizarOp)}
-        onClose={() => setFinalizarOp(null)}
-        onConfirm={confirmarFinalizacao}
-        title="Finalizar produção"
-        description={finalizarOp ? `Confirmar que a OP #${finalizarOp.id} (${finalizarOp.produto || "produção"}) foi concluída? O estado passará diretamente para Finalizado${Array.isArray(finalizarOp.reserva_estoques) && finalizarOp.reserva_estoques.length ? " e as reservas de material serão baixadas do estoque" : ""}.` : ""}
-        confirmLabel="Finalizar"
-        cancelLabel="Cancelar"
-        icon="check_circle"
-        tone="success"
       />
 
       <ConfirmDialog

@@ -212,14 +212,14 @@ export default function OrcamentosPage() {
   }));
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {carregando && <ListSkeleton count={5} />}
 
       {!carregando && (
-        <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">Orçamentos</h1>
-            <p className="mt-1 text-sm text-muted-foreground">{orcamentos.length} orçamentos registados // ORC</p>
+            <p className="mt-1 text-sm text-muted-foreground">{orcamentos.length} orçamentos registados</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Link href="/orcamentos/novo">
@@ -600,8 +600,8 @@ export default function OrcamentosPage() {
         }
       />
 
-      <footer className="p-6 text-center border-t bg-muted/30 rounded-2xl">
-        <p className="text-sm text-muted-foreground">SIGRAF — Sistema de Gestão para Indústria Gráfica</p>
+      <footer className="border-t pt-6 pb-2 text-center">
+        <p className="text-[11px] text-muted-foreground">SIGRAF · Sistema de Gestão para Indústria Gráfica</p>
       </footer>
 
       <FloatButton href="/orcamentos/novo" label="Novo Orçamento" icon="request_quote" />

@@ -111,7 +111,7 @@ export default function ContasBancariasTab() {
           <h2 className="font-sans text-xl font-bold text-foreground tracking-tight flex items-center gap-2">
             <Icon name="account_balance" className="text-primary text-[22px]" /> Contas e Caixa
           </h2>
-          <p className="text-primary mt-0.5 font-mono text-[10px] uppercase tracking-widest">
+          <p className="mt-0.5 text-xs text-muted-foreground">
             {contas.length} conta{contas.length === 1 ? "" : "s"} · usadas nos movimentos de tesouraria, faturas e recibos
           </p>
         </div>

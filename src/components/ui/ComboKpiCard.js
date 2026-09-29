@@ -16,10 +16,10 @@ const VARIANTS = {
  *
  * stats = [{ label, value, sublabel }] (até 2)
  */
-export default function ComboKpiCard({ icon, title, subtitle, stats, iconVariant = "primary", className }) {
+export default function ComboKpiCard({ icon, title, subtitle, stats, iconVariant = "primary", className, style }) {
   const v = VARIANTS[iconVariant] || VARIANTS.primary;
   return (
-    <Card className={cn("relative overflow-hidden", className)}>
+    <Card style={style} className={cn("relative overflow-hidden", className)}>
       <div className={cn("absolute inset-x-0 top-0 h-0.5", v.bar)} aria-hidden="true" />
       <CardContent className="p-5 sm:p-6">
         <div className="flex items-center gap-3 mb-5">

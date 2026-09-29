@@ -6,6 +6,7 @@ export * from "./FormField";
 export * from "./FormSection";
 export * from "./Input";
 export * from "./KpiCard";
+export { default as PageHeader } from "./PageHeader";
 export * from "./MediaCard";
 export * from "./RadioCard";
 export * from "./TextField";

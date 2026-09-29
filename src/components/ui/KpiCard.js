@@ -1,4 +1,4 @@
-import { Card, CardContent } from "@/components/ui/Card";
+import { CardContent } from "@/components/ui/Card";
 import Icon from "@/components/Icon";
 import { cn } from "@/lib/utils";
 
@@ -35,10 +35,21 @@ const VARIANTS = {
   },
 };
 
-export default function KpiCard({ icon, label, value, unit, badge, barPct, iconVariant = "primary", className, children }) {
+export default function KpiCard({ icon, label, value, unit, badge, barPct, iconVariant = "primary", className, onClick, active, children }) {
   const v = VARIANTS[iconVariant] || VARIANTS.primary;
+  const Wrapper = onClick ? "button" : "div";
   return (
-    <Card className={cn("relative overflow-hidden", className)}>
+    <Wrapper
+      type={onClick ? "button" : undefined}
+      onClick={onClick}
+      aria-pressed={onClick ? !!active : undefined}
+      className={cn(
+        "relative overflow-hidden w-full text-left",
+        onClick && "focus-ring-soft cursor-pointer transition-transform duration-200 ease-in-out hover:-translate-y-0.5",
+        active && "ring-2 ring-primary/50",
+        className
+      )}
+    >
       <div className={cn("absolute inset-x-0 top-0 h-0.5", v.bar)} aria-hidden="true" />
       <CardContent className="flex items-start gap-4 sm:gap-5 p-5 sm:p-6">
         <div
@@ -66,6 +77,6 @@ export default function KpiCard({ icon, label, value, unit, badge, barPct, iconV
           {children}
         </div>
       </CardContent>
-    </Card>
+    </Wrapper>
   );
 }
