@@ -47,8 +47,20 @@ export async function removerAnexo(id) {
   return data;
 }
 
-// URL pública do ficheiro guardado no backend (pasta /uploads)
-export function urlAnexo(caminho) {
-  const base = (process.env.NEXT_PUBLIC_API_URL || "http://[::1]:8000/api").replace(/\/api\/?$/, "");
-  return `${base}/uploads/${caminho}`;
+// Abre o anexo (PDF/imagem) guardado na base de dados numa nova aba.
+// Usa a API autenticada (o ficheiro já não está em /uploads público).
+export async function abrirAnexo(id) {
+  const janela = window.open("", "_blank");
+  try {
+    const res = await api.get(`/tesouraria/anexos/${id}`, { responseType: "blob" });
+    const blob = res.data;
+    const url = URL.createObjectURL(blob);
+    if (janela) {
+      janela.location.href = url;
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (err) {
+    if (janela) janela.close();
+    throw err;
+  }
 }

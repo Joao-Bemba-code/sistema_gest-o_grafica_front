@@ -9,7 +9,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import FilterBar, { useFilter } from "@/components/ui/FilterBar";
 import { ListSkeleton } from "@/components/Skeleton";
-import { listarMovimentos, removerAnexo, urlAnexo } from "@/services/tesouraria";
+import { listarMovimentos, removerAnexo, abrirAnexo } from "@/services/tesouraria";
 
 const POR_PAGINA = 9;
 
@@ -148,6 +148,14 @@ export default function ComprovativosTab() {
     if (n === 1 || n === totalPaginas || (n >= paginaAtual - 1 && n <= paginaAtual + 1)) paginasVisiveis.push(n);
   }
 
+  const abrir = async (i) => {
+    try {
+      await abrirAnexo(i.id);
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao abrir ficheiro", "error");
+    }
+  };
+
   const confirmarRemocao = async () => {
     if (!aRemover) return;
     setRemovendo(true);
@@ -226,14 +234,13 @@ export default function ComprovativosTab() {
                   </div>
 
                   <div className="flex items-center justify-between mt-3 pt-3 border-t">
-                    <a
-                      href={urlAnexo(i.caminho)}
-                      target="_blank"
-                      rel="noreferrer"
+                    <button
+                      type="button"
+                      onClick={() => abrir(i)}
                       className="inline-flex items-center gap-1.5 text-[11px] font-medium text-primary hover:underline"
                     >
                       <Icon name="open_in_new" className="text-[13px]" /> Abrir ficheiro
-                    </a>
+                    </button>
                     <button
                       type="button"
                       onClick={() => setARemover(i)}

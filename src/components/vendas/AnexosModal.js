@@ -7,7 +7,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import Icon from "@/components/Icon";
 import { useToast } from "@/components/Toast";
 import { inputCls } from "@/lib/estoque";
-import { anexarFicheiros, removerAnexo, urlAnexo } from "@/services/tesouraria";
+import { anexarFicheiros, removerAnexo, abrirAnexo } from "@/services/tesouraria";
 
 function formatBytes(n) {
   const v = Number(n || 0);
@@ -57,6 +57,14 @@ export default function AnexosModal({ movimento, open, onClose, onMudou }) {
     }
   };
 
+  const abrir = async (a) => {
+    try {
+      await abrirAnexo(a.id);
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao abrir ficheiro", "error");
+    }
+  };
+
   const confirmarRemocao = async () => {
     if (!aRemover) return;
     setRemovendo(true);
@@ -100,9 +108,9 @@ export default function AnexosModal({ movimento, open, onClose, onMudou }) {
                 <p className="text-xs font-semibold text-foreground truncate">{a.nome_original}</p>
                 <p className="text-[10px] text-muted-foreground">{formatBytes(a.tamanho)} · {formatData(a.createdAt)}</p>
               </div>
-              <a href={urlAnexo(a.caminho)} target="_blank" rel="noreferrer" className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-primary transition-colors shrink-0" title="Abrir ficheiro">
+              <button type="button" onClick={() => abrir(a)} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-primary transition-colors shrink-0" title="Abrir ficheiro">
                 <Icon name="open_in_new" className="text-[16px]" />
-              </a>
+              </button>
               <button type="button" onClick={() => setARemover(a)} className="p-1.5 rounded hover:bg-error/10 text-muted-foreground hover:text-error transition-colors shrink-0" title="Remover anexo">
                 <Icon name="delete" className="text-[16px]" />
               </button>
