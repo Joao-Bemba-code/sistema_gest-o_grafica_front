@@ -34,3 +34,21 @@ export async function exportarTesouraria(params = {}) {
   const { data } = await api.get("/tesouraria/exportar", { params, responseType: "blob" });
   return data;
 }
+
+export async function anexarFicheiros(movimentoId, ficheiros) {
+  const form = new FormData();
+  ficheiros.forEach((f) => form.append("anexos", f));
+  const { data } = await api.post(`/tesouraria/${movimentoId}/anexos`, form, { timeout: 60000 });
+  return data;
+}
+
+export async function removerAnexo(id) {
+  const { data } = await api.delete(`/tesouraria/anexos/${id}`);
+  return data;
+}
+
+// URL pública do ficheiro guardado no backend (pasta /uploads)
+export function urlAnexo(caminho) {
+  const base = (process.env.NEXT_PUBLIC_API_URL || "http://[::1]:8000/api").replace(/\/api\/?$/, "");
+  return `${base}/uploads/${caminho}`;
+}

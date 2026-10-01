@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { listarMovimentos, criarMovimento, removerMovimento, resumoTesouraria, exportarTesouraria } from "@/services/tesouraria";
+import { listarMovimentos, criarMovimento, removerMovimento, resumoTesouraria, exportarTesouraria, anexarFicheiros } from "@/services/tesouraria";
 import { listarContas, criarConta } from "@/services/contasBancarias";
+import AnexosModal from "@/components/vendas/AnexosModal";
 import Icon from "@/components/Icon";
 import { Card, CardContent } from "@/components/ui/Card";
 import KpiCard from "@/components/ui/KpiCard";
@@ -109,6 +110,8 @@ export default function TesourariaTab() {
   const [loading, setLoading] = useState(true);
   const [modalNovo, setModalNovo] = useState(false);
   const [form, setForm] = useState(initialForm);
+  const [novosAnexos, setNovosAnexos] = useState([]);
+  const [anexosMovimento, setAnexosMovimento] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [criandoCaixa, setCriandoCaixa] = useState(false);
   const [eliminarItem, setEliminarItem] = useState(null);
@@ -232,7 +235,14 @@ export default function TesourariaTab() {
 
   const abrirNovo = () => {
     setForm(initialForm);
+    setNovosAnexos([]);
     setModalNovo(true);
+  };
+
+  const fecharNovo = () => {
+    setModalNovo(false);
+    setForm(initialForm);
+    setNovosAnexos([]);
   };
 
   const handleChange = (e) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -301,10 +311,18 @@ export default function TesourariaTab() {
         observacoes: form.observacoes,
         cliente_id: form.cliente_id || undefined,
       };
-      await criarMovimento(payload);
+      const criado = await criarMovimento(payload);
+      if (novosAnexos.length > 0 && criado?.id) {
+        try {
+          await anexarFicheiros(criado.id, novosAnexos);
+        } catch (err) {
+          addToast(err.response?.data?.erro || "Movimento registado, mas os recibos não foram anexados", "warning");
+        }
+      }
       addToast("Movimento registado com sucesso", "success");
       setModalNovo(false);
       setForm(initialForm);
+      setNovosAnexos([]);
       await Promise.all([carregarResumo(), carregarMovimentos(), carregarContas()]);
     } catch (err) {
       addToast(err.response?.data?.erro || "Erro ao registar movimento", "error");
@@ -325,6 +343,19 @@ export default function TesourariaTab() {
       addToast(err.response?.data?.erro || "Erro ao eliminar movimento", "error");
     } finally {
       setDeletando(false);
+    }
+  };
+
+  // Recarrega a lista e actualiza o movimento aberto no modal de anexos,
+  // para os anexos novos/removidos aparecerem logo.
+  const atualizarAposAnexos = async () => {
+    try {
+      const data = await listarMovimentos();
+      const lista = Array.isArray(data) ? data : data?.data ?? data?.movimentos ?? [];
+      setMovimentos(lista);
+      setAnexosMovimento((prev) => (prev ? lista.find((x) => x.id === prev.id) || prev : prev));
+    } catch {
+      // silencioso: o modal mantém o que já tinha
     }
   };
 
@@ -349,7 +380,7 @@ export default function TesourariaTab() {
     <div className="space-y-5">
       <div className="flex flex-wrap justify-end gap-3">
         <button onClick={handleExportar} disabled={movimentos.length === 0} className="bg-surface-variant text-on-surface border border-outline-variant px-4 py-2 rounded font-mono flex items-center gap-2 hover:border-primary hover:text-primary transition-all text-[11px] uppercase tracking-wider disabled:opacity-50 disabled:pointer-events-none">
-          <Icon name="download" className="text-[16px]" /> Exportar CSV
+          <Icon name="download" className="text-[16px]" /> Exportar Excel
         </button>
         <button onClick={abrirNovo} className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium shadow-sm hover:bg-primary/90 transition-colors ">
           <Icon name="add" className="text-[16px]" /> Novo Movimento
@@ -454,6 +485,14 @@ export default function TesourariaTab() {
                         </p>
                         <p className="text-[10px] text-muted-foreground">{formatData(m.data_movimento || m.data)}</p>
                       </div>
+                      <Button variant="ghost" size="sm" onClick={() => setAnexosMovimento(m)} title="Recibos / Anexos" className="relative">
+                        <Icon name="attach_file" className="text-[16px] text-muted-foreground" />
+                        {m.anexos?.length > 0 && (
+                          <span className="absolute top-0.5 right-0 min-w-[15px] h-[15px] px-1 rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center">
+                            {m.anexos.length}
+                          </span>
+                        )}
+                      </Button>
                       <Button variant="ghost" size="sm" onClick={() => setEliminarItem(m)} title="Remover"><Icon name="delete" className="text-[16px] text-destructive" /></Button>
                     </div>
                   </div>
@@ -495,13 +534,13 @@ export default function TesourariaTab() {
 
       <Modal
         open={modalNovo}
-        onClose={() => { setModalNovo(false); setForm(initialForm); }}
+        onClose={fecharNovo}
         title="Novo Movimento"
         icon="add_card"
         size="lg"
         footer={
           <>
-            <Button type="button" variant="outline" onClick={() => { setModalNovo(false); setForm(initialForm); }}>Cancelar</Button>
+            <Button type="button" variant="outline" onClick={fecharNovo}>Cancelar</Button>
             <Button type="submit" form="form-tesouraria" loading={salvando}>Registar Movimento</Button>
           </>
         }
@@ -605,6 +644,22 @@ export default function TesourariaTab() {
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Observações</label>
               <textarea name="observacoes" rows={3} value={form.observacoes} onChange={handleChange} className={inputCls} placeholder="Notas adicionais..." />
             </div>
+            <div className="sm:col-span-2 flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Recibos / Comprovativos (opcional)</label>
+              <input
+                type="file"
+                multiple
+                accept=".pdf,.jpg,.jpeg,.png,.webp"
+                onChange={(e) => setNovosAnexos(Array.from(e.target.files || []))}
+                className={inputCls}
+              />
+              <p className="text-[10px] text-muted-foreground">PDF ou imagem (JPG, PNG, WEBP), até 10 MB cada.</p>
+              {novosAnexos.length > 0 && (
+                <p className="text-[10px] text-foreground truncate">
+                  {novosAnexos.length} ficheiro(s): {novosAnexos.map((f) => f.name).join(", ")}
+                </p>
+              )}
+            </div>
           </div>
         </form>
       </Modal>
@@ -616,6 +671,13 @@ export default function TesourariaTab() {
         loading={deletando}
         title="Eliminar movimento"
         description={eliminarItem ? `Tem a certeza que deseja eliminar o movimento "${eliminarItem.descricao || eliminarItem.categoria || eliminarItem.id}"? Esta ação não pode ser desfeita.` : ""}
+      />
+
+      <AnexosModal
+        movimento={anexosMovimento}
+        open={Boolean(anexosMovimento)}
+        onClose={() => setAnexosMovimento(null)}
+        onMudou={atualizarAposAnexos}
       />
     </div>
   );
