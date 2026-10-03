@@ -432,7 +432,7 @@ export default function DividasTab() {
                           )}
                         </div>
             <p className="text-xs text-muted-foreground mt-1 truncate">
-                          {d.cliente?.empresa || d.cliente?.nome || "Sem cliente"}{d.cliente?.nif ? ` (NIF: ${d.cliente.nif})` : ""} �� {categorias.find((c) => c.value === d.categoria)?.label || d.categoria}
+                          {d.cliente?.empresa || d.cliente?.nome || "Sem cliente"}{d.cliente?.nif ? ` (NIF: ${d.cliente.nif})` : ""} · {categorias.find((c) => c.value === d.categoria)?.label || d.categoria}
                         </p>
                         <p className="text-[11px] text-muted-foreground mt-0.5">
                           Emissão {formatData(d.data_emissao)} · Vencimento {formatData(d.data_vencimento)}
