@@ -132,8 +132,15 @@ export default function DividasTab() {
 
   useEffect(() => {
     carregar();
-    listarClientes({ tipo: "cliente" })
-      .then((d) => setClientes(Array.isArray(d) ? d : []))
+    listarClientes({})
+      .then((d) => {
+        const lista = Array.isArray(d) ? d : [];
+        const unicos = Array.from(new Map(lista.map((c) => [c.id, c])).values());
+        unicos.sort((a, b) =>
+          (a.empresa || a.nome || "").localeCompare(b.empresa || b.nome || "", "pt")
+        );
+        setClientes(unicos);
+      })
       .catch(() => setClientes([]));
     listarContas({ ativo: "true" })
       .then((d) => setContas(Array.isArray(d) ? d : []))
@@ -424,8 +431,8 @@ export default function DividasTab() {
                             <Badge variant="destructive">{atraso} dia(s) em atraso</Badge>
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1 truncate">
-                          {d.cliente?.empresa || d.cliente?.nome || "Sem cliente"} · {categorias.find((c) => c.value === d.categoria)?.label || d.categoria}
+            <p className="text-xs text-muted-foreground mt-1 truncate">
+                          {d.cliente?.empresa || d.cliente?.nome || "Sem cliente"}{d.cliente?.nif ? ` (NIF: ${d.cliente.nif})` : ""} �� {categorias.find((c) => c.value === d.categoria)?.label || d.categoria}
                         </p>
                         <p className="text-[11px] text-muted-foreground mt-0.5">
                           Emissão {formatData(d.data_emissao)} · Vencimento {formatData(d.data_vencimento)}
@@ -482,7 +489,7 @@ export default function DividasTab() {
               <select value={form.cliente_id} onChange={(e) => setForm((p) => ({ ...p, cliente_id: e.target.value }))} className={inputCls}>
                 <option value="">Sem cliente vinculado</option>
                 {clientes.map((c) => (
-                  <option key={c.id} value={c.id}>{c.empresa || c.nome}</option>
+                  <option key={c.id || `${c.nome}-${c.nif}`} value={c.id}>{c.empresa || c.nome}{c.nif ? ` (NIF: ${c.nif})` : ""}</option>
                 ))}
               </select>
             </FormField>
