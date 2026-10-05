@@ -137,7 +137,7 @@ export default function DividasTab() {
         const lista = Array.isArray(d) ? d : [];
         const unicos = Array.from(new Map(lista.map((c) => [c.id, c])).values());
         unicos.sort((a, b) =>
-          (a.empresa || a.nome || "").localeCompare(b.empresa || b.nome || "", "pt")
+          (a.nome || a.empresa || "").localeCompare(b.nome || b.empresa || "", "pt")
         );
         setClientes(unicos);
       })
@@ -431,8 +431,8 @@ export default function DividasTab() {
                             <Badge variant="destructive">{atraso} dia(s) em atraso</Badge>
                           )}
                         </div>
-            <p className="text-xs text-muted-foreground mt-1 truncate">
-                          {d.cliente?.empresa || d.cliente?.nome || "Sem cliente"}{d.cliente?.nif ? ` (NIF: ${d.cliente.nif})` : ""} · {categorias.find((c) => c.value === d.categoria)?.label || d.categoria}
+                        <p className="text-xs text-muted-foreground mt-1 truncate">
+                          {d.cliente?.nome || d.cliente?.empresa || "Sem cliente"}{d.cliente?.nif ? ` (NIF: ${d.cliente.nif})` : ""} · {categorias.find((c) => c.value === d.categoria)?.label || d.categoria}
                         </p>
                         <p className="text-[11px] text-muted-foreground mt-0.5">
                           Emissão {formatData(d.data_emissao)} · Vencimento {formatData(d.data_vencimento)}
@@ -489,7 +489,7 @@ export default function DividasTab() {
               <select value={form.cliente_id} onChange={(e) => setForm((p) => ({ ...p, cliente_id: e.target.value }))} className={inputCls}>
                 <option value="">Sem cliente vinculado</option>
                 {clientes.map((c) => (
-                  <option key={c.id || `${c.nome}-${c.nif}`} value={c.id}>{c.empresa || c.nome}{c.nif ? ` (NIF: ${c.nif})` : ""}</option>
+                  <option key={c.id || `${c.nome}-${c.nif}`} value={c.id}>{c.nome || c.empresa}{c.empresa && c.nome && c.empresa !== c.nome ? ` — ${c.empresa}` : ""}{c.nif ? ` (NIF: ${c.nif})` : ""}</option>
                 ))}
               </select>
             </FormField>
@@ -596,7 +596,7 @@ export default function DividasTab() {
             <div className="rounded-lg bg-muted/50 border border-border/60 px-3 py-2">
               <p className="text-sm font-semibold text-foreground">{modalPagar.descricao}</p>
               <p className="text-xs text-muted-foreground">
-                {modalPagar.cliente?.empresa || modalPagar.cliente?.nome || "Sem cliente"} · Saldo {formatKz(saldoDe(modalPagar))}
+                {modalPagar.cliente?.nome || modalPagar.cliente?.empresa || "Sem cliente"} · Saldo {formatKz(saldoDe(modalPagar))}
               </p>
             </div>
             <p className="text-[11px] text-muted-foreground">
@@ -662,7 +662,7 @@ export default function DividasTab() {
         {verFicha && (
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3 text-xs">
-              <div><p className="text-muted-foreground">Cliente</p><p className="font-medium text-foreground">{verFicha.cliente?.empresa || verFicha.cliente?.nome || "—"}</p></div>
+              <div><p className="text-muted-foreground">Cliente</p><p className="font-medium text-foreground">{verFicha.cliente?.nome || verFicha.cliente?.empresa || "—"}</p></div>
               <div><p className="text-muted-foreground">Estado</p><p className="font-medium text-foreground">{(estadoCfg[verFicha.estado] || {}).label || verFicha.estado}</p></div>
               <div><p className="text-muted-foreground">Valor</p><p className="font-medium text-foreground">{formatKz(verFicha.valor)}</p></div>
               <div><p className="text-muted-foreground">Pago</p><p className="font-medium text-foreground">{formatKz(verFicha.valor_pago)}</p></div>

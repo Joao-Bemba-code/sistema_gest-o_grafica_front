@@ -91,7 +91,7 @@ export default function ComprovativosTab() {
             tipo: m.tipo,
             descricao: m.descricao || "",
             categoria: m.categoria || "",
-            clienteNome: m.cliente ? (m.cliente.empresa || m.cliente.nome || "") : "",
+            clienteNome: m.cliente ? (m.cliente.nome || m.cliente.empresa || "") : "",
             contaNome: m.conta ? `${m.conta.banco_nome || ""}${m.conta.numero_conta ? ` (${m.conta.numero_conta})` : ""}`.trim() : "",
             valor: Number(m.valor || 0),
           });
