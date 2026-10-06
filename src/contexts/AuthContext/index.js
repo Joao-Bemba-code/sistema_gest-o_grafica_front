@@ -38,8 +38,9 @@ export function AuthProvider({ children }) {
           }
         }
       } catch (e) {
-        // Token inválido/expirado → limpa a sessão.
-        sair();
+        // 401 já é tratado no interceptor (limpa sessão e redireciona).
+        // Erros de rede/servidor não podem desligar o utilizador: mantém-se
+        // a sessão guardada e o perfil é revalidado na próxima carga.
       }
       setCarregando(false);
     };

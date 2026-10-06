@@ -35,6 +35,12 @@ const alternarPermissao = (perm, modulo, acao) => {
   const nova = JSON.parse(JSON.stringify(perm));
   if (!nova[modulo]) nova[modulo] = {};
   nova[modulo][acao] = !nova[modulo][acao];
+  // Sem "ver" não é possível usar o módulo: ao marcar qualquer outra ação,
+  // liga "ver"; ao desligar "ver", limpa as restantes ações do módulo.
+  if (acao !== "ver" && nova[modulo][acao]) nova[modulo].ver = true;
+  if (acao === "ver" && !nova[modulo].ver) {
+    ACOES.forEach((a) => { if (a.valor !== "ver") nova[modulo][a.valor] = false; });
+  }
   return nova;
 };
 
@@ -46,6 +52,8 @@ const alternarTodasPermissoes = (perm, modulo, acoes) => {
   acoes.forEach((a) => { nova[modulo][a.valor] = !todasLigadas; });
   return nova;
 };
+
+const temModuloVisivel = (perm) => MODULOS.some((m) => !!perm?.[m.valor]?.ver);
 
 const formatarDataHora = (valor) => {
   if (!valor) return "—";
@@ -183,7 +191,9 @@ export default function UtilizadoresPage() {
     }
     setSalvando(true);
     try {
-      const permsEnvio = permPersonalizadas ? permissoes : null;
+      // Permissões sem nenhum módulo visível não têm efeito: guarda-se null
+      // para o utilizador ficar com as permissões por defeito do perfil.
+      const permsEnvio = permPersonalizadas && temModuloVisivel(permissoes) ? permissoes : null;
       if (modal.edicao) {
         await atualizar(modal.edicao.id, {
           nome: form.nome,
@@ -422,13 +432,9 @@ export default function UtilizadoresPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        setPermPersonalizadas((v) => {
-                          if (!v) {
-                            setPermissoes(permissoesDoPerfil(form.perfil));
-                            return true;
-                          }
-                          return false;
-                        });
+                        const ativar = !permPersonalizadas;
+                        setPermPersonalizadas(ativar);
+                        if (ativar) setPermissoes(permissoesDoPerfil(form.perfil));
                       }}
                       className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${permPersonalizadas ? "bg-primary" : "bg-muted"}`}
                       aria-pressed={permPersonalizadas}

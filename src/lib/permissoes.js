@@ -87,14 +87,18 @@ export function permissoesDoUsuario(usuario) {
   // (dados antigos ou gravados incompletos) com os valores do perfil, para que
   // uma permissão parcial não bloqueie silenciosamente outros módulos.
   const efetivas = {};
+  let algumModuloVisivel = false;
   MODULOS.forEach((m) => {
     efetivas[m] = {};
     ACOES.forEach((a) => {
       const valor = usuario.permissoes?.[m]?.[a];
       efetivas[m][a] = typeof valor === "boolean" ? valor : !!perfil[m]?.[a];
     });
+    if (efetivas[m].ver) algumModuloVisivel = true;
   });
-  return efetivas;
+  // Permissões personalizadas que não dão acesso a nenhum módulo (objeto vazio
+  // ou dados antigos gravados todos a false) são ignoradas: volta ao perfil.
+  return algumModuloVisivel ? efetivas : perfil;
 }
 
 // Verifica se o utilizador tem permissão para acao no modulo.

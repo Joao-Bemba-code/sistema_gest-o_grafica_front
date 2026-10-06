@@ -1,4 +1,14 @@
 import withPWA from "next-pwa";
+import defaultCache from "next-pwa/cache.js";
+
+// As respostas da API (perfil, permissões, utilizadores, ...) nunca podem ser
+// servidas pelo cache do service worker. Com NetworkFirst, se o backend demorar
+// (cold start), o SW devolvia dados antigos: depois de gravar permissões a app
+// continuava a mostrar "0 módulos" e o utilizador atualizado ficava sem acesso.
+const SEM_CACHE_API = {
+  urlPattern: /^https?:\/\/[^/]+\/api\//i,
+  handler: "NetworkOnly",
+};
 
 /** @type {import('next').NextConfig} */
 
@@ -46,6 +56,7 @@ const withPWAConfig = withPWA({
   skipWaiting: true,
   disable: process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_DISABLE_PWA === "true",
   scope: "/",
+  runtimeCaching: [SEM_CACHE_API, ...defaultCache],
 });
 
 const config = withPWAConfig(nextConfig);
