@@ -151,7 +151,7 @@ export default function UtilizadoresPage() {
     setForm({ nome: u.nome || "", email: u.email || "", senha: "", perfil: u.perfil || "producao" });
     const temPerm = !!u.permissoes && Object.keys(u.permissoes).length > 0;
     setPermPersonalizadas(temPerm);
-    setPermissoes(temPerm ? JSON.parse(JSON.stringify(u.permissoes)) : permissoesVazias());
+    setPermissoes(temPerm ? JSON.parse(JSON.stringify(permissoesDoUsuario(u))) : permissoesVazias());
     setModal({ aberto: true, edicao: u });
   };
 
@@ -416,7 +416,7 @@ export default function UtilizadoresPage() {
                     <div>
                       <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider">Permissões personalizadas</p>
                       <p className="text-[11px] text-muted-foreground mt-0.5">
-                        Se ativadas, sobrepõem o perfil por defeito. Use as ações Ver, Criar, Editar e Eliminar por módulo.
+                        Se ativadas, sobrepõem o perfil por defeito. Use as ações Ver, Criar, Editar, Eliminar e Aprovar por módulo.
                       </p>
                     </div>
                     <button
@@ -440,10 +440,10 @@ export default function UtilizadoresPage() {
 
                   {permPersonalizadas && (() => {
                     const perfilBase = permissoesDoPerfil(form.perfil);
-                    const acoesEditor = ACOES.filter((a) => a.valor !== "aprovar");
+                    const acoesEditor = ACOES;
                     return (
                       <div className="space-y-1.5 max-h-64 overflow-y-auto custom-scrollbar pr-1">
-                        <div className="grid grid-cols-[1fr_repeat(4,44px)] gap-2 items-center">
+                        <div className="grid grid-cols-[1fr_repeat(5,44px)] gap-2 items-center">
                           <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Módulo</span>
                           {acoesEditor.map((a) => (
                             <span key={a.valor} className="text-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider" title={a.label}>{a.valor.slice(0, 3)}</span>
@@ -452,7 +452,7 @@ export default function UtilizadoresPage() {
                         {MODULOS.map((m) => {
                           const acessivel = !!perfilBase?.[m.valor]?.ver;
                           return (
-                            <div key={m.valor} className="grid grid-cols-[1fr_repeat(4,44px)] gap-2 items-center py-1 border-b border-border/10 last:border-0">
+                            <div key={m.valor} className="grid grid-cols-[1fr_repeat(5,44px)] gap-2 items-center py-1 border-b border-border/10 last:border-0">
                               <span className="text-[12px] font-medium text-foreground truncate flex items-center gap-1.5">
                                 <button
                                   type="button"

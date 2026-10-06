@@ -81,8 +81,20 @@ const PERMISSOES_PADRAO = {
 export function permissoesDoUsuario(usuario) {
   if (!usuario) return {};
   if (usuario.perfil === "admin") return PERMISSOES_PADRAO.admin;
-  if (usuario.permissoes) return usuario.permissoes;
-  return PERMISSOES_PADRAO[usuario.perfil] || PERMISSOES_PADRAO.producao;
+  const perfil = PERMISSOES_PADRAO[usuario.perfil] || PERMISSOES_PADRAO.producao;
+  if (!usuario.permissoes) return perfil;
+  // Normaliza as permissões personalizadas: preenche módulos/ações em falta
+  // (dados antigos ou gravados incompletos) com os valores do perfil, para que
+  // uma permissão parcial não bloqueie silenciosamente outros módulos.
+  const efetivas = {};
+  MODULOS.forEach((m) => {
+    efetivas[m] = {};
+    ACOES.forEach((a) => {
+      const valor = usuario.permissoes?.[m]?.[a];
+      efetivas[m][a] = typeof valor === "boolean" ? valor : !!perfil[m]?.[a];
+    });
+  });
+  return efetivas;
 }
 
 // Verifica se o utilizador tem permissão para acao no modulo.
