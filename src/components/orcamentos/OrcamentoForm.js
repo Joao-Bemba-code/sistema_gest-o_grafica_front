@@ -49,10 +49,29 @@ export function custoUnitItem(it) {
   return (it.materiais || []).reduce((s, m) => s + custoTotalMaterial(m), 0);
 }
 
+// Preço de venda por unidade de um item composto manualmente: soma total dos
+// materiais dividida pela quantidade de unidades do item.
+export function precoUnitComposto(it) {
+  const qtd = Number(it?.quantidade) || 0;
+  const soma = custoUnitItem(it);
+  return qtd > 0 ? Number((soma / qtd).toFixed(2)) : 0;
+}
+
+export function itemComposto(it) {
+  return !!it?.produtoAplicado || (it?.materiais || []).some((m) => m.material_id);
+}
+
 export function recalcularItem(it) {
-  const custoTotal = custoUnitItem(it);
-  const valorUnitario = Number(custoTotal.toFixed(2));
-  return { valorUnitario, total: Number(custoTotal.toFixed(2)) };
+  const valorUnitario = itemComposto(it) ? precoUnitComposto(it) : Number(it?.valorUnitario) || 0;
+  const qtd = Number(it?.quantidade) || 0;
+  const total = qtd > 0 ? Number((qtd * valorUnitario).toFixed(2)) : valorUnitario;
+  return { valorUnitario, total };
+}
+
+export function totalQuantidadeItem(it) {
+  const preco = Number(it?.valorUnitario) || 0;
+  const qtd = Number(it?.quantidade) || 0;
+  return qtd > 0 ? Number((qtd * preco).toFixed(2)) : preco;
 }
 
 export function recalcularServico(sv) {
@@ -198,12 +217,6 @@ export default function OrcamentoForm({ formId = "form-orcamento", form, setFiel
   const addItem = () => setForm((p) => ({ ...p, itens: [...p.itens, { ...blankItem, materiais: [{ ...blankMaterial }] }] }));
   const removeItem = (idx) => setForm((p) => ({ ...p, itens: p.itens.filter((_, i) => i !== idx) }));
 
-  const totalQuantidadeItem = (it) => {
-    const qtd = Number(it.quantidade) || 0;
-    const preco = Number(it.valorUnitario) || 0;
-    return qtd > 0 ? Number((qtd * preco).toFixed(2)) : preco;
-  };
-
   const setItem = (idx, key, val) => {
     setForm((p) => {
       const itens = [...p.itens];
@@ -217,22 +230,18 @@ export default function OrcamentoForm({ formId = "form-orcamento", form, setFiel
           if (produto) {
             const qtd = Number(val) || 0;
             itens[idx].materiais = materiaisDaComposicao(produto, qtd > 0 ? qtd : 1);
-            itens[idx].valorUnitario =
-              Number(itens[idx].valorUnitario) > 0
-                ? itens[idx].valorUnitario
-                : Number(produto.preco_venda) || Number(produto.custo_unit) || 0;
+            if (!(Number(itens[idx].valorUnitario) > 0)) {
+              itens[idx].valorUnitario = Number(produto.preco_venda) || Number(produto.custo_unit) || 0;
+            }
             itens[idx].total = totalQuantidadeItem(itens[idx]);
             return { ...p, itens };
           }
         }
-        const temMateriais = (itens[idx].materiais || []).some((m) => m.material_id);
-        if (temMateriais) {
-          const calc = recalcularItem(itens[idx]);
-          itens[idx].valorUnitario = calc.valorUnitario;
-          itens[idx].total = calc.total;
-        } else {
-          itens[idx].total = totalQuantidadeItem(itens[idx]);
+        // Item composto manualmente: o preço por unidade segue a soma dos materiais dividida pela quantidade.
+        if ((itens[idx].materiais || []).some((mm) => mm.material_id)) {
+          itens[idx].valorUnitario = precoUnitComposto(itens[idx]);
         }
+        itens[idx].total = totalQuantidadeItem(itens[idx]);
       }
       return { ...p, itens };
     });
@@ -249,9 +258,11 @@ export default function OrcamentoForm({ formId = "form-orcamento", form, setFiel
       if (novasMat.length === 0) return p;
       it.materiais = novasMat;
       it.descricao = produto.nome || produto.nome_tecnico || it.descricao;
-      it.valorUnitario = Number(produto.preco_venda) || Number(produto.custo_unit) || 0;
-      it.total = totalQuantidadeItem(it);
+      if (!(Number(it.valorUnitario) > 0)) {
+        it.valorUnitario = Number(produto.preco_venda) || Number(produto.custo_unit) || 0;
+      }
       it.produtoAplicado = produto.id;
+      it.total = totalQuantidadeItem(it);
       itens[idx] = it;
       return { ...p, itens };
     });
@@ -271,9 +282,11 @@ export default function OrcamentoForm({ formId = "form-orcamento", form, setFiel
       const qtdItem = Number(it.quantidade) || 1;
       const comp = Array.isArray(match.composicao) ? match.composicao : [];
       it.materiais = comp.length > 0 ? materiaisDaComposicao(match, qtdItem) : [];
-      it.valorUnitario = Number(match.preco_venda) || Number(match.custo_unit) || 0;
-      it.total = totalQuantidadeItem(it);
+      if (!(Number(it.valorUnitario) > 0)) {
+        it.valorUnitario = Number(match.preco_venda) || Number(match.custo_unit) || 0;
+      }
       it.produtoAplicado = match.id;
+      it.total = totalQuantidadeItem(it);
       itens[idx] = it;
       return { ...p, itens };
     });
@@ -313,9 +326,11 @@ export default function OrcamentoForm({ formId = "form-orcamento", form, setFiel
       const calcParcial = custoParcialDoMaterial(mat[mi]);
       mat[mi].pecas_por_folha = calcParcial ? calcParcial.pecas_por_folha : 1;
       itens[idx] = { ...itens[idx], materiais: mat, produtoAplicado: null };
-      const calc = recalcularItem(itens[idx]);
-      itens[idx].valorUnitario = calc.valorUnitario;
-      itens[idx].total = calc.total;
+      // Item composto manualmente: preço por unidade = soma dos materiais (totais do serviço) / quantidade de unidades.
+      if ((itens[idx].materiais || []).some((mm) => mm.material_id)) {
+        itens[idx].valorUnitario = precoUnitComposto(itens[idx]);
+      }
+      itens[idx].total = totalQuantidadeItem(itens[idx]);
       return { ...p, itens };
     });
   };
@@ -331,9 +346,11 @@ export default function OrcamentoForm({ formId = "form-orcamento", form, setFiel
     setForm((p) => {
       const itens = [...p.itens];
       itens[idx] = { ...itens[idx], materiais: (itens[idx].materiais || []).filter((_, i) => i !== mi), produtoAplicado: null };
-      const calc = recalcularItem(itens[idx]);
-      itens[idx].valorUnitario = calc.valorUnitario;
-      itens[idx].total = calc.total;
+      // Item composto manualmente: preço por unidade = soma dos materiais restantes / quantidade de unidades.
+      if ((itens[idx].materiais || []).some((mm) => mm.material_id)) {
+        itens[idx].valorUnitario = precoUnitComposto(itens[idx]);
+      }
+      itens[idx].total = totalQuantidadeItem(itens[idx]);
       return { ...p, itens };
     });
 
@@ -527,7 +544,7 @@ return (
                       </div>
                       <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
                         <div className="flex items-center gap-1.5">
-                          <NumeroInput value={m.quantidade} onChange={(e) => setItemMaterial(idx, mi, "quantidade", e.target.value)} className={inputCls} placeholder={m.usar_parcial && m.pecas_por_folha > 1 ? "Peças" : "Qtd/un."} aria-label="Quantidade por unidade" />
+                          <NumeroInput value={m.quantidade} onChange={(e) => setItemMaterial(idx, mi, "quantidade", e.target.value)} className={inputCls} placeholder={m.usar_parcial && m.pecas_por_folha > 1 ? "Peças totais" : "Qtd. total"} aria-label="Quantidade total do serviço" />
                           {(() => {
                             if (m.usar_parcial && m.pecas_por_folha > 1) return <span className="text-[10px] font-mono text-primary font-bold shrink-0">peça{Number(m.quantidade) !== 1 ? "s" : ""}</span>;
                             return m.unidade ? <span className="text-[10px] font-mono text-primary font-bold shrink-0">{m.unidade}</span> : null;
@@ -637,7 +654,7 @@ return (
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 border-t border-border/40 pt-2.5">
                     <div className="flex items-center justify-between px-2.5 py-2 bg-muted border border-input rounded-lg">
-                      <span className="cyber-label">Custo materiais/un.</span>
+                      <span className="cyber-label">Custo materiais (total do serviço)</span>
                       <span className="text-xs font-bold font-mono text-foreground">{`Kz ${custoUnitItem(it).toLocaleString("pt-AO")}`}</span>
                     </div>
                     <div className="flex items-center justify-between px-2.5 py-2 bg-primary/10 border border-primary/30 rounded-lg">

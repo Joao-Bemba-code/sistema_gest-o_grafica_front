@@ -82,16 +82,17 @@ export default function OrcamentoModal({ open, editingId, onClose, onSaved }) {
                   const pecasPorFolha = Number(m.pecas_por_folha) || 1;
                   const usar_parcial = Boolean(m.usar_parcial);
                   const qtdFolhas = Number(m.quantidade_folhas) || Number(m.quantidade) || 0;
-                  const qtdDisplay = usar_parcial && pecasPorFolha > 1
+                  const qtdPorUnidade = usar_parcial && pecasPorFolha > 1
                     ? (Number(m.quantidade_pecas) || (qtdFolhas * pecasPorFolha))
                     : qtdFolhas;
+                  const fator = qtdItem > 0 ? qtdItem : 1;
                   return {
                     material_id: m.material_id ? String(m.material_id) : "",
                     descricao: m.descricao || "",
                     unidade: m.unidade || "un",
-                    quantidade: String(qtdDisplay || ""),
+                    quantidade: String(Number((qtdPorUnidade * fator).toFixed(4)) || ""),
                     preco_venda: Number(m.preco_folha) || Number(m.custo_unit) || 0,
-                    custo_total: Number(m.custo_total) || 0,
+                    custo_total: Number(((Number(m.custo_total) || 0) * fator).toFixed(2)),
                     mover_estoque: Boolean(m.mover_estoque),
                     usar_parcial: usar_parcial,
                     formato_final: m.formato_final || "",
@@ -170,20 +171,24 @@ export default function OrcamentoModal({ open, editingId, onClose, onSaved }) {
         cliente_id: form.cliente_id,
         cliente: { nome: form.cliente, empresa: form.empresa, nif: form.nif, telefone: form.telefone, email: form.email },
         itens: form.itens.map((it) => {
+          const qtdItem = Number(it.quantidade) || 1;
           const materiais = (it.materiais || [])
             .map((m) => {
               const pecasPorFolha = Number(m.pecas_por_folha) || 1;
-              const qtdPecas = Number(m.quantidade) || 0;
-              const qtdFolhas = m.usar_parcial && pecasPorFolha > 1
-                ? Math.ceil(qtdPecas / pecasPorFolha)
-                : qtdPecas;
+              const qtdPecasTotal = Number(m.quantidade) || 0;
+              const qtdFolhasTotal = m.usar_parcial && pecasPorFolha > 1
+                ? Math.ceil(qtdPecasTotal / pecasPorFolha)
+                : qtdPecasTotal;
+              // A interface mostra totais do serviço; aqui guarda por unidade do item.
+              const qtdFolhas = Number((qtdFolhasTotal / qtdItem).toFixed(4));
+              const qtdPecas = Number((qtdPecasTotal / qtdItem).toFixed(4));
               return {
                 material_id: m.material_id,
                 descricao: m.descricao,
                 unidade: m.unidade || "un",
                 quantidade: qtdFolhas,
                 custo_unit: Number(m.preco_venda) || 0,
-                custo_total: Number(m.custo_total) || 0,
+                custo_total: Number(((Number(m.custo_total) || 0) / qtdItem).toFixed(4)),
                 mover_estoque: Boolean(m.mover_estoque),
                 usar_parcial: Boolean(m.usar_parcial),
                 formato_final: m.formato_final || "",

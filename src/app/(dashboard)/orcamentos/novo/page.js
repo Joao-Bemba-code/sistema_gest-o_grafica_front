@@ -11,7 +11,7 @@ import OrcamentoForm, {
   blankMaterial,
   blankServico,
   custoUnitItem,
-  recalcularItem,
+  totalQuantidadeItem,
   recalcularServico,
 } from "@/components/orcamentos/OrcamentoForm";
 import {
@@ -77,24 +77,22 @@ function NovoOrcamentoInner() {
               cliente_id: o.cliente_id ? String(o.cliente_id) : "",
               cliente: o.cliente?.nome || "", empresa: o.cliente?.empresa || "", nif: o.cliente?.nif || "",
               telefone: o.cliente?.telefone || "", email: o.cliente?.email || "",
-              itens: (Array.isArray(o.itens) && o.itens.length ? o.itens : [blankItem]).map((it) => ({
-                descricao: it.descricao || "",
-                quantidade: String(it.quantidade ?? ""),
-                valorUnitario: String(it.valorUnitario ?? ""),
-                materiais: (it.materiais || []).map((m) => {
+              itens: (Array.isArray(o.itens) && o.itens.length ? o.itens : [blankItem]).map((it) => {
+                const qtdItem = Number(it.quantidade) || 1;
+                const materiais = (it.materiais || []).map((m) => {
                   const pecasPorFolha = Number(m.pecas_por_folha) || 1;
                   const usar_parcial = Boolean(m.usar_parcial);
                   const qtdFolhas = Number(m.quantidade_folhas) || Number(m.quantidade) || 0;
-                  const qtdDisplay = usar_parcial && pecasPorFolha > 1
+                  const qtdPorUnidade = usar_parcial && pecasPorFolha > 1
                     ? (Number(m.quantidade_pecas) || (qtdFolhas * pecasPorFolha))
                     : qtdFolhas;
                   return {
                     material_id: m.material_id ? String(m.material_id) : "",
                     descricao: m.descricao || "",
                     unidade: m.unidade || "un",
-                    quantidade: String(qtdDisplay || ""),
+                    quantidade: String(Number((qtdPorUnidade * qtdItem).toFixed(4)) || ""),
                     preco_venda: Number(m.preco_folha) || Number(m.custo_unit) || 0,
-                    custo_total: Number(m.custo_total) || 0,
+                    custo_total: Number(((Number(m.custo_total) || 0) * qtdItem).toFixed(2)),
                     mover_estoque: Boolean(m.mover_estoque),
                     usar_parcial: usar_parcial,
                     formato_final: m.formato_final || "",
@@ -107,8 +105,15 @@ function NovoOrcamentoInner() {
                     altura_mm: m.altura_mm != null ? m.altura_mm : "",
                     especificacoes: m.especificacoes || {},
                   };
-                }),
-              })),
+                });
+                const item = {
+                  descricao: it.descricao || "",
+                  quantidade: String(it.quantidade ?? ""),
+                  valorUnitario: String(it.valorUnitario ?? ""),
+                  materiais,
+                };
+                return { ...item, total: totalQuantidadeItem(item) };
+              }),
               servicos: (Array.isArray(o.servicos) && o.servicos.length ? o.servicos : [blankServico]).map((sv) => ({
                 servico_id: sv.servico_id || "",
                 descricao: sv.descricao || "",
@@ -172,29 +177,25 @@ function NovoOrcamentoInner() {
       cliente_id: form.cliente_id,
       cliente: { nome: form.cliente, empresa: form.empresa, nif: form.nif, telefone: form.telefone, email: form.email },
       itens: form.itens.map((it) => {
-        const calc = recalcularItem(it);
-        return {
-          descricao: it.descricao,
-          quantidade: Number(it.quantidade),
-          valorUnitario: calc.valorUnitario,
-          total: calc.total,
-          composto: (it.materiais || []).filter((m) => m.material_id).length > 0,
-          margem: 0,
-          materiais: [
+        const qtdItem = Number(it.quantidade) || 1;
+        const materiais = [
             ...(it.materiais || [])
               .map((m) => {
                 const pecasPorFolha = Number(m.pecas_por_folha) || 1;
-                const qtdPecas = Number(m.quantidade) || 0;
-                const qtdFolhas = m.usar_parcial && pecasPorFolha > 1
-                  ? Math.ceil(qtdPecas / pecasPorFolha)
-                  : qtdPecas;
+                const qtdPecasTotal = Number(m.quantidade) || 0;
+                const qtdFolhasTotal = m.usar_parcial && pecasPorFolha > 1
+                  ? Math.ceil(qtdPecasTotal / pecasPorFolha)
+                  : qtdPecasTotal;
+                // A interface mostra totais do serviço; aqui guarda por unidade do item.
+                const qtdFolhas = Number((qtdFolhasTotal / qtdItem).toFixed(4));
+                const qtdPecas = Number((qtdPecasTotal / qtdItem).toFixed(4));
                 return {
                   material_id: m.material_id,
                   descricao: m.descricao,
                   unidade: m.unidade || "un",
                   quantidade: qtdFolhas,
                   custo_unit: Number(m.preco_venda) || 0,
-                  custo_total: Number(m.custo_total) || 0,
+                  custo_total: Number(((Number(m.custo_total) || 0) / qtdItem).toFixed(4)),
                   mover_estoque: Boolean(m.mover_estoque),
                   usar_parcial: Boolean(m.usar_parcial),
                   formato_final: m.formato_final || "",
@@ -210,7 +211,17 @@ function NovoOrcamentoInner() {
                 };
               })
               .filter((m) => m.material_id),
-          ],
+        ];
+        const valorUnitario = Number(it.valorUnitario) || 0;
+        const total = totalQuantidadeItem({ ...it, materiais });
+        return {
+          descricao: it.descricao,
+          quantidade: Number(it.quantidade),
+          valorUnitario,
+          total,
+          composto: materiais.length > 0,
+          margem: 0,
+          materiais,
         };
       }),
       servicos: (form.servicos || []).map((sv) => {
@@ -329,7 +340,7 @@ materiais={materiais}
             <PreviewLinha label="NIF" valor={form.nif} />
             <PreviewLinha label="Telefone" valor={form.telefone} />
             {form.itens.map((it, i) => (
-              <PreviewLinha key={i} label={`Item ${i + 1}`} valor={`${it.descricao || "—"} · ${it.quantidade || 0}× ${formatKz(it.total || 0)}`} />
+              <PreviewLinha key={i} label={`Item ${i + 1}`} valor={`${it.descricao || "—"} · ${it.quantidade || 0}× ${formatKz(it.valorUnitario)} = ${formatKz(it.total || 0)}`} />
             ))}
             {(form.servicos || []).filter((sv) => sv.descricao).map((sv, i) => (
               <PreviewLinha key={`sv-${i}`} label={`Serviço ${i + 1}`} valor={`${sv.descricao} · ${sv.mob || 1}×${sv.duracaoHoras || 8}h · ${formatKz(sv.total || 0)}`} />

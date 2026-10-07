@@ -132,8 +132,11 @@ export default async function gerarOrcamentoPdf(orcamento, empresa = {}, opcoesE
       y = tituloSecaoMarca(doc, "Materiais", MARGEM, y) + 2;
       const materialRows = [];
       itensComMaterial.forEach((it) => {
+        const fator = Number(it.quantidade) || 1;
         (it.materiais || []).forEach((m) => {
-          materialRows.push([it.descricao, m.descricao || "", `${m.quantidade} ${m.unidade || "un"}`, formatKz(m.custo_unit), formatKz(m.custo_total)]);
+          const qtdTotal = Number((Number(m.quantidade || 0) * fator).toFixed(2));
+          const custoTotal = Number((Number(m.custo_total || 0) * fator).toFixed(2));
+          materialRows.push([it.descricao, m.descricao || "", `${qtdTotal} ${m.unidade || "un"}`, formatKz(m.custo_unit), formatKz(custoTotal)]);
         });
       });
       doc.autoTable({
