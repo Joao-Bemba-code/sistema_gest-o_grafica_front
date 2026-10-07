@@ -118,14 +118,10 @@ function HistoricoProcesso({ historico }) {
   );
 }
 
-function rotuloCampo(f) {
-  if (f === "maquina") return "Operacional";
-  return f.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
-}
-
 function normalizar(j) {
   const preRow = Array.isArray(j.pre_impressaos) ? j.pre_impressaos[0] : j.preImpressao;
-  const impRow = Array.isArray(j.impressaos) ? j.impressaos[0] : j.impressao;
+  const impRows = Array.isArray(j.impressaos) && j.impressaos.length > 0 ? j.impressaos : (j.impressao ? [j.impressao] : []);
+  const impRow = impRows[0];
   const qualRow = Array.isArray(j.qualidades) ? j.qualidades[0] : j.qualidade;
   const pre = preRow ? {
     arquivoRecebido: !!preRow.arquivo,
@@ -147,16 +143,50 @@ function normalizar(j) {
     quantidadeRejeitada: impRow.quantidade_rejeitada ?? "",
     observacoes: impRow.observacoes || "",
   } : {};
-  const ac = (Array.isArray(j.acabamentos) ? j.acabamentos : []).reduce((acc, r) => {
+  // Várias máquinas por OP: cada uma com o seu colaborador e tempo de trabalho.
+  imp.registos = impRows.map((r) => ({
+    maquina: r.maquina || "",
+    operador: r.operador || "",
+    horaInicio: r.data_inicio || "",
+    horaFim: r.data_fim || "",
+    tempoEstimado: r.tempo_estimado || "",
+    quantidadeProduzida: r.quantidade_produzida ?? "",
+    quantidadeRejeitada: r.quantidade_rejeitada ?? "",
+  }));
+  const acRows = Array.isArray(j.acabamentos) ? j.acabamentos : [];
+  const ac = acRows.reduce((acc, r) => {
     acc[r.servico === "hot_stamping" ? "hotStamping" : r.servico] = r.estado;
     return acc;
   }, {});
-  const acRow = (Array.isArray(j.acabamentos) ? j.acabamentos[0] : j.acabamento) || {};
-  ac.maquina = acRow.maquina || "";
-  ac.tempoEstimado = acRow.tempo_estimado || "";
-  ac.erros = acRow.erros ?? "";
-  ac.perdas = acRow.perdas ?? "";
-  ac.observacoes = acRow.observacoes || "";
+  const acRow = acRows[0] || (Array.isArray(j.acabamentos) ? null : j.acabamento) || {};
+  // Várias máquinas por OP: cada linha guarda a sua máquina/colaborador/tempo.
+  const maquinasVistas = new Set();
+  ac.maquinas = acRows
+    .filter((r) => String(r.maquina || "").trim())
+    .filter((r) => {
+      const chave = `${r.maquina}|${r.operador || ""}`;
+      if (maquinasVistas.has(chave)) return false;
+      maquinasVistas.add(chave);
+      return true;
+    })
+    .map((r) => ({
+      maquina: r.maquina || "",
+      operador: r.operador || "",
+      tempoEstimado: r.tempo_estimado || "",
+      erros: r.erros ?? "",
+      perdas: r.perdas ?? "",
+    }));
+  // Dados antigos: uma única linha com máquina, sem lista de máquinas.
+  if (ac.maquinas.length === 0 && acRow.maquina) {
+    ac.maquinas = [{
+      maquina: acRow.maquina || "",
+      operador: acRow.operador || "",
+      tempoEstimado: acRow.tempo_estimado || "",
+      erros: acRow.erros ?? "",
+      perdas: acRow.perdas ?? "",
+    }];
+  }
+  ac.observacoes = (acRows[0] && acRows[0].observacoes) || acRow.observacoes || "";
   return {
     ...j,
     status: j.estado || j.status || "aguardando",
@@ -245,6 +275,58 @@ export default function ProcessosTab() {
     setJobs(jobs.map(j => j.id === jobId ? { ...j, impressao: { ...j.impressao, [key]: value } } : j));
   };
 
+  const registoVazio = { maquina: "", operador: "", horaInicio: "", horaFim: "", tempoEstimado: "", quantidadeProduzida: "", quantidadeRejeitada: "" };
+
+  const updateRegisto = (jobId, idx, key, value) => {
+    setJobs(jobs.map(j => {
+      if (j.id !== jobId) return j;
+      const registos = [...(j.impressao?.registos || [])];
+      registos[idx] = { ...(registos[idx] || registoVazio), [key]: value };
+      return { ...j, impressao: { ...j.impressao, registos } };
+    }));
+  };
+
+  const adicionarRegisto = (jobId) => {
+    setJobs(jobs.map(j => j.id === jobId
+      ? { ...j, impressao: { ...j.impressao, registos: [...(j.impressao?.registos || []), { ...registoVazio }] } }
+      : j));
+  };
+
+  const removerRegisto = (jobId, idx) => {
+    setJobs(jobs.map(j => {
+      if (j.id !== jobId) return j;
+      const registos = [...(j.impressao?.registos || [])];
+      registos.splice(idx, 1);
+      return { ...j, impressao: { ...j.impressao, registos: registos.length ? registos : [{ ...registoVazio }] } };
+    }));
+  };
+
+  const maquinaAcabamentoVazia = { maquina: "", operador: "", tempoEstimado: "", erros: "", perdas: "" };
+
+  const updateMaquinaAcabamento = (jobId, idx, key, value) => {
+    setJobs(jobs.map(j => {
+      if (j.id !== jobId) return j;
+      const maquinas = [...(j.acabamento?.maquinas || [])];
+      maquinas[idx] = { ...(maquinas[idx] || maquinaAcabamentoVazia), [key]: value };
+      return { ...j, acabamento: { ...j.acabamento, maquinas } };
+    }));
+  };
+
+  const adicionarMaquinaAcabamento = (jobId) => {
+    setJobs(jobs.map(j => j.id === jobId
+      ? { ...j, acabamento: { ...j.acabamento, maquinas: [...(j.acabamento?.maquinas || []), { ...maquinaAcabamentoVazia }] } }
+      : j));
+  };
+
+  const removerMaquinaAcabamento = (jobId, idx) => {
+    setJobs(jobs.map(j => {
+      if (j.id !== jobId) return j;
+      const maquinas = [...(j.acabamento?.maquinas || [])];
+      maquinas.splice(idx, 1);
+      return { ...j, acabamento: { ...j.acabamento, maquinas } };
+    }));
+  };
+
   const updateQualidade = (jobId, key, value) => {
     setJobs(jobs.map(j => j.id === jobId ? { ...j, qualidade: { ...j.qualidade, [key]: value } } : j));
   };
@@ -270,8 +352,36 @@ export default function ProcessosTab() {
     }
     try {
       if (activeProcesso === "pre_impressao") await salvarPreImpressao(jobId, job.preImpressao);
-      else if (activeProcesso === "impressao") await salvarImpressao(jobId, job.impressao);
-      else if (activeProcesso === "acabamento") await salvarAcabamento(jobId, job.acabamento);
+      else if (activeProcesso === "impressao") {
+        const regs = (job.impressao?.registos || []).filter((r) => (r.maquina || "").trim());
+        if (!regs.length) {
+          addToast("Selecione pelo menos uma máquina para a impressão", "error");
+          return;
+        }
+        await salvarImpressao(jobId, {
+          registos: regs.map((r, i) => ({ ...r, observacoes: i === 0 ? (job.impressao.observacoes || "") : undefined })),
+        });
+      }
+      else if (activeProcesso === "acabamento") {
+        const servicosAc = ["corte", "dobra", "encadernacao", "laminacao", "verniz", "hotStamping"].map((s) => ({
+          servico: s,
+          estado: job.acabamento[s] || "pendente",
+        }));
+        const maquinasAc = (job.acabamento.maquinas || [])
+          .filter((m) => (m.maquina || "").trim())
+          .map((m) => ({
+            maquina: m.maquina,
+            operador: m.operador,
+            tempoEstimado: m.tempoEstimado,
+            erros: m.erros === "" || m.erros == null ? null : Number(m.erros) || 0,
+            perdas: m.perdas === "" || m.perdas == null ? null : Number(m.perdas) || 0,
+          }));
+        await salvarAcabamento(jobId, {
+          servicos: servicosAc,
+          maquinas: maquinasAc,
+          observacoes: job.acabamento.observacoes || "",
+        });
+      }
       else if (activeProcesso === "qualidade") await salvarQualidade(jobId, job.qualidade);
       else if (activeProcesso === "entrega") {
         const atualizada = await atualizarOrdem(jobId, { status: "entregue" });
@@ -422,29 +532,53 @@ export default function ProcessosTab() {
                 {activeProcesso === "impressao" && (
                   <div className="space-y-4">
                     <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Icon name="print" className="text-[18px] text-primary" /> Dados de Impressão</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {["maquina", "operador", "tempoEstimado", "horaInicio", "horaFim", "quantidadeProduzida", "quantidadeRejeitada"].map((f) => (
-                        f === "maquina" ? (
-                          <div key={f} className="flex flex-col gap-1">
-                            <label className="text-[10px] font-bold text-muted-foreground uppercase">Máquina</label>
-                            <select value={job.impressao[f] || ""} onChange={(e) => updateImpressao(job.id, f, e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30">
-                              <option value="">Seleccionar máquina...</option>
-                              {maquinas.map((m) => (
-                                <option key={m.id} value={m.nome_comum || m.codigo}>{m.nome_comum || m.codigo}{m.localizacao ? ` — ${m.localizacao}` : ""}</option>
-                              ))}
-                            </select>
-                          </div>
-                        ) : (
-                        <div key={f} className="flex flex-col gap-1">
-                          <label className="text-[10px] font-bold text-muted-foreground uppercase">{rotuloCampo(f)}</label>
-                          <input type={f.includes("hora") ? "time" : f.includes("quantidade") ? "number" : "text"} value={job.impressao[f] || ""} onChange={(e) => updateImpressao(job.id, f, f.includes("quantidade") ? Number(e.target.value) : e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder={f === "tempoEstimado" ? "ex: 1h30" : rotuloCampo(f)} />
+                    <p className="text-xs text-muted-foreground">
+                      Registe cada máquina usada com o seu colaborador e o tempo de trabalho.
+                    </p>
+                    {(job.impressao?.registos?.length ? job.impressao.registos : [{ ...registoVazio }]).map((r, idx) => (
+                      <div key={idx} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 p-3 rounded-xl border border-border/60 bg-muted/30">
+                        <div className="flex flex-col gap-1 lg:col-span-2">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase">Máquina {idx + 1}</label>
+                          <select value={r.maquina || ""} onChange={(e) => updateRegisto(job.id, idx, "maquina", e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30">
+                            <option value="">Seleccionar máquina...</option>
+                            {maquinas.map((m) => (
+                              <option key={m.id} value={m.nome_comum || m.codigo}>{m.nome_comum || m.codigo}{m.localizacao ? ` — ${m.localizacao}` : ""}</option>
+                            ))}
+                          </select>
                         </div>
-                        )
-                      ))}
-                      <div className="flex flex-col gap-1 sm:col-span-2 lg:col-span-3">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Observações</label>
-                        <textarea value={job.impressao.observacoes || ""} onChange={(e) => updateImpressao(job.id, "observacoes", e.target.value)} rows={2} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" placeholder="Notas sobre a impressão..." />
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase">Colaborador</label>
+                          <input type="text" value={r.operador || ""} onChange={(e) => updateRegisto(job.id, idx, "operador", e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder="Nome do colaborador" />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase">Início</label>
+                          <input type="time" value={r.horaInicio || ""} onChange={(e) => updateRegisto(job.id, idx, "horaInicio", e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase">Fim</label>
+                          <input type="time" value={r.horaFim || ""} onChange={(e) => updateRegisto(job.id, idx, "horaFim", e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase">Produzido</label>
+                          <input type="number" min="0" value={r.quantidadeProduzida ?? ""} onChange={(e) => updateRegisto(job.id, idx, "quantidadeProduzida", Number(e.target.value))} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder="0" />
+                        </div>
+                        <div className="flex items-end justify-between gap-2 lg:col-span-6">
+                          <div className="flex flex-col gap-1 flex-1">
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase">Rejeitado</label>
+                            <input type="number" min="0" value={r.quantidadeRejeitada ?? ""} onChange={(e) => updateRegisto(job.id, idx, "quantidadeRejeitada", Number(e.target.value))} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder="0" />
+                          </div>
+                          <Button variant="ghost" size="sm" onClick={() => removerRegisto(job.id, idx)} title="Remover esta máquina" className="text-error">
+                            <Icon name="delete" className="text-[16px]" /> Remover
+                          </Button>
+                        </div>
                       </div>
+                    ))}
+                    <Button variant="outline" size="sm" onClick={() => adicionarRegisto(job.id)}>
+                      <Icon name="add" className="text-[16px]" /> Adicionar máquina
+                    </Button>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase">Observações</label>
+                      <textarea value={job.impressao.observacoes || ""} onChange={(e) => updateImpressao(job.id, "observacoes", e.target.value)} rows={2} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" placeholder="Notas sobre a impressão..." />
                     </div>
                     <div className="flex justify-end"><Button size="sm" onClick={() => handleSave(job.id)}>Guardar</Button></div>
                   </div>
@@ -470,32 +604,49 @@ export default function ProcessosTab() {
                         );
                       })}
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Máquina usada</label>
-                        <select value={job.acabamento.maquina || ""} onChange={(e) => updateJob(job.id, "acabamento", "maquina", e.target.value)} className="w-full px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30">
-                          <option value="">Seleccionar máquina...</option>
-                          {maquinas.map((m) => (
-                            <option key={m.id} value={m.nome_comum || m.codigo}>{m.nome_comum || m.codigo}{m.localizacao ? ` — ${m.localizacao}` : ""}</option>
-                          ))}
-                        </select>
+                    <p className="text-xs text-muted-foreground">
+                      Registe as máquinas usadas no acabamento, com o colaborador e o tempo de trabalho de cada uma.
+                    </p>
+                    {(job.acabamento.maquinas?.length ? job.acabamento.maquinas : [maquinaAcabamentoVazia]).map((m, idx) => (
+                      <div key={idx} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 p-3 rounded-xl border border-border/60 bg-muted/30">
+                        <div className="flex flex-col gap-1 lg:col-span-2">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase">Máquina {idx + 1}</label>
+                          <select value={m.maquina || ""} onChange={(e) => updateMaquinaAcabamento(job.id, idx, "maquina", e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30">
+                            <option value="">Seleccionar máquina...</option>
+                            {maquinas.map((mm) => (
+                              <option key={mm.id} value={mm.nome_comum || mm.codigo}>{mm.nome_comum || mm.codigo}{mm.localizacao ? ` — ${mm.localizacao}` : ""}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase">Colaborador</label>
+                          <input type="text" value={m.operador || ""} onChange={(e) => updateMaquinaAcabamento(job.id, idx, "operador", e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder="Nome do colaborador" />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase">Tempo</label>
+                          <input type="text" value={m.tempoEstimado || ""} onChange={(e) => updateMaquinaAcabamento(job.id, idx, "tempoEstimado", e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder="ex: 1h30" />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase">Erros</label>
+                          <input type="number" min="0" value={m.erros ?? ""} onChange={(e) => updateMaquinaAcabamento(job.id, idx, "erros", Number(e.target.value))} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder="0" />
+                        </div>
+                        <div className="flex items-end justify-between gap-2">
+                          <div className="flex flex-col gap-1 flex-1">
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase">Perdas</label>
+                            <input type="number" min="0" value={m.perdas ?? ""} onChange={(e) => updateMaquinaAcabamento(job.id, idx, "perdas", Number(e.target.value))} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder="0" />
+                          </div>
+                          <Button variant="ghost" size="sm" onClick={() => removerMaquinaAcabamento(job.id, idx)} title="Remover esta máquina" className="text-error">
+                            <Icon name="delete" className="text-[16px]" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Tempo estimado</label>
-                        <input type="text" value={job.acabamento.tempoEstimado || ""} onChange={(e) => updateJob(job.id, "acabamento", "tempoEstimado", e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder="ex: 1h30" />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Erros</label>
-                        <input type="number" min="0" value={job.acabamento.erros ?? ""} onChange={(e) => updateJob(job.id, "acabamento", "erros", Number(e.target.value))} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder="Nº de erros" />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Perdas</label>
-                        <input type="number" min="0" value={job.acabamento.perdas ?? ""} onChange={(e) => updateJob(job.id, "acabamento", "perdas", Number(e.target.value))} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder="Qtd. perdida" />
-                      </div>
-                      <div className="flex flex-col gap-1 sm:col-span-2">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Observações</label>
-                        <textarea rows={1} value={job.acabamento.observacoes || ""} onChange={(e) => updateJob(job.id, "acabamento", "observacoes", e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" placeholder="Notas..." />
-                      </div>
+                    ))}
+                    <Button variant="outline" size="sm" onClick={() => adicionarMaquinaAcabamento(job.id)}>
+                      <Icon name="add" className="text-[16px]" /> Adicionar máquina
+                    </Button>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase">Observações</label>
+                      <textarea rows={1} value={job.acabamento.observacoes || ""} onChange={(e) => updateJob(job.id, "acabamento", "observacoes", e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" placeholder="Notas..." />
                     </div>
                     <div className="flex justify-end"><Button size="sm" onClick={() => handleSave(job.id)}>Guardar</Button></div>
                   </div>
