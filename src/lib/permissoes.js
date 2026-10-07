@@ -89,12 +89,14 @@ export function permissoesDoUsuario(usuario) {
   const efetivas = {};
   let algumModuloVisivel = false;
   MODULOS.forEach((m) => {
-    efetivas[m] = {};
+    const mod = m.valor;
+    efetivas[mod] = {};
     ACOES.forEach((a) => {
-      const valor = usuario.permissoes?.[m]?.[a];
-      efetivas[m][a] = typeof valor === "boolean" ? valor : !!perfil[m]?.[a];
+      const acao = a.valor;
+      const valor = usuario.permissoes?.[mod]?.[acao];
+      efetivas[mod][acao] = typeof valor === "boolean" ? valor : !!perfil[mod]?.[acao];
     });
-    if (efetivas[m].ver) algumModuloVisivel = true;
+    if (efetivas[mod].ver) algumModuloVisivel = true;
   });
   // Permissões personalizadas que não dão acesso a nenhum módulo (objeto vazio
   // ou dados antigos gravados todos a false) são ignoradas: volta ao perfil.
