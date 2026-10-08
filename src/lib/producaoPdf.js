@@ -5,29 +5,24 @@ import {
   COR_MARCA_SECUNDARIO,
   COR_MARCA_TEXTO,
   COR_MARCA_FUNDO,
-  COR_MARCA_LINHA,
   COR_MARCA_CINZA,
   MARGEM_MARCA,
   desenharCabecalhoMarca,
+  desenharMarcaDeAgua,
   tituloSecaoMarca,
   formatNumero,
+  formatarData,
+  TEMA_TABELA_MARCA,
 } from "@/lib/pdfEstilo";
 
 applyPlugin(jsPDF);
 
-const LARGURA_A4 = 210;
-const ALTURA_A4 = 297;
-const LARGURA_UTIL = LARGURA_A4 - MARGEM_MARCA * 2;
-const ALTURA_CAMPOS = 8;
-const ALTURA_CABECALHO = 6.4;
-const ALTURA_LINHA = 9;
-
-function dataCurta(v) {
-  if (!v) return "—";
-  const d = new Date(v);
-  if (isNaN(d.getTime())) return String(v).slice(0, 10) || "—";
-  return d.toLocaleDateString("pt-AO");
-}
+const ESTADO_LABEL = {
+  aguardando: "Aguardando",
+  em_producao: "Em Produção",
+  finalizado: "Finalizado",
+  entregue: "Entregue",
+};
 
 function texto(v) {
   if (v && typeof v === "object") {
@@ -37,192 +32,161 @@ function texto(v) {
   return t || "—";
 }
 
-// Caixa com rótulo em cima e linha em baixo (ou valor)
-function campo(doc, x, y, w, rotulo, valor = "", opcoes = {}) {
-  const { altura = ALTURA_CAMPOS, preenchivel = true } = opcoes;
-  doc.setFontSize(6.4);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COR_MARCA_SECUNDARIO);
-  doc.text(String(rotulo).toUpperCase(), x, y, { charSpace: 0.2, maxWidth: w });
-  const yValor = y + 4.6;
-  if (preenchivel && !valor) {
-    doc.setDrawColor(...COR_MARCA_LINHA);
-    doc.setLineWidth(0.2);
-    doc.line(x, yValor, x + w, yValor);
-  } else {
-    doc.setFontSize(8.4);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(...COR_MARCA_TEXTO);
-    const linhas = doc.splitTextToSize(texto(valor), w);
-    doc.text(linhas.slice(0, 2), x, yValor);
-  }
-  return y + altura;
-}
-
-// Nome do serviço/produto em destaque (até 3 linhas) para caber na página
-function blocoProduto(doc, x, y, w, produto) {
-  doc.setFontSize(6.4);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COR_MARCA_SECUNDARIO);
-  doc.text("SERVIÇO / PRODUTO", x, y, { charSpace: 0.2 });
-  doc.setFontSize(10.5);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COR_MARCA_TEXTO);
-  const linhas = doc.splitTextToSize(texto(produto), w).slice(0, 3);
-  doc.text(linhas, x, y + 6.4);
-  return y + 6.4 + linhas.length * 4.8 + 3;
-}
-
-// Grelha "Descrição / Quantidade / Observação" pautada para preenchimento manual.
-// `maxLinhas` limita as linhas desenhadas para a grelha caber na página;
-// devolve a altura desenhada e a quantidade de itens que ficaram de fora.
-function grelhaItens(doc, x, y, w, linhas, opcoes = {}) {
-  const { alturaLinha = ALTURA_LINHA, minLinhas = 6, maxLinhas = Infinity } = opcoes;
-  const colDesc = w * 0.46;
-  const colQtd = w * 0.14;
-  const colObs = w - colDesc - colQtd;
-  const cols = [
-    { x, w: colDesc, rotulo: "Descrição" },
-    { x: x + colDesc, w: colQtd, rotulo: "Qtd." },
-    { x: x + colDesc + colQtd, w: colObs, rotulo: "Observação" },
-  ];
-
-  doc.setFillColor(...COR_MARCA_FUNDO);
-  doc.rect(x, y, w, ALTURA_CABECALHO, "F");
-  doc.setFontSize(6.8);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COR_MARCA_PRINCIPAL);
-  cols.forEach((c) => doc.text(String(c.rotulo).toUpperCase(), c.x + 1.5, y + 4.4, { charSpace: 0.2 }));
-  let cy = y + ALTURA_CABECALHO;
-
-  const total = Math.max(minLinhas, Math.min(linhas.length, maxLinhas));
-  for (let i = 0; i < total; i += 1) {
-    const item = linhas[i];
-    if (item) {
-      doc.setFontSize(7.6);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(...COR_MARCA_TEXTO);
-      const partes = doc.splitTextToSize(texto(item.descricao), colDesc - 3);
-      doc.text(partes.slice(0, 2), cols[0].x + 1.5, cy + 4.2);
-      if (item.quantidade != null && item.quantidade !== "") {
-        doc.text(String(item.quantidade), cols[1].x + colQtd / 2, cy + 4.2, { align: "center" });
-      }
-      if (item.observacao) {
-        doc.text(doc.splitTextToSize(String(item.observacao), colObs - 3).slice(0, 2), cols[2].x + 1.5, cy + 4.2);
-      }
-    }
-    doc.setDrawColor(...COR_MARCA_LINHA);
-    doc.setLineWidth(0.15);
-    cols.forEach((c) => doc.line(c.x, cy, c.x + c.w, cy));
-    doc.line(x + colDesc + colQtd, cy, x + colDesc + colQtd, cy + alturaLinha);
-    cy += alturaLinha;
-  }
-  doc.setDrawColor(...COR_MARCA_LINHA);
-  doc.line(x, cy, x + w, cy);
-  const altura = cy - y;
-  const omitidos = Math.max(0, linhas.length - total);
-  if (omitidos > 0) {
-    doc.setFontSize(6.4);
-    doc.setFont("helvetica", "italic");
-    doc.setTextColor(...COR_MARCA_SECUNDARIO);
-    doc.text(`+ ${omitidos} item(ns) — ver detalhe no sistema`, x, cy + 3.4);
-    return altura + 5;
-  }
-  return altura;
-}
-
-function materiaisDaOrdem(op, matPorId) {
-  const reservas = Array.isArray(op?.reserva_estoques) ? op.reserva_estoques : [];
-  if (reservas.length) {
-    return reservas.map((r) => {
-      const m = matPorId?.[r.material_id] || {};
-      return {
-        descricao: [m.codigo, m.nome].filter(Boolean).join(" — ") || `Material #${r.material_id}`,
-        quantidade: `${formatNumero(r.quantidade_reservada)} ${m.unidade || "un"}`,
-        observacao: r.lote ? `Lote ${r.lote}` : "",
-      };
-    });
-  }
+/**
+ * Materiais apenas para produtos/serviços compostos com material de stock.
+ * As quantidades vêm guardadas por unidade do item, por isso multiplica-se
+ * pela quantidade do item para obter o total a consumir na OP.
+ * Se a OP não tiver orçamento ligado, usa as reservas de stock como lista simples.
+ */
+function materiaisDaOrdem(op, matPorId = {}) {
   const itens = Array.isArray(op?.orcamentoDados?.orcamento_items) ? op.orcamentoDados.orcamento_items : [];
-  return itens.map((i) => ({
-    descricao: i.descricao,
-    quantidade: formatNumero(i.quantidade),
-    observacao: "",
-  }));
-}
+  const linhas = [];
+  itens.forEach((it) => {
+    const fator = Number(it.quantidade) || 1;
+    const nomeItem = it.descricao || "—";
+    (it.materiais || [])
+      .filter((m) => m.material_id)
+      .forEach((m) => {
+        linhas.push([
+          nomeItem,
+          m.descricao || `Material #${m.material_id}`,
+          `${formatNumero(Number((m.quantidade || 0) * fator).toFixed(2))} ${m.unidade || "un"}`,
+        ]);
+      });
+  });
+  if (linhas.length) return linhas;
 
-// Serviços do orçamento ligado à OP, para a grelha do PDF
-function servicosDaOrdem(op) {
-  const servicos = Array.isArray(op?.orcamentoDados?.servicos) ? op.orcamentoDados.servicos : [];
-  return servicos.map((s) => ({
-    descricao: texto(s.descricao),
-    quantidade: s.mob != null && s.mob !== "" ? formatNumero(s.mob) : "",
-    observacao: "",
-  }));
+  const reservas = Array.isArray(op?.reserva_estoques) ? op.reserva_estoques : [];
+  return reservas.map((r) => {
+    const m = matPorId?.[r.material_id] || {};
+    const nome = [m.codigo, m.nome].filter(Boolean).join(" — ") || `Material #${r.material_id}`;
+    return [
+      "—",
+      nome,
+      `${formatNumero(Number(r.quantidade_reservada || 0))} ${m.unidade || "un"}${r.lote ? ` · Lote ${r.lote}` : ""}`,
+    ];
+  });
 }
 
 /**
- * Gera a folha da Ordem de Produção em PDF, simplificada e sempre numa página:
- * apenas o nome do serviço/produto (com quantidade) e a lista de materiais.
+ * Folha de trabalho da Ordem de Produção, no estilo do orçamento:
+ * apenas detalhes técnicos (sem preços). Materiais aparecem só quando há
+ * composição com material de stock; caso contrário fica serviço/produto + quantidade.
  */
 export default async function gerarOrdemProducaoPdf(op, org = {}, matPorId = {}) {
   const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-  const pw = LARGURA_A4;
-  const ph = ALTURA_A4;
+  const pw = doc.internal.pageSize.getWidth();
+  const ph = doc.internal.pageSize.getHeight();
   const x = MARGEM_MARCA;
-  const w = LARGURA_UTIL;
+  const w = pw - MARGEM_MARCA * 2;
 
   const numero = op?.numero || (op?.id ? `OP-${op.id}` : "OP");
   const impressoEm = new Date();
+  const estado = ESTADO_LABEL[op?.estado || op?.status] || op?.estado || "—";
+  const clienteDados = op?.clienteDados || (op?.cliente && typeof op.cliente === "object" ? op.cliente : null);
 
-  const { yInicio } = await desenharCabecalhoMarca(doc, {
+  const { logo } = await desenharCabecalhoMarca(doc, {
     titulo: "Ordem de Produção",
     empresa: org,
-    direitos: [
-      numero,
-      `${texto(op?.produto)}`.slice(0, 46),
-      `Impresso em ${dataCurta(impressoEm)}`,
-    ],
+    direitos: [numero, estado, `Impresso em ${formatarData(impressoEm)}`],
   });
+  desenharMarcaDeAgua(doc, logo);
 
-  let y = yInicio;
+  let y = 50;
 
-  // ─── Serviço / Produto ───
-  y = tituloSecaoMarca(doc, "Serviço / Produto", x, y) + 2;
-  y = blocoProduto(doc, x, y, w, op?.produto);
-  campo(doc, x, y, w, "Cliente", texto(op?.cliente), { preenchivel: false, altura: 10 });
-  y += 10 + 2;
-  const meia = (w - 6) / 2;
-  campo(doc, x, y, meia, "OP / Encomenda", numero, { preenchivel: false });
-  campo(doc, x + meia + 6, y, meia, "Quantidade", op?.quantidade, { preenchivel: false });
-  y += ALTURA_CAMPOS + 6;
+  // ─── Cliente (apenas o nome) ───
+  const nomeCliente = (clienteDados?.nome || texto(op?.cliente) || "—").trim() || "—";
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(...COR_MARCA_TEXTO);
+  doc.text(`Cliente: ${nomeCliente}`, x, y + 4);
+  y += 14;
 
-  // ─── Serviços ───
-  // Só é desenhada se o orçamento tiver serviços; o espaço restante da página
-  // é dividido entre esta grelha e a dos materiais para caber sempre numa página.
-  const servicos = servicosDaOrdem(op);
-  if (servicos.length) {
-    y = tituloSecaoMarca(doc, "Serviços", x, y) + 2;
-    const maxLinhasServ = Math.max(3, Math.floor((ph - 14 - y - ALTURA_CABECALHO) / ALTURA_LINHA));
-    const hServ = grelhaItens(doc, x, y, w, servicos, {
-      minLinhas: Math.min(3, maxLinhasServ),
-      maxLinhas: maxLinhasServ,
+  // ─── Dados da OP ───
+  const campos = [
+    { rotulo: "OP / Encomenda", valor: numero },
+    { rotulo: "Quantidade", valor: op?.quantidade != null && op?.quantidade !== "" ? formatNumero(op?.quantidade) : "—" },
+    { rotulo: "Data de entrada", valor: formatarData(op?.data_entrada || op?.dataEntrada) },
+    { rotulo: "Data de entrega", valor: formatarData(op?.data_entrega || op?.dataEntrega) },
+  ];
+  const hInfo = 15;
+  doc.setFillColor(...COR_MARCA_FUNDO);
+  doc.roundedRect(x, y, w, hInfo, 2.5, 2.5, "F");
+  const colW = (w - 18 - 18) / 4;
+  campos.forEach((c, i) => {
+    const cx = x + 9 + i * (colW + 6);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6.4);
+    doc.setTextColor(...COR_MARCA_SECUNDARIO);
+    doc.text(c.rotulo.toUpperCase(), cx, y + 6, { charSpace: 0.2 });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.6);
+    doc.setTextColor(...COR_MARCA_TEXTO);
+    doc.text(doc.splitTextToSize(String(c.valor), colW).slice(0, 1)[0] || "—", cx, y + 11.5);
+  });
+  y += hInfo + 8;
+
+  // ─── Serviços / Produtos ───
+  const itens = Array.isArray(op?.orcamentoDados?.orcamento_items) ? op.orcamentoDados.orcamento_items : [];
+  const produtos = itens.length
+    ? itens
+    : op?.produto
+      ? [{ descricao: op.produto, quantidade: op.quantidade }]
+      : [];
+
+  if (produtos.length) {
+    y = tituloSecaoMarca(doc, "Serviços / Produtos", x, y) + 2;
+    doc.autoTable({
+      startY: y,
+      head: [["Descrição", "Qtd"]],
+      body: produtos.map((it) => [it.descricao || "—", formatNumero(it.quantidade)]),
+      ...TEMA_TABELA_MARCA,
+      columnStyles: { 0: { fontStyle: "bold" }, 1: { halign: "center", cellWidth: 24 } },
     });
-    y += hServ + 4;
+    y = doc.lastAutoTable.finalY + 6;
   }
 
-  // ─── Materiais ───
-  // A grelha usa todo o espaço restante para caber sempre numa página;
-  // se houver mais materiais do que linhas disponíveis, indica-se no rodapé
-  // da grelha quantos ficaram de fora.
-  y = tituloSecaoMarca(doc, "Materiais e consumo", x, y) + 2;
+  // ─── Serviços (mão de obra do orçamento) ───
+  const servicos = Array.isArray(op?.orcamentoDados?.servicos) ? op.orcamentoDados.servicos : [];
+  if (servicos.length) {
+    y = tituloSecaoMarca(doc, "Serviços", x, y) + 2;
+    doc.autoTable({
+      startY: y,
+      head: [["Descrição", "Trabalhadores", "Prazo", "Duração"]],
+      body: servicos.map((sv) => {
+        const prazoExecucao = sv.prazoExecucao ?? sv.prazo_execucao ?? 1;
+        const unidade = sv.prazoUnidade || sv.prazo_unidade || "dias";
+        const duracaoHoras = sv.duracaoHoras ?? sv.duracao_horas ?? 0;
+        const prazoLabel = unidade === "horas" ? "hora" : unidade === "minutos" ? "minuto" : "dia";
+        const plural = Number(prazoExecucao) !== 1;
+        return [
+          sv.descricao || "—",
+          sv.mob != null && sv.mob !== "" ? String(sv.mob) : "—",
+          `${prazoExecucao} ${prazoLabel}${plural ? "s" : ""}`,
+          duracaoHoras ? `${duracaoHoras}h` : "—",
+        ];
+      }),
+      ...TEMA_TABELA_MARCA,
+      headStyles: { ...TEMA_TABELA_MARCA.headStyles, fillColor: COR_MARCA_FUNDO, textColor: COR_MARCA_PRINCIPAL },
+      columnStyles: { 1: { halign: "center" }, 2: { halign: "center" }, 3: { halign: "center" } },
+    });
+    y = doc.lastAutoTable.finalY + 6;
+  }
+
+  // ─── Materiais (apenas material de stock, listado por serviço/produto) ───
   const materiais = materiaisDaOrdem(op, matPorId);
-  const maxLinhasMat = Math.max(4, Math.floor((ph - 14 - y - ALTURA_CABECALHO) / ALTURA_LINHA));
-  const hMat = grelhaItens(doc, x, y, w, materiais, {
-    minLinhas: Math.min(6, maxLinhasMat),
-    maxLinhas: maxLinhasMat,
-  });
-  y += hMat + 4;
+  if (materiais.length) {
+    y = tituloSecaoMarca(doc, "Materiais", x, y) + 2;
+    doc.autoTable({
+      startY: y,
+      head: [["Serviço / Produto", "Material", "Qtd"]],
+      body: materiais,
+      ...TEMA_TABELA_MARCA,
+      headStyles: { ...TEMA_TABELA_MARCA.headStyles, fillColor: COR_MARCA_FUNDO, textColor: COR_MARCA_PRINCIPAL },
+      columnStyles: { 0: { fontStyle: "bold" }, 2: { halign: "center", cellWidth: 42 } },
+    });
+    y = doc.lastAutoTable.finalY + 6;
+  }
 
   // ─── Rodapé ───
   const total = doc.internal.getNumberOfPages();
@@ -232,12 +196,12 @@ export default async function gerarOrdemProducaoPdf(op, org = {}, matPorId = {})
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...COR_MARCA_CINZA);
     doc.text(
-      `${numero} · impresso em ${dataCurta(impressoEm)} · documento de trabalho`,
+      `${numero} · impresso em ${formatarData(impressoEm)} · documento de trabalho`,
       MARGEM_MARCA,
       ph - 8
     );
     doc.text(`Página ${p} de ${total}`, pw - MARGEM_MARCA, ph - 8, { align: "right" });
   }
 
-  doc.save(`${numero.replace(/[^\w-]+/g, "_")}_ordem_producao.pdf`);
+  doc.save(`${String(numero).replace(/[^\w-]+/g, "_")}_ordem_producao.pdf`);
 }

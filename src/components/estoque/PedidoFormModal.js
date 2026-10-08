@@ -7,7 +7,6 @@ import Icon from "@/components/Icon";
 import FornecedorSelect from "./FornecedorSelect";
 import NumeroInput from "@/components/ui/NumeroInput";
 import { inputCls, toNum } from "@/lib/estoque";
-import { formatKz } from "@/lib/estoque";
 import { FormField } from "@/components/ui/FormField";
 
 export default function PedidoFormModal({ open, onClose, fornecedores, materiais, materialInicial, nomeUsuario, onConfirm }) {
@@ -20,14 +19,11 @@ export default function PedidoFormModal({ open, onClose, fornecedores, materiais
       {
         material_id: inicial.id != null ? String(inicial.id) : "",
         quantidade: "",
-        preco_unit: toNum(inicial.custo_unit) > 0 ? String(toNum(inicial.custo_unit)) : "",
       },
     ],
   }));
   const [erro, setErro] = useState("");
   const [submetendo, setSubmetendo] = useState(false);
-
-  const total = form.itens.reduce((s, i) => s + (toNum(i.quantidade) * toNum(i.preco_unit)), 0);
 
   const setItem = (idx, campo, valor) =>
     setForm((f) => ({
@@ -36,15 +32,13 @@ export default function PedidoFormModal({ open, onClose, fornecedores, materiais
     }));
 
   const adicionarItem = () =>
-    setForm((f) => ({ ...f, itens: [...f.itens, { material_id: "", quantidade: "", preco_unit: "" }] }));
+    setForm((f) => ({ ...f, itens: [...f.itens, { material_id: "", quantidade: "" }] }));
 
   const removerItem = (idx) =>
     setForm((f) => ({ ...f, itens: f.itens.filter((_, i) => i !== idx) }));
 
   const trocarMaterial = (idx, id) => {
-    const mat = materiais.find((m) => String(m.id) === id);
     setItem(idx, "material_id", id);
-    if (mat && (toNum(mat.custo_unit) > 0)) setItem(idx, "preco_unit", String(toNum(mat.custo_unit)));
   };
 
   const valida = () => {
@@ -64,7 +58,7 @@ export default function PedidoFormModal({ open, onClose, fornecedores, materiais
       .map((i) => ({
         material_id: Number(i.material_id),
         quantidade: String(i.quantidade),
-        preco_unit: i.preco_unit ? String(i.preco_unit) : "0",
+        preco_unit: "0",
       }));
     setSubmetendo(true);
     const ok = await onConfirm({
@@ -112,18 +106,16 @@ export default function PedidoFormModal({ open, onClose, fornecedores, materiais
 
         <div className="rounded-xl border border-border/60 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 bg-muted/50 border-b border-border/60">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Materiais do pedido</p>
+            <p className="text-[11px] font-semibold text-muted-foreground tracking-wider">Materiais do pedido</p>
             <Button type="button" size="sm" variant="outline" onClick={adicionarItem}>
               <Icon name="add" className="text-base" /> Adicionar material
             </Button>
           </div>
           <div className="divide-y divide-border/60">
-            {form.itens.map((item, idx) => {
-              const mat = materiais.find((m) => String(m.id) === item.material_id);
-              return (
+            {form.itens.map((item, idx) => (
                 <div key={idx} className="grid grid-cols-1 sm:grid-cols-12 gap-3 px-4 py-3 items-end">
-                  <div className="sm:col-span-5">
-                    <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Material</span>
+                  <div className="sm:col-span-8">
+                    <span className="text-[10px] font-semibold text-muted-foreground tracking-wider block mb-1.5">Material</span>
                     <select
                       value={item.material_id}
                       onChange={(e) => trocarMaterial(idx, e.target.value)}
@@ -131,20 +123,13 @@ export default function PedidoFormModal({ open, onClose, fornecedores, materiais
                     >
                       <option value="">Seleccionar material...</option>
                       {materiais.map((m) => (
-                        <option key={m.id} value={m.id}>{m.codigo} — {m.nome} {m.unidade ? `(${m.unidade})` : ""}</option>
+                        <option key={m.id} value={m.id}>{m.nome} {m.unidade ? `(${m.unidade})` : ""}</option>
                       ))}
                     </select>
                   </div>
-                  <div className="sm:col-span-2">
-                    <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Quantidade</span>
+                  <div className="sm:col-span-3">
+                    <span className="text-[10px] font-semibold text-muted-foreground tracking-wider block mb-1.5">Quantidade</span>
                     <NumeroInput value={item.quantidade} onChange={(e) => setItem(idx, "quantidade", e.target.value)} className={inputCls} placeholder="0" />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Preço unit.</span>
-                    <NumeroInput value={item.preco_unit} onChange={(e) => setItem(idx, "preco_unit", e.target.value)} className={inputCls} placeholder="0,00" />
-                  </div>
-                  <div className="sm:col-span-2 text-sm font-bold text-foreground">
-                    {formatKz(toNum(item.quantidade) * toNum(item.preco_unit))}
                   </div>
                   <div className="sm:col-span-1 flex justify-end">
                     {form.itens.length > 1 && (
@@ -159,12 +144,7 @@ export default function PedidoFormModal({ open, onClose, fornecedores, materiais
                     )}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-          <div className="flex items-center justify-between px-4 py-3 bg-muted/30 border-t border-border/60">
-            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Total do pedido</span>
-            <span className="text-lg font-extrabold text-primary">{formatKz(total)}</span>
+            ))}
           </div>
         </div>
 

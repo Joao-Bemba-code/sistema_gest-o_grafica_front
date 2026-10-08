@@ -57,7 +57,7 @@ export default function PedidoReceberModal({ open, pedido, onClose, onConfirm })
     >
       <div className="space-y-4">
         <div className="bg-muted/50 rounded-xl p-4 border border-border/60 space-y-1">
-          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Fornecedor</p>
+          <p className="text-[11px] font-semibold text-muted-foreground tracking-wider">Fornecedor</p>
           <p className="text-base font-bold text-foreground">{pedido?.fornecedor_nome || "—"}</p>
           <p className="text-xs text-muted-foreground">
             O stock só aumenta pelas quantidades que confirmas aqui. Cada item gera uma entrada no estoque.
@@ -70,11 +70,11 @@ export default function PedidoReceberModal({ open, pedido, onClose, onConfirm })
             return (
               <div key={i.id} className="grid grid-cols-1 sm:grid-cols-12 gap-3 px-4 py-3 items-end">
                 <div className="sm:col-span-6">
-                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">{i.codigo || "Material"}</span>
+                  <span className="text-[10px] font-semibold text-muted-foreground tracking-wider block mb-1.5">{i.codigo || "Material"}</span>
                   <p className="text-sm font-bold text-foreground truncate">{i.nome}</p>
                 </div>
                 <div className="sm:col-span-3">
-                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Qtd recebida agora</span>
+                  <span className="text-[10px] font-semibold text-muted-foreground tracking-wider block mb-1.5">Qtd recebida agora</span>
                   <NumeroInput
                     value={qtds[i.id]}
                     onChange={(e) => setQtds((m) => ({ ...m, [i.id]: e.target.value }))}
@@ -92,7 +92,7 @@ export default function PedidoReceberModal({ open, pedido, onClose, onConfirm })
         </div>
 
         <div>
-          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Lote (aplicado a todas as quantidades)</span>
+          <span className="text-[11px] font-semibold text-muted-foreground tracking-wider block mb-1.5">Lote (aplicado a todas as quantidades)</span>
           <input value={lote} onChange={(e) => setLote(e.target.value)} className={inputCls} placeholder="Ex: LOTE-2026-01" />
         </div>
 

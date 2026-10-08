@@ -72,7 +72,15 @@ export default async function gerarRelatorioMaquinas(maquinas, ordens = [], empr
     ...TEMA_TABELA_MARCA,
     headStyles: { ...TEMA_TABELA_MARCA.headStyles, fontSize: 7.5 },
     bodyStyles: { ...TEMA_TABELA_MARCA.styles, fontSize: 7.5 },
-    columnStyles: { 0: { halign: "center" }, 4: { halign: "center" } },
+    columnStyles: {
+      0: { halign: "center", cellWidth: 18 },
+      1: { cellWidth: 34 },
+      2: { cellWidth: 34 },
+      3: { cellWidth: 32 },
+      4: { halign: "center", cellWidth: 20 },
+      5: { cellWidth: 22 },
+      6: { cellWidth: 22 },
+    },
   });
 
   // ===== Detalhe por máquina =====
@@ -110,7 +118,7 @@ export default async function gerarRelatorioMaquinas(maquinas, ordens = [], empr
     ]);
 
     const linhasUso = uso.map((u) => [
-      `OP ${u.op.numero || u.op.id}`,
+      u.op.numero || `#${u.op.id || "—"}`,
       formatarDataHora(u.reg.data_inicio || u.reg.inicio || u.reg.horaInicio || ""),
       u.reg.operador || "—",
       u.reg.quantidade_produzida != null ? String(u.reg.quantidade_produzida) : "—",

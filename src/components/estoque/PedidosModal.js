@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import Icon from "@/components/Icon";
 import { inputCls, toNum } from "@/lib/estoque";
-import { formatKz } from "@/lib/estoque";
 
 const estados = {
   enviado: { label: "Enviado", variant: "warning" },
@@ -93,7 +92,6 @@ export default function PedidosModal({ open, onClose, pedidos, carregando, onNov
                     </div>
                     <div className="flex items-center gap-2">
                       {estadoBadge(p)}
-                      <span className="text-sm font-extrabold text-primary">{formatKz(p.total)}</span>
                     </div>
                   </div>
 

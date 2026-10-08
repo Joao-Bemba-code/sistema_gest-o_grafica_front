@@ -227,7 +227,7 @@ export default function RequisicoesMaterialModal({
                     <div className="rounded-lg border border-border/60 overflow-hidden">
                       <table className="w-full text-xs">
                         <thead className="bg-muted/50">
-                          <tr className="text-left text-[10px] uppercase tracking-wider text-muted-foreground">
+                          <tr className="text-left text-[10px] tracking-wider text-muted-foreground">
                             <th className="px-3 py-1.5 font-semibold">Material</th>
                             <th className="px-3 py-1.5 font-semibold text-right">Pedido</th>
                             <th className="px-3 py-1.5 font-semibold text-right">Disponível</th>

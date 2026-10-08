@@ -58,6 +58,7 @@ function normalizar(op) {
     ...op,
     status: op.estado || op.status || "aguardando",
     cliente: op.cliente?.nome || op.cliente || "—",
+    clienteDados: op.cliente && typeof op.cliente === "object" ? op.cliente : null,
     orcamento: orcamentoDados?.numero || op.orcamento || "—",
     orcamentoDados,
     dataEntrada: op.data_entrada || op.dataEntrada || "",

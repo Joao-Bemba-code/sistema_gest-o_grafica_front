@@ -82,19 +82,25 @@ async function desenharCabecalho(doc, org = {}, titulo) {
   doc.setTextColor(...PRETO);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
-  doc.text(org.nome || "SIGRAF", textoX, 14 + 8);
+  // Limita o nome à largura disponível antes do título (topo direito)
+  const larguraTitulo = doc.getTextWidth(String(titulo));
+  const larguraNome = Math.max(40, pw - MARGEM - textoX - larguraTitulo - 12);
+  const linhasNome = doc.splitTextToSize(org.nome || "SIGRAF", larguraNome).slice(0, 2);
+  doc.text(linhasNome[0], textoX, 14 + 8);
+  if (linhasNome[1]) doc.text(linhasNome[1], textoX, 14 + 8 + 4.5);
 
-  const tituloY = 14 + box + 9;
+  // Título no topo direito, acima da Data/Hora
+  const tituloY = 14 + 8;
   doc.setFontSize(13);
-  doc.text(titulo, textoX, tituloY);
+  doc.text(titulo, pw - MARGEM, tituloY, { align: "right" });
 
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...CINZA_ESCURO);
-  doc.text(`Data: ${data}`, pw - MARGEM, tituloY - 4, { align: "right" });
-  doc.text(`Hora: ${hora}`, pw - MARGEM, tituloY + 1.5, { align: "right" });
+  doc.text(`Data: ${data}`, pw - MARGEM, tituloY + 6.5, { align: "right" });
+  doc.text(`Hora: ${hora}`, pw - MARGEM, tituloY + 12, { align: "right" });
 
-  const linhaY = tituloY + 5;
+  const linhaY = 14 + box + 7;
   return { tituloY, linhaY, pw, box };
 }
 
@@ -154,7 +160,11 @@ async function desenharCabecalhoRelatorio(doc, org = {}, titulo) {
   doc.setTextColor(...PRETO);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
-  doc.text(org.nome || "SIGRAF", textoX, y + 2);
+  // Limita o nome à largura disponível antes da coluna Data/Hora (à direita)
+  const larguraNome = pw - MARGEM - textoX - 40;
+  const partesNome = doc.splitTextToSize(org.nome || "SIGRAF", larguraNome);
+  const nomeCortado = partesNome.length > 1 ? `${partesNome[0].slice(0, Math.max(1, partesNome[0].length - 1))}…` : partesNome[0];
+  doc.text(nomeCortado, textoX, y + 2);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
@@ -352,20 +362,16 @@ export async function gerarFichaMaterialPDF(mat, org = {}) {
 export async function gerarPedidoPDF(pedido, org = {}) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
-  const { linhaY } = await desenharCabecalho(doc, org, "Pedido de Compra");
+  const { linhaY } = await desenharCabecalho(doc, org, "Requisição");
 
   const numero = pedido.numero || `PED-${pedido.id || ""}`;
   const data = pedido.data_pedido ? new Date(pedido.data_pedido) : null;
   const dataStr = data && !isNaN(data.getTime()) ? data.toLocaleDateString("pt-PT") : "—";
   const itens = (pedido.itens || []).map((i) => ({
-    codigo: i.codigo || "—",
     nome: i.nome || "—",
     unidade: i.unidade || "un",
     quantidade: Number(i.quantidade) || 0,
-    preco_unit: Number(i.preco_unit) || 0,
-    total: Number(i.total) || 0,
   }));
-  const total = itens.reduce((s, i) => s + i.total, 0);
 
   autoTable(doc, {
     startY: linhaY + 6,
@@ -387,31 +393,18 @@ export async function gerarPedidoPDF(pedido, org = {}) {
 
   autoTable(doc, {
     startY: doc.lastAutoTable.finalY + 6,
-    head: [["Código", "Material", "Unid.", "Quantidade", "Preço Unit.", "Total"]],
+    head: [["Material", "Unid.", "Quantidade"]],
     body: itens.map((i) => [
-      i.codigo,
       i.nome,
       i.unidade,
       formatNumero(i.quantidade),
-      formatKz(i.preco_unit),
-      formatKz(i.total),
     ]),
-    foot: [["", "", "", "", "Total", formatKz(total)]],
     ...TEMA_RELATORIO,
-    footStyles: {
-      fillColor: CINZA_CLARO,
-      textColor: PRETO,
-      fontStyle: "bold",
-      fontSize: 9,
-    },
     columnStyles: colunasProporcionais(
-      [1.2, 3.2, 0.8, 1.5, 1.5, 1.5],
+      [3.4, 0.8, 1.5],
       {
-        0: { halign: "center" },
-        2: { halign: "center" },
-        3: { halign: "right" },
-        4: { halign: "right" },
-        5: { halign: "right" },
+        1: { halign: "center" },
+        2: { halign: "right" },
       }
     ),
   });
@@ -429,7 +422,7 @@ export async function gerarPedidoPDF(pedido, org = {}) {
   }
 
   finalizarComRodape(doc);
-  doc.save(`Pedido_${numero.replace(/[^\w-]+/g, "_")}.pdf`);
+  doc.save(`Requisicao_${numero.replace(/[^\w-]+/g, "_")}.pdf`);
 }
 
 // ============================================================

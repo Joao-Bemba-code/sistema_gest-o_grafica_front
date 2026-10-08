@@ -91,7 +91,7 @@ export const TEMA_TABELA_MARCA = {
         d.setTextColor(...COR_MARCA_PRINCIPAL);
         d.setFont("helvetica", "bold");
         d.setFontSize(8.5);
-        d.text(d.marcaNome, 14, 9);
+        d.text(d.splitTextToSize(String(d.marcaNome), 150)[0], 14, 9);
       }
     }
     d.setFont("helvetica", "normal");
@@ -212,25 +212,34 @@ export async function desenharCabecalhoMarca(doc, { titulo = "", empresa = {}, d
     doc.text((empresa.nome || "C").trim().charAt(0).toUpperCase(), boxX + box / 2, boxY + box / 2 + 5, { align: "center" });
   }
 
-  // Nome e contactos da empresa
+  // Nome e contactos da empresa. A coluna esquerda é limitada pela largura do
+  // título, para nunca invadir o título nem os metadados do lado direito
+  // (evita letras sobrepostas com nomes de empresa longos).
   const textoX = boxX + box + 8;
   doc.marcaNome = empresa.nome || "SIGRAF";
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16.5);
+  const larguraTitulo = doc.getTextWidth(String(titulo || "").toUpperCase());
+  const larguraColunaEsquerda = Math.max(40, pw - MARGEM_MARCA - larguraTitulo - textoX - 12);
+
   doc.setTextColor(...COR_MARCA_PRINCIPAL);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(15);
-  doc.text(empresa.nome || "SIGRAF", textoX, 18);
+  doc.setFontSize(14);
+  const linhasNome = doc.splitTextToSize(empresa.nome || "SIGRAF", larguraColunaEsquerda).slice(0, 2);
+  doc.text(linhasNome[0], textoX, 17.5);
+  if (linhasNome[1]) doc.text(linhasNome[1], textoX, 22);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.6);
   doc.setTextColor(...COR_MARCA_TEXTO);
-  let ty = 25;
+  let ty = 25.5 + (linhasNome.length > 1 ? 4.3 : 0);
   const info = [
     empresa.endereco,
     `NIF: ${empresa.nif || "—"}   ·   Tel: ${empresa.telefone || "—"}   ·   Email: ${empresa.email || "—"}`,
   ].filter(Boolean);
   for (const l in info) {
-    const partes = doc.splitTextToSize(info[l], 82);
+    const partes = doc.splitTextToSize(info[l], larguraColunaEsquerda + 16);
     for (const p of partes.slice(0, 2)) {
-      if (ty > 38) break;
+      if (ty > 39.5) break;
       doc.text(p, textoX, ty);
       ty += 4.3;
     }
@@ -244,9 +253,11 @@ export async function desenharCabecalhoMarca(doc, { titulo = "", empresa = {}, d
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.6);
   doc.setTextColor(...COR_MARCA_TEXTO);
+  const larguraDireita = Math.max(40, pw - MARGEM_MARCA - (textoX + larguraColunaEsquerda + 16) - 6);
   let ry = 26;
   (direitos || []).slice(0, 3).forEach((l) => {
-    doc.text(l, pw - MARGEM_MARCA, ry, { align: "right" });
+    const partes = doc.splitTextToSize(String(l ?? ""), larguraDireita).slice(0, 1);
+    if (partes[0]) doc.text(partes[0], pw - MARGEM_MARCA, ry, { align: "right" });
     ry += 5.4;
   });
 

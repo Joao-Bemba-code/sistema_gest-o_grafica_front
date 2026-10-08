@@ -290,12 +290,16 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
               <input type="checkbox" checked={!!form.controla_lote} onChange={(e) => onChange("controla_lote", e.target.checked)} className="w-4 h-4 rounded accent-primary" />
               <span className="text-xs text-foreground">Rastreabilidade por lote</span>
             </label>
-            <Campo label="Marca" full>
-              <input value={form.especificacoes?.marca || ""} onChange={(e) => aoMudarEspec("marca", e.target.value)} className={inputCls} placeholder="Ex: Canon, Roland..." />
-            </Campo>
-            <Campo label="Modelo" full>
-              <input value={form.especificacoes?.modelo || ""} onChange={(e) => aoMudarEspec("modelo", e.target.value)} className={inputCls} placeholder="Ex: X-100, Pro 200..." />
-            </Campo>
+            {!camposEspec.some((c) => c.chave === "marca") && (
+              <Campo label="Marca" full>
+                <input value={form.especificacoes?.marca || ""} onChange={(e) => aoMudarEspec("marca", e.target.value)} className={inputCls} placeholder="Ex: Canon, Roland..." />
+              </Campo>
+            )}
+            {!camposEspec.some((c) => c.chave === "modelo") && (
+              <Campo label="Modelo" full>
+                <input value={form.especificacoes?.modelo || ""} onChange={(e) => aoMudarEspec("modelo", e.target.value)} className={inputCls} placeholder="Ex: X-100, Pro 200..." />
+              </Campo>
+            )}
           </div>
         )}
 

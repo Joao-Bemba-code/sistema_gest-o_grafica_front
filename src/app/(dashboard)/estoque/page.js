@@ -453,7 +453,7 @@ export default function EstoquePage() {
             <Icon name="calculate" className="text-[16px]" /> Conversor
           </button>
           <Link href="/estoque/novo" className="pill nav-pill hover:opacity-90 transition-opacity">
-            <Icon name="add" className="text-[16px]" /> Novo Item
+            <Icon name="add" className="text-[16px]" /> Novo
           </Link>
         </div>
       </div>
@@ -731,7 +731,7 @@ export default function EstoquePage() {
         <p className="text-[11px] text-muted-foreground">SIGRAF · Sistema de Gestão para Indústria Gráfica</p>
       </footer>
 
-      <FloatButton href="/estoque/novo" label="Novo Item" icon="inventory_2" />
+      <FloatButton href="/estoque/novo" label="Novo" icon="inventory_2" />
     </div>
   );
 }
