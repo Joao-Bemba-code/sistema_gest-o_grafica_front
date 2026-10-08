@@ -17,11 +17,12 @@ export default function CategoriaSelect({ value, categorias = [], onChange, plac
   };
 
   const selecionada = categorias.find((c) => String(c.id) === String(value));
-  const textoInicial = selecionada
-    ? [tiposItem[normalizarTipoItem(selecionada.tipo)]?.label || "", selecionada.subfamilia]
-        .filter(Boolean)
-        .join(" > ") || selecionada.nome || selecionada.familia || ""
-    : "";
+  const textoInicial = (() => {
+    if (!selecionada) return "";
+    const famCfg = familias[normalizarFamilia(selecionada.familia)];
+    const famLabel = famCfg?.label || String(selecionada.familia || "");
+    return [famLabel, selecionada.subfamilia].filter(Boolean).join(" > ") || selecionada.nome || famLabel || "";
+  })();
 
   const filtrados = categorias.filter((c) => {
     const t = busca.toLowerCase();
@@ -94,6 +95,7 @@ export default function CategoriaSelect({ value, categorias = [], onChange, plac
             const famCfg = familias[fam];
             const tipoCfg = tiposItem[normalizarTipoItem(cat.tipo)];
             const tipoLabel = tipoCfg?.label || String(cat.tipo || "");
+            const famLabel = famCfg?.label || String(cat.familia || "");
             return (
               <li key={cat.id} role="option" aria-selected={String(cat.id) === String(value)}>
                 <button
@@ -104,15 +106,13 @@ export default function CategoriaSelect({ value, categorias = [], onChange, plac
                 >
                   {<Icon name={famCfg?.icon || (tipoCfg?.label === "Maquinaria" ? "precision_manufacturing" : "category")} className="text-sm text-primary shrink-0" />}
                   <span className="flex-1 min-w-0">
-                    <span className="block truncate">{tipoLabel || famCfg?.label || cat.familia || cat.nome}</span>
-                    {(cat.subfamilia || famCfg) && (
-                      <span className="block text-[9px] text-muted-foreground truncate">
-                        {[cat.subfamilia, famCfg?.label || cat.familia].filter(Boolean).join(" > ")}
-                      </span>
+                    <span className="block truncate">{famLabel || tipoLabel || cat.nome}</span>
+                    {cat.subfamilia && (
+                      <span className="block text-[9px] text-muted-foreground truncate">{cat.subfamilia}</span>
                     )}
                   </span>
-                  {famCfg && famCfg.label !== tipoLabel && (
-                    <span className="text-[9px] font-mono text-primary border border-primary/30 rounded px-1.5 py-0.5 shrink-0 bg-primary/5">{famCfg.label}</span>
+                  {tipoLabel && tipoLabel !== famLabel && (
+                    <span className="text-[9px] font-mono text-primary border border-primary/30 rounded px-1.5 py-0.5 shrink-0 bg-primary/5">{tipoLabel}</span>
                   )}
                 </button>
               </li>
