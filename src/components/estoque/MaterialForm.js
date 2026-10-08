@@ -79,10 +79,16 @@ function CampoEspecificacao({ campo, valor, onChange }) {
 
 export default function MaterialForm({ formId = "form-material", form, onChange, onSubmit, categorias, fornecedores, materiais = [], idMaterial }) {
   const [tab, setTab] = useState("identificacao");
+  const [familiaFiltro, setFamiliaFiltro] = useState(() => {
+    const c = categorias.find((x) => String(x.id) === String(form.categoria_id));
+    return c ? normalizarFamilia(c.familia) : "";
+  });
   const id = (sufixo) => `${formId}-${sufixo}`;
   const categoria = categorias.find((c) => String(c.id) === String(form.categoria_id));
+  const categoriasFiltradas = familiaFiltro
+    ? categorias.filter((c) => normalizarFamilia(c.familia) === familiaFiltro)
+    : categorias;
   const tipoLabel = categoria ? (tiposItem[normalizarTipoItem(categoria.tipo)]?.label || String(categoria.tipo || "")) : "";
-  const catFamiliaLabel = categoria ? (familias[normalizarFamilia(categoria.familia)]?.label || categoria.familia || "") : "";
   const camposEspec = camposDeCategoria(categoria, form.unidade);
   const ePapel = ["folha", "resma"].includes(normalizarUnidade(form.unidade));
   const unidadesDisponiveis = categoria ? unidadesParaFamilia(categoria.familia) : unidades;
@@ -137,6 +143,7 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
         }
       }
       onChange("codigo", `${prefixo}-${String(maxNum + 1).padStart(4, "0")}`);
+      setFamiliaFiltro(normalizarFamilia(cat.familia));
       if (mudou) {
         onChange("especificacoes", {
           ...(form.especificacoes || {}),
@@ -145,6 +152,14 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
       }
     }
   }, [categorias, materiais, onChange, form]);
+
+  const aoMudarFamilia = (fam) => {
+    setFamiliaFiltro(fam);
+    if (!fam) return;
+    if (categoria && normalizarFamilia(categoria.familia) === fam) return;
+    onChange("categoria_id", "");
+    onChange("codigo", "");
+  };
 
   const aoMudarEspec = (chave, valor) => {
     const especificacoes = { ...(form.especificacoes || {}) };
@@ -184,19 +199,24 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
             <Campo label="Nome" obrigatorio>
               <input required aria-required="true" value={form.nome} onChange={(e) => onChange("nome", e.target.value)} className={inputCls} placeholder="Ex: Papel Couché 150g A3" />
             </Campo>
+            <Campo label="Família">
+              <select
+                value={familiaFiltro}
+                onChange={(e) => aoMudarFamilia(e.target.value)}
+                className={inputCls}
+                aria-label="Filtrar categorias por família"
+              >
+                <option value="">Todas as famílias</option>
+                {Object.keys(familias).map((k) => (
+                  <option key={k} value={k}>{familias[k].label}</option>
+                ))}
+              </select>
+            </Campo>
             <Campo label="Categoria" obrigatorio>
               <CategoriaSelect
                 value={form.categoria_id}
-                categorias={categorias}
+                categorias={categoriasFiltradas}
                 onChange={(id) => aoMudarCategoria(id)}
-              />
-            </Campo>
-            <Campo label="Família">
-              <input
-                value={catFamiliaLabel}
-                readOnly
-                className={`${inputCls} bg-muted/50 cursor-not-allowed`}
-                placeholder={form.categoria_id ? "Carregando família..." : "Escolha a categoria"}
               />
             </Campo>
             <Campo label="Grupo" obrigatorio>
