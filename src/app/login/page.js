@@ -86,7 +86,7 @@ export default function LoginPage() {
             <Icon name="precision_manufacturing" className="text-xl ms-fill" />
           </div>
           <div className="min-w-0">
-            <p className="text-[15px] font-semibold leading-none tracking-tight text-foreground">SIGRAF</p>
+            <p className="text-[15px] font-semibold leading-none tracking-tight text-foreground">KAMGEST</p>
             <p className="mt-1 text-[11px] text-muted-foreground">Gestão de Gráfica</p>
           </div>
         </div>
@@ -118,7 +118,7 @@ export default function LoginPage() {
         </div>
 
         <p className="relative text-[11px] text-muted-foreground">
-          © {new Date().getFullYear()} SIGRAF — Sistema de Gestão para Indústria Gráfica
+          © {new Date().getFullYear()} KAMGEST — Sistema de Gestão para Indústria Gráfica
         </p>
       </aside>
 
@@ -139,7 +139,7 @@ export default function LoginPage() {
             <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <Icon name="precision_manufacturing" className="text-2xl ms-fill" />
             </div>
-            <p className="text-xl font-bold tracking-tight text-foreground">SIGRAF</p>
+            <p className="text-xl font-bold tracking-tight text-foreground">KAMGEST</p>
             <p className="mt-1 text-xs text-muted-foreground">Sistema de Gestão para Indústria Gráfica</p>
           </div>
 
@@ -233,7 +233,7 @@ export default function LoginPage() {
           </form>
 
           <p className="mt-8 text-center text-[11px] text-muted-foreground lg:hidden">
-            © {new Date().getFullYear()} SIGRAF — Sistema de Gestão para Indústria Gráfica
+            © {new Date().getFullYear()} KAMGEST — Sistema de Gestão para Indústria Gráfica
           </p>
         </div>
       </main>

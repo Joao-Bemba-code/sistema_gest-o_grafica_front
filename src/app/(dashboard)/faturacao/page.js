@@ -1,25 +1,38 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import Modal from "@/components/Modal";
 import Icon from "@/components/Icon";
-import { Card, CardContent } from "@/components/ui/Card";
-import KpiCard from "@/components/ui/KpiCard";
-import { inputCls } from "@/lib/estoque";
+import { inputCls, toNum } from "@/lib/estoque";
 import NumeroInput from "@/components/ui/NumeroInput";
 import { Button } from "@/components/ui/Button";
 import FloatButton from "@/components/ui/FloatButton";
-import { Badge } from "@/components/ui/Badge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
-import FilterBar, { useFilter } from "@/components/ui/FilterBar";
+import RowMenu from "@/components/ui/RowMenu";
+import Paginacao, { usePaginacao } from "@/components/ui/Paginacao";
+import {
+  Ledger,
+  LedgerHeader,
+  FilterRow,
+  LedgerTable,
+  LedgerTh,
+  LedgerTr,
+  LedgerTd,
+  IdCell,
+  StatusBadge,
+  LedgerEmpty,
+} from "@/components/ui/Ledger";
 import { criarFatura, listarFaturas, exportarFaturas, marcarPaga, buscarFatura, removerFatura, consultarEstadoAGT, enviarFaturaAGT } from "@/services/faturacao";
 import { listar as listarOrcamentos } from "@/services/orcamentos";
 import { listarOrdens } from "@/services/producao";
 import { listar as listarClientes } from "@/services/clientes";
 import { listarContas } from "@/services/contasBancarias";
 import { buscarOrganizacao } from "@/services/configuracoes";
+import { resumoTesouraria, listarMovimentos } from "@/services/tesouraria";
+import { podeAtual } from "@/lib/permissoes";
 import gerarPDF from "@/lib/faturacaoPdf";
 
 const metodos = {
@@ -39,18 +52,25 @@ const tiposDoc = {
 };
 
 const faturaEstados = {
-  emitida: { label: "Emitida", variant: "warning" },
-  paga: { label: "Paga", variant: "success" },
-  parcial: { label: "Parcial", variant: "info" },
-  vencida: { label: "Vencida", variant: "destructive" },
-  cancelada: { label: "Cancelada", variant: "outline" },
+  emitida: { label: "Emitida", tom: "warning" },
+  paga: { label: "Paga", tom: "success" },
+  parcial: { label: "Parcial", tom: "info" },
+  vencida: { label: "Vencida", tom: "error" },
+  cancelada: { label: "Cancelada", tom: "neutral" },
 };
 
 const agtEstados = {
-  pendente: { label: "AGT: Pendente", variant: "warning" },
-  valida: { label: "AGT: Validada", variant: "success" },
-  invalida: { label: "AGT: Inválida", variant: "destructive" },
+  pendente: { label: "AGT: Pendente", tom: "warning" },
+  valida: { label: "AGT: Validada", tom: "success" },
+  invalida: { label: "AGT: Inválida", tom: "error" },
 };
+
+const CAMPOS_FAT = [
+  { value: "numero", label: "Número", obter: (f) => f.numero || "" },
+  { value: "cliente", label: "Cliente", obter: (f) => `${f.cliente?.nome || ""} ${f.cliente?.empresa || ""}` },
+  { value: "estado", label: "Estado", obter: (f) => f.estado || "" },
+  { value: "tipo", label: "Tipo de documento", obter: (f) => f.tipo || "" },
+];
 
 const hoje = new Date().toISOString().split("T")[0];
 const blankItem = { descricao: "", quantidade: "", preco_unit: "" };
@@ -61,8 +81,14 @@ const blankFaturaForm = {
 
 function formatKz(v) { return `Kz ${Number(v || 0).toLocaleString("pt-AO")}`; }
 
+const tabClsBase = "-mb-px inline-flex items-center gap-1.5 whitespace-nowrap border-b-2 pb-2.5 pt-2 text-sm font-semibold transition-colors";
+const tabClsAtiva = "border-blue-600 font-bold text-blue-600";
+const tabClsInativa = "border-transparent text-muted-foreground hover:text-foreground";
+
 export default function FaturacaoPage() {
+  const router = useRouter();
   const [faturas, setFaturas] = useState([]);
+  const [movimentos, setMovimentos] = useState([]);
   const [ordens, setOrdens] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [orcamentos, setOrcamentos] = useState([]);
@@ -77,11 +103,13 @@ export default function FaturacaoPage() {
   const [deletando, setDeletando] = useState(false);
   const [contas, setContas] = useState([]);
   const [contaPagamento, setContaPagamento] = useState("");
+  const [tesouraria, setTesouraria] = useState({});
+  const [filtroMes, setFiltroMes] = useState("");
   const { addToast } = useToast();
 
   const carregarDados = () => {
-    Promise.all([listarFaturas(), listarOrdens(), listarClientes({ tipo: "cliente" }), listarOrcamentos(), buscarOrganizacao().catch(() => null), listarContas().catch(() => [])])
-      .then(([f, o, c, orcData, emp, cb]) => {
+    Promise.all([listarFaturas(), listarOrdens(), listarClientes({ tipo: "cliente" }), listarOrcamentos(), buscarOrganizacao().catch(() => null), listarContas().catch(() => []), resumoTesouraria().catch(() => ({})), listarMovimentos().catch(() => [])])
+      .then(([f, o, c, orcData, emp, cb, tes, mov]) => {
         setFaturas(Array.isArray(f) ? f : f?.data || []);
         setOrdens(Array.isArray(o) ? o : o?.ordens || []);
         setClientes(Array.isArray(c) ? c : c?.data || []);
@@ -91,6 +119,8 @@ export default function FaturacaoPage() {
         setContas(lista);
         const fav = lista.find((x) => x.favorita) || lista[0];
         setContaPagamento(fav ? String(fav.id) : "");
+        setTesouraria(tes && typeof tes === "object" ? tes : {});
+        setMovimentos(Array.isArray(mov) ? mov : mov?.data || mov?.movimentos || []);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -101,19 +131,38 @@ export default function FaturacaoPage() {
   }, []);
 
 
-  const filterConfig = useMemo(() => [
-    { value: "todas", label: "Todas", icon: "filter_list" },
-    ...Object.entries(faturaEstados).map(([k, v]) => ({
-      value: k, label: v.label, field: "estado",
-      icon: k === "paga" ? "check_circle" : k === "emitida" ? "pending" : k === "vencida" ? "warning" : k === "cancelada" ? "cancel" : "info",
-    })),
-  ], []);
+  const [filtro, setFiltro] = useState({ campo: "numero", operador: "contem", termo: "" });
+  const [filtroEstado, setFiltroEstado] = useState("todas");
+  const [ordem, setOrdem] = useState({ chave: "", dir: 1 });
+  const [filtrosAbertos, setFiltrosAbertos] = useState(true);
 
-  const { search, setSearch, activeFilter, setActiveFilter, filtered: filteredFaturasFinal, total } = useFilter({
-    items: faturas,
-    searchFields: ["numero", "cliente.nome", "cliente.empresa"],
-    filterConfig,
-  });
+  const filteredFaturasFinal = useMemo(() => {
+    const termo = filtro.termo.trim().toLowerCase();
+    let res = [...faturas];
+    if (filtroEstado !== "todas") res = res.filter((f) => f.estado === filtroEstado);
+    if (filtroMes) res = res.filter((f) => String(f.data_emissao || "").slice(0, 7) === filtroMes);
+    if (termo) {
+      const cfg = CAMPOS_FAT.find((c) => c.value === filtro.campo) || CAMPOS_FAT[0];
+      res = res.filter((f) => {
+        const alvo = String(cfg.obter(f) || "").toLowerCase();
+        if (filtro.operador === "igual") return alvo === termo;
+        if (filtro.operador === "comeca") return alvo.startsWith(termo);
+        return alvo.includes(termo);
+      });
+    }
+    if (ordem.chave === "numero") res.sort((a, b) => String(a.numero || "").localeCompare(String(b.numero || ""), "pt", { numeric: true }) * ordem.dir);
+    if (ordem.chave === "total") res.sort((a, b) => (valorDoc(a) - valorDoc(b)) * ordem.dir);
+    if (ordem.chave === "emissao") res.sort((a, b) => (new Date(a.data_emissao || 0) - new Date(b.data_emissao || 0)) * ordem.dir);
+    return res;
+  }, [faturas, filtro, filtroEstado, ordem, filtroMes]);
+
+  const contagensEstado = useMemo(() => {
+    const c = { todas: faturas.length };
+    for (const k of Object.keys(faturaEstados)) c[k] = faturas.filter((f) => f.estado === k).length;
+    return c;
+  }, [faturas]);
+
+  const { visiveis: faturasVisiveis, ...pag } = usePaginacao({ items: filteredFaturasFinal });
 
   const abrirFatura = async (f) => {
     setSelectedFatura(f);
@@ -134,15 +183,8 @@ export default function FaturacaoPage() {
   const totalVencidas = faturas.filter((f) => f.estado === "vencida").reduce((s, f) => s + valorDoc(f), 0);
   const recebidoHoje = faturas.filter((f) => f.estado === "paga" && (f.data_pagamento || f.data_emissao) === hoje).reduce((s, f) => s + pagoDoc(f), 0);
 
-  const clientesMap = {};
-  faturas.forEach((f) => {
-    const nome = f.cliente?.nome || clientes.find((c) => c.id === f.cliente_id)?.nome || "—";
-    if (nome === "—") return;
-    if (!clientesMap[nome]) clientesMap[nome] = { nome, total: 0, faturas: 0 };
-    clientesMap[nome].total += valorDoc(f);
-    clientesMap[nome].faturas += 1;
-  });
-  const topClientes = Object.values(clientesMap).sort((a, b) => b.total - a.total).slice(0, 5);
+  const despesas = useMemo(() => movimentos.filter((m) => m.tipo === "saida"), [movimentos]);
+  const { visiveis: despesasVisiveis, ...pagDesp } = usePaginacao({ items: despesas });
 
   const faturaSubtotal = faturaForm.itens.reduce((s, i) => s + (Number(i.quantidade) || 0) * (Number(i.preco_unit) || 0), 0);
   const faturaIva = (faturaSubtotal * (Number(faturaForm.iva) || 0)) / 100;
@@ -314,7 +356,7 @@ export default function FaturacaoPage() {
 
   const handleExportar = async () => {
     try {
-      const blob = await exportarFaturas({ estado: activeFilter === "todas" ? undefined : activeFilter });
+      const blob = await exportarFaturas({ estado: filtroEstado === "todas" ? undefined : filtroEstado });
       const url = window.URL.createObjectURL(new Blob([blob]));
       const a = document.createElement("a");
       a.href = url;
@@ -332,141 +374,268 @@ export default function FaturacaoPage() {
   if (loading) return <CardSkeleton lines={6} />;
   if (error) return <div className="bg-destructive/10 text-destructive rounded-2xl p-6 text-center font-semibold">{error}</div>;
 
+  const entradasMes = Number(tesouraria.entradasMes || 0);
+  const saidasMes = Number(tesouraria.saidasMes || 0);
+  const resultado = entradasMes - saidasMes;
+  const margem = entradasMes > 0 ? (resultado / entradasMes) * 100 : 0;
+  const kpis = [
+    { key: "receitas", icon: "trending_up", label: "Receitas", valor: Math.round(entradasMes).toLocaleString("pt-AO"), sufixo: "Kz", icone: "bg-primary/10 text-primary", cor: "text-foreground" },
+    { key: "despesas", icon: "account_balance_wallet", label: "Despesas", valor: Math.round(saidasMes).toLocaleString("pt-AO"), sufixo: "Kz", icone: "bg-error/10 text-error", cor: "text-foreground" },
+    { key: "resultado", icon: "bar_chart", label: "Resultado", valor: Math.round(resultado).toLocaleString("pt-AO"), sufixo: "Kz", icone: "bg-success/10 text-success", cor: resultado < 0 ? "text-error" : "text-success" },
+    { key: "margem", icon: "speed", label: "Margem", valor: `${margem.toFixed(1)}%`, icone: "bg-success/10 text-success", cor: "text-foreground" },
+  ];
+  const podeDespesas = podeAtual("tesouraria", "ver");
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Faturação</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{faturas.length} documentos</p>
+    <div className="space-y-4">
+      {/* Faixa do módulo - identificação financeiro (teal) */}
+      <div className="flex items-center rounded-xl bg-[#0a615a] px-5 py-2.5 text-white shadow-sm">
+        <span className="text-lg font-extrabold uppercase tracking-wide">6. FINANCEIRO</span>
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-extrabold tracking-tight text-foreground">Gestão Financeira</h1>
+          <p className="mt-0.5 text-xs font-medium text-muted-foreground">Contabilidade, facturação e resultados.</p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <button onClick={() => setFatModalOpen(true)} className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium shadow-sm hover:bg-primary/90 transition-colors ">
-            <Icon name="add" className="text-[16px]" /> Nova Fatura
-          </button>
+        <div className="flex shrink-0 flex-wrap items-center gap-2.5">
           {faturas.length > 0 && (
-            <button onClick={handleExportar} className="bg-surface-variant text-on-surface border border-outline-variant px-4 py-2 rounded font-mono flex items-center gap-2 hover:border-primary hover:text-primary transition-all text-[11px] uppercase tracking-wider">
-              <Icon name="download" className="text-[16px]" /> Exportar
+            <button type="button" onClick={handleExportar} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 text-sm font-medium text-foreground transition-colors hover:bg-muted/60">
+              <Icon name="download" className="text-base" /> Exportar
             </button>
           )}
+          {podeDespesas && (
+            <button type="button" onClick={() => router.push("/tesouraria")} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#2563eb] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700">
+              <Icon name="add" className="text-base" /> Nova Despesa
+            </button>
+          )}
+          <button onClick={() => setFatModalOpen(true)} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#2563eb] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700">
+            <Icon name="add" className="text-base" /> Nova Factura
+          </button>
         </div>
       </div>
 
-      <div className="flex gap-2">
-        {["faturas", "clientes"].map((t) => (
-          <Button key={t} variant={tab === t ? "default" : "outline"} size="sm" onClick={() => setTab(t)}>
-            <Icon name={t === "faturas" ? "receipt_long" : "groups"} className="text-sm" />
-            {t === "faturas" ? "Faturas" : "Clientes"}
-          </Button>
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Indicadores financeiros">
+        {kpis.map((k) => (
+          <div key={k.key} className="flex items-center gap-3.5 rounded-xl border border-border bg-card p-4 shadow-[0_2px_4px_rgba(0,0,0,0.02)]">
+            <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-xl ${k.icone}`}>
+              <Icon name={k.icon} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold leading-tight text-muted-foreground">{k.label}</p>
+              <p className={`truncate text-xl font-black leading-tight tabular-nums tracking-tight sm:text-2xl ${k.cor}`}>
+                {k.valor}
+                {k.sufixo && <span className="ml-1 text-xs font-bold text-muted-foreground">{k.sufixo}</span>}
+              </p>
+            </div>
+          </div>
         ))}
+      </section>
+
+      <div className="flex flex-col gap-3 border-b border-border sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
+          {[
+            { id: "faturas", label: "Facturação", icon: "receipt_long" },
+            { id: "despesas", label: "Despesas", icon: "account_balance_wallet" },
+            { id: "resultados", label: "Resultados", icon: "bar_chart" },
+          ].map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              aria-pressed={tab === t.id}
+              className={`${tabClsBase} ${tab === t.id ? tabClsAtiva : tabClsInativa}`}
+            >
+              <Icon name={t.icon} className="text-base" /> {t.label}
+            </button>
+          ))}
+        </div>
+        {tab === "faturas" && (
+          <label className="flex items-center gap-2 pb-1.5 text-xs text-muted-foreground">
+            <Icon name="calendar_month" className="text-base" />
+            <input
+              type="month"
+              value={filtroMes}
+              onChange={(e) => setFiltroMes(e.target.value)}
+              className="h-8 rounded-lg border border-border bg-card px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+            />
+            {filtroMes && (
+              <button type="button" onClick={() => setFiltroMes("")} className="font-medium text-primary hover:underline">Limpar</button>
+            )}
+          </label>
+        )}
       </div>
 
+
       {tab === "faturas" && (
-        <>
-          <section className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
-            {[
-              { label: "Total a Receber", value: formatKz(totalReceber), icon: "paid", iconVariant: "warning" },
-              { label: "Total Recebido", value: formatKz(totalRecebido), icon: "payments", iconVariant: "success" },
-              { label: "Recebido Hoje", value: formatKz(recebidoHoje), icon: "today", iconVariant: "primary" },
-              { label: "Vencidas", value: formatKz(totalVencidas), icon: "warning", iconVariant: "error" },
-            ].map((kpi) => (
-              <KpiCard key={kpi.label} icon={kpi.icon} label={kpi.label} value={kpi.value} iconVariant={kpi.iconVariant} />
-            ))}
-          </section>
-
-          <FilterBar
-            search={search}
-            onSearchChange={setSearch}
-            placeholder="Pesquisar por nº fatura, cliente..."
-            filters={filterConfig}
-            activeFilter={activeFilter}
-            onFilterChange={setActiveFilter}
-            count={total}
-            countLabel="faturas"
+        <Ledger rotulo="Faturas ledger">
+          <LedgerHeader
+            titulo="Faturas"
+            subtitulo={`${faturas.length} documentos · a receber ${formatKz(totalReceber)} · recebido ${formatKz(totalRecebido)} · recebido hoje ${formatKz(recebidoHoje)} · vencidas ${formatKz(totalVencidas)}`}
+            onToggleFiltros={() => setFiltrosAbertos((v) => !v)}
+            filtrosAbertos={filtrosAbertos}
           />
-
-          <div className="space-y-3">
-            {filteredFaturasFinal.map((f) => (
-              <Card key={f.id} className="hover-lift cursor-pointer" onClick={() => abrirFatura(f)}>
-                <CardContent className="p-5">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-4 min-w-0">
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                        <Icon name="receipt_long" className="text-primary text-[20px]" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-sm text-foreground">{f.numero}</span>
-                          <Badge variant={tiposDoc[f.tipo]?.variant || "outline"} className="text-[10px]">
-                            {tiposDoc[f.tipo]?.label || f.tipo}
-                          </Badge>
-                          <Badge variant={faturaEstados[f.estado]?.variant || "outline"} className="text-[10px]">
-                            {faturaEstados[f.estado]?.label || f.estado}
-                          </Badge>
-                          {f.agt_status && (
-                            <Badge variant={agtEstados[f.agt_status]?.variant || "outline"} className="text-[10px]">
-                              {agtEstados[f.agt_status]?.label || f.agt_status}
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {f.cliente?.nome || "—"}
-                          {f.agt_document_no ? " • " + f.agt_document_no : ""}
-                          {f.estado === "paga" && f.data_pagamento
-                            ? ` • Pago em ${new Date(f.data_pagamento).toLocaleDateString("pt-BR")}`
-                            : f.data_vencimento ? ` • Venc: ${new Date(f.data_vencimento).toLocaleDateString("pt-BR")}` : ""}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-lg font-bold text-foreground">{formatKz(valorDoc(f))}</p>
-                      {f.iva > 0 && <p className="text-[10px] text-muted-foreground">IVA {Number(f.iva)}%</p>}
-                      <div className="flex items-center justify-end gap-1 mt-1">
-                        <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); gerarPDF(f, empresa); }} title="Baixar PDF"><Icon name="download" className="text-[16px]" /></Button>
-                        <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setEliminarItem(f); }} title="Remover fatura"><Icon name="delete" className="text-[16px] text-destructive" /></Button>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+          {filtrosAbertos && (
+            <FilterRow
+              campo={filtro.campo}
+              setCampo={(v) => setFiltro((f) => ({ ...f, campo: v }))}
+              campos={CAMPOS_FAT.map(({ value, label }) => ({ value, label }))}
+              operador={filtro.operador}
+              setOperador={(v) => setFiltro((f) => ({ ...f, operador: v }))}
+              termo={filtro.termo}
+              setTermo={(v) => setFiltro((f) => ({ ...f, termo: v }))}
+              aoLimpar={() => setFiltro((f) => ({ ...f, termo: "" }))}
+              placeholder="Pesquisar por nº fatura, cliente..."
+            />
+          )}
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2">
+            <button
+              type="button"
+              onClick={() => setFiltroEstado("todas")}
+              aria-pressed={filtroEstado === "todas"}
+              className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-sm font-medium whitespace-nowrap transition-colors ${filtroEstado === "todas" ? "border-blue-600/40 bg-blue-50 text-blue-600" : "border-border bg-card text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}
+            >
+              Todas <span className="text-[11px] text-muted-foreground">{contagensEstado.todas}</span>
+            </button>
+            {Object.entries(faturaEstados).map(([k, v]) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setFiltroEstado(k)}
+                aria-pressed={filtroEstado === k}
+                className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-sm font-medium whitespace-nowrap transition-colors ${filtroEstado === k ? "border-blue-600/40 bg-blue-50 text-blue-600" : "border-border bg-card text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}
+              >
+                {v.label} <span className="text-[11px] text-muted-foreground">{contagensEstado[k] ?? 0}</span>
+              </button>
             ))}
-            {filteredFaturasFinal.length === 0 && (
-              <div className="text-center p-12 text-muted-foreground">
-                <Icon name="receipt_long" className="text-4xl block mx-auto mb-2 opacity-30" />
-                <p className="font-medium">Nenhuma fatura encontrada</p>
-              </div>
-            )}
           </div>
-        </>
+
+          <LedgerTable>
+            <thead>
+              <tr className="border-b border-border">
+                <LedgerTh onSort={() => setOrdem((p) => (p.chave === "numero" ? { chave: "numero", dir: -p.dir } : { chave: "numero", dir: 1 }))} ativo={ordem.chave === "numero"}>Nº</LedgerTh>
+                <LedgerTh onSort={() => setOrdem((p) => (p.chave === "emissao" ? { chave: "emissao", dir: -p.dir } : { chave: "emissao", dir: 1 }))} ativo={ordem.chave === "emissao"}>Data</LedgerTh>
+                <LedgerTh>Cliente/Fornecedor</LedgerTh>
+                <LedgerTh>Tipo</LedgerTh>
+                <LedgerTh onSort={() => setOrdem((p) => (p.chave === "total" ? { chave: "total", dir: -p.dir } : { chave: "total", dir: 1 }))} ativo={ordem.chave === "total"} className="text-right">Valor (Kz)</LedgerTh>
+                <LedgerTh>Estado</LedgerTh>
+                <LedgerTh className="w-10" />
+              </tr>
+            </thead>
+            <tbody>
+              {faturasVisiveis.map((f) => (
+                <LedgerTr key={f.id} onClick={() => abrirFatura(f)}>
+                  <LedgerTd className="whitespace-nowrap font-semibold text-slate-800">
+                    <IdCell id={f.numero} meta={f.data_emissao ? new Date(f.data_emissao).toLocaleDateString("pt-AO") : "—"} aoAbrir={() => abrirFatura(f)} />
+                  </LedgerTd>
+                  <LedgerTd className="text-muted-foreground whitespace-nowrap">{f.data_emissao ? new Date(f.data_emissao).toLocaleDateString("pt-AO") : "—"}</LedgerTd>
+                  <LedgerTd className="max-w-48"><span className="block truncate font-medium">{f.cliente?.nome || "—"}</span></LedgerTd>
+                  <LedgerTd className="whitespace-nowrap text-slate-700">{tiposDoc[f.tipo]?.label || f.tipo || "—"}</LedgerTd>
+                  <LedgerTd className="text-right tabular-nums whitespace-nowrap">
+                    <span className="block font-semibold text-slate-800">{toNum(valorDoc(f)).toLocaleString("pt-AO")}</span>
+                    {f.iva > 0 && <span className="block text-xs text-muted-foreground">IVA {Number(f.iva)}%</span>}
+                  </LedgerTd>
+                  <LedgerTd>
+                    <span className="flex flex-wrap items-center gap-1">
+                      <StatusBadge tom={(faturaEstados[f.estado] || { tom: "neutral" }).tom}>{faturaEstados[f.estado]?.label || f.estado}</StatusBadge>
+                      {f.agt_status && (
+                        <StatusBadge tom={(agtEstados[f.agt_status] || { tom: "neutral" }).tom}>{agtEstados[f.agt_status]?.label || f.agt_status}</StatusBadge>
+                      )}
+                    </span>
+                  </LedgerTd>
+                  <LedgerTd>
+                    <RowMenu
+                      ariaLabel="Ações da fatura"
+                      itens={[
+                        { icone: "visibility", rotulo: "Ver detalhes", onClick: () => abrirFatura(f) },
+                        { icone: "download", rotulo: "Baixar PDF", onClick: () => gerarPDF(f, empresa) },
+                        { icone: "delete", rotulo: "Remover", danger: true, onClick: () => setEliminarItem(f) },
+                      ]}
+                    />
+                  </LedgerTd>
+                </LedgerTr>
+              ))}
+            </tbody>
+          </LedgerTable>
+          {pag.total === 0 && (
+            <LedgerEmpty icone="receipt_long">
+              {faturas.length === 0 ? "Nenhuma fatura registada" : "Nenhuma fatura corresponde ao filtro"}
+            </LedgerEmpty>
+          )}
+          <Paginacao {...pag} label="faturas" />
+        </Ledger>
       )}
 
-      {tab === "clientes" && (
-        <Card>
-          <CardContent className="p-5">
-            <h2 className="font-bold text-foreground mb-4">Top Clientes por Faturação</h2>
-            <div className="space-y-3">
-              {topClientes.map((c, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <span className="text-xs font-bold text-muted-foreground w-5">{i + 1}º</span>
-                  <div className="flex-1">
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="font-medium text-foreground">{c.nome}</span>
-                      <span className="font-bold text-foreground">{formatKz(c.total)}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full bg-primary rounded-full" style={{ width: `${(c.total / (totalReceber + totalRecebido)) * 100 || 0}%` }} />
-                      </div>
-                      <span className="text-[10px] text-muted-foreground">{c.faturas} faturas</span>
-                    </div>
-                  </div>
-                </div>
+      {tab === "despesas" && (
+        <Ledger rotulo="Despesas ledger">
+          <LedgerHeader
+            titulo="Despesas"
+            subtitulo={`${despesas.length} movimentos de saída`}
+          />
+          <LedgerTable>
+            <thead>
+              <tr className="border-b border-border">
+                <LedgerTh>Nº</LedgerTh>
+                <LedgerTh>Data</LedgerTh>
+                <LedgerTh>Cliente/Fornecedor</LedgerTh>
+                <LedgerTh>Tipo</LedgerTh>
+                <LedgerTh className="text-right">Valor (Kz)</LedgerTh>
+              </tr>
+            </thead>
+            <tbody>
+              {despesasVisiveis.map((m) => (
+                <LedgerTr key={m.id}>
+                  <LedgerTd className="whitespace-nowrap font-semibold text-slate-800">
+                    <IdCell id={m.referencia || `DES-${String(m.id).padStart(4, "0")}`} meta={m.categoria || "—"} />
+                  </LedgerTd>
+                  <LedgerTd className="text-muted-foreground whitespace-nowrap">{m.data_movimento || m.data ? new Date(m.data_movimento || m.data).toLocaleDateString("pt-AO") : "—"}</LedgerTd>
+                  <LedgerTd className="max-w-48"><span className="block truncate font-medium">{m.descricao || "—"}</span></LedgerTd>
+                  <LedgerTd className="whitespace-nowrap font-medium text-red-500">Despesa</LedgerTd>
+                  <LedgerTd className="text-right tabular-nums whitespace-nowrap font-semibold text-slate-800">{toNum(m.valor).toLocaleString("pt-AO")}</LedgerTd>
+                </LedgerTr>
               ))}
-              {topClientes.length === 0 && (
-                <p className="text-center p-6 text-muted-foreground">Nenhuma fatura registada</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+            </tbody>
+          </LedgerTable>
+          {pagDesp.total === 0 && (
+            <LedgerEmpty icone="account_balance_wallet">Nenhuma despesa registada</LedgerEmpty>
+          )}
+          <Paginacao {...pagDesp} label="movimentos" />
+        </Ledger>
+      )}
+
+      {tab === "resultados" && (
+        <Ledger rotulo="Resultados ledger">
+          <LedgerHeader
+            titulo="Resultados"
+            subtitulo="Receitas, despesas e resultado do período"
+          />
+          <LedgerTable>
+            <thead>
+              <tr className="border-b border-border">
+                <LedgerTh>Indicador</LedgerTh>
+                <LedgerTh className="text-right">Valor (Kz)</LedgerTh>
+              </tr>
+            </thead>
+            <tbody>
+              <LedgerTr>
+                <LedgerTd className="font-medium">Receitas</LedgerTd>
+                <LedgerTd className="text-right tabular-nums font-semibold text-slate-800">{toNum(entradasMes).toLocaleString("pt-AO")}</LedgerTd>
+              </LedgerTr>
+              <LedgerTr>
+                <LedgerTd className="font-medium">Despesas</LedgerTd>
+                <LedgerTd className="text-right tabular-nums font-semibold text-slate-800">{toNum(saidasMes).toLocaleString("pt-AO")}</LedgerTd>
+              </LedgerTr>
+              <LedgerTr>
+                <LedgerTd className="font-medium">Resultado</LedgerTd>
+                <LedgerTd className={`text-right tabular-nums font-semibold ${resultado < 0 ? "text-red-600" : "text-emerald-600"}`}>{toNum(resultado).toLocaleString("pt-AO")}</LedgerTd>
+              </LedgerTr>
+              <LedgerTr>
+                <LedgerTd className="font-medium">Margem</LedgerTd>
+                <LedgerTd className="text-right tabular-nums font-semibold text-slate-800">{margem.toFixed(1)}%</LedgerTd>
+              </LedgerTr>
+            </tbody>
+          </LedgerTable>
+        </Ledger>
       )}
 
       <Modal open={fatModalOpen} onClose={() => { setFaturaForm(blankFaturaForm); setFatModalOpen(false); }} title={faturaForm.tipo === "recibo" ? "Novo Recibo" : faturaForm.tipo === "factura_recibo" ? "Nova Factura Recibo" : "Nova Fatura"} icon="receipt_long" size="2xl"
@@ -655,9 +824,9 @@ export default function FaturacaoPage() {
                   {selectedFatura.cliente?.nif && <p className="text-xs text-muted-foreground">NIF: {selectedFatura.cliente.nif}</p>}
                 </div>
                 <div className="flex flex-col items-end gap-1.5">
-                  <Badge variant={faturaEstados[selectedFatura.estado]?.variant || "outline"} className="text-[10px]">
+                  <StatusBadge tom={(faturaEstados[selectedFatura.estado] || { tom: "neutral" }).tom}>
                     {faturaEstados[selectedFatura.estado]?.label || selectedFatura.estado}
-                  </Badge>
+                  </StatusBadge>
                   {selectedFatura.orcamento && (
                     <span className="text-[10px] text-muted-foreground">
                       Origem: <span className="font-semibold text-foreground">{selectedFatura.orcamento.numero || selectedFatura.orcamento.id}</span>
@@ -743,9 +912,9 @@ export default function FaturacaoPage() {
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Comunicação à AGT</p>
                   {selectedFatura.agt_status && (
-                    <Badge variant={agtEstados[selectedFatura.agt_status]?.variant || "outline"} className="text-[10px]">
+                    <StatusBadge tom={(agtEstados[selectedFatura.agt_status] || { tom: "neutral" }).tom}>
                       {agtEstados[selectedFatura.agt_status]?.label || selectedFatura.agt_status}
-                    </Badge>
+                    </StatusBadge>
                   )}
                 </div>
                 {selectedFatura.agt_document_no && (
@@ -795,9 +964,6 @@ export default function FaturacaoPage() {
         description={eliminarItem ? `Tem a certeza que deseja remover a fatura "${eliminarItem.numero}"? Esta ação não pode ser desfeita.` : ""}
       />
 
-      <footer className="border-t pt-6 pb-2 text-center">
-        <p className="text-[11px] text-muted-foreground">SIGRAF · Sistema de Gestão para Indústria Gráfica</p>
-      </footer>
 
       <FloatButton onClick={() => setFatModalOpen(true)} label="Nova Fatura" icon="receipt_long" />
     </div>

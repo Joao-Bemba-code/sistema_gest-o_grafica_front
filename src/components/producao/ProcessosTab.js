@@ -2,12 +2,23 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Icon from "@/components/Icon";
-import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
+import Modal from "@/components/Modal";
 import Paginacao, { usePaginacao } from "@/components/ui/Paginacao";
+import {
+  Ledger,
+  LedgerHeader,
+  FilterRow,
+  LedgerTable,
+  LedgerTh,
+  LedgerTr,
+  LedgerTd,
+  IdCell,
+  StatusBadge,
+  LedgerEmpty,
+} from "@/components/ui/Ledger";
 import { situacaoOP, situacaoMaterial, bloqueadaPorMaterial, SITUACAO_MATERIAL } from "@/lib/producaoStatus";
 import { listarOrdens, salvarPreImpressao, salvarImpressao, salvarAcabamento, salvarQualidade, atualizarOrdem } from "@/services/producao";
 import { listar as listarMaquinas } from "@/services/maquinas";
@@ -23,7 +34,6 @@ const processos = [
 
 const processoStatusOptions = ["pendente", "em_execucao", "concluido"];
 const processoStatusLabels = { pendente: "Pendente", em_execucao: "Em Execução", concluido: "Concluído" };
-const processoStatusVariants = { pendente: "outline", em_execucao: "warning", concluido: "success" };
 
 function derivarProcesso(j) {
   if (j.estado === "entregue" || j.entrega_ok) return "entrega";
@@ -42,6 +52,13 @@ const processoIcone = {
   acabamento: "handyman",
   qualidade: "verified",
   entrega: "local_shipping",
+};
+
+const statusTons = {
+  aguardando: "warning",
+  em_producao: "info",
+  finalizado: "success",
+  entregue: "neutral",
 };
 
 function fmtHistData(v) {
@@ -199,13 +216,16 @@ function normalizar(j) {
   };
 }
 
+const inputCls = "h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus-visible:ring-2 focus-visible:ring-primary/25 transition-colors";
+
 export default function ProcessosTab() {
   const [jobs, setJobs] = useState([]);
   const [activeProcesso, setActiveProcesso] = useState("pre_impressao");
   const [selectedJob, setSelectedJob] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [filtro, setFiltro] = useState("em_curso");
+  const [filtro, setFiltro] = useState({ campo: "cliente", operador: "contem", termo: "" });
+  const [situacao, setSituacao] = useState("em_curso");
+  const [filtrosAbertos, setFiltrosAbertos] = useState(true);
   const [maquinas, setMaquinas] = useState([]);
   const { addToast } = useToast();
 
@@ -218,7 +238,6 @@ export default function ProcessosTab() {
       const data = ordensRes.value;
       const arr = (Array.isArray(data) ? data : data?.ordens || []).map(normalizar);
       setJobs(arr);
-      setSelectedJob((prev) => prev ?? arr[0]?.id ?? null);
       if (maquinasRes.status === "rejected") {
         setMaquinas([]);
         addToast(`Aviso: máquinas indisponíveis — ${descricaoErroApi(maquinasRes.reason, "máquinas")}`, "warning");
@@ -234,36 +253,36 @@ export default function ProcessosTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Com milhares de OPs não dá para mostrar tudo: filtra-se primeiro pelo
-  // que interessa ao operador (o que está a decorrer e o que está parado por
-  // falta de material) e só depois se pagina o resto.
-  const filtroConfig = useMemo(() => [
-    { value: "em_curso", label: "Em curso", icon: "pending_actions", test: (j) => ["aguardando", "em_producao"].includes(j.status) },
-    { value: "bloqueadas", label: "Paradas por material", icon: "lock_clock", test: (j) => bloqueadaPorMaterial(j) },
-    { value: "liberadas", label: "Com material", icon: "check_circle", test: (j) => j.status !== "aguardando" && j.status !== "em_producao" ? true : situacaoMaterial(j) === SITUACAO_MATERIAL.material_liberado || situacaoMaterial(j) === SITUACAO_MATERIAL.sem_material },
-    { value: "concluidas", label: "Concluídas", icon: "task_alt", test: (j) => ["finalizado", "entregue"].includes(j.status) },
-    { value: "todos", label: "Todas", icon: "filter_list", test: () => true },
+  const situacaoConfig = useMemo(() => [
+    { value: "em_curso", label: "Em curso", test: (j) => ["aguardando", "em_producao"].includes(j.status) },
+    { value: "bloqueadas", label: "Paradas por material", test: (j) => bloqueadaPorMaterial(j) },
+    { value: "liberadas", label: "Com material", test: (j) => j.status !== "aguardando" && j.status !== "em_producao" ? true : situacaoMaterial(j) === SITUACAO_MATERIAL.material_liberado || situacaoMaterial(j) === SITUACAO_MATERIAL.sem_material },
+    { value: "concluidas", label: "Concluídas", test: (j) => ["finalizado", "entregue"].includes(j.status) },
+    { value: "todos", label: "Todas", test: () => true },
   ], []);
 
   const filtrados = useMemo(() => {
-    const q = search.toLowerCase().trim();
-    const cfg = filtroConfig.find((f) => f.value === filtro) || filtroConfig[0];
+    const termo = filtro.termo.toLowerCase().trim();
+    const cfg = situacaoConfig.find((f) => f.value === situacao) || situacaoConfig[0];
     return jobs.filter((j) => {
       if (!cfg.test(j)) return false;
-      if (!q) return true;
-      return (
-        String(j.cliente || "").toLowerCase().includes(q) ||
-        String(j.produto || "").toLowerCase().includes(q) ||
-        String(j.id).includes(q)
-      );
+      if (!termo) return true;
+      let alvo = "";
+      if (filtro.campo === "cliente") alvo = j.cliente;
+      else if (filtro.campo === "produto") alvo = j.produto;
+      else alvo = String(j.id);
+      alvo = String(alvo || "").toLowerCase();
+      if (filtro.operador === "igual") return alvo === termo;
+      if (filtro.operador === "comeca") return alvo.startsWith(termo);
+      return alvo.includes(termo);
     });
-  }, [jobs, search, filtro, filtroConfig]);
+  }, [jobs, filtro, situacao, situacaoConfig]);
 
   const contagens = useMemo(() => {
     const c = {};
-    for (const f of filtroConfig) c[f.value] = jobs.filter(f.test).length;
+    for (const f of situacaoConfig) c[f.value] = jobs.filter(f.test).length;
     return c;
-  }, [jobs, filtroConfig]);
+  }, [jobs, situacaoConfig]);
 
   const { visiveis, ...pag } = usePaginacao({ items: filtrados });
 
@@ -343,9 +362,6 @@ export default function ProcessosTab() {
   const handleSave = async (jobId) => {
     const job = jobs.find(j => j.id === jobId);
     if (!job) return;
-    // Espelha `podeAvancar` no backend: com material reservado, a OP fica
-    // parada até `requisicao_estado === "libertada"`. Qualquer estado
-    // anterior deixava o utilizador gravar e receber 422 do servidor.
     if (bloqueadaPorMaterial(job) && activeProcesso !== "entrega") {
       addToast("Primeiro liberte os materiais da OP (saída de stock) para avançar", "error");
       return;
@@ -393,334 +409,343 @@ export default function ProcessosTab() {
     }
   };
 
+  const jobAtivo = selectedJob ? jobs.find((j) => j.id === selectedJob) : null;
+
   if (loading) return <CardSkeleton lines={6} />;
 
   return (
-    <div className="space-y-5">
-      <div className="flex gap-2 overflow-x-auto pb-2">
+    <div className="space-y-4">
+      <div className="inline-flex items-center gap-0.5 rounded-lg border border-border bg-muted/50 p-0.5 overflow-x-auto max-w-full">
         {processos.map((e) => (
-          <Button key={e.id} variant={activeProcesso === e.id ? "default" : "outline"} size="sm" onClick={() => { setActiveProcesso(e.id); if (selectedJob == null && jobs.length) setSelectedJob(jobs[0].id); }}>
-            <Icon name={e.icon} className="text-[16px]" />
-            {e.label}
-          </Button>
-        ))}
-      </div>
-
-      <div className="relative">
-        <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[18px]" />
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Pesquisar por cliente, produto, nº da OP..."
-          className="w-full pl-10 pr-10 py-2.5 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30"
-        />
-        {search && (
           <button
+            key={e.id}
             type="button"
-            onClick={() => setSearch("")}
-            aria-label="Limpar pesquisa"
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-          >
-            <Icon name="close" className="text-[16px]" />
-          </button>
-        )}
-      </div>
-
-      <div className="flex gap-1.5 flex-wrap items-center">
-        {filtroConfig.map((f) => (
-          <button
-            key={f.value}
-            type="button"
-            onClick={() => setFiltro(f.value)}
-            aria-pressed={filtro === f.value}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-200 ease-in-out border ${
-              filtro === f.value
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-outline-variant/30 bg-background/40 text-muted-foreground hover:border-outline-variant hover:text-foreground"
+            onClick={() => setActiveProcesso(e.id)}
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+              activeProcesso === e.id ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <Icon name={f.icon} className="text-xs" />
-            {f.label}
-            <span className={`ml-0.5 px-1.5 py-0.5 rounded text-[9px] ${filtro === f.value ? "bg-primary/20" : "bg-muted"}`}>
-              {contagens[f.value] ?? 0}
-            </span>
+            <Icon name={e.icon} className="text-sm" />
+            {e.label}
           </button>
         ))}
-        <span className="ml-auto text-[10px] font-mono text-muted-foreground">
-          {filtrados.length} de {jobs.length}
-        </span>
       </div>
 
-      <div className="space-y-3">
-        {visiveis.map((job) => {
-          const sc = situacaoOP(job);
+      <Ledger rotulo="Processos ledger">
+        <LedgerHeader
+          titulo={processoLabels[activeProcesso]}
+          subtitulo={`${filtrados.length} de ${jobs.length} OPs · conclua todos os processos para finalizar cada OP`}
+          onToggleFiltros={() => setFiltrosAbertos((v) => !v)}
+          filtrosAbertos={filtrosAbertos}
+        />
+        {filtrosAbertos && (
+          <>
+            <FilterRow
+              campo={filtro.campo}
+              setCampo={(v) => setFiltro((f) => ({ ...f, campo: v }))}
+              campos={[
+                { value: "cliente", label: "Cliente" },
+                { value: "produto", label: "Produto" },
+                { value: "op", label: "Nº da OP" },
+              ]}
+              operador={filtro.operador}
+              setOperador={(v) => setFiltro((f) => ({ ...f, operador: v }))}
+              termo={filtro.termo}
+              setTermo={(v) => setFiltro((f) => ({ ...f, termo: v }))}
+              aoLimpar={() => setFiltro((f) => ({ ...f, termo: "" }))}
+              placeholder="Pesquisar..."
+            />
+            <div className="flex flex-wrap items-center gap-1 border-b border-border px-4 py-2">
+              {situacaoConfig.map((f) => (
+                <button
+                  key={f.value}
+                  type="button"
+                  onClick={() => setSituacao(f.value)}
+                  className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors border ${
+                    situacao === f.value
+                      ? "border-border bg-card text-foreground shadow-sm"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {f.label}
+                  <span className={`rounded px-1.5 py-0.5 text-[9px] ${situacao === f.value ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>
+                    {contagens[f.value] ?? 0}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        <LedgerTable>
+          <thead>
+            <tr className="border-b border-border">
+              <LedgerTh>OP</LedgerTh>
+              <LedgerTh>Cliente</LedgerTh>
+              <LedgerTh>Produto</LedgerTh>
+              <LedgerTh>Processo</LedgerTh>
+              <LedgerTh>Estado</LedgerTh>
+              <LedgerTh className="w-10" />
+            </tr>
+          </thead>
+          <tbody>
+            {visiveis.map((job) => {
+              const matSit = situacaoMaterial(job);
+              return (
+                <LedgerTr key={job.id} onClick={() => setSelectedJob(job.id)}>
+                  <LedgerTd className="max-w-40">
+                    <IdCell id={`OP #${job.id}`} meta={job.produto ? `Qtd: ${job.quantidade}` : ""} aoAbrir={() => setSelectedJob(job.id)} />
+                  </LedgerTd>
+                  <LedgerTd className="max-w-48"><span className="block truncate text-sm">{job.cliente}</span></LedgerTd>
+                  <LedgerTd className="max-w-48"><span className="block truncate">{job.produto || "—"}</span></LedgerTd>
+                  <LedgerTd>
+                    <span className="flex flex-wrap items-center gap-1">
+                      <StatusBadge tom="neutral">{processoLabels[job.processoAtual]}</StatusBadge>
+                      {matSit && matSit.bloqueia && <StatusBadge tom="error">Material por libertar</StatusBadge>}
+                    </span>
+                  </LedgerTd>
+                  <LedgerTd><StatusBadge tom={statusTons[job.status] || "neutral"}>{situacaoOP(job)?.label || job.status}</StatusBadge></LedgerTd>
+                  <LedgerTd>
+                    <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedJob(job.id); }}>
+                      <Icon name="edit" className="text-sm" /> Abrir
+                    </Button>
+                  </LedgerTd>
+                </LedgerTr>
+              );
+            })}
+          </tbody>
+        </LedgerTable>
+        {pag.total === 0 && (
+          jobs.length === 0
+            ? <LedgerEmpty icone="construction">Nenhuma ordem de produção encontrada</LedgerEmpty>
+            : <LedgerEmpty icone="search_off">Nenhuma OP neste filtro</LedgerEmpty>
+        )}
+        <Paginacao {...pag} label="OPs" />
+      </Ledger>
+
+      <Modal
+        open={Boolean(jobAtivo)}
+        onClose={() => setSelectedJob(null)}
+        title={jobAtivo ? `OP #${jobAtivo.id} — ${processoLabels[activeProcesso]}` : ""}
+        icon={processoIcone[activeProcesso]}
+        size="xl"
+      >
+        {jobAtivo && (() => {
+          const job = jobAtivo;
           const matSit = situacaoMaterial(job);
           return (
-          <Card key={job.id}>
-            <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setSelectedJob(selectedJob === job.id ? null : job.id)}>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <Icon name="construction" className="text-primary text-[20px]" />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-sm text-foreground">OP #{job.id}</span>
-                    <Badge variant={sc.variant || "outline"} className="text-[10px]">{sc.label}</Badge>
-                    <Badge variant="outline" className="text-[10px]">{processoLabels[job.processoAtual]}</Badge>
-                    {matSit && matSit.bloqueia && (
-                      <Badge variant="destructive" className="text-[10px]">
-                        <Icon name="inventory_2" className="text-[12px]" /> Material por libertar
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground truncate">{job.cliente} — {job.produto}</p>
-                </div>
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-bold text-foreground">{job.cliente}</span>
+                  {job.produto ? <> — {job.produto}</> : ""} · Qtd: <strong>{job.quantidade}</strong>
+                </p>
+                <StatusBadge tom={statusTons[job.status] || "neutral"}>{situacaoOP(job)?.label || job.status}</StatusBadge>
               </div>
-              <span className="text-xs text-muted-foreground shrink-0">Qtd: {job.quantidade}</span>
-            </div>
 
-            {selectedJob === job.id && (
-              <div className="border-t p-5 space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-sm text-muted-foreground">
-                    <span className="font-bold text-foreground">OP #{job.id}</span>
-                    {job.produto ? <> — {job.produto}</> : ""} · Qtd: <strong>{job.quantidade}</strong>
-                  </p>
-                  {!["finalizado", "entregue"].includes(job.status) && (
-                    <p className="text-xs text-muted-foreground">
-                      Conclua todos os processos — a OP passa a <strong>Finalizada</strong> automaticamente quando a <strong>qualidade</strong> for aprovada.
+              {matSit && matSit.bloqueia && (
+                <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 p-4">
+                  <Icon name="inventory" className="text-[20px] text-warning shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">
+                      {matSit === SITUACAO_MATERIAL.aguardando_liberacao
+                        ? "Aguardando libertação de material"
+                        : "Aguardando libertação de materiais"}
                     </p>
-                  )}
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {matSit === SITUACAO_MATERIAL.aguardando_liberacao
+                        ? "A requisição de material já foi submetida, mas o armazém ainda não deu a saída. Só após a libertação é que a OP pode avançar para produção. Vá à aba \"Ordens\" para aprovar."
+                        : "Esta OP não tem a saída de material confirmada pelo armazém. Só após a libertação é que pode avançar para produção. Vá à aba \"Ordens\" → \"Requisição material\"."}
+                    </p>
+                  </div>
                 </div>
-                {matSit && matSit.bloqueia && (
-                  <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
-                    <Icon name="inventory" className="text-[20px] text-amber-600 shrink-0" />
-                    <div>
-                      <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
-                        {matSit === SITUACAO_MATERIAL.aguardando_liberacao
-                          ? "Aguardando libertação de material"
-                          : "Aguardando libertação de materiais"}
-                      </p>
-                      <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-0.5">
-                        {matSit === SITUACAO_MATERIAL.aguardando_liberacao
-                          ? "A requisição de material já foi submetida, mas o armazém ainda não deu a saída. Só após a libertação é que a OP pode avançar para produção. Vá à aba \"Ordens\" para aprovar."
-                          : "Esta OP não tem a saída de material confirmada pelo armazém. Só após a libertação é que pode avançar para produção. Vá à aba \"Ordens\" → \"Requisição material\"."}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                {activeProcesso === "pre_impressao" && (
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Icon name="rule" className="text-[18px] text-primary" /> Checklist Pré-Impressão</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {["arquivoRecebido", "tamanhoCorreto", "CMYK", "fontesConvertidas", "imagem300DPI", "revisaoOrtografica", "aprovacaoCliente"].map((key) => (
-                        <label key={key} className="flex items-center gap-3 p-4 rounded-xl bg-muted/50 border cursor-pointer hover:bg-muted transition-colors">
-                          <input type="checkbox" checked={!!job.preImpressao[key]} onChange={(e) => updateJob(job.id, "preImpressao", key, e.target.checked)} className="w-4 h-4 rounded accent-primary" />
-                          <span className="text-sm text-foreground">{key.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase())}</span>
-                        </label>
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-xl">
-                      <Icon name="person" className="text-[18px] text-muted-foreground" />
-                      <input className="text-sm bg-transparent outline-none border-b border-transparent focus:border-primary text-foreground flex-1" value={job.preImpressao.responsavel} onChange={(e) => updateJob(job.id, "preImpressao", "responsavel", e.target.value)} placeholder="Responsável" />
-                    </div>
-                    <div className="flex justify-end"><Button size="sm" onClick={() => handleSave(job.id)}>Guardar</Button></div>
-                  </div>
-                )}
+              )}
 
-                {activeProcesso === "impressao" && (
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Icon name="print" className="text-[18px] text-primary" /> Dados de Impressão</h3>
-                    <p className="text-xs text-muted-foreground">
-                      Registe cada máquina usada com o seu colaborador e o tempo de trabalho.
-                    </p>
-                    {(job.impressao?.registos?.length ? job.impressao.registos : [{ ...registoVazio }]).map((r, idx) => (
-                      <div key={idx} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 p-3 rounded-xl border border-border/60 bg-muted/30">
-                        <div className="flex flex-col gap-1 lg:col-span-2">
-                          <label className="text-[10px] font-bold text-muted-foreground uppercase">Máquina {idx + 1}</label>
-                          <select value={r.maquina || ""} onChange={(e) => updateRegisto(job.id, idx, "maquina", e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30">
-                            <option value="">Seleccionar máquina...</option>
-                            {maquinas.map((m) => (
-                              <option key={m.id} value={m.nome_comum || m.codigo}>{m.nome_comum || m.codigo}{m.localizacao ? ` — ${m.localizacao}` : ""}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <label className="text-[10px] font-bold text-muted-foreground uppercase">Colaborador</label>
-                          <input type="text" value={r.operador || ""} onChange={(e) => updateRegisto(job.id, idx, "operador", e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder="Nome do colaborador" />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <label className="text-[10px] font-bold text-muted-foreground uppercase">Início</label>
-                          <input type="time" value={r.horaInicio || ""} onChange={(e) => updateRegisto(job.id, idx, "horaInicio", e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <label className="text-[10px] font-bold text-muted-foreground uppercase">Fim</label>
-                          <input type="time" value={r.horaFim || ""} onChange={(e) => updateRegisto(job.id, idx, "horaFim", e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <label className="text-[10px] font-bold text-muted-foreground uppercase">Produzido</label>
-                          <input type="number" min="0" value={r.quantidadeProduzida ?? ""} onChange={(e) => updateRegisto(job.id, idx, "quantidadeProduzida", Number(e.target.value))} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder="0" />
-                        </div>
-                        <div className="flex items-end justify-between gap-2 lg:col-span-6">
-                          <div className="flex flex-col gap-1 flex-1">
-                            <label className="text-[10px] font-bold text-muted-foreground uppercase">Rejeitado</label>
-                            <input type="number" min="0" value={r.quantidadeRejeitada ?? ""} onChange={(e) => updateRegisto(job.id, idx, "quantidadeRejeitada", Number(e.target.value))} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder="0" />
-                          </div>
-                          <Button variant="ghost" size="sm" onClick={() => removerRegisto(job.id, idx)} title="Remover esta máquina" className="text-error">
-                            <Icon name="delete" className="text-[16px]" /> Remover
-                          </Button>
-                        </div>
-                      </div>
+              {activeProcesso === "pre_impressao" && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {["arquivoRecebido", "tamanhoCorreto", "CMYK", "fontesConvertidas", "imagem300DPI", "revisaoOrtografica", "aprovacaoCliente"].map((key) => (
+                      <label key={key} className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 p-3.5 cursor-pointer hover:bg-muted/70 transition-colors">
+                        <input type="checkbox" checked={!!job.preImpressao[key]} onChange={(e) => updateJob(job.id, "preImpressao", key, e.target.checked)} className="w-4 h-4 rounded accent-primary" />
+                        <span className="text-sm text-foreground">{key.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase())}</span>
+                      </label>
                     ))}
-                    <Button variant="outline" size="sm" onClick={() => adicionarRegisto(job.id)}>
-                      <Icon name="add" className="text-[16px]" /> Adicionar máquina
-                    </Button>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-bold text-muted-foreground uppercase">Observações</label>
-                      <textarea value={job.impressao.observacoes || ""} onChange={(e) => updateImpressao(job.id, "observacoes", e.target.value)} rows={2} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" placeholder="Notas sobre a impressão..." />
-                    </div>
-                    <div className="flex justify-end"><Button size="sm" onClick={() => handleSave(job.id)}>Guardar</Button></div>
                   </div>
-                )}
-
-                {activeProcesso === "acabamento" && (
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Icon name="handyman" className="text-[18px] text-primary" /> Acabamento</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                      {["corte", "dobra", "encadernacao", "laminacao", "verniz", "hotStamping"].map((proc) => {
-                        const val = job.acabamento[proc] || "pendente";
-                        const icons = { corte: "content_cut", dobra: "flip", encadernacao: "menu_book", laminacao: "layers", verniz: "format_paint", hotStamping: "star" };
-                        return (
-                          <button key={proc} onClick={() => toggleAcabamento(job.id, proc)} className={`p-3 rounded-xl border text-center transition-all hover:shadow-sm ${
-                            val === "pendente" ? "border-border bg-muted/50 text-muted-foreground" :
-                            val === "em_execucao" ? "border-amber-300 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400" :
-                            "border-green-300 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400"
-                          }`}>
-                            <Icon name={icons[proc]} className="text-[20px] block mb-1" />
-                            <p className="text-xs font-bold capitalize">{proc === "hotStamping" ? "Hot Stamping" : proc}</p>
-                            <p className="text-[10px] mt-1">{processoStatusLabels[val]}</p>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Registe as máquinas usadas no acabamento, com o colaborador e o tempo de trabalho de cada uma.
-                    </p>
-                    {(job.acabamento.maquinas?.length ? job.acabamento.maquinas : [maquinaAcabamentoVazia]).map((m, idx) => (
-                      <div key={idx} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 p-3 rounded-xl border border-border/60 bg-muted/30">
-                        <div className="flex flex-col gap-1 lg:col-span-2">
-                          <label className="text-[10px] font-bold text-muted-foreground uppercase">Máquina {idx + 1}</label>
-                          <select value={m.maquina || ""} onChange={(e) => updateMaquinaAcabamento(job.id, idx, "maquina", e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30">
-                            <option value="">Seleccionar máquina...</option>
-                            {maquinas.map((mm) => (
-                              <option key={mm.id} value={mm.nome_comum || mm.codigo}>{mm.nome_comum || mm.codigo}{mm.localizacao ? ` — ${mm.localizacao}` : ""}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <label className="text-[10px] font-bold text-muted-foreground uppercase">Colaborador</label>
-                          <input type="text" value={m.operador || ""} onChange={(e) => updateMaquinaAcabamento(job.id, idx, "operador", e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder="Nome do colaborador" />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <label className="text-[10px] font-bold text-muted-foreground uppercase">Tempo</label>
-                          <input type="text" value={m.tempoEstimado || ""} onChange={(e) => updateMaquinaAcabamento(job.id, idx, "tempoEstimado", e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder="ex: 1h30" />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <label className="text-[10px] font-bold text-muted-foreground uppercase">Erros</label>
-                          <input type="number" min="0" value={m.erros ?? ""} onChange={(e) => updateMaquinaAcabamento(job.id, idx, "erros", Number(e.target.value))} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder="0" />
-                        </div>
-                        <div className="flex items-end justify-between gap-2">
-                          <div className="flex flex-col gap-1 flex-1">
-                            <label className="text-[10px] font-bold text-muted-foreground uppercase">Perdas</label>
-                            <input type="number" min="0" value={m.perdas ?? ""} onChange={(e) => updateMaquinaAcabamento(job.id, idx, "perdas", Number(e.target.value))} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder="0" />
-                          </div>
-                          <Button variant="ghost" size="sm" onClick={() => removerMaquinaAcabamento(job.id, idx)} title="Remover esta máquina" className="text-error">
-                            <Icon name="delete" className="text-[16px]" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                    <Button variant="outline" size="sm" onClick={() => adicionarMaquinaAcabamento(job.id)}>
-                      <Icon name="add" className="text-[16px]" /> Adicionar máquina
-                    </Button>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-bold text-muted-foreground uppercase">Observações</label>
-                      <textarea rows={1} value={job.acabamento.observacoes || ""} onChange={(e) => updateJob(job.id, "acabamento", "observacoes", e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" placeholder="Notas..." />
-                    </div>
-                    <div className="flex justify-end"><Button size="sm" onClick={() => handleSave(job.id)}>Guardar</Button></div>
+                  <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 p-3">
+                    <Icon name="person" className="text-[18px] text-muted-foreground" />
+                    <input className="text-sm bg-transparent outline-none border-b border-transparent focus:border-primary text-foreground flex-1" value={job.preImpressao.responsavel} onChange={(e) => updateJob(job.id, "preImpressao", "responsavel", e.target.value)} placeholder="Responsável" />
                   </div>
-                )}
+                  <div className="flex justify-end"><Button size="sm" onClick={() => handleSave(job.id)}>Guardar</Button></div>
+                </div>
+              )}
 
-                {activeProcesso === "qualidade" && (
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Icon name="verified" className="text-[18px] text-primary" /> Controlo de Qualidade</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {["cor", "corte", "quantidade", "acabamento", "embalagem"].map((campo) => (
-                        <div key={campo} className="flex flex-col gap-1">
-                          <label className="text-[10px] font-bold text-muted-foreground uppercase">{campo}</label>
-                          <select value={job.qualidade[campo] || ""} onChange={(e) => updateQualidade(job.id, campo, e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30">
-                            <option value="">Seleccionar...</option>
-                            <option value="aprovado">Aprovado</option>
-                            <option value="reprovado">Reprovado</option>
-                          </select>
-                        </div>
-                      ))}
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Resultado Final</label>
-                        <select value={job.qualidade.resultado || ""} onChange={(e) => updateQualidade(job.id, "resultado", e.target.value)} className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30 font-bold">
-                          <option value="">Seleccionar...</option>
-                          <option value="aprovado">APROVADO</option>
-                          <option value="reprovado">REPROVADO</option>
+              {activeProcesso === "impressao" && (
+                <div className="space-y-4">
+                  <p className="text-xs text-muted-foreground">
+                    Registe cada máquina usada com o seu colaborador e o tempo de trabalho.
+                  </p>
+                  {(job.impressao?.registos?.length ? job.impressao.registos : [{ ...registoVazio }]).map((r, idx) => (
+                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 rounded-lg border border-border bg-muted/30 p-3">
+                      <div className="flex flex-col gap-1 lg:col-span-2">
+                        <label className="text-[10px] font-semibold text-muted-foreground">Máquina {idx + 1}</label>
+                        <select value={r.maquina || ""} onChange={(e) => updateRegisto(job.id, idx, "maquina", e.target.value)} className={inputCls}>
+                          <option value="">Seleccionar máquina...</option>
+                          {maquinas.map((m) => (
+                            <option key={m.id} value={m.nome_comum || m.codigo}>{m.nome_comum || m.codigo}{m.localizacao ? ` — ${m.localizacao}` : ""}</option>
+                          ))}
                         </select>
                       </div>
-                    </div>
-                    <div className="flex justify-end"><Button size="sm" onClick={() => handleSave(job.id)}>Guardar</Button></div>
-                  </div>
-                )}
-
-                {activeProcesso === "entrega" && (
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Icon name="local_shipping" className="text-[18px] text-primary" /> Entrega</h3>
-                    <div className="p-6 bg-muted/50 rounded-xl text-center">
-                      <Icon name="local_shipping" className="text-4xl text-muted-foreground/30 block mb-2" />
-                      <p className="text-sm text-muted-foreground">Estado da entrega: <strong className="text-foreground">{job.status === "entregue" ? "Concluído" : "Pendente"}</strong></p>
-                    </div>
-                    {job.status !== "entregue" && (
-                      <div className="flex justify-end">
-                        <Button size="sm" variant="success" onClick={() => handleSave(job.id)}>
-                          <Icon name="local_shipping" className="text-[16px]" /> Marcar como entregue
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-semibold text-muted-foreground">Colaborador</label>
+                        <input type="text" value={r.operador || ""} onChange={(e) => updateRegisto(job.id, idx, "operador", e.target.value)} className={inputCls} placeholder="Nome do colaborador" />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-semibold text-muted-foreground">Início</label>
+                        <input type="time" value={r.horaInicio || ""} onChange={(e) => updateRegisto(job.id, idx, "horaInicio", e.target.value)} className={inputCls} />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-semibold text-muted-foreground">Fim</label>
+                        <input type="time" value={r.horaFim || ""} onChange={(e) => updateRegisto(job.id, idx, "horaFim", e.target.value)} className={inputCls} />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-semibold text-muted-foreground">Produzido</label>
+                        <input type="number" min="0" value={r.quantidadeProduzida ?? ""} onChange={(e) => updateRegisto(job.id, idx, "quantidadeProduzida", Number(e.target.value))} className={inputCls} placeholder="0" />
+                      </div>
+                      <div className="flex items-end justify-between gap-2 lg:col-span-6">
+                        <div className="flex flex-col gap-1 flex-1">
+                          <label className="text-[10px] font-semibold text-muted-foreground">Rejeitado</label>
+                          <input type="number" min="0" value={r.quantidadeRejeitada ?? ""} onChange={(e) => updateRegisto(job.id, idx, "quantidadeRejeitada", Number(e.target.value))} className={inputCls} placeholder="0" />
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={() => removerRegisto(job.id, idx)} title="Remover esta máquina" className="text-error">
+                          <Icon name="delete" className="text-[16px]" /> Remover
                         </Button>
                       </div>
-                    )}
+                    </div>
+                  ))}
+                  <Button variant="outline" size="sm" onClick={() => adicionarRegisto(job.id)}>
+                    <Icon name="add" className="text-[16px]" /> Adicionar máquina
+                  </Button>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-semibold text-muted-foreground">Observações</label>
+                    <textarea value={job.impressao.observacoes || ""} onChange={(e) => updateImpressao(job.id, "observacoes", e.target.value)} rows={2} className={`${inputCls} h-auto resize-none py-2`} placeholder="Notas sobre a impressão..." />
                   </div>
-                )}
+                  <div className="flex justify-end"><Button size="sm" onClick={() => handleSave(job.id)}>Guardar</Button></div>
+                </div>
+              )}
 
-                <HistoricoProcesso historico={job.historico_processos} />
-              </div>
-            )}
-          </Card>
+              {activeProcesso === "acabamento" && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                    {["corte", "dobra", "encadernacao", "laminacao", "verniz", "hotStamping"].map((proc) => {
+                      const val = job.acabamento[proc] || "pendente";
+                      const icons = { corte: "content_cut", dobra: "flip", encadernacao: "menu_book", laminacao: "layers", verniz: "format_paint", hotStamping: "star" };
+                      return (
+                        <button key={proc} onClick={() => toggleAcabamento(job.id, proc)} className={`p-3 rounded-lg border text-center transition-colors ${
+                          val === "pendente" ? "border-border bg-muted/40 text-muted-foreground" :
+                          val === "em_execucao" ? "border-warning/30 bg-warning/10 text-warning" :
+                          "border-success/30 bg-success/10 text-success"
+                        }`}>
+                          <Icon name={icons[proc]} className="text-[20px] block mb-1" />
+                          <p className="text-xs font-medium capitalize">{proc === "hotStamping" ? "Hot Stamping" : proc}</p>
+                          <p className="text-[10px] mt-1">{processoStatusLabels[val]}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Registe as máquinas usadas no acabamento, com o colaborador e o tempo de trabalho de cada uma.
+                  </p>
+                  {(job.acabamento.maquinas?.length ? job.acabamento.maquinas : [maquinaAcabamentoVazia]).map((m, idx) => (
+                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 rounded-lg border border-border bg-muted/30 p-3">
+                      <div className="flex flex-col gap-1 lg:col-span-2">
+                        <label className="text-[10px] font-semibold text-muted-foreground">Máquina {idx + 1}</label>
+                        <select value={m.maquina || ""} onChange={(e) => updateMaquinaAcabamento(job.id, idx, "maquina", e.target.value)} className={inputCls}>
+                          <option value="">Seleccionar máquina...</option>
+                          {maquinas.map((mm) => (
+                            <option key={mm.id} value={mm.nome_comum || mm.codigo}>{mm.nome_comum || mm.codigo}{mm.localizacao ? ` — ${mm.localizacao}` : ""}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-semibold text-muted-foreground">Colaborador</label>
+                        <input type="text" value={m.operador || ""} onChange={(e) => updateMaquinaAcabamento(job.id, idx, "operador", e.target.value)} className={inputCls} placeholder="Nome do colaborador" />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-semibold text-muted-foreground">Tempo</label>
+                        <input type="text" value={m.tempoEstimado || ""} onChange={(e) => updateMaquinaAcabamento(job.id, idx, "tempoEstimado", e.target.value)} className={inputCls} placeholder="ex: 1h30" />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-semibold text-muted-foreground">Erros</label>
+                        <input type="number" min="0" value={m.erros ?? ""} onChange={(e) => updateMaquinaAcabamento(job.id, idx, "erros", Number(e.target.value))} className={inputCls} placeholder="0" />
+                      </div>
+                      <div className="flex items-end justify-between gap-2">
+                        <div className="flex flex-col gap-1 flex-1">
+                          <label className="text-[10px] font-semibold text-muted-foreground">Perdas</label>
+                          <input type="number" min="0" value={m.perdas ?? ""} onChange={(e) => updateMaquinaAcabamento(job.id, idx, "perdas", Number(e.target.value))} className={inputCls} placeholder="0" />
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={() => removerMaquinaAcabamento(job.id, idx)} title="Remover esta máquina" className="text-error">
+                          <Icon name="delete" className="text-[16px]" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  <Button variant="outline" size="sm" onClick={() => adicionarMaquinaAcabamento(job.id)}>
+                    <Icon name="add" className="text-[16px]" /> Adicionar máquina
+                  </Button>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-semibold text-muted-foreground">Observações</label>
+                    <textarea rows={1} value={job.acabamento.observacoes || ""} onChange={(e) => updateJob(job.id, "acabamento", "observacoes", e.target.value)} className={`${inputCls} h-auto resize-none py-2`} placeholder="Notas..." />
+                  </div>
+                  <div className="flex justify-end"><Button size="sm" onClick={() => handleSave(job.id)}>Guardar</Button></div>
+                </div>
+              )}
+
+              {activeProcesso === "qualidade" && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {["cor", "corte", "quantidade", "acabamento", "embalagem"].map((campo) => (
+                      <div key={campo} className="flex flex-col gap-1">
+                        <label className="text-[10px] font-semibold text-muted-foreground capitalize">{campo}</label>
+                        <select value={job.qualidade[campo] || ""} onChange={(e) => updateQualidade(job.id, campo, e.target.value)} className={inputCls}>
+                          <option value="">Seleccionar...</option>
+                          <option value="aprovado">Aprovado</option>
+                          <option value="reprovado">Reprovado</option>
+                        </select>
+                      </div>
+                    ))}
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-semibold text-muted-foreground">Resultado Final</label>
+                      <select value={job.qualidade.resultado || ""} onChange={(e) => updateQualidade(job.id, "resultado", e.target.value)} className={`${inputCls} font-medium`}>
+                        <option value="">Seleccionar...</option>
+                        <option value="aprovado">Aprovado</option>
+                        <option value="reprovado">Reprovado</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex justify-end"><Button size="sm" onClick={() => handleSave(job.id)}>Guardar</Button></div>
+                </div>
+              )}
+
+              {activeProcesso === "entrega" && (
+                <div className="space-y-4">
+                  <div className="rounded-lg border border-border bg-muted/40 p-6 text-center">
+                    <Icon name="local_shipping" className="text-4xl text-muted-foreground/30 block mb-2" />
+                    <p className="text-sm text-muted-foreground">Estado da entrega: <strong className="text-foreground">{job.status === "entregue" ? "Concluído" : "Pendente"}</strong></p>
+                  </div>
+                  {job.status !== "entregue" && (
+                    <div className="flex justify-end">
+                      <Button size="sm" variant="success" onClick={() => handleSave(job.id)}>
+                        <Icon name="local_shipping" className="text-[16px]" /> Marcar como entregue
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <HistoricoProcesso historico={job.historico_processos} />
+            </div>
           );
-        })}
-      </div>
-
-      {jobs.length === 0 && !loading && (
-        <div className="text-center p-12 text-muted-foreground">
-          <Icon name="construction" className="text-4xl block mx-auto mb-2 opacity-30" />
-          <p className="font-medium">Nenhuma ordem de produção encontrada</p>
-          <p className="text-xs mt-1">Aprove um orçamento na Área Comercial para gerar a OP automaticamente.</p>
-        </div>
-      )}
-
-      {jobs.length > 0 && filtrados.length === 0 && (
-        <div className="text-center p-12 text-muted-foreground">
-          <Icon name="search_off" className="text-4xl block mx-auto mb-2 opacity-30" />
-          <p className="font-medium">Nenhuma OP neste filtro</p>
-          <p className="text-xs mt-1">Ajuste a pesquisa ou mude o filtro acima.</p>
-        </div>
-      )}
-
-      {filtrados.length > 0 && <Paginacao {...pag} label="OPs" />}
+        })()}
+      </Modal>
     </div>
   );
 }

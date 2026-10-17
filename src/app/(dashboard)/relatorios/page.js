@@ -3,19 +3,20 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Icon from "@/components/Icon";
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import Modal from "@/components/Modal";
 import KpiCard from "@/components/ui/KpiCard";
 import MultiSelect from "@/components/ui/MultiSelect";
 import FiltroChips from "@/components/ui/FiltroChips";
-import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
+import { Ledger, LedgerHeader, LedgerTable, LedgerTh, LedgerTr, LedgerTd, StatusBadge, LedgerEmpty } from "@/components/ui/Ledger";
 import { useToast } from "@/components/Toast";
 import { listarOrdens } from "@/services/producao";
 import { listar } from "@/services/clientes";
 import { listar as listarFaturas } from "@/services/faturacao";
 import { listar as listarMateriais } from "@/services/materiais";
 import { listar as listarCategorias } from "@/services/categorias";
+import { resumoTesouraria } from "@/services/tesouraria";
 import { gerarRelatorioStockPDF, gerarRelatorioCadastrosPDF, gerarRelatorioCategoriasPDF, gerarRelatorioFaturacoesPDF, gerarRelatorioProducaoPDF } from "@/lib/estoquePdf";
+import { exportarRelatorioExcel, exportarRelatorioPDF } from "@/lib/relatoriosExport";
 import { toNum, familias, normalizarFamilia, tiposItem, normalizarTipoItem } from "@/lib/estoque";
 import { buscarOrganizacao } from "@/services/configuracoes";
 
@@ -74,17 +75,47 @@ const STATUS_MATERIAL = [
   { value: "esgotado", label: "Esgotado", cor: "#b91c1c", icon: "error" },
 ];
 
+const COR_RELATORIO = "#0066CC";
+
+const MODULOS_REL = [
+  { value: "comercial", label: "Comercial", icon: "trending_up" },
+  { value: "producao", label: "Produção", icon: "precision_manufacturing" },
+  { value: "stocks", label: "Stocks", icon: "inventory_2" },
+  { value: "financeiro", label: "Financeiro", icon: "account_balance" },
+  { value: "tesouraria", label: "Tesouraria", icon: "savings" },
+];
+
+const tabClsBase =
+  "-mb-px inline-flex items-center gap-1.5 whitespace-nowrap border-b-2 pb-2.5 pt-2 text-sm font-medium transition-colors";
+const tabClsAtiva = "border-blue-600 font-bold text-blue-600";
+const tabClsInativa = "border-transparent text-muted-foreground hover:text-foreground";
+
+const botaoPdfCls =
+  "inline-flex h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 text-xs font-semibold text-red-700 transition-colors hover:bg-red-100";
+const botaoExcelCls =
+  "inline-flex h-9 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100";
+
+function variacaoDe(serie) {
+  if (!Array.isArray(serie) || serie.length < 2) return null;
+  const anterior = Number(serie[serie.length - 2]?.valor) || 0;
+  const atual = Number(serie[serie.length - 1]?.valor) || 0;
+  if (!anterior) return atual ? 100 : null;
+  return Math.round(((atual - anterior) / anterior) * 100);
+}
+
 function PainelFiltros({ icon, titulo, acoes, children }) {
   return (
-    <div className="bg-card border border-border rounded-2xl shadow-card overflow-hidden">
-      <div className="flex items-center gap-2.5 px-4 sm:px-5 py-3 border-b border-border">
-        <span className="w-7 h-7 rounded-lg bg-muted border border-border flex items-center justify-center shrink-0">
-          <Icon name={icon} className="text-base text-muted-foreground" />
-        </span>
-        <p className="text-sm font-semibold text-foreground tracking-tight">{titulo}</p>
-        {acoes && <div className="ml-auto flex items-center gap-2">{acoes}</div>}
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border bg-muted">
+            <Icon name={icon} className="text-base text-muted-foreground" />
+          </span>
+          <p className="truncate text-sm font-semibold text-foreground">{titulo}</p>
+        </div>
+        {acoes && <div className="flex shrink-0 items-center gap-2">{acoes}</div>}
       </div>
-      <div className="p-3 sm:p-4 space-y-3">{children}</div>
+      <div className="space-y-3">{children}</div>
     </div>
   );
 }
@@ -92,7 +123,7 @@ function PainelFiltros({ icon, titulo, acoes, children }) {
 function ChartTooltip({ active, payload, label, formato }) {
   if (!active || !payload || payload.length === 0) return null;
   return (
-    <div className="bg-card border border-border rounded-xl shadow-card px-3 py-2 text-xs space-y-1">
+    <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs space-y-1">
       <p className="font-semibold text-foreground">{label}</p>
       {payload.map((p, i) => (
         <p key={i} className="flex items-center gap-2 text-muted-foreground">
@@ -107,13 +138,13 @@ function ChartTooltip({ active, payload, label, formato }) {
 
 function CabecalhoGrafico({ icon, titulo, sub }) {
   return (
-    <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5 border-b border-border">
-      <span className="w-8 h-8 rounded-lg bg-muted border border-border flex items-center justify-center shrink-0">
-        <Icon name={icon} className="text-lg text-foreground" />
+    <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-muted">
+        <Icon name={icon} className="text-lg text-muted-foreground" />
       </span>
       <div className="min-w-0">
-        <h3 className="text-sm font-semibold text-foreground tracking-tight truncate">{titulo}</h3>
-        {sub && <p className="text-[10px] text-muted-foreground truncate">{sub}</p>}
+        <h3 className="truncate text-sm font-semibold text-foreground">{titulo}</h3>
+        {sub && <p className="truncate text-[11px] text-muted-foreground">{sub}</p>}
       </div>
     </div>
   );
@@ -121,10 +152,30 @@ function CabecalhoGrafico({ icon, titulo, sub }) {
 
 function CartaoGrafico({ icon, titulo, sub, children, className = "" }) {
   return (
-    <section className={`rounded-2xl bg-card border border-border shadow-card overflow-hidden ${className}`}>
+    <section className={`overflow-hidden rounded-xl border border-border bg-card ${className}`}>
       <CabecalhoGrafico icon={icon} titulo={titulo} sub={sub} />
-      <div className="p-4 sm:p-5">{children}</div>
+      <div className="p-4">{children}</div>
     </section>
+  );
+}
+
+function TabsPills({ opcoes, valor, onChange }) {
+  return (
+    <div className="inline-flex items-center gap-0.5 rounded-lg border border-border bg-muted/50 p-0.5">
+      {opcoes.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          onClick={() => onChange(o.value)}
+          className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+            valor === o.value ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {o.icon && <Icon name={o.icon} className="text-sm" />}
+          {o.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -139,9 +190,9 @@ function AreaGrafico({ dados, serie, nome, cor, formato, xKey = "label" }) {
             <stop offset="100%" stopColor={cor} stopOpacity={0.02} />
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.25} />
-        <XAxis dataKey={xKey} tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 11 }} dy={4} />
-        <YAxis tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 11 }} width={52} tickFormatter={formato} allowDecimals={false} />
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+        <XAxis dataKey={xKey} tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} dy={4} />
+        <YAxis tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} width={52} tickFormatter={formato} allowDecimals={false} />
         <Tooltip content={<ChartTooltip formato={formato} />} />
         <Area type="monotone" dataKey="valor" name={nome} stroke={cor} strokeWidth={2.5} fill={`url(#${gradId})`} activeDot={{ r: 4 }} />
       </AreaChart>
@@ -198,18 +249,22 @@ export default function RelatoriosPage() {
   const [filtroStatusMaterial, setFiltroStatusMaterial] = useState([]);
   const [filtroFamiliasMateriais, setFiltroFamiliasMateriais] = useState([]);
   const [busca, setBusca] = useState("");
+  const [tesouraria, setTesouraria] = useState(null);
+  const [relatorioId, setRelatorioId] = useState(null);
+  const [relatorioVer, setRelatorioVer] = useState(null);
   const { addToast } = useToast();
 
   const carregarDados = useCallback(async () => {
     setLoading(true);
     try {
-      const [ords, clis, fats, mats, cats, o] = await Promise.all([
+      const [ords, clis, fats, mats, cats, o, tes] = await Promise.all([
         listarOrdens(),
         listar(),
         listarFaturas(),
         listarMateriais(),
         listarCategorias(),
-        buscarOrganizacao()
+        buscarOrganizacao(),
+        resumoTesouraria().catch(() => null)
       ]);
       setOrdens(Array.isArray(ords) ? ords : ords?.ordens || []);
       setClientes(Array.isArray(clis) ? clis : clis?.data || []);
@@ -217,6 +272,7 @@ export default function RelatoriosPage() {
       setMateriais(Array.isArray(mats) ? mats : []);
       setCategorias(Array.isArray(cats) ? cats : []);
       setOrg(o || {});
+      setTesouraria(tes || null);
     } catch (err) {
       setError(err.message);
       addToast(err.response?.data?.erro || "Erro ao carregar relatórios", "error");
@@ -226,7 +282,8 @@ export default function RelatoriosPage() {
   }, [addToast]);
 
   useEffect(() => {
-    carregarDados();
+    const t = setTimeout(() => carregarDados(), 0);
+    return () => clearTimeout(t);
   }, [carregarDados]);
 
   const ultimosMeses = useMemo(() => getUltimos6Meses(), []);
@@ -392,38 +449,356 @@ export default function RelatoriosPage() {
   const totalClientes = useMemo(() => clientes.filter((c) => c.tipo === "cliente").length, [clientes]);
   const totalFornecedores = useMemo(() => clientes.filter((c) => c.tipo === "fornecedor").length, [clientes]);
 
-  const abas = [
-    { key: "comercial", label: "Área Comercial", icon: "trending_up" },
-    { key: "producao", label: "Produção", icon: "precision_manufacturing" },
-    { key: "provisionamento", label: "Provisionamento", icon: "inventory_2" },
-    { key: "recursos", label: "Recursos", icon: "category" },
-  ];
+  const categoriasStock = useMemo(() => {
+    const map = {};
+    materiais.forEach((m) => {
+      const cat = m.categoria?.nome || "Sem categoria";
+      if (!map[cat]) map[cat] = { itens: 0, qtd: 0, valor: 0 };
+      map[cat].itens += 1;
+      map[cat].qtd += toNum(m.quantidade);
+      map[cat].valor += toNum(m.quantidade) * toNum(m.custo_unit);
+    });
+    return Object.entries(map)
+      .map(([nome, d]) => ({ nome, ...d }))
+      .sort((a, b) => b.valor - a.valor);
+  }, [materiais]);
+
+  const tesourariaPorMes = useMemo(() => {
+    const hoje = new Date();
+    const counts = ultimosMeses.map((m) => ({ label: m.label, mes: m.mes, entradas: 0, saidas: 0 }));
+    const movs = Array.isArray(tesouraria?.movimentos) ? tesouraria.movimentos : [];
+    movs.forEach((mov) => {
+      const raw = mov.data_movimento || mov.data;
+      const d = raw ? new Date(raw) : null;
+      if (!d || isNaN(d.getTime()) || d.getFullYear() !== hoje.getFullYear()) return;
+      const idx = ultimosMeses.findIndex((m) => m.mes === d.getMonth());
+      if (idx < 0) return;
+      const v = Number(mov.valor) || 0;
+      if (mov.tipo === "entrada") counts[idx].entradas += v;
+      else if (mov.tipo === "saida") counts[idx].saidas += v;
+    });
+    return counts;
+  }, [tesouraria, ultimosMeses]);
+
+  const contasTesouraria = useMemo(
+    () => (Array.isArray(tesouraria?.contas) ? tesouraria.contas : []),
+    [tesouraria]
+  );
+
+  const relatorios = useMemo(() => {
+    const texto = (r, v) => (r.formato || ((x) => String(Math.round(Number(x) || 0))))(v);
+    const mk = (r) => ({
+      id: r.id,
+      titulo: r.titulo,
+      icon: r.icon,
+      sub: r.sub || "Total calculado com base nos dados actuais.",
+      serie: r.serie || [],
+      total: r.total,
+      totalTexto: texto(r, r.total),
+      variacao: r.variacao ?? null,
+      formato: r.formato,
+      formatoAxis: r.formatoAxis,
+      cor: r.cor || COR_RELATORIO,
+      colunas: r.colunas || ["Item", "Valor"],
+      linhas: r.linhas || [],
+      onExportPdf: () =>
+        exportarRelatorioPDF({
+          titulo: r.titulo,
+          org,
+          cabecalhos: r.colunas || ["Item", "Valor"],
+          linhas: r.linhas || [],
+          resumo: [`Total: ${texto(r, r.total)}`],
+        }),
+      onExportExcel: () => exportarRelatorioExcel(r.titulo, r.colunas || ["Item", "Valor"], r.linhas || []),
+    });
+
+    const soma = (arr, campo) => arr.reduce((s, x) => s + (Number(x[campo]) || 0), 0);
+
+    const vendasSerie = vendasPorMes.map((v) => ({ label: v.label, valor: v.valor }));
+    const totalVendas = soma(vendasSerie, "valor");
+    const recebidoSerie = recebidoPorMes.map((v) => ({ label: v.label, valor: v.valor }));
+    const totalRecebido = soma(recebidoSerie, "valor");
+    const docsSerie = vendasPorMes.map((v) => ({ label: v.label, valor: v.quantidade }));
+    const clientesSerie = clientesTop.map((c) => ({ label: c.nome, valor: c.total }));
+    const totalClientesTop = soma(clientesSerie, "valor");
+
+    const prodSerie = ultimosMeses.map((m) => ({ label: m.label, valor: (producaoPorMes[m.mes] || { produzidas: 0 }).produzidas }));
+    const entrSerie = ultimosMeses.map((m) => ({ label: m.label, valor: (producaoPorMes[m.mes] || { entregues: 0 }).entregues }));
+    const pctSerie = ultimosMeses.map((m) => ({ label: m.label, valor: (producaoPorMes[m.mes] || { pct: 0 }).pct }));
+    const statusSerie = opsPorStatus.map((s) => ({ label: s.label, valor: s.quantidade }));
+
+    const catsValorSerie = categoriasStock.map((c) => ({ label: c.nome, valor: c.valor }));
+    const catsItensSerie = categoriasStock.map((c) => ({ label: c.nome, valor: c.itens }));
+    const catsQtdSerie = categoriasStock.map((c) => ({ label: c.nome, valor: c.qtd }));
+    const matStatusSerie = STATUS_MATERIAL.map((s) => ({ label: s.label, valor: contagemStatusMaterial[s.value] || 0 }));
+
+    const finEstadoSerie = ESTADOS_FATURA.map((s) => ({ label: s.label, valor: contagemEstadosFatura[s.value] || 0 }));
+    const despesasSerie = tesourariaPorMes.map((m) => ({ label: m.label, valor: m.saidas }));
+    const entradasSerie = tesourariaPorMes.map((m) => ({ label: m.label, valor: m.entradas }));
+    const saidasSerie = tesourariaPorMes.map((m) => ({ label: m.label, valor: m.saidas }));
+    const contasSerie = contasTesouraria.map((c) => ({ label: c.nome || `Conta #${c.id}`, valor: Number(c.saldo_atual) || 0 }));
+
+    const porModulo = {
+      comercial: [
+        mk({
+          id: "vendas-periodo", titulo: "Vendas por período", icon: "trending_up",
+          sub: "Total acumulado nos últimos 6 meses",
+          serie: vendasSerie, total: totalVendas, variacao: variacaoDe(vendasSerie), formato: fmtKz, formatoAxis: compactKz,
+          colunas: ["Período", "Valor", "Documentos"],
+          linhas: vendasPorMes.map((v) => [v.label, fmtKz(v.valor), v.quantidade]),
+        }),
+        mk({
+          id: "clientes-activos", titulo: "Clientes mais activos", icon: "workspace_premium",
+          sub: "Clientes com maior faturação.",
+          serie: clientesSerie, total: totalClientesTop, formato: fmtKz, formatoAxis: compactKz,
+          colunas: ["Cliente", "Faturação"],
+          linhas: clientesTop.map((c) => [c.nome, fmtKz(c.total)]),
+        }),
+        mk({
+          id: "documentos", titulo: "Documentos emitidos", icon: "receipt_long",
+          sub: "Documentos emitidos nos últimos 6 meses.",
+          serie: docsSerie, total: soma(docsSerie, "valor"), variacao: variacaoDe(docsSerie),
+          colunas: ["Período", "Documentos"], linhas: vendasPorMes.map((v) => [v.label, v.quantidade]),
+        }),
+        mk({
+          id: "recebimentos", titulo: "Recebimentos", icon: "payments",
+          sub: "Faturas pagas nos últimos 6 meses.",
+          serie: recebidoSerie, total: totalRecebido, variacao: variacaoDe(recebidoSerie), formato: fmtKz, formatoAxis: compactKz,
+          colunas: ["Período", "Recebido", "Documentos"],
+          linhas: recebidoPorMes.map((v) => [v.label, fmtKz(v.valor), v.quantidade]),
+        }),
+      ],
+      producao: [
+        mk({
+          id: "ordens-periodo", titulo: "Ordens por período", icon: "precision_manufacturing",
+          sub: "Ordens de produção registadas nos últimos 6 meses.",
+          serie: prodSerie, total: soma(prodSerie, "valor"), variacao: variacaoDe(prodSerie),
+          colunas: ["Período", "Ordens"], linhas: prodSerie.map((x) => [x.label, x.valor]),
+        }),
+        mk({
+          id: "entregas-periodo", titulo: "Entregas por período", icon: "local_shipping",
+          sub: "Ordens entregues nos últimos 6 meses.",
+          serie: entrSerie, total: soma(entrSerie, "valor"), variacao: variacaoDe(entrSerie),
+          colunas: ["Período", "Entregues"], linhas: entrSerie.map((x) => [x.label, x.valor]),
+        }),
+        mk({
+          id: "taxa-entrega", titulo: "Taxa de entrega", icon: "show_chart",
+          sub: "Percentagem de ordens entregues nos últimos 6 meses.",
+          serie: pctSerie, total: pctSerie.length ? pctSerie[pctSerie.length - 1].valor : 0,
+          formato: (v) => `${Math.round(Number(v) || 0)}%`,
+          colunas: ["Período", "Taxa (%)"], linhas: pctSerie.map((x) => [x.label, `${x.valor}%`]),
+        }),
+        mk({
+          id: "ordens-estado", titulo: "Ordens por estado", icon: "pie_chart",
+          sub: "Distribuição das ordens por estado.",
+          serie: statusSerie, total: soma(statusSerie, "valor"),
+          colunas: ["Estado", "Ordens"], linhas: statusSerie.map((x) => [x.label, x.valor]),
+        }),
+      ],
+      stocks: [
+        mk({
+          id: "valor-stock-categoria", titulo: "Valor de stock por categoria", icon: "savings",
+          sub: "Valor de inventário por categoria de material.",
+          serie: catsValorSerie, total: soma(catsValorSerie, "valor"), formato: fmtKz, formatoAxis: compactKz,
+          colunas: ["Categoria", "Valor"], linhas: categoriasStock.map((c) => [c.nome, fmtKz(c.valor)]),
+        }),
+        mk({
+          id: "itens-categoria", titulo: "Itens por categoria", icon: "category",
+          sub: "Número de materiais por categoria.",
+          serie: catsItensSerie, total: soma(catsItensSerie, "valor"),
+          colunas: ["Categoria", "Itens"], linhas: categoriasStock.map((c) => [c.nome, c.itens]),
+        }),
+        mk({
+          id: "qtd-categoria", titulo: "Quantidade em stock por categoria", icon: "inventory_2",
+          sub: "Quantidade total de material em stock por categoria.",
+          serie: catsQtdSerie, total: soma(catsQtdSerie, "valor"),
+          formato: (v) => Number(v || 0).toLocaleString("pt-AO"),
+          colunas: ["Categoria", "Quantidade"], linhas: categoriasStock.map((c) => [c.nome, c.qtd.toLocaleString("pt-AO")]),
+        }),
+        mk({
+          id: "materiais-estado", titulo: "Materiais por estado", icon: "warning",
+          sub: "Estado do inventário de materiais.",
+          serie: matStatusSerie, total: soma(matStatusSerie, "valor"),
+          colunas: ["Estado", "Materiais"], linhas: matStatusSerie.map((x) => [x.label, x.valor]),
+        }),
+      ],
+      financeiro: [
+        mk({
+          id: "faturacao", titulo: "Faturação emitida", icon: "receipt_long",
+          sub: "Total faturado nos últimos 6 meses.",
+          serie: vendasSerie, total: totalVendas, variacao: variacaoDe(vendasSerie), formato: fmtKz, formatoAxis: compactKz,
+          colunas: ["Período", "Faturação"], linhas: vendasPorMes.map((v) => [v.label, fmtKz(v.valor)]),
+        }),
+        mk({
+          id: "recebido", titulo: "Recebido", icon: "payments",
+          sub: "Valor efetivamente recebido nos últimos 6 meses.",
+          serie: recebidoSerie, total: totalRecebido, variacao: variacaoDe(recebidoSerie), formato: fmtKz, formatoAxis: compactKz,
+          colunas: ["Período", "Recebido"], linhas: recebidoPorMes.map((v) => [v.label, fmtKz(v.valor)]),
+        }),
+        mk({
+          id: "docs-estado", titulo: "Documentos por estado", icon: "description",
+          sub: "Distribuição dos documentos por estado.",
+          serie: finEstadoSerie, total: soma(finEstadoSerie, "valor"),
+          colunas: ["Estado", "Documentos"], linhas: finEstadoSerie.map((x) => [x.label, x.valor]),
+        }),
+        mk({
+          id: "despesas", titulo: "Despesas (Tesouraria)", icon: "trending_down",
+          sub: "Saídas registadas na tesouraria nos últimos 6 meses.",
+          serie: despesasSerie, total: soma(despesasSerie, "valor"), variacao: variacaoDe(despesasSerie), formato: fmtKz, formatoAxis: compactKz,
+          colunas: ["Período", "Saídas"], linhas: despesasSerie.map((x) => [x.label, fmtKz(x.valor)]),
+        }),
+      ],
+      tesouraria: [
+        mk({
+          id: "entradas-mes", titulo: "Entradas por mês", icon: "arrow_downward",
+          sub: "Entradas na tesouraria nos últimos 6 meses.",
+          serie: entradasSerie, total: soma(entradasSerie, "valor"), variacao: variacaoDe(entradasSerie), formato: fmtKz, formatoAxis: compactKz,
+          colunas: ["Período", "Entradas"], linhas: entradasSerie.map((x) => [x.label, fmtKz(x.valor)]),
+        }),
+        mk({
+          id: "saidas-mes", titulo: "Saídas por mês", icon: "arrow_upward",
+          sub: "Saídas na tesouraria nos últimos 6 meses.",
+          serie: saidasSerie, total: soma(saidasSerie, "valor"), variacao: variacaoDe(saidasSerie), formato: fmtKz, formatoAxis: compactKz,
+          colunas: ["Período", "Saídas"], linhas: saidasSerie.map((x) => [x.label, fmtKz(x.valor)]),
+        }),
+        mk({
+          id: "saldo-contas", titulo: "Saldo por conta", icon: "account_balance_wallet",
+          sub: "Saldo atual por conta bancária e caixa.",
+          serie: contasSerie, total: soma(contasSerie, "valor"), formato: fmtKz, formatoAxis: compactKz,
+          colunas: ["Conta", "Saldo"], linhas: contasSerie.map((x) => [x.label, fmtKz(x.valor)]),
+        }),
+      ],
+    };
+
+    return porModulo[aba] || [];
+  }, [
+    aba, org, vendasPorMes, recebidoPorMes, clientesTop, producaoPorMes, opsPorStatus,
+    ultimosMeses, categoriasStock, contagemStatusMaterial, contagemEstadosFatura, tesourariaPorMes,
+    contasTesouraria,
+  ]);
+
+  const relatorioAtivo = relatorios.find((r) => r.id === relatorioId) || relatorios[0] || null;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <span className="w-12 h-12 rounded-2xl bg-card border border-border shadow-card flex items-center justify-center hidden sm:flex shrink-0">
-          <Icon name="query_stats" className="text-2xl text-primary" />
+    <div className="space-y-5">
+      {/* Faixa do módulo - identificação Relatórios (azul) */}
+      <div className="flex items-center justify-between rounded-xl bg-[#0066CC] px-5 py-2.5 text-white shadow-sm">
+        <span className="text-lg font-extrabold uppercase tracking-wide">10. RELATÓRIOS</span>
+        <span className="hidden text-[11px] font-semibold uppercase tracking-wider text-blue-100 sm:block">
+          Sistema Integrado de Gestão Empresarial
         </span>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Relatórios</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Visão geral do desempenho da produção</p>
-        </div>
       </div>
 
-      <div className="flex gap-2 flex-wrap">
-        {abas.map((a) => (
+      <div className="min-w-0">
+        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Relatórios e Análises</h1>
+        <p className="mt-0.5 text-xs font-medium text-muted-foreground">Informação para melhores decisões.</p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-border">
+        {MODULOS_REL.map((m) => (
           <button
-            key={a.key}
+            key={m.value}
             type="button"
-            onClick={() => setAba(a.key)}
-            className={`pill transition-colors ${aba === a.key ? "nav-pill" : "pill-muted hover:border-primary hover:text-primary"}`}
+            onClick={() => { setAba(m.value); setRelatorioId(null); }}
+            aria-pressed={aba === m.value}
+            className={`${tabClsBase} ${aba === m.value ? tabClsAtiva : tabClsInativa}`}
           >
-            <Icon name={a.icon} className="text-base" />
-            {a.label}
+            <Icon name={m.icon} className="text-base" /> {m.label}
           </button>
         ))}
       </div>
+
+      {relatorios.length > 0 && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+          <section className="overflow-hidden rounded-xl border border-border bg-card lg:col-span-5">
+            <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+              <Icon name="description" className="text-base text-muted-foreground" />
+              <h2 className="text-sm font-semibold text-foreground">Relatórios Disponíveis</h2>
+            </div>
+            <ul className="space-y-1 p-3">
+              {relatorios.map((r) => {
+                const ativo = relatorioAtivo?.id === r.id;
+                return (
+                  <li key={r.id}>
+                    <button
+                      type="button"
+                      onClick={() => setRelatorioId(r.id)}
+                      className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left text-sm transition-all ${
+                        ativo ? "bg-blue-50 text-blue-700 ring-1 ring-blue-100/80" : "text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+                        ativo ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500"
+                      }`}>
+                        <Icon name={r.icon} className="text-sm" />
+                      </span>
+                      <span className={`min-w-0 flex-1 truncate ${ativo ? "font-semibold text-blue-900" : "font-medium"}`}>{r.titulo}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+
+          <section className="overflow-hidden rounded-xl border border-border bg-card lg:col-span-7">
+            {relatorioAtivo && (
+              <>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border px-4 py-3">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-base font-bold text-slate-900">{relatorioAtivo.titulo}</h3>
+                    <p className="truncate text-xs text-slate-400">{relatorioAtivo.sub}</p>
+                  </div>
+                  <div className="flex shrink-0 flex-col sm:items-end">
+                    <p className="text-xl font-black tracking-tight text-slate-900 tabular-nums">{relatorioAtivo.totalTexto}</p>
+                    {relatorioAtivo.variacao !== null && (
+                      <span className={`mt-0.5 inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 ${
+                        relatorioAtivo.variacao >= 0 ? "bg-emerald-50 text-emerald-600 ring-emerald-200" : "bg-red-50 text-red-600 ring-red-200"
+                      }`}>
+                        <Icon name={relatorioAtivo.variacao >= 0 ? "trending_up" : "trending_down"} className="text-sm" />
+                        {relatorioAtivo.variacao >= 0 ? "+" : ""}{relatorioAtivo.variacao}%
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="px-4 pt-3">
+                  <div className="h-64">
+                    {relatorioAtivo.serie.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={relatorioAtivo.serie} margin={{ top: 10, right: 10, left: -14, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                          <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} dy={4} interval={0} />
+                          <YAxis tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} width={52} tickFormatter={relatorioAtivo.formatoAxis} allowDecimals={false} />
+                          <Tooltip content={<ChartTooltip formato={relatorioAtivo.formato} />} cursor={{ fill: "var(--muted)" }} />
+                          <Bar dataKey="valor" name={relatorioAtivo.titulo} radius={[6, 6, 0, 0]} maxBarSize={54} fill={relatorioAtivo.cor} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-border">
+                        <p className="text-sm text-muted-foreground">Sem dados suficientes para este relatório.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => setRelatorioVer(relatorioAtivo)}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-100"
+                  >
+                    <Icon name="visibility" className="text-sm text-slate-500" /> Visualizar
+                  </button>
+                  <button type="button" onClick={relatorioAtivo.onExportPdf} className={botaoPdfCls}>
+                    <Icon name="picture_as_pdf" className="text-sm text-red-600" /> Exportar PDF
+                  </button>
+                  <button type="button" onClick={relatorioAtivo.onExportExcel} className={botaoExcelCls}>
+                    <Icon name="grid_on" className="text-sm text-emerald-600" /> Exportar Excel
+                  </button>
+                </div>
+              </>
+            )}
+          </section>
+        </div>
+      )}
 
       {aba === "comercial" && (
         <>
@@ -431,9 +806,13 @@ export default function RelatoriosPage() {
               icon="filter_list"
               titulo="Filtros da Área Comercial"
               acoes={
-                <Button size="sm" variant="outline" onClick={() => gerarRelatorioFaturacoesPDF(faturasFiltradas, org, { estados: filtroEstadosFatura, tipos: filtroTiposFatura })}>
+                <button
+                  type="button"
+                  onClick={() => gerarRelatorioFaturacoesPDF(faturasFiltradas, org, { estados: filtroEstadosFatura, tipos: filtroTiposFatura })}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                >
                   <Icon name="picture_as_pdf" className="text-sm" /> Exportar PDF
-                </Button>
+                </button>
               }
             >
             <FiltroChips
@@ -465,18 +844,11 @@ export default function RelatoriosPage() {
             ))}
           </div>
 
-          <div className="flex gap-2 flex-wrap">
-            {ultimosMeses.map((m) => (
-              <button
-                key={m.labelCurto}
-                type="button"
-                onClick={() => setPeriodo(m.labelCurto)}
-                className={`pill transition-colors ${periodo === m.labelCurto ? "nav-pill" : "pill-muted hover:border-primary hover:text-primary"}`}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
+          <TabsPills
+            valor={periodo}
+            onChange={setPeriodo}
+            opcoes={ultimosMeses.map((m) => ({ value: m.labelCurto, label: m.label }))}
+          />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <CartaoGrafico icon="receipt_long" titulo="Faturação Emitida" sub={`Total: ${fmtKz(vendasPorMes.reduce((s, v) => s + v.valor, 0))}`}>
@@ -521,91 +893,82 @@ export default function RelatoriosPage() {
             </CartaoGrafico>
           </div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-sm font-medium">Cadastros</CardTitle>
-              <div className="flex gap-1.5">
-                <Button size="sm" variant="outline" onClick={() => gerarRelatorioCadastrosPDF(clientes, org, "todos")}>
-                  <Icon name="picture_as_pdf" className="text-sm" />
-                  Todos
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => gerarRelatorioCadastrosPDF(clientes, org, "cliente")}>
-                  <Icon name="picture_as_pdf" className="text-sm" />
-                  Clientes
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => gerarRelatorioCadastrosPDF(clientes, org, "fornecedor")}>
-                  <Icon name="picture_as_pdf" className="text-sm" />
-                  Fornecedores
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-                <div className="flex gap-1.5">
-                  {[
-                    { v: "todos", label: `Todos (${clientes.length})`, icon: "badge" },
-                    { v: "cliente", label: `Clientes (${totalClientes})`, icon: "person" },
-                    { v: "fornecedor", label: `Fornecedores (${totalFornecedores})`, icon: "local_shipping" },
-                  ].map((f) => (
-                    <Button
-                      key={f.v}
-                      variant={filtroTipo === f.v ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setFiltroTipo(f.v)}
-                    >
-                      <Icon name={f.icon} className="text-sm" />
-                      {f.label}
-                    </Button>
-                  ))}
-                </div>
+          <Ledger rotulo="Cadastros ledger">
+            <LedgerHeader
+              titulo="Cadastros"
+              subtitulo={`${cadastrosFiltrados.length} de ${clientes.length} registos`}
+            />
+            <div className="flex flex-col gap-2.5 border-b border-border px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+              <TabsPills
+                valor={filtroTipo}
+                onChange={setFiltroTipo}
+                opcoes={[
+                  { value: "todos", label: `Todos (${clientes.length})`, icon: "badge" },
+                  { value: "cliente", label: `Clientes (${totalClientes})`, icon: "person" },
+                  { value: "fornecedor", label: `Fornecedores (${totalFornecedores})`, icon: "local_shipping" },
+                ]}
+              />
+              <div className="flex items-center gap-1.5">
                 <div className="relative w-full sm:w-64">
                   <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-base" />
                   <input
-                    className="pl-9 pr-4 py-1.5 bg-background border rounded text-sm w-full outline-none focus:ring-1 focus:ring-primary"
+                    className="w-full rounded-lg border border-border bg-card py-1.5 pl-9 pr-4 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus-visible:ring-2 focus-visible:ring-primary/25"
                     placeholder="Buscar..."
                     value={busca}
                     onChange={(e) => setBusca(e.target.value)}
                   />
                 </div>
+                {[
+                  { v: "todos", label: "Todos" },
+                  { v: "cliente", label: "Clientes" },
+                  { v: "fornecedor", label: "Fornecedores" },
+                ].map((r) => (
+                  <button
+                    key={r.v}
+                    type="button"
+                    onClick={() => gerarRelatorioCadastrosPDF(clientes, org, r.v)}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                  >
+                    <Icon name="picture_as_pdf" className="text-sm" /> {r.label}
+                  </button>
+                ))}
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Tipo</th>
-                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Nome</th>
-                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase hidden sm:table-cell">Empresa</th>
-                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">NIF</th>
-                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase hidden lg:table-cell">Email</th>
-                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Telefone</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cadastrosFiltrados.map((c, i) => (
-                      <tr key={c.id || c.codigo || i} className="border-b">
-                        <td className="px-3 py-2.5">
-                          <Badge variant="outline" className="text-xs">
-                            <Icon name={c.tipo === "cliente" ? "person" : "local_shipping"} className="text-xs mr-1" />
-                            {c.tipo === "cliente" ? "Cliente" : "Fornecedor"}
-                          </Badge>
-                        </td>
-                        <td className="px-3 py-2.5 font-medium">{c.nome}</td>
-                        <td className="px-3 py-2.5 text-muted-foreground hidden sm:table-cell">{c.empresa || "—"}</td>
-                        <td className="px-3 py-2.5 text-muted-foreground font-mono text-xs">{c.nif || "—"}</td>
-                        <td className="px-3 py-2.5 text-muted-foreground text-xs hidden lg:table-cell">{c.email || "—"}</td>
-                        <td className="px-3 py-2.5 text-muted-foreground">{c.telefone || "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {cadastrosFiltrados.length === 0 && (
-                  <p className="text-center py-8 text-muted-foreground text-sm">
-                    {clientes.length === 0 ? "Nenhum cadastro encontrado" : "Nenhum resultado para os filtros escolhidos"}
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+            <LedgerTable>
+              <thead>
+                <tr className="border-b border-border">
+                  <LedgerTh>Tipo</LedgerTh>
+                  <LedgerTh>Nome</LedgerTh>
+                  <LedgerTh className="hidden sm:table-cell">Empresa</LedgerTh>
+                  <LedgerTh>NIF</LedgerTh>
+                  <LedgerTh className="hidden lg:table-cell">Email</LedgerTh>
+                  <LedgerTh>Telefone</LedgerTh>
+                </tr>
+              </thead>
+              <tbody>
+                {cadastrosFiltrados.map((c, i) => (
+                  <LedgerTr key={c.id || c.codigo || i}>
+                    <LedgerTd>
+                      <StatusBadge tom="neutral">
+                        <Icon name={c.tipo === "cliente" ? "person" : "local_shipping"} className="text-xs" />
+                        {c.tipo === "cliente" ? "Cliente" : "Fornecedor"}
+                      </StatusBadge>
+                    </LedgerTd>
+                    <LedgerTd className="font-medium">{c.nome}</LedgerTd>
+                    <LedgerTd className="hidden text-muted-foreground sm:table-cell">{c.empresa || "—"}</LedgerTd>
+                    <LedgerTd className="font-mono text-xs text-muted-foreground">{c.nif || "—"}</LedgerTd>
+                    <LedgerTd className="hidden text-xs text-muted-foreground lg:table-cell">{c.email || "—"}</LedgerTd>
+                    <LedgerTd className="text-muted-foreground">{c.telefone || "—"}</LedgerTd>
+                  </LedgerTr>
+                ))}
+              </tbody>
+            </LedgerTable>
+            {cadastrosFiltrados.length === 0 && (
+              <LedgerEmpty icone="search_off">
+                {clientes.length === 0 ? "Nenhum cadastro encontrado" : "Nenhum resultado para os filtros escolhidos"}
+              </LedgerEmpty>
+            )}
+          </Ledger>
         </>
       )}
 
@@ -624,9 +987,13 @@ export default function RelatoriosPage() {
               icon="filter_list"
               titulo="Filtros de Produção"
               acoes={
-                <Button size="sm" variant="outline" onClick={() => gerarRelatorioProducaoPDF(ordensFiltradas, org, { estados: filtroEstadosOrdem })}>
+                <button
+                  type="button"
+                  onClick={() => gerarRelatorioProducaoPDF(ordensFiltradas, org, { estados: filtroEstadosOrdem })}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                >
                   <Icon name="picture_as_pdf" className="text-sm" /> Exportar PDF
-                </Button>
+                </button>
               }
             >
               <FiltroChips
@@ -641,12 +1008,10 @@ export default function RelatoriosPage() {
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {opsPorStatus.map((s) => (
-                <Card key={s.status}>
-                  <CardContent className="p-4 text-center">
-                    <p className="text-2xl font-semibold">{s.quantidade}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
-                  </CardContent>
-                </Card>
+                <div key={s.status} className="rounded-xl border border-border bg-card p-4 text-center">
+                  <p className="text-2xl font-semibold tabular-nums text-foreground">{s.quantidade}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{s.label}</p>
+                </div>
               ))}
             </div>
 
@@ -691,9 +1056,9 @@ export default function RelatoriosPage() {
                           <stop offset="100%" stopColor="#047857" stopOpacity={0.02} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.25} />
-                      <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 11 }} dy={4} />
-                      <YAxis tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 11 }} width={40} allowDecimals={false} />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                      <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} dy={4} />
+                      <YAxis tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} width={40} allowDecimals={false} />
                       <Tooltip content={<ChartTooltip />} />
                       <Area type="monotone" dataKey="valor" name="Produzidas" stroke="#4338ca" strokeWidth={2.5} fill="url(#grad-produzidas)" activeDot={{ r: 4 }} />
                       <Area type="monotone" dataKey="entregues" name="Entregues" stroke="#047857" strokeWidth={2.5} fill="url(#grad-entregues)" activeDot={{ r: 4 }} />
@@ -706,7 +1071,7 @@ export default function RelatoriosPage() {
         );
       })()}
 
-      {aba === "provisionamento" && (() => {
+      {aba === "stocks" && (() => {
         const catMap = {};
         materiaisFiltrados.forEach((m) => {
           const cat = m.categoria?.nome || "Sem categoria";
@@ -739,9 +1104,13 @@ export default function RelatoriosPage() {
               icon="filter_list"
               titulo="Filtros de Provisionamento"
               acoes={
-                <Button size="sm" variant="outline" onClick={() => gerarRelatorioStockPDF(materiaisFiltrados, categorias, org)}>
+                <button
+                  type="button"
+                  onClick={() => gerarRelatorioStockPDF(materiaisFiltrados, categorias, org)}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                >
                   <Icon name="picture_as_pdf" className="text-sm" /> Exportar PDF
-                </Button>
+                </button>
               }
             >
               <FiltroChips
@@ -776,56 +1145,58 @@ export default function RelatoriosPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-              <Card className="lg:col-span-2">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-sm font-medium">Resumo por Categoria</CardTitle>
-                  <Button size="sm" variant="outline" onClick={() => gerarRelatorioStockPDF(materiaisFiltrados, categorias, org)}>
+              <Ledger rotulo="Resumo por categoria ledger" className="lg:col-span-2">
+                <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+                  <h2 className="truncate text-sm font-semibold text-foreground">Resumo por Categoria</h2>
+                  <button
+                    type="button"
+                    onClick={() => gerarRelatorioStockPDF(materiaisFiltrados, categorias, org)}
+                    className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                  >
                     <Icon name="picture_as_pdf" className="text-sm" />
                     PDF
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Categoria</th>
-                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Itens</th>
-                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Qtd.</th>
-                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Disponível</th>
-                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase hidden sm:table-cell">Valor</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {catSorted.map(([nome, d]) => {
-                          const famCfg = familias[d.familia];
-                          return (
-                            <tr key={nome} className="border-b">
-                              <td className="px-3 py-2.5 flex items-center gap-2">
-                                {famCfg && <Icon name={famCfg.icon} className="text-sm text-muted-foreground" />}
-                                <span className="font-medium">{nome}</span>
-                              </td>
-                              <td className="px-3 py-2.5 text-right font-mono text-xs">{d.itens}</td>
-                              <td className="px-3 py-2.5 text-right font-mono text-xs">{d.qtd.toLocaleString("pt-AO")}</td>
-                              <td className="px-3 py-2.5 text-right font-mono text-xs">{d.disponivel.toLocaleString("pt-AO")}</td>
-                              <td className="px-3 py-2.5 text-right font-mono text-xs hidden sm:table-cell">Kz {d.valorTotal.toLocaleString("pt-AO")}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                      <tfoot>
-                        <tr className="border-t-2 font-medium">
-                          <td className="px-3 py-2.5 text-xs">TOTAL</td>
-                          <td className="px-3 py-2.5 text-right font-mono text-xs">{totalItens}</td>
-                          <td className="px-3 py-2.5 text-right font-mono text-xs">{totalQtd.toLocaleString("pt-AO")}</td>
-                          <td className="px-3 py-2.5 text-right font-mono text-xs">{totalQtd.toLocaleString("pt-AO")}</td>
-                          <td className="px-3 py-2.5 text-right font-mono text-xs hidden sm:table-cell">Kz {totalValor.toLocaleString("pt-AO")}</td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
+                  </button>
+                </div>
+                <LedgerTable>
+                  <thead>
+                    <tr className="border-b border-border">
+                      <LedgerTh>Categoria</LedgerTh>
+                      <LedgerTh className="text-right">Itens</LedgerTh>
+                      <LedgerTh className="text-right">Qtd.</LedgerTh>
+                      <LedgerTh className="text-right">Disponível</LedgerTh>
+                      <LedgerTh className="hidden text-right sm:table-cell">Valor</LedgerTh>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {catSorted.map(([nome, d]) => {
+                      const famCfg = familias[d.familia];
+                      return (
+                        <LedgerTr key={nome}>
+                          <LedgerTd>
+                            <span className="flex items-center gap-2">
+                              {famCfg && <Icon name={famCfg.icon} className="text-sm text-muted-foreground" />}
+                              <span className="font-medium">{nome}</span>
+                            </span>
+                          </LedgerTd>
+                          <LedgerTd className="text-right font-mono text-xs tabular-nums">{d.itens}</LedgerTd>
+                          <LedgerTd className="text-right font-mono text-xs tabular-nums">{d.qtd.toLocaleString("pt-AO")}</LedgerTd>
+                          <LedgerTd className="text-right font-mono text-xs tabular-nums">{d.disponivel.toLocaleString("pt-AO")}</LedgerTd>
+                          <LedgerTd className="hidden text-right font-mono text-xs tabular-nums sm:table-cell">Kz {d.valorTotal.toLocaleString("pt-AO")}</LedgerTd>
+                        </LedgerTr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t border-border font-medium">
+                      <LedgerTd className="text-xs">TOTAL</LedgerTd>
+                      <LedgerTd className="text-right font-mono text-xs tabular-nums">{totalItens}</LedgerTd>
+                      <LedgerTd className="text-right font-mono text-xs tabular-nums">{totalQtd.toLocaleString("pt-AO")}</LedgerTd>
+                      <LedgerTd className="text-right font-mono text-xs tabular-nums">{totalQtd.toLocaleString("pt-AO")}</LedgerTd>
+                      <LedgerTd className="hidden text-right font-mono text-xs tabular-nums sm:table-cell">Kz {totalValor.toLocaleString("pt-AO")}</LedgerTd>
+                    </tr>
+                  </tfoot>
+                </LedgerTable>
+              </Ledger>
 
               <CartaoGrafico icon="pie_chart" titulo="Valor de Stock por Categoria" sub="Top 6 categorias por valor">
                 <DonutGrafico
@@ -845,54 +1216,61 @@ export default function RelatoriosPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-semibold text-emerald-500">{materiaisFiltrados.filter((m) => m.status === "ok").length}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Saudáveis</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-semibold text-amber-500">{abaixoMin}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Abaixo do Mínimo</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-semibold text-red-500">{esgotados}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Esgotados</p>
-                </CardContent>
-              </Card>
+              <div className="rounded-xl border border-border bg-card p-4 text-center">
+                <p className="text-2xl font-semibold tabular-nums text-success">{materiaisFiltrados.filter((m) => m.status === "ok").length}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Saudáveis</p>
+              </div>
+              <div className="rounded-xl border border-border bg-card p-4 text-center">
+                <p className="text-2xl font-semibold tabular-nums text-warning">{abaixoMin}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Abaixo do Mínimo</p>
+              </div>
+              <div className="rounded-xl border border-border bg-card p-4 text-center">
+                <p className="text-2xl font-semibold tabular-nums text-error">{esgotados}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Esgotados</p>
+              </div>
             </div>
 
             {criticos > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm font-medium">Itens Críticos</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {materiaisFiltrados.filter((m) => m.status === "esgotado" || m.status === "repor").map((m) => (
-                      <div key={m.id} className="flex items-center justify-between px-3 py-2 rounded border">
-                        <div className="flex items-center gap-2">
-                          <Icon name={m.status === "esgotado" ? "error" : "warning"} className={`text-sm ${m.status === "esgotado" ? "text-red-500" : "text-amber-500"}`} />
-                          <span className="text-sm font-medium">{m.nome}</span>
-                          <span className="text-xs text-muted-foreground">{m.categoria?.nome || ""}</span>
-                        </div>
-                        <span className={`text-xs font-mono font-medium ${m.status === "esgotado" ? "text-red-500" : "text-amber-500"}`}>
-                          {toNum(m.estoque_disponivel).toLocaleString("pt-AO")} / {toNum(m.ponto_ressuprimento || m.estoque_min).toLocaleString("pt-AO")} {m.unidade}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+              <Ledger rotulo="Itens críticos ledger">
+                <LedgerHeader titulo="Itens Críticos" subtitulo={`${criticos} materiais em alerta`} />
+                <LedgerTable>
+                  <thead>
+                    <tr className="border-b border-border">
+                      <LedgerTh>Material</LedgerTh>
+                      <LedgerTh>Estado</LedgerTh>
+                      <LedgerTh className="text-right">Disponível</LedgerTh>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {materiaisFiltrados.filter((m) => m.status === "esgotado" || m.status === "repor").map((m) => {
+                      const esgotado = m.status === "esgotado";
+                      return (
+                        <LedgerTr key={m.id}>
+                          <LedgerTd>
+                            <span className="flex items-center gap-2">
+                              <Icon name={esgotado ? "error" : "warning"} className={`text-sm ${esgotado ? "text-error" : "text-warning"}`} />
+                              <span className="text-sm font-medium text-foreground">{m.nome}</span>
+                              <span className="text-xs text-muted-foreground">{m.categoria?.nome || ""}</span>
+                            </span>
+                          </LedgerTd>
+                          <LedgerTd>
+                            <StatusBadge tom={esgotado ? "error" : "warning"}>{esgotado ? "Esgotado" : "A repor"}</StatusBadge>
+                          </LedgerTd>
+                          <LedgerTd className="text-right font-mono text-xs tabular-nums text-foreground">
+                            {toNum(m.estoque_disponivel).toLocaleString("pt-AO")} / {toNum(m.ponto_ressuprimento || m.estoque_min).toLocaleString("pt-AO")} {m.unidade}
+                          </LedgerTd>
+                        </LedgerTr>
+                      );
+                    })}
+                  </tbody>
+                </LedgerTable>
+              </Ledger>
             )}
           </>
         );
       })()}
 
-      {aba === "recursos" && (() => {
+      {aba === "stocks" && (() => {
         const fams = new Map();
         const grupos = new Map();
         const resolverGrupo = (c) => tiposItem[normalizarTipoItem(c.tipo)]?.label || String(c.tipo || "").trim() || "Sem grupo";
@@ -971,7 +1349,7 @@ export default function RelatoriosPage() {
             </div>
 
             {/* ─────────── FILTROS (Grupo / Família — multi-seleção) ─────────── */}
-            <div className="bg-card border border-border rounded-2xl shadow-card p-3 sm:p-4">
+            <div className="rounded-xl border border-border bg-card p-4">
               <div className="flex flex-wrap items-center gap-3">
                 <MultiSelect icon="category" value={filtroGrupos} onChange={setFiltroGrupos} options={opcoesGrupos} placeholder="Todos os grupos" />
                 <MultiSelect icon="folder" value={filtroFamilias} onChange={setFiltroFamilias} options={opcoesFamilias} placeholder="Todas as famílias" />
@@ -979,7 +1357,7 @@ export default function RelatoriosPage() {
                   <button
                     type="button"
                     onClick={() => { setFiltroFamilias([]); setFiltroGrupos([]); }}
-                    className="shrink-0 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-border bg-muted/40 text-xs text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+                    className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
                   >
                     <Icon name="close" className="text-sm text-primary" /> Limpar filtros
                   </button>
@@ -1000,10 +1378,10 @@ export default function RelatoriosPage() {
                 <div className="h-52">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={listaGrupos} margin={{ top: 10, right: 10, left: -14, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.25} />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                       <XAxis dataKey="name" tick={false} axisLine={false} height={8} />
-                      <YAxis tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 11 }} width={40} allowDecimals={false} />
-                      <Tooltip content={<ChartTooltip formato={(v) => `${v} categoria${v === 1 ? "" : "s"}`} />} cursor={{ fill: "rgba(148,163,184,0.08)" }} />
+                      <YAxis tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} width={40} allowDecimals={false} />
+                      <Tooltip content={<ChartTooltip formato={(v) => `${v} categoria${v === 1 ? "" : "s"}`} />} cursor={{ fill: "var(--muted)" }} />
                       <Bar dataKey="value" name="Categorias" radius={[6, 6, 0, 0]} maxBarSize={34}>
                         {listaGrupos.map((d, i) => <Cell key={i} fill={d.color} />)}
                       </Bar>
@@ -1048,17 +1426,53 @@ export default function RelatoriosPage() {
 
             {/* Botão de exportação PDF do relatório de categorias */}
             <div className="flex justify-end">
-              <Button size="sm" variant="outline" onClick={() => gerarRelatorioCategoriasPDF(categorias, materiais, org, { familias: filtroFamilias.map(labelDeFam), grupos: filtroGrupos })}>
+              <button
+                type="button"
+                onClick={() => gerarRelatorioCategoriasPDF(categorias, materiais, org, { familias: filtroFamilias.map(labelDeFam), grupos: filtroGrupos })}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+              >
                 <Icon name="picture_as_pdf" className="text-sm" /> Exportar
-              </Button>
+              </button>
             </div>
           </>
         );
       })()}
 
-      <footer className="border-t pt-6 pb-2 text-center">
-        <p className="text-[11px] text-muted-foreground">SIGRAF · Sistema de Gestão para Indústria Gráfica</p>
-      </footer>
+      <Modal
+        open={!!relatorioVer}
+        onClose={() => setRelatorioVer(null)}
+        title={relatorioVer?.titulo || "Relatório"}
+        icon={relatorioVer?.icon || "description"}
+        size="lg"
+      >
+        {relatorioVer && (
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">{relatorioVer.sub}</p>
+            <p className="text-lg font-extrabold tracking-tight text-foreground tabular-nums">{relatorioVer.totalTexto}</p>
+            <LedgerTable>
+              <thead>
+                <tr className="border-b border-border">
+                  {relatorioVer.colunas.map((c, i) => (
+                    <LedgerTh key={c} className={i > 0 ? "text-right" : ""}>{c}</LedgerTh>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {relatorioVer.linhas.map((linha, i) => (
+                  <LedgerTr key={i}>
+                    {linha.map((celula, j) => (
+                      <LedgerTd key={j} className={j > 0 ? "text-right tabular-nums" : ""}>{celula}</LedgerTd>
+                    ))}
+                  </LedgerTr>
+                ))}
+              </tbody>
+            </LedgerTable>
+            {relatorioVer.linhas.length === 0 && (
+              <LedgerEmpty icone="bar_chart">Sem dados para apresentar</LedgerEmpty>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

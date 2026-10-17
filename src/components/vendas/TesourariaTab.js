@@ -3,31 +3,49 @@
 import { useState, useEffect, useMemo } from "react";
 import { listarMovimentos, criarMovimento, removerMovimento, resumoTesouraria, exportarTesouraria, anexarFicheiros } from "@/services/tesouraria";
 import { listarContas, criarConta } from "@/services/contasBancarias";
+import { resumo as resumoDividas } from "@/services/dividas";
+import { podeAtual } from "@/lib/permissoes";
 import AnexosModal from "@/components/vendas/AnexosModal";
 import Icon from "@/components/Icon";
-import { Card, CardContent } from "@/components/ui/Card";
-import KpiCard from "@/components/ui/KpiCard";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
-import FilterBar, { useFilter } from "@/components/ui/FilterBar";
 import Modal from "@/components/Modal";
 import NumeroInput from "@/components/ui/NumeroInput";
+import RowMenu from "@/components/ui/RowMenu";
+import Paginacao, { usePaginacao } from "@/components/ui/Paginacao";
+import {
+  Ledger,
+  LedgerHeader,
+  FilterRow,
+  LedgerTable,
+  LedgerTh,
+  LedgerTr,
+  LedgerTd,
+  IdCell,
+  StatusBadge,
+  LedgerEmpty,
+} from "@/components/ui/Ledger";
 import { inputCls } from "@/lib/estoque";
 import gerarRelatorioTesourariaPdf from "@/lib/tesourariaPdf";
 import { ListSkeleton } from "@/components/Skeleton";
 
 const tipoCfg = {
-  entrada: { label: "Entrada", variant: "success", icon: "south_west" },
-  saida: { label: "Saída", variant: "destructive", icon: "north_east" },
-  transferencia: { label: "Transferência", variant: "info", icon: "swap_horiz" },
+  entrada: { label: "Entrada", tom: "success", icon: "south_west" },
+  saida: { label: "Saída", tom: "error", icon: "north_east" },
+  transferencia: { label: "Transferência", tom: "info", icon: "swap_horiz" },
 };
 
 const estadoCfg = {
-  confirmado: { label: "Confirmado", variant: "success" },
-  pendente: { label: "Pendente", variant: "warning" },
-  cancelado: { label: "Cancelado", variant: "secondary" },
+  confirmado: { label: "Confirmado", tom: "success" },
+  pendente: { label: "Pendente", tom: "warning" },
+  cancelado: { label: "Cancelado", tom: "neutral" },
+};
+
+const tipoBadge = {
+  entrada: "bg-emerald-50 text-emerald-600",
+  saida: "bg-red-50 text-red-600",
+  transferencia: "bg-blue-50 text-blue-600",
 };
 
 const metodos = [
@@ -91,6 +109,21 @@ const initialForm = {
 
 const POR_PAGINA = 5;
 
+const CAMPOS = [
+  { value: "geral", label: "Todos os campos", obter: (m) => `${m.descricao || ""} ${m.referencia || ""} ${m.categoria || ""}` },
+  { value: "descricao", label: "Descrição", obter: (m) => m.descricao || "" },
+  { value: "categoria", label: "Categoria", obter: (m) => m.categoria || "" },
+  { value: "referencia", label: "Referência", obter: (m) => m.referencia || "" },
+];
+
+const pillBase = "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-sm font-medium whitespace-nowrap transition-colors";
+const pillAtiva = "border-primary/40 bg-primary/10 text-primary";
+const pillInativa = "border-border bg-card text-muted-foreground hover:bg-muted/60 hover:text-foreground";
+
+const tabClsBase = "-mb-px inline-flex items-center gap-1.5 whitespace-nowrap border-b-2 pb-2.5 pt-2 text-sm font-medium transition-colors";
+const tabClsAtiva = "border-primary font-bold text-primary";
+const tabClsInativa = "border-transparent text-muted-foreground hover:text-foreground";
+
 function formatKz(v) { return `Kz ${Number(v || 0).toLocaleString("pt-AO")}`; }
 
 function formatData(v) {
@@ -103,10 +136,11 @@ function rotuloConta(conta) {
   return `${conta.banco_nome}${conta.numero_conta ? ` — Conta ${conta.numero_conta}` : ""}`;
 }
 
-export default function TesourariaTab() {
+export default function TesourariaTab({ aba = "movimentos", setAba, abas = [], children }) {
   const [movimentos, setMovimentos] = useState([]);
   const [contas, setContas] = useState([]);
   const [resumo, setResumo] = useState({ saldoTotal: 0, entradasMes: 0, saidasMes: 0, movimentosHoje: 0 });
+  const [dividasResumo, setDividasResumo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [modalNovo, setModalNovo] = useState(false);
   const [form, setForm] = useState(initialForm);
@@ -116,7 +150,13 @@ export default function TesourariaTab() {
   const [criandoCaixa, setCriandoCaixa] = useState(false);
   const [eliminarItem, setEliminarItem] = useState(null);
   const [deletando, setDeletando] = useState(false);
-  const [pagina, setPagina] = useState(1);
+  const [filtro, setFiltro] = useState({ campo: "geral", operador: "contem", termo: "" });
+  const [filtroRapido, setFiltroRapido] = useState("todos");
+  const [filtroConta, setFiltroConta] = useState("");
+  const [filtroContaTipo, setFiltroContaTipo] = useState("");
+  const [filtroMes, setFiltroMes] = useState("");
+  const [ordem, setOrdem] = useState({ chave: "", dir: 1 });
+  const [filtrosAbertos, setFiltrosAbertos] = useState(true);
   const { addToast } = useToast();
 
   const carregarResumo = async () => {
@@ -131,6 +171,13 @@ export default function TesourariaTab() {
       });
     } catch {
       setResumo({ saldoTotal: 0, entradasMes: 0, saidasMes: 0, movimentosHoje: 0 });
+    }
+    if (podeAtual("dividas", "ver")) {
+      try {
+        setDividasResumo(await resumoDividas());
+      } catch {
+        setDividasResumo(null);
+      }
     }
   };
 
@@ -175,23 +222,44 @@ export default function TesourariaTab() {
     })),
   ], [movimentos]);
 
-  const { search, setSearch, activeFilter, setActiveFilter, filtered, total } = useFilter({
-    items: movimentos,
-    searchFields: ["descricao", "referencia", "categoria"],
-    filterConfig,
-  });
+  const filtrados = useMemo(() => {
+    const termo = filtro.termo.trim().toLowerCase();
+    let res = [...movimentos];
+    if (termo) {
+      const cfg = CAMPOS.find((c) => c.value === filtro.campo) || CAMPOS[0];
+      res = res.filter((m) => {
+        const alvo = String(cfg.obter(m) || "").toLowerCase();
+        if (filtro.operador === "igual") return alvo === termo;
+        if (filtro.operador === "comeca") return alvo.startsWith(termo);
+        return alvo.includes(termo);
+      });
+    }
+    if (filtroRapido !== "todos") {
+      const cfg = filterConfig.find((f) => f.value === filtroRapido);
+      if (cfg?.field) res = res.filter((m) => m[cfg.field] === filtroRapido);
+    }
+    if (filtroMes) res = res.filter((m) => String(m.data_movimento || m.data || "").slice(0, 7) === filtroMes);
+    if (filtroConta) {
+      res = res.filter((m) => String(m.conta_bancaria_id) === String(filtroConta));
+    } else if (filtroContaTipo) {
+      const tipoDe = Object.fromEntries(contas.map((c) => [String(c.id), c.tipo_conta]));
+      res = res.filter((m) => (tipoDe[String(m.conta_bancaria_id)] === "caixa") === (filtroContaTipo === "caixa"));
+    }
+    if (ordem.chave === "descricao") res.sort((a, b) => String(a.descricao || "").localeCompare(String(b.descricao || ""), "pt") * ordem.dir);
+    if (ordem.chave === "valor") res.sort((a, b) => (Number(a.valor || 0) - Number(b.valor || 0)) * ordem.dir);
+    if (ordem.chave === "data_movimento") res.sort((a, b) => (new Date(a.data_movimento || a.data || 0).getTime() - new Date(b.data_movimento || b.data || 0).getTime()) * ordem.dir);
+    return res;
+  }, [movimentos, filtro, filtroRapido, ordem, filterConfig, filtroConta, filtroContaTipo, filtroMes, contas]);
 
-  const mudarBusca = (v) => { setSearch(v); setPagina(1); };
-  const mudarFiltro = (f) => { setActiveFilter(f); setPagina(1); };
+  const { visiveis: movimentosPaginados, ...pag } = usePaginacao({ items: filtrados, tamanhoInicial: POR_PAGINA });
 
-  const totalPaginas = Math.max(1, Math.ceil(filtered.length / POR_PAGINA));
-  const paginaAtual = Math.min(pagina, totalPaginas);
-  const inicioMov = (paginaAtual - 1) * POR_PAGINA;
-  const movimentosPaginados = filtered.slice(inicioMov, inicioMov + POR_PAGINA);
-  const paginasVisiveis = [];
-  for (let n = 1; n <= totalPaginas; n++) {
-    if (n === 1 || n === totalPaginas || (n >= paginaAtual - 1 && n <= paginaAtual + 1)) paginasVisiveis.push(n);
-  }
+  const mudarTermo = (v) => { setFiltro((f) => ({ ...f, termo: v })); pag.setPagina(1); };
+  const mudarFiltroRapido = (v) => { setFiltroRapido(v); pag.setPagina(1); };
+  const mudarConta = (v) => { setFiltroConta(v); setFiltroContaTipo(""); pag.setPagina(1); };
+  const mudarMes = (v) => { setFiltroMes(v); pag.setPagina(1); };
+  const filtrarTipoConta = (v) => { setFiltroContaTipo((p) => (p === v ? "" : v)); setFiltroConta(""); pag.setPagina(1); };
+  const limparFiltrosAvancados = () => { setFiltroConta(""); setFiltroContaTipo(""); setFiltroMes(""); pag.setPagina(1); };
+  const temFiltroAvancado = Boolean(filtroConta || filtroContaTipo || filtroMes);
 
   const contasAtivas = contas.filter((c) => c.ativo !== false);
   const contasPorId = Object.fromEntries(contas.map((c) => [String(c.id), c]));
@@ -223,18 +291,21 @@ export default function TesourariaTab() {
     return lista;
   }, [form.tipo, categoriasUsadas]);
 
-  const resumoPorConta = contasAtivas.map((c) => {
-    const ms = movimentos.filter((m) => String(m.conta_bancaria_id) === String(c.id));
-    const entradas = ms.filter((m) => m.tipo === "entrada").reduce((s, m) => s + Number(m.valor || 0), 0);
-    const saidas = ms.filter((m) => m.tipo === "saida" || (m.tipo === "transferencia" && String(m.conta_destino_id) !== String(c.id))).reduce((s, m) => s + Number(m.valor || 0), 0);
-    const ultimo = movimentos
-      .filter((m) => String(m.conta_bancaria_id) === String(c.id))
-      .sort((a, b) => new Date(b.data_movimento || 0) - new Date(a.data_movimento || 0))[0];
-    return { ...c, entradas, saidas, ultimo };
-  });
+  const saldoCaixa = contasAtivas.filter((c) => c.tipo_conta === "caixa").reduce((s, c) => s + Number(c.saldo_atual || 0), 0);
+  const saldoBanco = contasAtivas.filter((c) => c.tipo_conta !== "caixa").reduce((s, c) => s + Number(c.saldo_atual || 0), 0);
+  const aReceber = Number(dividasResumo?.total || 0);
 
-  const abrirNovo = () => {
-    setForm(initialForm);
+  const fmt = (v) => Math.round(Number(v || 0)).toLocaleString("pt-AO");
+  const kpis = [
+    { key: "caixa", icon: "account_balance_wallet", label: "Saldo de Caixa", valor: fmt(saldoCaixa), sufixo: "Kz", icone: "bg-warning/10 text-warning", cor: "text-foreground", sufixoCor: "text-muted-foreground" },
+    { key: "banco", icon: "account_balance", label: "Saldo Bancário", valor: fmt(saldoBanco), sufixo: "Kz", icone: "bg-primary/10 text-primary", cor: "text-foreground", sufixoCor: "text-muted-foreground" },
+    { key: "saidas", icon: "trending_down", label: "Saídas do Mês", valor: fmt(resumo.saidasMes), sufixo: "Kz", icone: "bg-error/10 text-error", cor: "text-error", sufixoCor: "text-error" },
+    { key: "receber", icon: "trending_up", label: "A Receber", valor: fmt(aReceber), sufixo: "Kz", icone: "bg-success/10 text-success", cor: "text-success", sufixoCor: "text-success" },
+  ];
+
+  const abrirNovo = (tipo = "saida") => {
+    const tipoInicial = typeof tipo === "string" ? tipo : "saida";
+    setForm({ ...initialForm, tipo: tipoInicial });
     setNovosAnexos([]);
     setModalNovo(true);
   };
@@ -377,160 +448,195 @@ export default function TesourariaTab() {
   };
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap justify-end gap-3">
-        <button onClick={handleExportar} disabled={movimentos.length === 0} className="bg-surface-variant text-on-surface border border-outline-variant px-4 py-2 rounded font-mono flex items-center gap-2 hover:border-primary hover:text-primary transition-all text-[11px] uppercase tracking-wider disabled:opacity-50 disabled:pointer-events-none">
-          <Icon name="download" className="text-[16px]" /> Exportar Excel
+    <div className="space-y-4">
+      <div className="flex flex-wrap justify-end gap-2.5">
+        <button
+          type="button"
+          onClick={handleExportar}
+          disabled={movimentos.length === 0}
+          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 text-sm font-medium text-foreground transition-colors hover:bg-muted/60 disabled:pointer-events-none disabled:opacity-50"
+        >
+          <Icon name="download" className="text-base" /> Exportar Excel
         </button>
-        <button onClick={abrirNovo} className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium shadow-sm hover:bg-primary/90 transition-colors ">
-          <Icon name="add" className="text-[16px]" /> Novo Movimento
+        <button
+          type="button"
+          onClick={() => abrirNovo("entrada")}
+          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-success/30 bg-success/10 px-4 text-sm font-semibold text-success transition-colors hover:bg-success/15"
+        >
+          <Icon name="add" className="text-base" /> Novo Recebimento
+        </button>
+        <button
+          type="button"
+          onClick={() => abrirNovo("saida")}
+          className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+        >
+          <Icon name="add" className="text-base" /> Novo Pagamento
         </button>
       </div>
 
-      <section className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
-        <KpiCard icon="account_balance" label="Saldo Total" value={formatKz(resumo.saldoTotal)} iconVariant="primary" />
-        <KpiCard icon="trending_up" label="Entradas do Mês" value={formatKz(resumo.entradasMes)} iconVariant="success" />
-        <KpiCard icon="trending_down" label="Saídas do Mês" value={formatKz(resumo.saidasMes)} iconVariant="error" />
-        <KpiCard icon="today" label="Movimentos Hoje" value={resumo.movimentosHoje} iconVariant="info" />
+      <section className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5" aria-label="Indicadores de tesouraria">
+        {kpis.map((k) => (
+          <div key={k.key} className="flex items-center gap-3.5 rounded-xl border border-border bg-card p-4 shadow-[0_2px_4px_rgba(0,0,0,0.02)]">
+            <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-xl ${k.icone}`}>
+              <Icon name={k.icon} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold leading-tight text-muted-foreground">{k.label}</p>
+              <p className={`truncate text-xl font-black leading-tight tabular-nums tracking-tight sm:text-2xl ${k.cor}`}>
+                {k.valor}
+                {k.sufixo && <span className={`ml-1 text-xs font-bold ${k.sufixoCor}`}>{k.sufixo}</span>}
+              </p>
+            </div>
+          </div>
+        ))}
       </section>
 
-      {resumoPorConta.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {resumoPorConta.map((c) => (
-            <Card key={c.id} className="hover-lift">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <Icon name="account_balance" className="text-primary text-[18px]" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-foreground truncate">{c.banco_nome || "Conta"}</p>
-                      <p className="text-[10px] text-muted-foreground truncate">{c.tipo_conta === "caixa" ? "Dinheiro em espécie" : `${c.numero_conta ? `Conta ${c.numero_conta}` : "—"}${c.iban ? ` · ${c.iban}` : ""}`}</p>
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-base font-bold text-foreground">{formatKz(c.saldo_atual)}</p>
-                    <p className="text-[9px] text-muted-foreground uppercase">Saldo</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="rounded-lg bg-emerald-500/10 p-2.5">
-                    <p className="text-[9px] font-bold text-emerald-700 uppercase">Entradas</p>
-                    <p className="text-sm font-bold text-emerald-700">{formatKz(c.entradas)}</p>
-                  </div>
-                  <div className="rounded-lg bg-error/10 p-2.5">
-                    <p className="text-[9px] font-bold text-error uppercase">Saídas</p>
-                    <p className="text-sm font-bold text-error">{formatKz(c.saidas)}</p>
-                  </div>
-                </div>
-                {c.ultimo && (
-                  <p className="text-[10px] text-muted-foreground mt-3 truncate">
-                    Último: <span className="font-semibold text-foreground">{c.ultimo.descricao}</span> · {formatKz(c.ultimo.valor)} · {formatData(c.ultimo.data_movimento)}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-border">
+        {abas.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setAba?.(t.id)}
+            aria-pressed={aba === t.id}
+            className={`${tabClsBase} ${aba === t.id ? tabClsAtiva : tabClsInativa}`}
+          >
+            <Icon name={t.icon} className="text-base" />
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {aba === "movimentos" ? (
+        <>
+      <Ledger rotulo="Movimentos de tesouraria ledger">
+        <LedgerHeader
+          titulo="Movimentos"
+          subtitulo={`${pag.total} de ${movimentos.length} movimentos`}
+          onToggleFiltros={() => setFiltrosAbertos((v) => !v)}
+          filtrosAbertos={filtrosAbertos}
+        />
+        {filtrosAbertos && (
+          <FilterRow
+            campo={filtro.campo}
+            setCampo={(v) => setFiltro((f) => ({ ...f, campo: v }))}
+            campos={CAMPOS.map(({ value, label }) => ({ value, label }))}
+            operador={filtro.operador}
+            setOperador={(v) => setFiltro((f) => ({ ...f, operador: v }))}
+            termo={filtro.termo}
+            setTermo={mudarTermo}
+            aoLimpar={() => { setFiltro((f) => ({ ...f, termo: "" })); pag.setPagina(1); }}
+            placeholder="Pesquisar por descrição, referência ou categoria..."
+          />
+        )}
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2">
+          {filterConfig.map((f) => (
+            <button
+              key={f.value}
+              type="button"
+              onClick={() => mudarFiltroRapido(f.value)}
+              aria-pressed={filtroRapido === f.value}
+              className={`${pillBase} ${filtroRapido === f.value ? pillAtiva : pillInativa}`}
+            >
+              <Icon name={f.icon} className="text-sm" /> {f.label}
+              <span className="text-[11px] text-muted-foreground tabular-nums">{f.count}</span>
+            </button>
           ))}
+          <div className="ml-auto flex flex-wrap items-center gap-1.5">
+            <select
+              value={filtroConta}
+              onChange={(e) => mudarConta(e.target.value)}
+              className="h-8 rounded-lg border border-border bg-card px-2 text-xs font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+              aria-label="Filtrar por conta"
+            >
+              <option value="">Todas as contas</option>
+              {contasAtivas.map((c) => (
+                <option key={c.id} value={c.id}>{rotuloConta(c)}</option>
+              ))}
+            </select>
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Icon name="calendar_month" className="text-base" />
+              <input
+                type="month"
+                value={filtroMes}
+                onChange={(e) => mudarMes(e.target.value)}
+                className="h-8 rounded-lg border border-border bg-card px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+                aria-label="Filtrar por mês"
+              />
+            </label>
+            {temFiltroAvancado && (
+              <button type="button" onClick={limparFiltrosAvancados} className="h-8 rounded-lg px-2 text-xs font-medium text-primary hover:underline">
+                Limpar
+              </button>
+            )}
+          </div>
         </div>
-      )}
 
-      <FilterBar
-        search={search}
-        onSearchChange={mudarBusca}
-        placeholder="Pesquisar por descrição, referência ou categoria..."
-        filters={filterConfig}
-        activeFilter={activeFilter}
-        onFilterChange={mudarFiltro}
-        count={total}
-        countLabel="movimentos"
-      />
-
-      {loading ? <ListSkeleton count={6} /> : (
-        <div className="space-y-3">
-          {movimentosPaginados.map((m) => {
-            const tc = tipoCfg[m.tipo] || { label: m.tipo, variant: "outline", icon: "swap_horiz" };
-            const ec = estadoCfg[m.estado] || { label: m.estado, variant: "outline" };
-            const isEntrada = m.tipo === "entrada";
-            const isSaida = m.tipo === "saida";
-            const conta = contasPorId[String(m.conta_bancaria_id)];
-            return (
-              <Card key={m.id} className="hover-lift">
-                <CardContent className="p-5">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-4 min-w-0">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${isEntrada ? "bg-emerald-500/10" : isSaida ? "bg-error/10" : "bg-primary/10"}`}>
-                        <Icon name={tc.icon} className={`text-[20px] ${isEntrada ? "text-emerald-600" : isSaida ? "text-error" : "text-primary"}`} />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant={tc.variant} className="text-[10px]">
-                            <Icon name={tc.icon} className="text-[10px] mr-1" /> {tc.label}
-                          </Badge>
-                          <Badge variant={ec.variant} className="text-[10px]">{ec.label}</Badge>
-                          <span className="font-bold text-sm text-foreground truncate">{m.descricao || m.categoria || "—"}</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground truncate mt-0.5">
-                          {m.categoria || "—"}
-                          {conta ? ` • ${rotuloConta(conta)}` : ""}
-                          {m.metodo_pagamento ? ` • ${m.metodo_pagamento}` : ""}
-                          {m.referencia ? ` • Ref: ${m.referencia}` : ""}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0 flex items-center gap-2">
-                      <div>
-                        <p className={`text-lg font-bold ${isEntrada ? "text-emerald-600" : isSaida ? "text-error" : "text-foreground"}`}>
-                          {isEntrada ? "+" : isSaida ? "−" : ""}{formatKz(m.valor)}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground">{formatData(m.data_movimento || m.data)}</p>
-                      </div>
-                      <Button variant="ghost" size="sm" onClick={() => setAnexosMovimento(m)} title="Recibos / Anexos" className="relative">
-                        <Icon name="attach_file" className="text-[16px] text-muted-foreground" />
-                        {m.anexos?.length > 0 && (
-                          <span className="absolute top-0.5 right-0 min-w-[15px] h-[15px] px-1 rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center">
-                            {m.anexos.length}
-                          </span>
-                        )}
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => setEliminarItem(m)} title="Remover"><Icon name="delete" className="text-[16px] text-destructive" /></Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-          {filtered.length === 0 && (
-            <div className="text-center p-12 text-muted-foreground">
-              <Icon name="savings" className="text-4xl block mx-auto mb-2 opacity-30" />
-              <p className="font-medium">Nenhum movimento encontrado</p>
-            </div>
-          )}
-          {filtered.length > 0 && totalPaginas > 1 && (
-            <div className="flex items-center justify-between gap-3 pt-1 flex-wrap">
-              <p className="text-xs text-muted-foreground font-mono">
-                Mostrando {inicioMov + 1}–{Math.min(inicioMov + POR_PAGINA, filtered.length)} de {filtered.length}
-              </p>
-              <div className="flex items-center gap-1.5">
-                <Button type="button" variant="outline" size="sm" disabled={paginaAtual <= 1} onClick={() => setPagina((p) => Math.max(1, p - 1))} className="h-8 w-8 p-0" title="Anterior">
-                  <Icon name="chevron_left" className="text-[14px]" />
-                </Button>
-                {paginasVisiveis.map((n, i) => (
-                  <span key={n} className="flex items-center gap-1.5">
-                    {i > 0 && paginasVisiveis[i - 1] !== n - 1 && <span className="text-muted-foreground text-xs">…</span>}
-                    <Button type="button" variant={n === paginaAtual ? "default" : "outline"} size="sm" onClick={() => setPagina(n)} className="h-8 w-8 p-0 text-xs">
-                      {n}
-                    </Button>
-                  </span>
-                ))}
-                <Button type="button" variant="outline" size="sm" disabled={paginaAtual >= totalPaginas} onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} className="h-8 w-8 p-0" title="Seguinte">
-                  <Icon name="chevron_right" className="text-[14px]" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+        {loading ? (
+          <div className="p-4"><ListSkeleton count={6} /></div>
+        ) : (
+          <>
+            <LedgerTable>
+              <thead>
+                <tr className="border-b border-border">
+                  <LedgerTh onSort={() => setOrdem((p) => (p.chave === "data_movimento" ? { chave: "data_movimento", dir: -p.dir } : { chave: "data_movimento", dir: 1 }))} ativo={ordem.chave === "data_movimento"}>Data</LedgerTh>
+                  <LedgerTh onSort={() => setOrdem((p) => (p.chave === "descricao" ? { chave: "descricao", dir: -p.dir } : { chave: "descricao", dir: 1 }))} ativo={ordem.chave === "descricao"}>Descrição</LedgerTh>
+                  <LedgerTh>Conta</LedgerTh>
+                  <LedgerTh>Tipo</LedgerTh>
+                  <LedgerTh onSort={() => setOrdem((p) => (p.chave === "valor" ? { chave: "valor", dir: -p.dir } : { chave: "valor", dir: 1 }))} ativo={ordem.chave === "valor"} className="text-right">Valor (Kz)</LedgerTh>
+                  <LedgerTh className="w-10" />
+                </tr>
+              </thead>
+              <tbody>
+                {movimentosPaginados.map((m) => {
+                  const tc = tipoCfg[m.tipo] || { label: m.tipo, tom: "neutral", icon: "swap_horiz" };
+                  const isEntrada = m.tipo === "entrada";
+                  const isSaida = m.tipo === "saida";
+                  const conta = contasPorId[String(m.conta_bancaria_id)];
+                  return (
+                    <LedgerTr key={m.id}>
+                      <LedgerTd className="tabular-nums whitespace-nowrap text-muted-foreground">{formatData(m.data_movimento || m.data)}</LedgerTd>
+                      <LedgerTd className="max-w-56">
+                        <IdCell
+                          id={m.descricao || m.categoria || "—"}
+                          meta={[m.categoria, m.referencia && `Ref: ${m.referencia}`].filter(Boolean).join(" · ") || "—"}
+                        />
+                      </LedgerTd>
+                      <LedgerTd className="max-w-40"><span className="block truncate text-muted-foreground">{conta ? rotuloConta(conta) : "—"}</span></LedgerTd>
+                      <LedgerTd>
+                        <StatusBadge tom="neutral" className={tipoBadge[m.tipo]}>
+                          <Icon name={tc.icon} className="text-[11px]" /> {tc.label}
+                        </StatusBadge>
+                      </LedgerTd>
+                      <LedgerTd className="tabular-nums whitespace-nowrap text-right">
+                        <span className={`font-bold ${isEntrada ? "text-success" : isSaida ? "text-error" : "text-foreground"}`}>
+                          {isEntrada ? "+" : isSaida ? "−" : ""}{Math.round(Number(m.valor || 0)).toLocaleString("pt-AO")}
+                        </span>
+                      </LedgerTd>
+                      <LedgerTd>
+                        <RowMenu
+                          ariaLabel="Ações do movimento"
+                          itens={[
+                            { icone: "attach_file", rotulo: m.anexos?.length > 0 ? `Anexos (${m.anexos.length})` : "Recibos / Anexos", onClick: () => setAnexosMovimento(m) },
+                            { icone: "delete", rotulo: "Remover", danger: true, onClick: () => setEliminarItem(m) },
+                          ]}
+                        />
+                      </LedgerTd>
+                    </LedgerTr>
+                  );
+                })}
+              </tbody>
+            </LedgerTable>
+            {pag.total === 0 && (
+              movimentos.length === 0
+                ? <LedgerEmpty icone="savings">Nenhum movimento registado</LedgerEmpty>
+                : <LedgerEmpty icone="search_off">Nenhum movimento corresponde ao filtro</LedgerEmpty>
+            )}
+            <Paginacao {...pag} label="movimentos" />
+          </>
+        )}
+      </Ledger>
+        </>
+      ) : children}
 
       <Modal
         open={modalNovo}

@@ -1,60 +1,66 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
 
-import { listar as listarOrcamentos } from "@/services/orcamentos";
-import { listar as listarClientes } from "@/services/clientes";
-import { listar as listarMateriais, extrato, movimentar } from "@/services/materiais";
 import { listar as listarFaturas } from "@/services/faturacao";
 import { listarOrdens } from "@/services/producao";
-import { listar as listarFornecedores } from "@/services/fornecedores";
-import { getUsuario } from "@/services/auth";
-import Icon from "@/components/Icon";
-import Modal from "@/components/Modal";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
-import { PieChart, Pie, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import ComboKpiCard from "@/components/ui/ComboKpiCard";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { useToast } from "@/components/Toast";
-import { KPIGridSkeleton, CardSkeleton, ListSkeleton } from "@/components/Skeleton";
-import FornecedorSelect from "@/components/estoque/FornecedorSelect";
-import NumeroInput from "@/components/ui/NumeroInput";
+import { listar as listarMateriais } from "@/services/materiais";
+import { listar as listarPedidos } from "@/services/pedidos";
+import { listar as listarMaquinas } from "@/services/maquinas";
+import { listarMovimentos } from "@/services/tesouraria";
+import {
+  ResponsiveContainer,
+  ComposedChart,
+  Bar,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+} from "recharts";
+import {
+  LuCalendar,
+  LuChevronDown,
+  LuChartColumn,
+  LuCog,
+  LuShoppingCart,
+  LuBox,
+  LuCreditCard,
+  LuOctagonAlert,
+  LuTriangleAlert,
+  LuBriefcase,
+  LuUserPlus,
+  LuFilePlus2,
+} from "react-icons/lu";
 
-const inputCls =
-  "w-full px-3 py-2.5 bg-background border border-input rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/30 transition-all";
+const DIA_MS = 86400000;
 
 function formatNum(v) {
   return Number(v || 0).toLocaleString("pt-AO");
 }
 
-function formatHora(v) {
-  const d = new Date(v);
-  if (isNaN(d.getTime())) return "—";
-  return (
-    d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) +
-    " " +
-    d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
-  );
+function dataFatura(f) {
+  const d = new Date(f.data_emissao || f.data || f.createdAt);
+  return isNaN(d.getTime()) ? null : d;
 }
 
-const ORDEM_ESTADOS = {
-  pendente: { label: "Pendente", variant: "secondary" },
-  aprovado: { label: "Aprovado", variant: "info" },
-  em_producao: { label: "Em Produção", variant: "warning" },
-  finalizado: { label: "Finalizado", variant: "success" },
-  entregue: { label: "Entregue", variant: "success" },
-  cancelado: { label: "Cancelado", variant: "outline" },
-  atrasado: { label: "Atrasado", variant: "destructive" },
-};
+function dataOrdem(o) {
+  const d = new Date(o.createdAt);
+  return isNaN(d.getTime()) ? null : d;
+}
 
-function parseDataEntrada(o) {
-  if (o.data_entrada) {
-    const [y, m, d] = String(o.data_entrada).split("-").map(Number);
-    if (y && m) return new Date(y, m - 1, d);
-  }
-  if (o.createdAt) return new Date(o.createdAt);
-  return null;
+function dataPedido(p) {
+  const d = p.data_pedido ? new Date(p.data_pedido) : p.createdAt ? new Date(p.createdAt) : null;
+  return d && !isNaN(d.getTime()) ? d : null;
+}
+
+function parseDataISO(s) {
+  if (!s) return null;
+  const [y, m, d] = String(s).split("-").map(Number);
+  if (!y || !m) return null;
+  return new Date(y, m - 1, d);
 }
 
 function parseDataEntrega(o) {
@@ -64,897 +70,528 @@ function parseDataEntrega(o) {
   return new Date(y, m - 1, d);
 }
 
-function agregarOrdens(ordens, periodo) {
-  const hoje = new Date();
-  if (periodo === "semanal") {
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(hoje);
-      d.setDate(hoje.getDate() - (6 - i));
-      const label = d.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "");
-      const value = ordens.filter((o) => {
-        const od = parseDataEntrada(o);
-        return od && od.toDateString() === d.toDateString();
-      }).length;
-      return { label, value };
-    });
-  }
-  if (periodo === "anual") {
-    const ano = hoje.getFullYear();
-    return Array.from({ length: 6 }, (_, i) => {
-      const y = ano - (5 - i);
-      return {
-        label: String(y).slice(2),
-        value: ordens.filter((o) => {
-          const od = parseDataEntrada(o);
-          return od && od.getFullYear() === y;
-        }).length,
-      };
-    });
-  }
-  const meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-  const ano = hoje.getFullYear();
-  return meses.map((m, i) => ({
-    label: m,
-    value: ordens.filter((o) => {
-      const od = parseDataEntrada(o);
-      return od && od.getFullYear() === ano && od.getMonth() === i;
-    }).length,
-  }));
+function variacao(atual, anterior) {
+  if (!anterior) return null;
+  return Math.round(((atual - anterior) / anterior) * 100);
 }
 
-function BarChart({ dados }) {
-  const max = Math.max(...dados.map((b) => b.value), 1);
+function estaAtrasada(o, ref) {
+  if (!o.data_entrega || o.estado === "finalizado" || o.estado === "entregue") return false;
+  const d = parseDataEntrega(o);
+  return d && d < ref;
+}
+
+/* ═══════════════ Componentes ═══════════════ */
+
+function Kpi({ icon: Icone, chipCls, iconCls, label, value, delta, deltaCls = "text-success", sub }) {
   return (
-    <div className="flex items-end gap-2 h-44">
-      {dados.map((b, i) => (
-        <div key={i} className="group flex flex-1 flex-col items-center justify-end h-full gap-1.5" title={`${b.label}: ${b.value}`}>
-          <span className="text-[10px] font-semibold text-foreground">{b.value}</span>
-          <div className="relative w-full max-w-[34px] flex-1 flex items-end">
-            <div className="absolute inset-0 rounded-full bg-muted/50" aria-hidden="true" />
-            <div
-              className="relative w-full rounded-full bg-gradient-to-t from-primary/60 to-primary transition-all duration-500 group-hover:from-primary group-hover:to-primary"
-              style={{ height: `${Math.max((b.value / max) * 100, 4)}%` }}
-            />
+    <div className="flex items-start space-x-3 rounded-xl border border-border bg-card p-3.5 shadow-sm">
+      <div className={cn("mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg", chipCls)}>
+        <Icone className={cn("h-[18px] w-[18px]", iconCls)} />
+      </div>
+      <div className="overflow-hidden">
+        <span className="block text-[11px] font-medium leading-tight text-muted-foreground">{label}</span>
+        <span className="mt-0.5 block truncate text-base font-bold tracking-tight text-foreground">{value}</span>
+        {delta != null ? (
+          <div className={cn("mt-1 flex items-center text-[10px] font-semibold", deltaCls)}>
+            <span>
+              {delta >= 0 ? "↑" : "↓"} {Math.abs(delta)}%
+            </span>
+            <span className="ml-1 font-normal text-muted-foreground">{sub}</span>
           </div>
-          <span className="text-[9px] font-semibold text-muted-foreground uppercase">{b.label}</span>
-        </div>
-      ))}
+        ) : (
+          <div className="mt-1 flex items-center text-[10px] font-normal text-muted-foreground">
+            <span>{sub}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
+function CartaoMarca() {
+  return (
+    <div className="relative flex h-full flex-col justify-between overflow-hidden rounded-xl bg-[#061528] p-5 text-white shadow-sm">
+      <div
+        className="absolute bottom-0 right-0 top-0 w-3/5 bg-cover bg-right opacity-90 mix-blend-luminosity"
+        style={{
+          backgroundImage:
+            "url('https://lh3.googleusercontent.com/aida-public/AB6AXuDhI9g_ceAsrhLbFjXmMlLPfN8mRlghz9NW5U-wsm5i8YaMF3gxR0b96dX0jPiYfu26bWKB8R5L0o5_Ykk4356dkW5TE4m9kRJGZy0N4QfglBIi702terU2jbq0W7pXQ6-PVVGZDORHLbzx6c5ik8n0l2jtA_dXlRU55FyWD1vQdlU532gHL8wsaEvSm9BWKfbqjJP9rgqar3RNxoZAgYjck4NroOiyWDiBgHNp4gYD-h62me317MN4uw')",
+        }}
+      />
+      <div className="absolute inset-0 bg-gradient-to-r from-[#061528] via-[#061528]/90 to-transparent" />
+      <div className="pointer-events-none absolute bottom-0 left-0 h-24 w-24 overflow-hidden">
+        <div className="absolute bottom-0 left-0 h-16 w-16 rounded-tr-3xl bg-blue-600" />
+        <div className="absolute bottom-4 left-6 h-12 w-12 rounded-full bg-amber-500 opacity-90 mix-blend-screen" />
+        <div className="absolute bottom-8 left-0 h-10 w-10 bg-cyan-400" />
+      </div>
+      <div className="relative z-10 space-y-0.5">
+        <h2 className="text-xl font-black leading-tight tracking-tight text-white">Mais controlo.</h2>
+        <h2 className="text-xl font-black leading-tight tracking-tight text-white">Mais eficiência.</h2>
+        <h2 className="text-xl font-black leading-tight tracking-tight text-white">Mais resultados.</h2>
+      </div>
+      <div className="relative z-10">
+        <p className="max-w-[190px] text-[11px] font-medium leading-relaxed text-slate-300">
+          Gestão integrada para a sua oficina de artes gráficas.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+const tooltipStyle = {
+  background: "var(--popover)",
+  border: "1px solid var(--border)",
+  borderRadius: 10,
+  fontSize: 12,
+  color: "var(--foreground)",
+};
+
+/* ═══════════════ Página ═══════════════ */
+
 export default function DashboardPage() {
   const [carregando, setCarregando] = useState(true);
-  const [orcamentos, setOrcamentos] = useState([]);
-  const [clientes, setClientes] = useState([]);
-  const [materiais, setMateriais] = useState([]);
   const [faturas, setFaturas] = useState([]);
   const [ordens, setOrdens] = useState([]);
+  const [materiais, setMateriais] = useState([]);
+  const [pedidos, setPedidos] = useState([]);
+  const [maquinas, setMaquinas] = useState([]);
   const [movimentos, setMovimentos] = useState([]);
-  const [fornecedores, setFornecedores] = useState([]);
-  const [periodo, setPeriodo] = useState("mensal");
-  const [reporModal, setReporModal] = useState({ open: false, material: null });
-  const [reporForm, setReporForm] = useState({ quantidade: "", fornecedor: "", lote: "", observacoes: "" });
-  const [aRepor, setARepor] = useState(false);
-  const [histAberto, setHistAberto] = useState(false);
-  const [histFiltro, setHistFiltro] = useState("");
-  const [histPagina, setHistPagina] = useState(1);
-  const HIST_POR_PAGINA = 8;
-  const [consumoAberto, setConsumoAberto] = useState(false);
-  const [consumoFiltro, setConsumoFiltro] = useState("");
-  const [consumoPagina, setConsumoPagina] = useState(1);
-  const CONSUMO_POR_PAGINA = 10;
-  const { addToast } = useToast();
+  const [periodo, setPeriodo] = useState("mes");
 
-  const nomeUsuario = getUsuario()?.nome || "";
-
-  const carregarDados = () => {
-    Promise.all([
-      listarOrcamentos().catch(() => []),
-      listarClientes({ tipo: "cliente" }).catch(() => []),
-      listarMateriais().catch(() => []),
-      listarFaturas().catch(() => []),
-      listarOrdens().catch(() => []),
-      extrato().catch(() => []),
-      listarFornecedores().catch(() => []),
-    ]).then(([o, c, m, f, p, mv, fo]) => {
-      setOrcamentos(o); setClientes(c); setMateriais(m);
-      setFaturas(f); setOrdens(p); setMovimentos(mv); setFornecedores(fo);
-    }).finally(() => setCarregando(false));
-  };
+  const carregar = useCallback(async () => {
+    try {
+      const [f, o, m, p, ma, mv] = await Promise.all([
+        listarFaturas().catch(() => []),
+        listarOrdens().catch(() => []),
+        listarMateriais().catch(() => []),
+        listarPedidos().catch(() => []),
+        listarMaquinas().catch(() => []),
+        listarMovimentos().catch(() => []),
+      ]);
+      setFaturas(f);
+      setOrdens(o);
+      setMateriais(m);
+      setPedidos(Array.isArray(p) ? p : p?.data || []);
+      setMaquinas(Array.isArray(ma) ? ma : []);
+      setMovimentos(Array.isArray(mv) ? mv : mv?.data || []);
+    } finally {
+      setCarregando(false);
+    }
+  }, []);
 
   useEffect(() => {
-    carregarDados();
-  }, []);
+    carregar();
+  }, [carregar]);
 
   const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
 
-  const hora = hoje.getHours();
-  const saudacao = hora < 12 ? "Bom dia" : hora < 19 ? "Boa tarde" : "Boa noite";
-  const primeiroNome = (nomeUsuario || "Utilizador").trim().split(/\s+/)[0];
-  const dataLongaBruta = hoje.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-  const dataLonga = dataLongaBruta.charAt(0).toUpperCase() + dataLongaBruta.slice(1);
+  const intervalo = (() => {
+    const y = hoje.getFullYear();
+    const m = hoje.getMonth();
+    const d = hoje.getDate();
+    if (periodo === "dia") {
+      const ini = new Date(y, m, d);
+      return { ini, fim: new Date(y, m, d + 1), iniAnt: new Date(y, m, d - 1), fimAnt: ini };
+    }
+    if (periodo === "semana") {
+      const ini = new Date(hoje.getTime() - 6 * DIA_MS);
+      const iniAnt = new Date(ini.getTime() - 7 * DIA_MS);
+      return { ini, fim: new Date(hoje.getTime() + DIA_MS), iniAnt, fimAnt: ini };
+    }
+    if (periodo === "ano") {
+      const ini = new Date(y, 0, 1);
+      return { ini, fim: new Date(y + 1, 0, 1), iniAnt: new Date(y - 1, 0, 1), fimAnt: ini };
+    }
+    const ini = new Date(y, m, 1);
+    return { ini, fim: new Date(y, m + 1, 1), iniAnt: new Date(y, m - 1, 1), fimAnt: ini };
+  })();
 
-  const orcamentosHoje = orcamentos.filter((o) => {
-    const d = o.data_emissao || o.data;
-    return d ? new Date(d).toDateString() === hoje.toDateString() : false;
+  const somarFaturas = (ini, fim) =>
+    faturas.reduce((s, f) => {
+      const dd = dataFatura(f);
+      return dd && dd >= ini && dd < fim ? s + parseFloat(f.total || f.valor || 0) : s;
+    }, 0);
+  const contarOrdens = (ini, fim) =>
+    ordens.filter((o) => {
+      const dd = dataOrdem(o);
+      return dd && dd >= ini && dd < fim;
+    }).length;
+  const somarPedidos = (ini, fim) =>
+    pedidos.reduce((s, p) => {
+      const dd = dataPedido(p);
+      return dd && dd >= ini && dd < fim ? s + Number(p.total || 0) : s;
+    }, 0);
+  const somarSaidas = (ini, fim) =>
+    movimentos.reduce((s, mv) => {
+      if (mv.tipo !== "saida") return s;
+      const dd = parseDataISO(mv.data_movimento);
+      return dd && dd >= ini && dd < fim ? s + Number(mv.valor || 0) : s;
+    }, 0);
+
+  const vendasAtual = somarFaturas(intervalo.ini, intervalo.fim);
+  const vendasAnt = somarFaturas(intervalo.iniAnt, intervalo.fimAnt);
+  const opsAtual = contarOrdens(intervalo.ini, intervalo.fim);
+  const opsAnt = contarOrdens(intervalo.iniAnt, intervalo.fimAnt);
+  const comprasAtual = somarPedidos(intervalo.ini, intervalo.fim);
+  const comprasAnt = somarPedidos(intervalo.iniAnt, intervalo.fimAnt);
+  const despesasAtual = somarSaidas(intervalo.ini, intervalo.fim);
+  const despesasAnt = somarSaidas(intervalo.iniAnt, intervalo.fimAnt);
+  const deltaVendas = variacao(vendasAtual, vendasAnt);
+  const deltaOps = variacao(opsAtual, opsAnt);
+  const deltaCompras = variacao(comprasAtual, comprasAnt);
+  const deltaDespesas = variacao(despesasAtual, despesasAnt);
+
+  const atrasadas = ordens.filter((o) => estaAtrasada(o, hoje));
+  const emProducao = ordens.filter((o) => o.estado === "em_producao").length;
+  const concluidas = ordens.filter((o) => o.estado === "finalizado" || o.estado === "entregue").length;
+  const preparacao = ordens.filter((o) => o.estado === "pendente" || o.estado === "aprovado").length;
+  const materiaisAlerta = materiais.filter(
+    (m) => m.status === "repor" || m.status === "esgotado" || m.status === "critico"
+  );
+
+  const faturasPorPagar = faturas.filter((f) => {
+    const total = Number(f.total || 0);
+    const pago = Number(f.valor_pago || 0);
+    return total > 0 && pago < total && f.estado !== "paga";
   });
-  const totalDia = orcamentosHoje.reduce((s, o) => s + parseFloat(o.total_com_iva ?? o.total ?? 0), 0);
-  const aprovados = orcamentos.filter((o) => o.estado === "aprovado").length;
-  const producao = ordens.filter((o) => o.estado === "em_producao").length;
-  const concluidos = ordens.filter((o) => o.estado === "finalizado" || o.estado === "entregue").length;
-  const faturacaoMes = faturas.filter((f) => {
-    const d = new Date(f.data_emissao);
-    return d.getMonth() === hoje.getMonth() && d.getFullYear() === hoje.getFullYear();
-  });
-  const totalFaturacao = faturacaoMes.reduce((s, f) => s + parseFloat(f.total || f.valor || 0), 0);
-  const atrasados = ordens.filter((o) => {
-    if (!o.data_entrega || o.estado === "entregue" || o.estado === "finalizado") return false;
-    const d = parseDataEntrega(o);
-    return d && d < hoje;
+  const saldoPorPagar = faturasPorPagar.reduce(
+    (s, f) => s + (Number(f.total || 0) - Number(f.valor_pago || 0)),
+    0
+  );
+  const faturasVencidas = faturasPorPagar.filter((f) => {
+    const v = parseDataISO(f.data_vencimento);
+    return v && v < hoje;
   }).length;
 
-  const faturacaoHoje = faturas.filter((f) => {
-    const d = new Date(f.data_emissao);
-    return !isNaN(d.getTime()) && d.toDateString() === hoje.toDateString();
-  });
-  const totalFaturamentoDia = faturacaoHoje.reduce((s, f) => s + parseFloat(f.total || f.valor || 0), 0);
+  const maquinasManutencao = maquinas.filter(
+    (m) => m.estado === "manutencao" || m.estado === "avariada"
+  );
 
-  const clientesDoDia = clientes.filter((c) => {
-    const d = c.dataCadastro ? new Date(c.dataCadastro) : null;
-    return d && !isNaN(d.getTime()) && d.toDateString() === hoje.toDateString();
+  /* ─── Donut: estado das ordens ─── */
+  const CIRC = 2 * Math.PI * 38;
+  const totalSeg = Math.max(1, concluidas + emProducao + preparacao + atrasadas.length);
+  let accSeg = 0;
+  const segmentosDonut = [
+    { label: "Concluídas", value: concluidas, color: "#10b981" },
+    { label: "Em produção", value: emProducao, color: "#0ea5e9" },
+    { label: "Em preparação", value: preparacao, color: "#f59e0b" },
+    { label: "Atrasadas", value: atrasadas.length, color: "#ef4444" },
+  ].map((s) => {
+    const len = (s.value / totalSeg) * CIRC;
+    const offset = -(accSeg / totalSeg) * CIRC;
+    accSeg += s.value;
+    return { ...s, len, offset };
   });
+
+  /* ─── Gráfico 6 meses: vendas vs produção ─── */
+  const dadosMeses = (() => {
+    const arr = [];
+    for (let i = 5; i >= 0; i--) {
+      const ini = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+      const fim = new Date(hoje.getFullYear(), hoje.getMonth() - i + 1, 1);
+      const vendas = faturas.reduce((s, f) => {
+        const dd = dataFatura(f);
+        return dd && dd >= ini && dd < fim ? s + parseFloat(f.total || f.valor || 0) : s;
+      }, 0);
+      const ops = ordens.filter((o) => {
+        const dd = dataOrdem(o);
+        return dd && dd >= ini && dd < fim;
+      }).length;
+      arr.push({
+        label: ini.toLocaleDateString("pt-PT", { month: "short" }).replace(".", ""),
+        vendas,
+        ops,
+      });
+    }
+    return arr;
+  })();
+
+  /* ─── Alertas ─── */
+  const alertas = [
+    faturasPorPagar.length > 0 && {
+      icon: faturasVencidas > 0 ? LuOctagonAlert : LuTriangleAlert,
+      tone: faturasVencidas > 0 ? "bg-error/10 text-error" : "bg-warning/10 text-warning",
+      titulo: `${faturasPorPagar.length} ${faturasPorPagar.length === 1 ? "Factura" : "Facturas"} por pagar`,
+      desc: `${formatNum(saldoPorPagar)} Kz em dívida${faturasVencidas > 0 ? ` · ${faturasVencidas} vencida${faturasVencidas === 1 ? "" : "s"}` : ""}`,
+    },
+    atrasadas.length > 0 && { icon: LuOctagonAlert, tone: "bg-error/10 text-error", titulo: `${atrasadas.length} ${atrasadas.length === 1 ? "Ordem" : "Ordens"} de produção atrasadas`, desc: "Rever planeamento" },
+    materiaisAlerta.length > 0 && { icon: LuTriangleAlert, tone: "bg-warning/10 text-warning", titulo: `${materiaisAlerta.length} ${materiaisAlerta.length === 1 ? "Artigo" : "Artigos"} com stock mínimo`, desc: "Necessitam reposição" },
+    maquinasManutencao.length > 0 && { icon: LuCog, tone: "bg-primary/10 text-primary", titulo: `${maquinasManutencao.length} ${maquinasManutencao.length === 1 ? "Equipamento" : "Equipamentos"} em manutenção`, desc: maquinasManutencao[0]?.nome_comum || maquinasManutencao[0]?.nome || "Verificar estado" },
+  ].filter(Boolean);
+
+  const mesLabel = hoje.toLocaleDateString("pt-PT", { month: "long", year: "numeric" });
+  const mesAtual = mesLabel.charAt(0).toUpperCase() + mesLabel.slice(1);
 
   const kpis = [
-    {
-      icon: "request_quote",
-      title: "Orçamentos",
-      subtitle: "Área Comercial",
-      stats: [
-        { label: "Orçamentos do Dia", value: orcamentosHoje.length, sublabel: `Kz ${totalDia.toLocaleString()}` },
-        { label: "Aprovados", value: aprovados, sublabel: `${orcamentos.length} total` },
-      ],
-      iconVariant: "primary",
-    },
-    {
-      icon: "task_alt",
-      title: "Trabalhos",
-      subtitle: "Produção",
-      stats: [
-        { label: "Concluídos", value: concluidos, sublabel: `${ordens.length} ordens` },
-        { label: "Em Atraso", value: atrasados, sublabel: atrasados > 0 ? "Atenção" : "OK", iconVariant: atrasados > 0 ? "error" : "success" },
-      ],
-      iconVariant: atrasados > 0 ? "error" : "success",
-    },
-    {
-      icon: "paid",
-      title: "Faturação",
-      subtitle: "Comercial",
-      stats: [
-        { label: "Mensal", value: `Kz ${totalFaturacao.toLocaleString()}`, sublabel: `${faturacaoMes.length} faturas` },
-        { label: "do Dia", value: `Kz ${totalFaturamentoDia.toLocaleString()}`, sublabel: `${faturacaoHoje.length} faturas` },
-      ],
-      iconVariant: "primary",
-    },
-    {
-      icon: "groups",
-      title: "Clientes",
-      subtitle: "Cadastros",
-      stats: [
-        { label: "Ativos", value: clientes.length, sublabel: "cadastrados" },
-        { label: "do Dia", value: clientesDoDia.length, sublabel: "novos hoje" },
-      ],
-      iconVariant: "secondary",
-    },
+    { icon: LuChartColumn, chipCls: "bg-primary/10", iconCls: "text-primary", label: "Vendas", value: `${formatNum(vendasAtual)} Kz`, delta: deltaVendas, sub: "vs. mês anterior" },
+    { icon: LuCog, chipCls: "bg-error/10", iconCls: "text-error", label: "Produção (OP)", value: formatNum(opsAtual), delta: deltaOps, sub: "ordens concluídas" },
+    { icon: LuShoppingCart, chipCls: "bg-warning/10", iconCls: "text-warning", label: "Compras", value: `${formatNum(comprasAtual)} Kz`, delta: deltaCompras, sub: "em materiais" },
+    { icon: LuBox, chipCls: "bg-success/10", iconCls: "text-success", label: "Stocks", value: formatNum(materiais.length), delta: null, sub: "artigos activos" },
+    { icon: LuCreditCard, chipCls: "bg-error/10", iconCls: "text-error", label: "Despesas", value: `${formatNum(despesasAtual)} Kz`, delta: deltaDespesas, deltaCls: "text-error", sub: "vs. mês anterior" },
   ];
 
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const atividades = useMemo(() => {
-    return ordens.slice(0, 3).map((o) => ({
-      name: `Ordem #${o.numero || o.id}`,
-      action: `estado: ${(o.estado || "").replace("_", " ")}`,
-      tag: o.produto || "Produção",
-      description: o.observacoes || `Cliente #${o.cliente_id} — ${o.quantidade || 0} unidades`,
-      time: o.createdAt ? `${Math.floor((now - new Date(o.createdAt)) / 60000)} min atrás` : "Hoje",
-    }));
-  }, [ordens, now]);
-
-  const ordensOrdenadas = useMemo(
-    () => [...ordens].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)),
-    [ordens]
-  );
-
-  const histFiltradas = useMemo(() => {
-    const q = (histFiltro || "").trim().toLowerCase();
-    return ordensOrdenadas.filter((o) => {
-      if (q && !String(`${o.numero} ${o.produto} ${o.estado}`).toLowerCase().includes(q)) return false;
-      return true;
-    });
-  }, [ordensOrdenadas, histFiltro]);
-
-  const histPaginas = Math.max(1, Math.ceil(histFiltradas.length / HIST_POR_PAGINA));
-  const histVisiveis = histFiltradas.slice((histPagina - 1) * HIST_POR_PAGINA, histPagina * HIST_POR_PAGINA);
-
-  const dadosGrafico = agregarOrdens(ordens, periodo);
-
-  const materiaisBaixo = materiais
-    .filter((m) => m.status === "repor" || m.status === "esgotado" || m.status === "critico")
-    .sort((a, b) => (a.estoque_disponivel || 0) - (b.estoque_disponivel || 0))
-    .slice(0, 3);
-
-  const statusMateriais = useMemo(() => {
-    let repor = 0;
-    let critico = 0;
-    let bom = 0;
-    materiais.forEach((m) => {
-      if (m.status === "esgotado" || m.status === "critico") {
-        critico++;
-      } else if (m.status === "repor") {
-        repor++;
-      } else {
-        bom++;
-      }
-    });
-    return [
-      { name: "Crítico", value: critico, fill: "var(--error)" },
-      { name: "A Repor", value: repor, fill: "var(--warning)" },
-      { name: "Bom", value: bom, fill: "var(--success)" }
-    ];
-  }, [materiais]);
-
-  const totalMateriais = statusMateriais.reduce((sum, item) => sum + item.value, 0);
-
-  const saidasMes = movimentos.filter((mv) => {
-    const d = new Date(mv.createdAt);
-    return mv.tipo === "saida" && d.getMonth() === hoje.getMonth() && d.getFullYear() === hoje.getFullYear();
-  });
-  const consumoMes = saidasMes.reduce((s, mv) => s + (parseFloat(mv.quantidade) || 0), 0);
-  const saidasTotal = movimentos.filter((mv) => mv.tipo === "saida").length;
-
-  const consumoRecente = movimentos
-    .filter((mv) => mv.tipo === "saida")
-    .slice(0, 5)
-    .map((mv) => ({
-      nome: mv.material?.nome || "—",
-      detalhe: `${Number(mv.quantidade)} ${mv.material?.unidade || "un"}`,
-      hora: formatHora(mv.createdAt),
-    }));
-
-  const saidasOrdenadas = useMemo(
-    () => movimentos.filter((mv) => mv.tipo === "saida").sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)),
-    [movimentos]
-  );
-
-  const consumoFiltradas = useMemo(() => {
-    const q = (consumoFiltro || "").trim().toLowerCase();
-    return saidasOrdenadas.filter((mv) => {
-      if (q) {
-        const material = (mv.material?.nome || "").toLowerCase();
-        const motivo = (mv.motivo || "").toLowerCase();
-        const lote = (mv.lote || "").toLowerCase();
-        const fornecedor = (mv.fornecedor_nome || "").toLowerCase();
-        const quantidade = String(mv.quantidade || "");
-        if (!material.includes(q) && !motivo.includes(q) && !lote.includes(q) && !fornecedor.includes(q) && !quantidade.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [saidasOrdenadas, consumoFiltro]);
-
-  const consumoPaginas = Math.max(1, Math.ceil(consumoFiltradas.length / CONSUMO_POR_PAGINA));
-  const consumoVisiveis = consumoFiltradas.slice((consumoPagina - 1) * CONSUMO_POR_PAGINA, consumoPagina * CONSUMO_POR_PAGINA);
-
-  const mesLabel = hoje.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
-  const [mesAgenda, setMesAgenda] = useState(() => new Date(hoje.getFullYear(), hoje.getMonth(), 1));
-  const mesView = mesAgenda;
-  const eMesAtual = mesView.getFullYear() === hoje.getFullYear() && mesView.getMonth() === hoje.getMonth();
-  const diasNoMes = new Date(mesView.getFullYear(), mesView.getMonth() + 1, 0).getDate();
-  const primeiroDia = new Date(mesView.getFullYear(), mesView.getMonth(), 1).getDay();
-  const mesLabelView = mesView.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
-  const entregasMes = ordens
-    .map((o) => ({ o, d: parseDataEntrega(o) }))
-    .filter((x) => x.d && x.d.getMonth() === mesView.getMonth() && x.d.getFullYear() === mesView.getFullYear())
-    .sort((a, b) => a.d - b.d);
-  const diasComEntrega = new Set(entregasMes.map((x) => x.d.getDate()));
-  const mudarMes = (delta) => setMesAgenda((m) => new Date(m.getFullYear(), m.getMonth() + delta, 1));
-
-  const abrirRepor = (m) => {
-    setReporForm({ quantidade: "", fornecedor: "", lote: "", observacoes: "" });
-    setReporModal({ open: true, material: m });
-  };
-
-  const enviarRepor = async (e) => {
-    e.preventDefault();
-    const m = reporModal.material;
-    if (!m || !reporForm.fornecedor) return;
-    setARepor(true);
-    try {
-      await movimentar({
-        material_id: m.id,
-        tipo: "entrada",
-        quantidade: Number(reporForm.quantidade),
-        lote: reporForm.lote || undefined,
-        motivo: "Reposição de stock",
-        fornecedor_nome: reporForm.fornecedor,
-        solicitado_por: nomeUsuario || "Sistema",
-        observacoes: reporForm.observacoes || "",
-      });
-      addToast(`Entrada registada para ${m.nome}`, "success");
-      setReporModal({ open: false, material: null });
-      setReporForm({ quantidade: "", fornecedor: "", lote: "", observacoes: "" });
-      Promise.all([listarMateriais().catch(() => []), extrato().catch(() => [])]).then(([mts, mv]) => {
-        setMateriais(mts); setMovimentos(mv);
-      });
-    } catch (err) {
-      addToast(err.response?.data?.erro || "Erro ao registar entrada", "error");
-    } finally {
-      setARepor(false);
-    }
-  };
+  const acoesRapidas = [
+    { icon: LuBriefcase, bg: "bg-primary/5 hover:bg-primary/10 border-primary/15", chip: "bg-primary text-primary-foreground", href: "/producao", label: "Nova OP" },
+    { icon: LuUserPlus, bg: "bg-success/5 hover:bg-success/10 border-success/15", chip: "bg-success text-white", href: "/clientes", label: "Novo Cliente" },
+    { icon: LuShoppingCart, bg: "bg-error/5 hover:bg-error/10 border-error/15", chip: "bg-error text-white", href: "/estoque/novo", label: "Nova Compra" },
+    { icon: LuFilePlus2, bg: "bg-info/5 hover:bg-info/10 border-info/15", chip: "bg-info text-white", href: "/faturacao", label: "Nova Factura" },
+  ];
 
   if (carregando) {
     return (
-      <div className="space-y-6">
-        <KPIGridSkeleton />
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2"><CardSkeleton lines={6} /></div>
-          <div><CardSkeleton lines={4} /></div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          <div className="xl:col-span-2"><ListSkeleton count={3} /></div>
-          <div><CardSkeleton lines={5} /></div>
+      <div className="flex flex-1 flex-col">
+        <div className="mx-auto grid w-full max-w-[1300px] flex-1 grid-cols-1 content-start gap-4 lg:grid-cols-12">
+          <div className="min-w-0 space-y-4 lg:col-span-9">
+            <div className="h-12 animate-pulse rounded-xl bg-card" />
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
+              <div className="grid grid-cols-2 gap-3 md:col-span-7 lg:col-span-5">
+                {Array.from({ length: 2 }).map((_, i) => (
+                  <div key={i} className="h-[92px] animate-pulse rounded-xl bg-card" />
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:col-span-5 lg:col-span-7">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="h-[92px] animate-pulse rounded-xl bg-card" />
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="lg:col-span-3 lg:col-start-10 lg:row-span-2 lg:row-start-1 lg:mb-[144px]">
+            <div className="h-full min-h-[240px] animate-pulse rounded-xl bg-card" />
+          </div>
+          <div className="min-w-0 lg:col-span-9">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
+              <div className="h-64 animate-pulse rounded-xl bg-card md:col-span-7 lg:col-span-5" />
+              <div className="h-64 animate-pulse rounded-xl bg-card md:col-span-5 lg:col-span-7" />
+            </div>
+          </div>
+          <div className="h-[114px] animate-pulse rounded-xl bg-card self-end lg:col-span-3 lg:col-start-10 lg:row-start-2" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
-      {/* Cabeçalho de boas-vindas */}
-      <section className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-primary/[0.07] via-background to-background p-6 sm:p-8">
-        <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-primary/10 blur-3xl" aria-hidden="true" />
-        <div className="relative min-w-0">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-primary">{dataLonga}</p>
-          <h1 className="mt-2 text-2xl sm:text-[2rem] font-bold tracking-tight text-foreground leading-tight">
-            {saudacao}, {primeiroNome}
-          </h1>
-          <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-            Visão geral da operação · {mesLabel}. Acompanhe orçamentos, produção, faturação e stock num só lugar.
-          </p>
-        </div>
-      </section>
-
-      {/* KPIs */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 md:gap-6">
-        {kpis.map((kpi, i) => (
-          <ComboKpiCard
-            key={kpi.title}
-            icon={kpi.icon}
-            title={kpi.title}
-            subtitle={kpi.subtitle}
-            stats={kpi.stats}
-            iconVariant={kpi.iconVariant}
-            className="group relative overflow-hidden animate-card-in"
-            style={{ "--stagger": `${i * 70}ms` }}
-          />
-        ))}
-      </section>
-
-      {/* Row 1: Status de Materiais + Volume de Produção */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 md:gap-6">
-        {/* Card 1: Status de Materiais */}
-        <Card className="rounded-2xl">
-          <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <>
+      <div className="mx-auto grid w-full max-w-[1300px] flex-1 grid-cols-1 content-start gap-4 lg:grid-cols-12">
+        {/* ══════════ Topo esquerdo: cabeçalho + KPIs ══════════ */}
+        <div className="min-w-0 space-y-4 lg:col-span-9">
+          {/* Cabeçalho: título + filtros */}
+          <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Status de Materiais</CardTitle>
-              <CardDescription>Distribuição dos materiais por status</CardDescription>
+              <h2 className="text-xl font-bold tracking-tight text-foreground">Visão Geral</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">Acompanhe o desempenho da sua gráfica em tempo real.</p>
             </div>
-          </CardHeader>
-          <CardContent>
-            {totalMateriais === 0 ? (
-              <div className="flex h-[250px] flex-col items-center justify-center gap-2 text-center">
-                <Icon name="inventory_2" className="text-3xl text-muted-foreground/40" />
-                <p className="text-xs text-muted-foreground">Sem materiais registados</p>
+            <div className="flex items-center space-x-3">
+              <div className="flex cursor-pointer items-center space-x-2 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground shadow-sm">
+                <LuCalendar className="h-4 w-4 text-muted-foreground" />
+                <span>{mesAtual}</span>
+                <LuChevronDown className="ml-1 h-3 w-3 text-muted-foreground" />
               </div>
-            ) : (
-              <>
-                <ResponsiveContainer width="100%" height={210}>
-                  <PieChart>
-                    <Pie
-                      data={statusMateriais}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={55}
-                      outerRadius={80}
-                      paddingAngle={3}
-                      strokeWidth={0}
-                    >
-                      {statusMateriais.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value) => `${value} materiais`} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="mt-4 space-y-2">
-                  {statusMateriais.map((s) => (
-                    <div key={s.name} className="flex items-center justify-between text-xs">
-                      <span className="flex items-center gap-2 text-muted-foreground">
-                        <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.fill }} />
-                        {s.name}
-                      </span>
-                      <span className="font-semibold text-foreground">{s.value}</span>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-[10px] text-muted-foreground mt-3 px-1 text-center">
-                  Total de materiais: <strong className="text-foreground">{totalMateriais}</strong>
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Card 2: Volume de Produção */}
-        <Card className="rounded-2xl">
-          <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <CardTitle>Volume de Produção</CardTitle>
-              <CardDescription>Ordens por período</CardDescription>
-            </div>
-            <div className="flex gap-0.5 rounded-lg bg-muted/70 p-0.5">
-              {[["semanal", "Sem"], ["mensal", "Mes"], ["anual", "Ano"]].map(([key, label]) => (
-                <Button
-                  key={key}
-                  variant={periodo === key ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setPeriodo(key)}
-                  className={periodo === key ? "shadow-sm" : ""}
-                >
-                  {label}
-                </Button>
-              ))}
-            </div>
-          </CardHeader>
-          <CardContent>
-            <BarChart dados={dadosGrafico} />
-            <p className="text-[10px] text-muted-foreground mt-3 px-1 text-center">
-              Total: <strong className="text-foreground">{ordens.length}</strong> ordens
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Row 2: Insumos e Produção */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6">
-        <Card className="rounded-2xl">
-          <CardHeader>
-            <CardTitle>Insumos e Produção</CardTitle>
-            <CardDescription>Status atual do estoque e produção</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3.5">
-            {/* Materiais em falta */}
-            {materiaisBaixo.length > 0 ? (
-              materiaisBaixo.map((m) => (
-                <div key={m.id} className="bg-destructive/10 border border-destructive/30 p-3.5 rounded-xl flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-destructive/15 flex items-center justify-center text-destructive shrink-0">
-                      <Icon name="inventory_2" className="text-lg" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-foreground truncate">{m.nome}</p>
-                      <p className="text-[10px] text-destructive font-medium">
-                        {Number(m.estoque_disponivel)} {m.unidade || "un"}
-                      </p>
-                    </div>
-                  </div>
-                  <Button variant="destructive" size="sm" onClick={() => abrirRepor(m)}>Repor</Button>
-                </div>
-              ))
-            ) : (
-              <div className="bg-emerald-500/10 border border-emerald-500/30 p-3.5 rounded-xl flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center text-emerald-600 shrink-0">
-                  <Icon name="check_circle" className="text-lg" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-foreground">Estoque em dia</p>
-                  <p className="text-[10px] text-emerald-600 font-medium">Nenhum material em falta</p>
-                </div>
-              </div>
-            )}
-
-            {/* Consumo e Produção */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-muted/50 p-4 rounded-xl flex flex-col justify-center border">
-                <Icon name="imagesearch_roller" className="text-primary mb-1.5 text-lg" />
-                <p className="text-[9px] uppercase font-semibold text-muted-foreground">Consumo Mês</p>
-                <p className="text-base font-bold text-foreground mt-0.5">{formatNum(consumoMes)}</p>
-                <p className="text-[9px] text-muted-foreground">{saidasTotal} saídas</p>
-              </div>
-              <div className="bg-muted/50 p-4 rounded-xl flex flex-col justify-center border">
-                <Icon name="settings_input_component" className="text-primary mb-1.5 text-lg" />
-                <p className="text-[9px] uppercase font-semibold text-muted-foreground">Produção</p>
-                <p className="text-base font-bold text-foreground mt-0.5">{producao}</p>
-                <p className="text-[9px] font-semibold text-emerald-600">Em produção</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl">
-          <CardHeader>
-            <CardTitle>Consumo Recente</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between mb-3">
-              <Button variant="ghost" size="sm" onClick={() => setConsumoAberto(true)} className="shrink-0 gap-1 text-[10px] h-7 ml-auto">
-                <Icon name="history" className="text-sm" />
-                Ver tudo
-              </Button>
-            </div>
-            <div className="divide-y divide-border/60">
-              {consumoRecente.slice(0, 6).map((item, i) => (
-                <div key={i} className="flex items-center justify-between gap-3 py-2.5 px-1 text-xs rounded-lg hover:bg-muted/40 transition-colors">
-                  <span className="flex items-center gap-2.5 text-muted-foreground min-w-0">
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted">
-                      <Icon name="inventory_2" className="text-sm text-muted-foreground" />
-                    </span>
-                    <span className="truncate font-medium text-foreground/80">{item.nome}</span>
-                  </span>
-                  <span className="text-muted-foreground/60 text-[10px] shrink-0 text-right">
-                    {item.detalhe} · {item.hora}
-                  </span>
-                </div>
-              ))}
-              {consumoRecente.length === 0 && (
-                <div className="flex flex-col items-center gap-2 py-6 text-center">
-                  <Icon name="inventory_2" className="text-2xl text-muted-foreground/40" />
-                  <p className="text-[10px] text-muted-foreground">Nenhum consumo recente</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Atividades e Agenda */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 md:gap-6">
-        <Card className="rounded-2xl xl:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Atividades da Produção</CardTitle>
-            <Button variant="ghost" size="sm" onClick={() => setHistAberto(true)} className="shrink-0 gap-1.5">
-              Ver Histórico Completo
-              <Icon name="arrow_forward" className="text-base" />
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {atividades.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 py-8 text-center">
-                <Icon name="description" className="text-3xl text-muted-foreground/40" />
-                <p className="text-xs text-muted-foreground">Sem atividades registadas</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {atividades.map((activity, idx) => (
-                  <div key={idx} className="flex gap-4 group">
-                    <div className="flex flex-col items-center">
-                      <div className="w-11 h-11 rounded-2xl bg-primary/10 border border-primary/10 flex items-center justify-center text-primary shrink-0">
-                        <Icon name="description" className="text-lg" />
-                      </div>
-                      {idx < atividades.length - 1 && <div className="w-px h-full bg-border mt-2" />}
-                    </div>
-                    <div className={`flex-1 ${idx < atividades.length - 1 ? "pb-4" : ""}`}>
-                      <div className="flex justify-between items-start gap-2">
-                        <p className="text-sm font-semibold text-foreground">
-                          {activity.name}{" "}
-                          <span className="font-normal text-muted-foreground">{activity.action}</span>
-                        </p>
-                        <Badge variant="secondary" className="text-[10px] uppercase shrink-0">{activity.tag}</Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-1">{activity.description}</p>
-                      <p className="text-[11px] text-primary font-medium mt-2">{activity.time}</p>
-                    </div>
-                  </div>
+              <div className="flex rounded-lg border border-border bg-card p-0.5 text-xs font-medium text-muted-foreground shadow-sm">
+                {[
+                  { value: "dia", label: "Dia" },
+                  { value: "semana", label: "Semana" },
+                  { value: "mes", label: "Mês" },
+                  { value: "ano", label: "Ano" },
+                ].map((o) => (
+                  <button
+                    key={o.value}
+                    type="button"
+                    onClick={() => setPeriodo(o.value)}
+                    className={cn(
+                      "rounded px-2.5 py-1 transition-colors hover:text-foreground",
+                      periodo === o.value ? "bg-primary font-semibold text-primary-foreground" : ""
+                    )}
+                  >
+                    {o.label}
+                  </button>
                 ))}
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          </div>
 
-        <Card className="rounded-2xl">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Agenda</CardTitle>
-            <div className="flex items-center gap-1">
-              <Button type="button" variant="ghost" size="icon" className="w-7 h-7" onClick={() => mudarMes(-1)} aria-label="Mês anterior" title="Mês anterior">
-                <Icon name="chevron_left" className="text-base" />
-              </Button>
-              <span className="text-sm font-medium text-primary capitalize w-28 text-center truncate">{mesLabelView}</span>
-              <Button type="button" variant="ghost" size="icon" className="w-7 h-7" onClick={() => mudarMes(1)} aria-label="Próximo mês" title="Próximo mês">
-                <Icon name="chevron_right" className="text-base" />
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-7 gap-1 text-center mb-4">
-              {["D", "S", "T", "Q", "Q", "S", "S"].map((d, i) => (
-                <span key={i} className="text-[10px] font-semibold text-muted-foreground">{d}</span>
+          {/* Linha de KPIs: 2 + 3 alinhados com os cartões de baixo */}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
+            <div className="grid grid-cols-2 gap-3 md:col-span-7 lg:col-span-5">
+              {kpis.slice(0, 2).map((k) => (
+                <Kpi key={k.label} {...k} />
               ))}
-              {Array.from({ length: primeiroDia }).map((_, i) => <div key={`b${i}`} />)}
-              {Array.from({ length: diasNoMes }).map((_, i) => {
-                const day = i + 1;
-                const temEntrega = diasComEntrega.has(day);
-                const eHoje = eMesAtual && day === hoje.getDate();
-                return (
-                  <div key={day} className="relative">
-                    <span className={`inline-flex items-center justify-center w-9 h-9 text-xs rounded-xl cursor-pointer transition-all
-                      ${eHoje ? "bg-primary text-on-primary font-bold shadow-sm" : "hover:bg-primary/10 text-foreground"}`}>
-                      {day}
-                    </span>
-                    {temEntrega && <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary" />}
-                  </div>
-                );
-              })}
             </div>
-            <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-1">
-              {entregasMes.map(({ o, d }) => (
-                <div key={o.id} className="p-3.5 bg-muted/50 rounded-xl border-l-4 border-primary flex gap-4 items-center">
-                  <div className="text-center leading-tight">
-                    <p className="text-[10px] font-semibold uppercase text-muted-foreground">
-                      {d.toLocaleDateString("pt-BR", { month: "short" })}
-                    </p>
-                    <p className="text-xl font-bold text-foreground">{d.getDate()}</p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:col-span-5 lg:col-span-7">
+              {kpis.slice(2).map((k) => (
+                <Kpi key={k.label} {...k} />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ══════════ Topo direito: imagem ══════════ */}
+        <div className="lg:col-span-3 lg:col-start-10 lg:row-span-2 lg:row-start-1 lg:mb-[144px]">
+          <CartaoMarca />
+        </div>
+
+        {/* ══════════ Linha dos gráficos + acesso rápido ══════════ */}
+        <div className="min-w-0 lg:col-span-9">
+          {/* Linha de gráficos: 12 colunas (5/4/3) */}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
+            {/* Vendas vs Produção */}
+            <div className="flex flex-col justify-between rounded-xl border border-border bg-card p-4 shadow-sm md:col-span-7 lg:col-span-5">
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="text-xs font-bold text-foreground">Vendas vs Produção (últimos 6 meses)</h3>
+                <div className="flex cursor-pointer items-center space-x-1 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                  <span>Últimos 6 meses</span>
+                  <LuChevronDown className="h-2.5 w-2.5 text-muted-foreground" />
+                </div>
+              </div>
+              <div className="relative mt-2 h-44 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={dadosMeses} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                    <XAxis dataKey="label" tick={{ fontSize: 8.5 }} axisLine={false} tickLine={false} />
+                    <YAxis
+                      tick={{ fontSize: 8 }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={40}
+                      tickFormatter={(v) => (v >= 1000000 ? `${v / 1000000}M` : v)}
+                    />
+                    <Tooltip
+                      contentStyle={tooltipStyle}
+                      formatter={(v, name) => [
+                        name === "vendas" ? `Kz ${formatNum(v)}` : `${v} OPs`,
+                        name === "vendas" ? "Vendas" : "Produção",
+                      ]}
+                    />
+                    <Bar dataKey="vendas" fill="var(--primary)" radius={[1.5, 1.5, 0, 0]} barSize={16} />
+                    <Line dataKey="ops" type="monotone" stroke="var(--error)" strokeWidth={1.8} dot={{ r: 2.5, fill: "var(--error)", strokeWidth: 0 }} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex items-center justify-center space-x-6 pt-1 text-[10px]">
+                <div className="flex items-center space-x-1.5">
+                  <span className="h-2.5 w-2.5 rounded-sm bg-primary" />
+                  <span className="text-muted-foreground">Vendas (Kz)</span>
+                </div>
+                <div className="flex items-center space-x-1.5">
+                  <div className="relative flex h-0.5 w-3.5 items-center justify-center bg-error">
+                    <span className="h-1.5 w-1.5 rounded-full bg-error" />
                   </div>
-                  <div className="flex-1 overflow-hidden">
-                    <p className="text-sm font-semibold text-foreground truncate">Entrega Pedido #{o.numero || o.id}</p>
-                    <p className="text-[10px] text-muted-foreground truncate">
-                      {o.produto || "Produção"}{o.cliente?.nome ? ` · ${o.cliente?.nome}` : ""}
-                    </p>
+                  <span className="text-muted-foreground">Produção (OP)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Estado das OP + Alertas: agrupados para alinhar com Compras/Stocks/Despesas */}
+            <div className="flex flex-col gap-3 md:col-span-5 lg:col-span-7 lg:grid lg:grid-cols-7">
+              {/* Estado das Ordens de Produção (donut) */}
+              <div className="flex flex-col justify-between rounded-xl border border-border bg-card p-4 shadow-sm lg:col-span-4">
+                <h3 className="mb-2 text-xs font-bold text-foreground">Estado das Ordens de Produção</h3>
+                <div className="my-auto flex items-center justify-between">
+                  <div className="relative flex h-28 w-28 flex-shrink-0 items-center justify-center">
+                    <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
+                      <circle cx="50" cy="50" fill="none" r="38" stroke="var(--muted)" strokeWidth="13" />
+                      {segmentosDonut.map((s) => (
+                        <circle
+                          key={s.label}
+                          cx="50"
+                          cy="50"
+                          fill="none"
+                          r="38"
+                          stroke={s.color}
+                          strokeWidth="13"
+                          strokeDasharray={`${s.len} ${CIRC}`}
+                          strokeDashoffset={s.offset}
+                        />
+                      ))}
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                      <span className="text-base font-bold leading-none text-foreground">{ordens.length}</span>
+                      <span className="mt-0.5 text-[9px] font-bold leading-none tracking-tight text-muted-foreground">OP</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2 pl-3 text-[10px]">
+                    {segmentosDonut.map((s) => (
+                      <div key={s.label} className="flex items-center justify-between space-x-2">
+                        <div className="flex items-center space-x-1.5">
+                          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
+                          <span className="text-muted-foreground">{s.label}</span>
+                        </div>
+                        <span className="font-bold text-foreground">
+                          {s.value} ({Math.round((s.value / totalSeg) * 100)}%)
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
-              {entregasMes.length === 0 && (
-                <p className="text-xs text-muted-foreground text-center py-3">Nenhuma entrega agendada neste mês</p>
-              )}
+                <div className="h-1" />
+              </div>
+
+              {/* Alertas do Sistema */}
+              <div className="flex flex-col justify-between rounded-xl border border-border bg-card p-4 shadow-sm lg:col-span-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-foreground">Alertas do Sistema</h3>
+                  <Link href="/relatorios" className="text-[10px] font-medium text-primary hover:underline">
+                    Ver todos →
+                  </Link>
+                </div>
+                <div className="space-y-2.5">
+                  {alertas.length === 0 ? (
+                    <p className="py-6 text-center text-xs text-muted-foreground">Sem alertas de momento.</p>
+                  ) : (
+                    alertas.map((a) => {
+                      const Icone = a.icon;
+                      return (
+                        <div key={a.titulo} className="flex items-start space-x-2.5">
+                          <div className={cn("mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full", a.tone)}>
+                            <Icone className="h-3 w-3" />
+                          </div>
+                          <div>
+                            <h4 className="text-[11px] font-bold leading-tight text-foreground">{a.titulo}</h4>
+                            <p className="text-[9.5px] leading-tight text-muted-foreground">{a.desc}</p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+
+        {/* ══════════ Acesso rápido: mesma linha dos gráficos ══════════ */}
+        <div className="self-end rounded-xl border border-border bg-card p-3.5 shadow-sm lg:col-span-3 lg:col-start-10 lg:row-start-2">
+          <h3 className="mb-2.5 text-xs font-bold text-foreground">Acesso rápido</h3>
+          <div className="grid grid-cols-4 gap-2">
+            {acoesRapidas.map((a) => {
+              const Icone = a.icon;
+              return (
+                <Link
+                  key={a.label}
+                  href={a.href}
+                  className={cn(
+                    "group flex flex-col items-center justify-center rounded-lg border p-2 transition",
+                    a.bg
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "mb-1 flex h-7 w-7 items-center justify-center rounded-md text-white shadow-xs transition-transform group-hover:scale-105",
+                      a.chip
+                    )}
+                  >
+                    <Icone className="h-4 w-4" />
+                  </div>
+                  <span className="text-[9.5px] font-semibold leading-tight text-foreground">{a.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
       </div>
-
-      {/* Modais */}
-      <Modal
-        open={reporModal.open}
-        onClose={() => setReporModal({ open: false, material: null })}
-        title="Repor Material"
-        icon="inventory_2"
-        size="sm"
-        footer={
-          <>
-            <Button type="button" variant="outline" onClick={() => setReporModal({ open: false, material: null })}>Cancelar</Button>
-            <Button type="submit" form="form-repor" loading={aRepor}>Registar Entrada</Button>
-          </>
-        }
-      >
-        <form id="form-repor" onSubmit={enviarRepor} className="space-y-4">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Material</label>
-            <div className="px-3 py-2.5 bg-muted border border-input rounded-xl text-xs font-semibold text-foreground">
-              {reporModal.material?.nome}
-              <span className="text-muted-foreground font-normal">
-                {" "}({reporModal.material?.unidade || "un"}) — disponível {Number(reporModal.material?.estoque_disponivel)}
-              </span>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Quantidade *</label>
-              <NumeroInput required value={reporForm.quantidade}
-                onChange={(e) => setReporForm({ ...reporForm, quantidade: e.target.value })}
-                className={inputCls} placeholder="0" />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Lote</label>
-              <input value={reporForm.lote}
-                onChange={(e) => setReporForm({ ...reporForm, lote: e.target.value })}
-                className={inputCls} placeholder="Opcional" />
-            </div>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Fornecedor *</label>
-            <FornecedorSelect
-              value={reporForm.fornecedor}
-              onChange={(v) => setReporForm({ ...reporForm, fornecedor: v })}
-              fornecedores={fornecedores}
-              placeholder="Procurar fornecedor ou escrever novo..."
-              required
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Observações</label>
-            <textarea rows={2} value={reporForm.observacoes}
-              onChange={(e) => setReporForm({ ...reporForm, observacoes: e.target.value })}
-              className={`${inputCls} resize-none`} placeholder="Nota da reposição..." />
-          </div>
-        </form>
-      </Modal>
-
-      <Modal
-        open={histAberto}
-        onClose={() => { setHistAberto(false); setHistPagina(1); }}
-        title="Histórico Completo de Ordens"
-        icon="history"
-        size="xl"
-        footer={
-          <div className="flex items-center justify-between w-full gap-3">
-            <p className="text-xs text-muted-foreground">
-              {histFiltradas.length} ordem{histFiltradas.length === 1 ? "" : "s"}
-            </p>
-            <div className="flex items-center gap-2">
-              <Button type="button" variant="outline" size="sm" disabled={histPagina <= 1} onClick={() => setHistPagina((p) => Math.max(1, p - 1))}>
-                Anterior
-              </Button>
-              <span className="text-xs font-semibold text-muted-foreground px-1">
-                {histPagina} / {histPaginas}
-              </span>
-              <Button type="button" variant="outline" size="sm" disabled={histPagina >= histPaginas} onClick={() => setHistPagina((p) => Math.min(histPaginas, p + 1))}>
-                Seguinte
-              </Button>
-            </div>
-          </div>
-        }
-      >
-        <div className="space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-            <div className="relative flex-1 min-w-0">
-              <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm" />
-              <input
-                value={histFiltro}
-                onChange={(e) => { setHistFiltro(e.target.value); setHistPagina(1); }}
-                className="w-full pl-9 pr-3 py-2 bg-muted/50 border rounded-xl text-xs focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-                placeholder="Pesquisar por número, produto ou estado..."
-              />
-            </div>
-            <Button type="button" variant="ghost" size="sm" className="shrink-0" onClick={() => { setHistFiltro(""); setHistPagina(1); }}>
-              Limpar
-            </Button>
-          </div>
-
-          {carregando ? (
-            <div className="flex items-center justify-center gap-2 py-12 text-xs text-muted-foreground">
-              <span className="spinner" aria-hidden="true" /> A carregar histórico...
-            </div>
-          ) : histVisiveis.length === 0 ? (
-            <div className="py-12 text-center">
-              <Icon name="inbox" className="text-3xl text-muted-foreground/40 mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">Nenhuma ordem encontrada</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-left text-[10px] uppercase tracking-wider text-muted-foreground border-b">
-                    <th className="py-2 pr-3 font-semibold">Ordem</th>
-                    <th className="py-2 pr-3 font-semibold">Produto</th>
-                    <th className="py-2 pr-3 font-semibold">Quantidade</th>
-                    <th className="py-2 pr-3 font-semibold">Estado</th>
-                    <th className="py-2 pr-3 font-semibold">Entrega</th>
-                    <th className="py-2 font-semibold">Criado em</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {histVisiveis.map((o) => {
-                    const cfg = ORDEM_ESTADOS[o.estado] || ORDEM_ESTADOS.pendente;
-                    return (
-                      <tr key={o.id} className="border-b last:border-0 hover:bg-muted/40 transition-colors">
-                        <td className="py-2.5 pr-3 font-semibold text-foreground">#{o.numero || o.id}</td>
-                        <td className="py-2.5 pr-3 text-muted-foreground truncate max-w-[10rem]">{o.produto || "—"}</td>
-                        <td className="py-2.5 pr-3">{o.quantidade ?? "—"}</td>
-                        <td className="py-2.5 pr-3">
-                          <Badge variant={cfg.variant} className="text-[10px] uppercase">{cfg.label}</Badge>
-                        </td>
-                        <td className="py-2.5 pr-3 text-muted-foreground">{o.data_entrega ? formatHora(o.data_entrega) : "—"}</td>
-                        <td className="py-2.5 text-muted-foreground">{formatHora(o.createdAt)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </Modal>
-
-      <Modal
-        open={consumoAberto}
-        onClose={() => { setConsumoAberto(false); setConsumoPagina(1); setConsumoFiltro(""); }}
-        title="Histórico Completo de Consumos"
-        icon="bar_chart"
-        size="xl"
-        footer={
-          <div className="flex items-center justify-between w-full gap-3">
-            <p className="text-xs text-muted-foreground">
-              {consumoFiltradas.length} consumo{consumoFiltradas.length === 1 ? "" : "s"} (saídas)
-            </p>
-            <div className="flex items-center gap-2">
-              <Button type="button" variant="outline" size="sm" disabled={consumoPagina <= 1} onClick={() => setConsumoPagina((p) => Math.max(1, p - 1))}>
-                Anterior
-              </Button>
-              <span className="text-xs font-semibold text-muted-foreground px-1">
-                {consumoPagina} / {consumoPaginas}
-              </span>
-              <Button type="button" variant="outline" size="sm" disabled={consumoPagina >= consumoPaginas} onClick={() => setConsumoPagina((p) => Math.min(consumoPaginas, p + 1))}>
-                Seguinte
-              </Button>
-            </div>
-          </div>
-        }
-      >
-        <div className="space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-            <div className="relative flex-1 min-w-0">
-              <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm" />
-              <input
-                value={consumoFiltro}
-                onChange={(e) => { setConsumoFiltro(e.target.value); setConsumoPagina(1); }}
-                className="w-full pl-9 pr-3 py-2 bg-muted/50 border rounded-xl text-xs focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-                placeholder="Pesquisar por material, motivo, lote, fornecedor..."
-              />
-            </div>
-            <Button type="button" variant="ghost" size="sm" className="shrink-0" onClick={() => { setConsumoFiltro(""); setConsumoPagina(1); }}>
-              Limpar
-            </Button>
-          </div>
-
-          {consumoVisiveis.length === 0 ? (
-            <div className="py-12 text-center">
-              <Icon name="inbox" className="text-3xl text-muted-foreground/40 mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">Nenhum consumo registado</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-left text-[10px] uppercase tracking-wider text-muted-foreground border-b">
-                    <th className="py-2 pr-3 font-semibold">Material</th>
-                    <th className="py-2 pr-3 font-semibold">Quantidade</th>
-                    <th className="py-2 pr-3 font-semibold">Motivo</th>
-                    <th className="py-2 pr-3 font-semibold">Lote</th>
-                    <th className="py-2 pr-3 font-semibold">Fornecedor</th>
-                    <th className="py-2 font-semibold">Data / Hora</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {consumoVisiveis.map((mv) => (
-                    <tr key={mv.id} className="border-b last:border-0 hover:bg-muted/40 transition-colors">
-                      <td className="py-2.5 pr-3 font-semibold text-foreground">{mv.material?.nome || "—"}</td>
-                      <td className="py-2.5 pr-3">
-                        <span className="font-semibold text-foreground">{Number(mv.quantidade)}</span>
-                        <span className="text-muted-foreground"> {mv.material?.unidade || "un"}</span>
-                      </td>
-                      <td className="py-2.5 pr-3 text-muted-foreground">{mv.motivo || "—"}</td>
-                      <td className="py-2.5 pr-3 text-muted-foreground">{mv.lote || "—"}</td>
-                      <td className="py-2.5 pr-3 text-muted-foreground">{mv.fornecedor_nome || "—"}</td>
-                      <td className="py-2.5 text-muted-foreground">{formatHora(mv.createdAt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </Modal>
-
-      <footer className="border-t pt-6 pb-2 text-center">
-        <p className="text-[11px] text-muted-foreground">
-          SIGRAF · Sistema de Gestão para Indústria Gráfica · {mesLabel}
-        </p>
-      </footer>
-    </div>
+    </>
   );
 }

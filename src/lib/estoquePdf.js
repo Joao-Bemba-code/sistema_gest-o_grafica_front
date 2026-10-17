@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { formatKz, familias, normalizarFamilia, tiposItem, normalizarTipoItem, entradasEspecificacao } from "./estoque";
+import { formatKz, familias, normalizarFamilia, tiposItem, normalizarTipoItem, entradasEspecificacao, especificacoesObjeto } from "./estoque";
 import { TEMA_TABELA, formatNumero, carregarLogo } from "./pdfEstilo";
 
 // ─────────────────────────────────────────────────────────────
@@ -85,7 +85,7 @@ async function desenharCabecalho(doc, org = {}, titulo) {
   // Limita o nome à largura disponível antes do título (topo direito)
   const larguraTitulo = doc.getTextWidth(String(titulo));
   const larguraNome = Math.max(40, pw - MARGEM - textoX - larguraTitulo - 12);
-  const linhasNome = doc.splitTextToSize(org.nome || "SIGRAF", larguraNome).slice(0, 2);
+  const linhasNome = doc.splitTextToSize(org.nome || "KAMGEST", larguraNome).slice(0, 2);
   doc.text(linhasNome[0], textoX, 14 + 8);
   if (linhasNome[1]) doc.text(linhasNome[1], textoX, 14 + 8 + 4.5);
 
@@ -162,7 +162,7 @@ async function desenharCabecalhoRelatorio(doc, org = {}, titulo) {
   doc.setFontSize(11);
   // Limita o nome à largura disponível antes da coluna Data/Hora (à direita)
   const larguraNome = pw - MARGEM - textoX - 40;
-  const partesNome = doc.splitTextToSize(org.nome || "SIGRAF", larguraNome);
+  const partesNome = doc.splitTextToSize(org.nome || "KAMGEST", larguraNome);
   const nomeCortado = partesNome.length > 1 ? `${partesNome[0].slice(0, Math.max(1, partesNome[0].length - 1))}…` : partesNome[0];
   doc.text(nomeCortado, textoX, y + 2);
 
@@ -225,7 +225,7 @@ function desenharRodapePagina(doc, paginaAtual, totalPaginas) {
   doc.setTextColor(...CINZA_MEDIO);
   doc.setFontSize(6.5);
   doc.setFont("helvetica", "normal");
-  doc.text(`Gerado por SIGRAF em ${data} às ${hora}`, MARGEM, ph - 6);
+  doc.text(`Gerado por KAMGEST em ${data} às ${hora}`, MARGEM, ph - 6);
   doc.text(`Página ${paginaAtual} de ${totalPaginas}`, pw - MARGEM, ph - 6, { align: "right" });
 }
 
@@ -246,7 +246,7 @@ export async function gerarRequisicaoPDF(mov, org = {}) {
   const { linhaY } = await desenharCabecalho(doc, org, "Requisição de Material");
 
   const mat = mov.material || {};
-  const cat = mat.categoria?.nome || "—";
+  const cat = mat.categoria?.nome || especificacoesObjeto(mat.especificacoes).categoria || "—";
   const ehEntrada = mov.tipo === "entrada";
   const custoUnit = mat.custo_unitario != null ? mat.custo_unitario : mat.custo_unit;
   const custoStr = custoUnit != null && Number(custoUnit) > 0 ? formatKz(custoUnit) : "—";
@@ -305,15 +305,16 @@ export async function gerarFichaMaterialPDF(mat, org = {}) {
   const pw = doc.internal.pageSize.getWidth();
   const { linhaY } = await desenharCabecalho(doc, org, "Ficha do Material");
 
-  const categoria = mat.categoria?.nome || mat.categoria_nome || "—";
+  const espec = especificacoesObjeto(mat.especificacoes);
+  const categoria = mat.categoria?.nome || mat.categoria_nome || espec.categoria || "—";
   const linhas = [
     ["Código", mat.codigo || "—"],
     ["Nome", mat.nome || "—"],
     ["Nome Técnico", mat.nome_tecnico || "—"],
     ["Categoria", categoria],
-    ["Família", familias[normalizarFamilia(mat.categoria?.familia)]?.label || mat.categoria?.familia || "—"],
-    ["Subfamília", mat.categoria?.subfamilia || "—"],
-    ["Tipo", tiposItem[normalizarTipoItem(mat.categoria?.tipo)]?.label || "—"],
+    ["Família", familias[normalizarFamilia(mat.categoria?.familia)]?.label || mat.categoria?.familia || espec.familia || "—"],
+    ["Subfamília", mat.categoria?.subfamilia || espec.subfamilia || "—"],
+    ["Tipo", tiposItem[normalizarTipoItem(mat.categoria?.tipo)]?.label || espec.grupo || "—"],
     ["Fornecedor", mat.fornecedor || "—"],
     ["Unidade", mat.unidade || "—"],
     ...entradasEspecificacao(mat.especificacoes).map((e) => [e.rotulo, e.valor]),
@@ -434,7 +435,7 @@ export async function gerarRelatorioStockPDF(materiais = [], categorias = [], or
 
   const catMap = {};
   materiais.forEach((m) => {
-    const cat = m.categoria?.nome || "Sem categoria";
+    const cat = m.categoria?.nome || especificacoesObjeto(m.especificacoes).categoria || "Sem categoria";
     if (!catMap[cat]) catMap[cat] = { qtd: 0, valorTotal: 0, disponivel: 0, itens: 0 };
     catMap[cat].itens += 1;
     catMap[cat].qtd += Number(m.quantidade) || 0;
@@ -503,7 +504,7 @@ export async function gerarRelatorioStockPDF(materiais = [], categorias = [], or
     head: [["Material", "Categoria", "Qtd.", "Mín", "Máx", "Ponto", "Custo", "Estado"]],
     body: materiaisSorted.map((m) => [
       m.nome || "—",
-      m.categoria?.nome || "—",
+      m.categoria?.nome || especificacoesObjeto(m.especificacoes).categoria || "—",
       `${formatNumero(m.quantidade)} ${m.unidade || ""}`.trim(),
       formatNumero(m.estoque_min),
       formatNumero(m.estoque_max),

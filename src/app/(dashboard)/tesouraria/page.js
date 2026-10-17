@@ -1,8 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Icon from "@/components/Icon";
-import PageHeader from "@/components/ui/PageHeader";
 import TesourariaTab from "@/components/vendas/TesourariaTab";
 import ContasBancariasTab from "@/components/tesouraria/ContasBancariasTab";
 import ComprovativosTab from "@/components/tesouraria/ComprovativosTab";
@@ -24,30 +22,25 @@ export default function TesourariaPage() {
   const abaVisivel = abas.some((t) => t.id === tab) ? tab : abas[0].id;
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Tesouraria" description="Movimentos financeiros, contas e caixa" />
-
-      <div className="seg-track">
-        {abas.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className={`seg-tab ${abaVisivel === t.id ? "is-active" : ""}`}
-          >
-            <Icon name={t.icon} className="text-lg" />
-            {t.label}
-          </button>
-        ))}
+    <div className="space-y-4">
+      {/* Faixa do módulo - identificação tesouraria (âmbar) */}
+      <div className="flex items-center justify-between rounded-xl bg-[#c27b00] px-5 py-2.5 text-white shadow-sm">
+        <span className="text-lg font-extrabold uppercase tracking-wide">7. TESOURARIA</span>
+        <span className="hidden text-[11px] font-semibold uppercase tracking-wider text-amber-100 sm:block">
+          Sistema Integrado de Gestão Empresarial
+        </span>
       </div>
 
-      {abaVisivel === "movimentos" && <TesourariaTab />}
+      <div className="min-w-0">
+        <h1 className="text-2xl font-extrabold tracking-tight text-foreground">Gestão de Tesouraria</h1>
+        <p className="mt-0.5 text-xs font-medium text-muted-foreground">Caixa, bancos e pagamentos.</p>
+      </div>
 
-      {abaVisivel === "contas" && <ContasBancariasTab />}
-
-      {abaVisivel === "comprovativos" && <ComprovativosTab />}
-
-      {abaVisivel === "dividas" && <DividasTab />}
+      <TesourariaTab aba={abaVisivel} setAba={setTab} abas={abas}>
+        {abaVisivel === "contas" && <ContasBancariasTab />}
+        {abaVisivel === "comprovativos" && <ComprovativosTab />}
+        {abaVisivel === "dividas" && <DividasTab />}
+      </TesourariaTab>
     </div>
   );
 }

@@ -1,11 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Modal from "@/components/Modal";
 import Icon from "@/components/Icon";
-import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
+import PageHeader from "@/components/ui/PageHeader";
+import Paginacao, { usePaginacao } from "@/components/ui/Paginacao";
+import {
+  Ledger,
+  LedgerHeader,
+  FilterRow,
+  LedgerTable,
+  LedgerTh,
+  LedgerTr,
+  LedgerTd,
+  IdCell,
+  StatusBadge,
+  LedgerEmpty,
+} from "@/components/ui/Ledger";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
 import { inputCls } from "@/lib/estoque";
@@ -19,7 +31,19 @@ const campos = [
   { key: "embalagem", label: "Embalagem", icon: "inventory_2" },
 ];
 
-const statusVariants = { aprovado: "success", reprovado: "destructive", pendente: "outline" };
+const CAMPOS = [
+  { value: "geral", label: "Todos os campos", obter: (i) => `${i.op || ""} ${i.cliente || ""} ${i.produto || ""} ${i.responsavel || ""}` },
+  { value: "op", label: "OP", obter: (i) => i.op || "" },
+  { value: "cliente", label: "Cliente", obter: (i) => i.cliente || "" },
+  { value: "produto", label: "Produto", obter: (i) => i.produto || "" },
+  { value: "responsavel", label: "Responsável", obter: (i) => i.responsavel || "" },
+];
+
+const pillBase = "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-sm font-medium whitespace-nowrap transition-colors";
+const pillAtiva = "border-primary/40 bg-primary/10 text-primary";
+const pillInativa = "border-border bg-card text-muted-foreground hover:bg-muted/60 hover:text-foreground";
+
+const statusTom = { aprovado: "success", reprovado: "error", pendente: "neutral" };
 const initialForm = { op: "", cliente: "", produto: "", responsavel: "", cor: "pendente", corte: "pendente", quantidade: "pendente", acabamento: "pendente", embalagem: "pendente" };
 
 function calcularResultado(insp) {
@@ -34,6 +58,9 @@ export default function QualidadePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filtro, setFiltro] = useState("todos");
+  const [busca, setBusca] = useState({ campo: "geral", operador: "contem", termo: "" });
+  const [ordem, setOrdem] = useState({ chave: "", dir: 1 });
+  const [filtrosAbertos, setFiltrosAbertos] = useState(true);
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState(initialForm);
   const [editandoId, setEditandoId] = useState(null);
@@ -53,7 +80,31 @@ export default function QualidadePage() {
     }).catch(err => setError(err.message)).finally(() => setLoading(false));
   }, []);
 
-  const filtered = filtro === "todos" ? inspecoes : inspecoes.filter(i => calcularResultado(i) === filtro);
+  const filtrados = useMemo(() => {
+    let res = filtro === "todos" ? inspecoes : inspecoes.filter(i => calcularResultado(i) === filtro);
+    const termo = busca.termo.trim().toLowerCase();
+    if (termo) {
+      const cfg = CAMPOS.find((c) => c.value === busca.campo) || CAMPOS[0];
+      res = res.filter((i) => {
+        const alvo = String(cfg.obter(i) || "").toLowerCase();
+        if (busca.operador === "igual") return alvo === termo;
+        if (busca.operador === "comeca") return alvo.startsWith(termo);
+        return alvo.includes(termo);
+      });
+    }
+    if (ordem.chave) {
+      res = [...res].sort((a, b) => {
+        const av = ordem.chave === "resultado" ? calcularResultado(a) : String(a[ordem.chave] || "").toLowerCase();
+        const bv = ordem.chave === "resultado" ? calcularResultado(b) : String(b[ordem.chave] || "").toLowerCase();
+        return (av < bv ? -1 : av > bv ? 1 : 0) * ordem.dir;
+      });
+    }
+    return res;
+  }, [inspecoes, filtro, busca, ordem]);
+
+  const pag = usePaginacao({ items: filtrados });
+
+  const contagem = (f) => f === "todos" ? inspecoes.length : inspecoes.filter(i => calcularResultado(i) === f).length;
 
   const toggleCampo = (key) => {
     const ordem = ["pendente", "aprovado", "reprovado"];
@@ -87,70 +138,88 @@ export default function QualidadePage() {
   if (error) return <div className="bg-destructive/10 text-destructive rounded-2xl p-6 text-center font-semibold">{error}</div>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Controlo de Qualidade</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{inspecoes.length} inspeções registadas</p>
-        </div>
-      </div>
+    <div className="space-y-4">
+      <PageHeader titulo="Controlo de Qualidade" descricao={`${inspecoes.length} inspeções registadas`} />
 
-      <div className="flex gap-2 flex-wrap">
-        {["todos", "aprovado", "pendente", "reprovado"].map((f) => (
-          <Button key={f} variant={filtro === f ? "default" : "outline"} size="sm" onClick={() => setFiltro(f)}>
-            {f === "todos" ? "Todos" : f.charAt(0).toUpperCase() + f.slice(1)}
-          </Button>
-        ))}
-      </div>
-
-      <div className="space-y-3">
-        {filtered.map((insp) => {
-          const resultado = calcularResultado(insp);
-          return (
-            <Card key={insp.id} className="hover-lift">
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between gap-4 mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <Icon name="verified" className="text-primary text-[20px]" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-foreground">{insp.op}</span>
-                        <Badge variant={resultado === "aprovado" ? "success" : resultado === "reprovado" ? "destructive" : "warning"} className="text-[10px]">{resultado}</Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{insp.cliente} — {insp.produto}</p>
-                    </div>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={() => handleEdit(insp)}><Icon name="edit" className="text-sm" /> Inspecionar</Button>
-                </div>
-                <div className="grid grid-cols-5 gap-2">
-                  {campos.map((c) => {
-                    const val = insp[c.key];
-                    return (
-                      <div key={c.key} className={`flex flex-col items-center gap-1 p-2 rounded-lg border text-xs ${
-                        val === "aprovado" ? "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400" :
-                        val === "reprovado" ? "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400" :
-                        "border-border bg-muted/50 text-muted-foreground"
-                      }`}>
-                        <Icon name={c.icon} className="text-base" />
-                        <span className="text-[9px] font-semibold">{c.label}</span>
-                        <Badge variant={statusVariants[val]} className="text-[8px] px-1 py-0">{val}</Badge>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-        {filtered.length === 0 && (
-          <div className="text-center p-12 text-muted-foreground">
-            <Icon name="verified" className="text-4xl block mx-auto mb-2 opacity-30" />
-            <p className="font-medium">Nenhuma inspeção encontrada</p>
-          </div>
+      <Ledger rotulo="Qualidade ledger">
+        <LedgerHeader
+          titulo="Inspeções"
+          subtitulo={`${filtrados.length} de ${inspecoes.length} inspeções`}
+          onToggleFiltros={() => setFiltrosAbertos((v) => !v)}
+          filtrosAbertos={filtrosAbertos}
+        />
+        {filtrosAbertos && (
+          <FilterRow
+            campo={busca.campo}
+            setCampo={(v) => setBusca((f) => ({ ...f, campo: v }))}
+            campos={CAMPOS.map(({ value, label }) => ({ value, label }))}
+            operador={busca.operador}
+            setOperador={(v) => setBusca((f) => ({ ...f, operador: v }))}
+            termo={busca.termo}
+            setTermo={(v) => setBusca((f) => ({ ...f, termo: v }))}
+            aoLimpar={() => setBusca((f) => ({ ...f, termo: "" }))}
+            placeholder="Pesquisar inspeções por OP, cliente, produto..."
+          />
         )}
-      </div>
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2">
+          {["todos", "aprovado", "pendente", "reprovado"].map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFiltro(f)}
+              aria-pressed={filtro === f}
+              className={`${pillBase} ${filtro === f ? pillAtiva : pillInativa}`}
+            >
+              {f === "todos" ? "Todos" : f.charAt(0).toUpperCase() + f.slice(1)}
+              <span className="text-[11px] text-muted-foreground">{contagem(f)}</span>
+            </button>
+          ))}
+        </div>
+
+        <LedgerTable>
+          <thead>
+            <tr className="border-b border-border">
+              <LedgerTh onSort={() => setOrdem((p) => (p.chave === "op" ? { chave: "op", dir: -p.dir } : { chave: "op", dir: 1 }))} ativo={ordem.chave === "op"}>OP</LedgerTh>
+              <LedgerTh onSort={() => setOrdem((p) => (p.chave === "resultado" ? { chave: "resultado", dir: -p.dir } : { chave: "resultado", dir: 1 }))} ativo={ordem.chave === "resultado"}>Resultado</LedgerTh>
+              {campos.map((c) => (
+                <LedgerTh key={c.key}>{c.label}</LedgerTh>
+              ))}
+              <LedgerTh className="w-32" />
+            </tr>
+          </thead>
+          <tbody>
+            {pag.visiveis.map((insp) => {
+              const resultado = calcularResultado(insp);
+              return (
+                <LedgerTr key={insp.id}>
+                  <LedgerTd className="max-w-56">
+                    <IdCell id={insp.op} meta={`${insp.cliente} — ${insp.produto}`} aoAbrir={() => handleEdit(insp)} />
+                  </LedgerTd>
+                  <LedgerTd>
+                    <StatusBadge tom={statusTom[resultado]}>{resultado}</StatusBadge>
+                  </LedgerTd>
+                  {campos.map((c) => (
+                    <LedgerTd key={c.key}>
+                      <StatusBadge tom={statusTom[insp[c.key]] || "neutral"}>{insp[c.key]}</StatusBadge>
+                    </LedgerTd>
+                  ))}
+                  <LedgerTd>
+                    <button
+                      type="button"
+                      onClick={() => handleEdit(insp)}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                    >
+                      <Icon name="edit" className="text-sm" /> Inspecionar
+                    </button>
+                  </LedgerTd>
+                </LedgerTr>
+              );
+            })}
+          </tbody>
+        </LedgerTable>
+        {pag.total === 0 && <LedgerEmpty icone="verified">Nenhuma inspeção encontrada</LedgerEmpty>}
+        <Paginacao {...pag} label="registos" />
+      </Ledger>
 
       <Modal open={modal} onClose={() => setModal(false)} title="Inspeção de Qualidade" icon="verified" size="lg"
         footer={<><Button type="button" variant="outline" onClick={() => setModal(false)}>Cancelar</Button><Button type="submit" form="form-qualidade">Concluir Inspeção</Button></>}>
@@ -169,8 +238,8 @@ export default function QualidadePage() {
             {campos.map((c) => (
               <button key={c.key} type="button" onClick={() => toggleCampo(c.key)}
                 className={`p-4 rounded-xl border-2 text-center transition-all text-xs font-bold ${
-                  form[c.key] === "aprovado" ? "border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400" :
-                  form[c.key] === "reprovado" ? "border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400" :
+                  form[c.key] === "aprovado" ? "border-success/30 bg-success/10 text-success" :
+                  form[c.key] === "reprovado" ? "border-error/30 bg-error/10 text-error" :
                   "border-border bg-background text-muted-foreground"
                 }`}>
                 <Icon name={c.icon} className="text-xl block mb-1 mx-auto" />
@@ -181,10 +250,6 @@ export default function QualidadePage() {
           </div>
         </form>
       </Modal>
-
-      <footer className="border-t pt-6 pb-2 text-center">
-        <p className="text-[11px] text-muted-foreground">SIGRAF · Sistema de Gestão para Indústria Gráfica</p>
-      </footer>
     </div>
   );
 }

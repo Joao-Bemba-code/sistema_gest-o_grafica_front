@@ -1,5 +1,6 @@
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import PwaReload from "@/components/PwaReload";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -11,9 +12,9 @@ const inter = Inter({
 const jetBrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jbmono" });
 
 export const metadata = {
-  title: "SIGRAF - Gestão de Gráfica",
+  title: "KAMGEST - Gestão de Gráfica",
   description: "Sistema de Gestão para Indústria Gráfica",
-  applicationName: "SIGRAF",
+  applicationName: "KAMGEST",
   manifest: "/manifest.webmanifest",
   formatDetection: { telephone: false },
   icons: {
@@ -29,12 +30,12 @@ export const metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "SIGRAF",
+    title: "KAMGEST",
   },
 };
 
 export const viewport = {
-  themeColor: "#4338ca",
+  themeColor: "#131316",
   colorScheme: "light dark",
 };
 
@@ -54,6 +55,7 @@ export default function RootLayout({ children }) {
       <body className="bg-surface-container-lowest text-on-surface min-h-screen">
         <ThemeProvider>
           <AuthProvider>
+            <PwaReload />
             {children}
           </AuthProvider>
         </ThemeProvider>

@@ -14,10 +14,9 @@ import { useToast } from "@/components/Toast";
 import { ListSkeleton } from "@/components/Skeleton";
 import FilterBar, { useFilter } from "@/components/ui/FilterBar";
 import { entradasEspecificacao } from "@/lib/estoque";
-import { listar, remover, mudarEstado, enviarProducao } from "@/services/orcamentos";
+import { listar, remover, mudarEstado } from "@/services/orcamentos";
 import { buscarOrganizacao } from "@/services/configuracoes";
 import OrcamentoPdfModal from "@/components/orcamentos/OrcamentoPdfModal";
-import AprovarOrcamentoDialog from "@/components/orcamentos/AprovarOrcamentoDialog";
 
 const estadoColors = {
   aprovado: "success",
@@ -94,8 +93,6 @@ export default function OrcamentosPage() {
   const [selected, setSelected] = useState(null);
   const [eliminarItem, setEliminarItem] = useState(null);
   const [deletando, setDeletando] = useState(false);
-  const [aprovarAlvo, setAprovarAlvo] = useState(null);
-  const [aprovando, setAprovando] = useState(false);
   const { addToast } = useToast();
 
   const filterConfig = useMemo(() => [
@@ -147,10 +144,6 @@ export default function OrcamentosPage() {
 
   const handleMudarEstado = async (o, novoEstado) => {
     if (!novoEstado || novoEstado === o.estado) return;
-    if (novoEstado === "aprovado") {
-      setAprovarAlvo(o);
-      return;
-    }
     const antigo = o.estado;
     try {
       const atualizado = await mudarEstado(o.id, novoEstado);
@@ -162,44 +155,13 @@ export default function OrcamentosPage() {
     }
   };
 
-  const confirmarAprovacao = async (comProducao) => {
-    const o = aprovarAlvo;
-    if (!o) return;
-    setAprovando(true);
-    try {
-      const atualizado = await mudarEstado(o.id, "aprovado", comProducao ? { gerar_op: true } : undefined);
-      setOrcamentos((prev) => prev.map((x) => (x.id === o.id ? normalizarOrcamento({ ...x, ...atualizado }) : x)));
-      addToast(
-        comProducao
-          ? `Orçamento ${o.numero || o.id} aprovado e enviado para produção`
-          : `Orçamento ${o.numero || o.id} aprovado`,
-        "success"
-      );
-      setAprovarAlvo(null);
-    } catch (err) {
-      addToast(err.response?.data?.erro || "Erro ao aprovar o orçamento", "error");
-    } finally {
-      setAprovando(false);
-    }
-  };
-
-  const enviarParaProducao = async (o) => {
-    try {
-      const r = await enviarProducao(o.id);
-      setOrcamentos((prev) => prev.map((x) => (x.id === o.id && r.ordem ? { ...x, ordem_producao: r.ordem } : x)));
-      addToast(r.mensagem || "Orçamento enviado para produção", "success");
-    } catch (err) {
-      addToast(err.response?.data?.erro || "Erro ao enviar para produção", "error");
-    }
-  };
-
   const handleWhatsApp = (o) => {
     const tel = String(o.cliente?.telefone || o.cliente?.whatsapp || "").replace(/\D/g, "");
     if (!tel) {
       addToast("Cliente sem telefone registado", "error");
       return;
     }
-    const msg = encodeURIComponent(`Olá ${o.cliente?.nome || ""}! Segue o seu orçamento ${o.numero || o.id} da ${empresa.nome || "SIGRAF"}.`);
+    const msg = encodeURIComponent(`Olá ${o.cliente?.nome || ""}! Segue o seu orçamento ${o.numero || o.id} da ${empresa.nome || "KAMGEST"}.`);
     window.open(`https://wa.me/${tel}?text=${msg}`, "_blank", "noopener,noreferrer");
   };
 
@@ -416,11 +378,6 @@ export default function OrcamentosPage() {
                     >
                       {ESTADOS.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
                     </select>
-                    {o.estado === "aprovado" && !o.ordem_producao?.id && (
-                      <Button variant="outline" size="sm" onClick={() => enviarParaProducao(o)}>
-                        <Icon name="factory" className="text-sm" /> Produção
-                      </Button>
-                    )}
                     <Button variant="ghost" size="sm" onClick={() => irParaEdicao(o)}><Icon name="edit" className="text-sm" /> Editar</Button>
                     <Button variant="ghost" size="sm" onClick={() => handleGerarPdf(o)}><Icon name="picture_as_pdf" className="text-sm" /></Button>
                     <Button variant="ghost" size="sm" onClick={() => setEliminarItem(o)} className="text-error"><Icon name="delete" className="text-sm" /></Button>
@@ -440,11 +397,6 @@ export default function OrcamentosPage() {
             <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <CardTitle className="flex items-center gap-2"><Icon name="description" className="text-primary" /> Detalhes — {o.numero || o.id}</CardTitle>
               <div className="flex gap-2 flex-wrap">
-                {o.estado === "aprovado" && !o.ordem_producao?.id && (
-                  <Button variant="outline" size="sm" onClick={() => enviarParaProducao(o)}>
-                    <Icon name="factory" className="text-[16px]" /> Enviar para Produção
-                  </Button>
-                )}
                 <Button variant="outline" size="sm" onClick={() => handleGerarPdf(o)}><Icon name="picture_as_pdf" className="text-[16px]" /> PDF</Button>
                 <Button variant="outline" size="sm" onClick={() => handleWhatsApp(o)}><Icon name="chat" className="text-[16px]" /> WhatsApp</Button>
               </div>
@@ -637,14 +589,6 @@ export default function OrcamentosPage() {
         onClose={() => setPdfOrcamento(null)}
       />
 
-      <AprovarOrcamentoDialog
-        open={Boolean(aprovarAlvo)}
-        orcamento={aprovarAlvo}
-        onClose={() => setAprovarAlvo(null)}
-        onConfirmar={confirmarAprovacao}
-        carregando={aprovando}
-      />
-
       <ConfirmDialog
         open={Boolean(eliminarItem)}
         onClose={() => setEliminarItem(null)}
@@ -657,10 +601,6 @@ export default function OrcamentosPage() {
             : ""
         }
       />
-
-      <footer className="border-t pt-6 pb-2 text-center">
-        <p className="text-[11px] text-muted-foreground">SIGRAF · Sistema de Gestão para Indústria Gráfica</p>
-      </footer>
 
       <FloatButton href="/orcamentos/novo" label="Novo Orçamento" icon="request_quote" />
     </div>

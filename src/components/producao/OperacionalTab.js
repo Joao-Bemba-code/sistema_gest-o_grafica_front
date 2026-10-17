@@ -2,12 +2,24 @@
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import Icon from "@/components/Icon";
-import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
-import KpiCard from "@/components/ui/KpiCard";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
+import Modal from "@/components/Modal";
+import RowMenu from "@/components/ui/RowMenu";
+import Paginacao, { usePaginacao } from "@/components/ui/Paginacao";
+import {
+  Ledger,
+  LedgerHeader,
+  FilterRow,
+  LedgerTable,
+  LedgerTh,
+  LedgerTr,
+  LedgerTd,
+  IdCell,
+  StatusBadge,
+  LedgerEmpty,
+} from "@/components/ui/Ledger";
 import { listarOrdens, salvarImpressao, libertarParaMaquina } from "@/services/producao";
 import { listar as listarMaquinas } from "@/services/maquinas";
 import { descricaoErroApi } from "@/services/api";
@@ -16,10 +28,10 @@ import MaquinasTab from "@/components/producao/MaquinasTab";
 import { getUsuario } from "@/services/auth";
 
 const statusConfig = {
-  aguardando: { label: "Aguardando", variant: "warning" },
-  em_producao: { label: "Em Produção", variant: "info" },
-  finalizado: { label: "Finalizado", variant: "success" },
-  entregue: { label: "Entregue", variant: "secondary" },
+  aguardando: { label: "Aguardando", tom: "warning" },
+  em_producao: { label: "Em Produção", tom: "info" },
+  finalizado: { label: "Finalizado", tom: "success" },
+  entregue: { label: "Entregue", tom: "neutral" },
 };
 
 function formatData(v) {
@@ -54,17 +66,29 @@ const camposRegisto = [
   { key: "quantidadeRejeitada", label: "Rejeitado", tipo: "number" },
 ];
 
+const CAMPOS = [
+  { value: "numero", label: "Nº da OP", obter: (o) => `${o.numero || ""} ${o.id || ""}` },
+  { value: "cliente", label: "Cliente", obter: (o) => o.cliente || "" },
+  { value: "produto", label: "Produto", obter: (o) => o.produto || "" },
+  { value: "operacional", label: "Operacional", obter: (o) => o.operacional || "" },
+  { value: "operador", label: "Operador", obter: (o) => o.operador || "" },
+];
+
+const inputCls = "h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary/25 transition-colors";
+
 export default function OperacionalTab() {
   const { addToast } = useToast();
   const [ops, setOps] = useState([]);
   const [maquinas, setMaquinas] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
   const [registo, setRegisto] = useState({});
-  const [expandidoId, setExpandidoId] = useState(null);
+  const [detalhe, setDetalhe] = useState(null);
   const [libertarOp, setLibertarOp] = useState(null);
   const [guardando, setGuardando] = useState(false);
   const [subTab, setSubTab] = useState("maquinas");
+  const [filtro, setFiltro] = useState({ campo: "numero", operador: "contem", termo: "" });
+  const [ordem, setOrdem] = useState({ chave: "", dir: 1 });
+  const [filtrosAbertos, setFiltrosAbertos] = useState(true);
 
   const carregarDados = useCallback(() => {
     Promise.allSettled([listarOrdens(), listarMaquinas()])
@@ -99,17 +123,24 @@ export default function OperacionalTab() {
     carregarDados();
   }, [carregarDados]);
 
-  const filtrados = useMemo(() => {
-    if (!search.trim()) return ops;
-    const q = search.toLowerCase();
-    return ops.filter((o) =>
-      o.cliente?.toLowerCase().includes(q) ||
-      o.produto?.toLowerCase().includes(q) ||
-      o.operacional?.toLowerCase().includes(q) ||
-      o.operador?.toLowerCase().includes(q) ||
-      String(o.id).includes(q)
-    );
-  }, [ops, search]);
+  const resultado = useMemo(() => {
+    const termo = filtro.termo.trim().toLowerCase();
+    let res = [...ops];
+    if (termo) {
+      const cfg = CAMPOS.find((c) => c.value === filtro.campo) || CAMPOS[0];
+      res = res.filter((o) => {
+        const alvo = String(cfg.obter(o) || "").toLowerCase();
+        if (filtro.operador === "igual") return alvo === termo;
+        if (filtro.operador === "comeca") return alvo.startsWith(termo);
+        return alvo.includes(termo);
+      });
+    }
+    if (ordem.chave === "numero") res.sort((a, b) => String(a.numero || "").localeCompare(String(b.numero || ""), "pt", { numeric: true }) * ordem.dir);
+    if (ordem.chave === "dataInicio") res.sort((a, b) => (new Date(a.dataInicio || 0) - new Date(b.dataInicio || 0)) * ordem.dir);
+    return res;
+  }, [ops, filtro, ordem]);
+
+  const { visiveis, ...pag } = usePaginacao({ items: resultado });
 
   const totalEmProducao = ops.filter((o) => o.status === "em_producao").length;
   const semOperacional = ops.filter((o) => o.requisicao_estado === "libertada" && !o.operacional).length;
@@ -117,10 +148,6 @@ export default function OperacionalTab() {
     () => new Set(ops.map((o) => o.operacional).filter(Boolean).map((n) => n.trim().toLowerCase())).size,
     [ops]
   );
-
-  const abrirEdicao = (o) => {
-    setExpandidoId(expandidoId === o.id ? null : o.id);
-  };
 
   const atualizarCampo = (opId, key, value) => {
     setRegisto((prev) => ({ ...prev, [opId]: { ...(prev[opId] || {}), [key]: value } }));
@@ -167,183 +194,209 @@ export default function OperacionalTab() {
     }
   };
 
+  const opDetalhe = detalhe ? ops.find((o) => o.id === detalhe) || null : null;
+
   return (
-    <div className="space-y-5">
-      <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="flex items-center gap-3">
-          <Icon name="precision_manufacturing" className="text-[22px] text-primary shrink-0" />
-          <div>
-            <p className="text-sm font-semibold text-foreground">Registo Operacional</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Gestão completa das máquinas e registo das máquinas usadas em cada ordem de produção.
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-1 p-1 rounded-xl bg-muted/60 border border-border/30 w-fit">
-          {[
-            { id: "maquinas", label: "Máquinas", icon: "precision_manufacturing" },
-            { id: "por_op", label: "Registo por OP", icon: "assignment" },
-          ].map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setSubTab(t.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-colors ${
-                subTab === t.id ? "bg-primary/20 text-primary shadow" : "text-muted-foreground hover:text-foreground hover:bg-muted"
-              }`}
-            >
-              <Icon name={t.icon} className="text-[15px]" /> {t.label}
-            </button>
-          ))}
-        </div>
+    <div className="space-y-4">
+      <div className="inline-flex gap-0.5 rounded-lg border border-border bg-muted/50 p-0.5">
+        {[
+          { id: "maquinas", label: "Máquinas", icon: "precision_manufacturing" },
+          { id: "por_op", label: "Registo por OP", icon: "assignment" },
+        ].map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setSubTab(t.id)}
+            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              subTab === t.id ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Icon name={t.icon} className="text-base" /> {t.label}
+          </button>
+        ))}
       </div>
 
       {subTab === "maquinas" ? (
         <MaquinasTab registarEstado />
       ) : (
-        <>
-      <section className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        <KpiCard icon="construction" label="Em Produção" value={totalEmProducao} iconVariant="info" />
-        <KpiCard icon="pending_actions" label="Sem Operacional" value={semOperacional} iconVariant="warning" />
-        <KpiCard icon="precision_manufacturing" label="Operacionais Ativos" value={operacionaisAtivos} iconVariant="success" />
-      </section>
+        <Ledger rotulo="Registo operacional ledger">
+          <LedgerHeader
+            titulo="Registo operacional"
+            subtitulo={`${ops.length} OPs · ${totalEmProducao} em produção · ${semOperacional} sem operacional · ${operacionaisAtivos} operacionais ativos`}
+            onToggleFiltros={() => setFiltrosAbertos((v) => !v)}
+            filtrosAbertos={filtrosAbertos}
+          />
+          {filtrosAbertos && (
+            <FilterRow
+              campo={filtro.campo}
+              setCampo={(v) => setFiltro((f) => ({ ...f, campo: v }))}
+              campos={CAMPOS.map(({ value, label }) => ({ value, label }))}
+              operador={filtro.operador}
+              setOperador={(v) => setFiltro((f) => ({ ...f, operador: v }))}
+              termo={filtro.termo}
+              setTermo={(v) => setFiltro((f) => ({ ...f, termo: v }))}
+              aoLimpar={() => setFiltro((f) => ({ ...f, termo: "" }))}
+              placeholder="Pesquisar por nº OP, cliente, produto, operacional, operador..."
+            />
+          )}
+          {loading ? (
+            <div className="p-4"><CardSkeleton lines={5} /></div>
+          ) : (
+            <>
+              <LedgerTable>
+                <thead>
+                  <tr className="border-b border-border">
+                    <LedgerTh onSort={() => setOrdem((p) => (p.chave === "numero" ? { chave: "numero", dir: -p.dir } : { chave: "numero", dir: 1 }))} ativo={ordem.chave === "numero"}>OP</LedgerTh>
+                    <LedgerTh>Cliente</LedgerTh>
+                    <LedgerTh>Produto</LedgerTh>
+                    <LedgerTh>Operacional</LedgerTh>
+                    <LedgerTh onSort={() => setOrdem((p) => (p.chave === "dataInicio" ? { chave: "dataInicio", dir: -p.dir } : { chave: "dataInicio", dir: 1 }))} ativo={ordem.chave === "dataInicio"}>Início</LedgerTh>
+                    <LedgerTh>Produzido</LedgerTh>
+                    <LedgerTh>Estado</LedgerTh>
+                    <LedgerTh className="w-10" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {visiveis.map((o) => {
+                    const sc = statusConfig[o.status] || { label: o.status, tom: "neutral" };
+                    const temOperacional = !!o.operacional;
+                    return (
+                      <LedgerTr key={o.id} onClick={() => setDetalhe(o.id)}>
+                        <LedgerTd className="max-w-36">
+                          <IdCell id={o.numero || `OP #${o.id}`} meta={`Qtd ${o.quantidade ?? "—"}`} aoAbrir={() => setDetalhe(o.id)} />
+                        </LedgerTd>
+                        <LedgerTd className="max-w-44"><span className="block truncate">{o.cliente}</span></LedgerTd>
+                        <LedgerTd className="max-w-44"><span className="block truncate">{o.produto || "—"}</span></LedgerTd>
+                        <LedgerTd className="max-w-44">
+                          {temOperacional ? (
+                            <>
+                              <span className="block truncate">{o.operacional}</span>
+                              <span className="block truncate text-xs text-muted-foreground">{o.operador || "Sem operador"}</span>
+                            </>
+                          ) : (
+                            <StatusBadge tom="neutral">Sem operacional</StatusBadge>
+                          )}
+                        </LedgerTd>
+                        <LedgerTd className="text-muted-foreground whitespace-nowrap">{temOperacional ? formatData(o.dataInicio) : "—"}</LedgerTd>
+                        <LedgerTd className="tabular-nums">{o.quantidadeProduzida ?? "—"}</LedgerTd>
+                        <LedgerTd>
+                          <span className="flex flex-wrap items-center gap-1">
+                            <StatusBadge tom={sc.tom}>{sc.label}</StatusBadge>
+                            {o.requisicao_estado === "libertada" && !temOperacional && (
+                              <StatusBadge tom="warning">Aguardando atribuição</StatusBadge>
+                            )}
+                          </span>
+                        </LedgerTd>
+                        <LedgerTd>
+                          <RowMenu
+                            ariaLabel="Ações do registo"
+                            itens={[
+                              ...(o.requisicao_estado === "libertada" && !temOperacional
+                                ? [{ icone: "precision_manufacturing", rotulo: "Atribuir operacional", onClick: () => setLibertarOp(o) }]
+                                : [{ icone: "edit", rotulo: "Editar registo", onClick: () => setDetalhe(o.id) }]),
+                            ]}
+                          />
+                        </LedgerTd>
+                      </LedgerTr>
+                    );
+                  })}
+                </tbody>
+              </LedgerTable>
+              {pag.total === 0 && (
+                ops.length === 0
+                  ? <LedgerEmpty icone="precision_manufacturing">Nenhum registo operacional — atribua um operacional a uma OP para iniciar o registo</LedgerEmpty>
+                  : <LedgerEmpty icone="search_off">Nenhuma OP corresponde ao filtro</LedgerEmpty>
+              )}
+              <Paginacao {...pag} label="OPs" />
+            </>
+          )}
+        </Ledger>
+      )}
 
-      <div className="relative">
-        <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[18px]" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Pesquisar por nº OP, cliente, produto, operacional, operador..."
-          className="w-full pl-10 pr-4 py-2.5 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30"
-        />
-        {search && (
-          <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-            <Icon name="close" className="text-[16px]" />
-          </button>
-        )}
-      </div>
+      <Modal
+        open={Boolean(opDetalhe)}
+        onClose={() => setDetalhe(null)}
+        title={`OP ${opDetalhe?.numero || opDetalhe?.id || ""} — Registo operacional`}
+        icon="assignment"
+        size="lg"
+      >
+        {opDetalhe && (() => {
+          const r = registo[opDetalhe.id] || {};
+          const temOperacional = !!opDetalhe.operacional;
+          const sc = statusConfig[opDetalhe.status] || { label: opDetalhe.status, tom: "neutral" };
+          return (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusBadge tom={sc.tom}>{sc.label}</StatusBadge>
+                {temOperacional ? (
+                  <StatusBadge tom="success">{opDetalhe.operacional}</StatusBadge>
+                ) : (
+                  <StatusBadge tom="neutral">Sem operacional</StatusBadge>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">{opDetalhe.cliente} — {opDetalhe.produto} ({opDetalhe.quantidade})</p>
 
-      {loading ? (
-        <CardSkeleton lines={5} />
-      ) : filtrados.length === 0 ? (
-        <div className="text-center p-12 text-muted-foreground">
-          <Icon name="precision_manufacturing" className="text-4xl block mx-auto mb-2 opacity-30" />
-          <p className="font-medium">Nenhum registo operacional</p>
-          <p className="text-xs mt-1">Atribua um operacional a uma ordem de produção para iniciar o registo.</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {filtrados.map((o) => {
-            const sc = statusConfig[o.status] || {};
-            const r = registo[o.id] || {};
-            const temOperacional = !!o.operacional;
-            return (
-              <Card key={o.id}>
-                <div className="p-5 flex flex-col xl:flex-row xl:items-center justify-between gap-4 cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => abrirEdicao(o)}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <Icon name="construction" className="text-primary text-[20px]" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-sm text-foreground">OP {o.id}</span>
-                        <Badge variant={sc.variant || "outline"} className="text-[10px]">{sc.label || o.status}</Badge>
-                        {temOperacional ? (
-                          <Badge variant="success" className="text-[10px]"><Icon name="precision_manufacturing" className="text-[12px]" /> {o.operacional}</Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-[10px]">Sem operacional</Badge>
-                        )}
+              {opDetalhe.requisicao_estado === "pendente" && (
+                <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3">
+                  <Icon name="inventory" className="text-[20px] text-warning shrink-0" />
+                  <p className="text-xs text-foreground">
+                    Aguardando requisição de materiais. Primeiro faça a saída de materiais na aba <strong>Ordens</strong> para poder atribuir o operacional.
+                  </p>
+                </div>
+              )}
+
+              {opDetalhe.requisicao_estado === "libertada" && !temOperacional && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-lg border border-success/30 bg-success/10 px-4 py-3">
+                  <p className="text-xs text-foreground">Materiais libertados. Atribua o operacional para iniciar a produção.</p>
+                  <Button size="sm" onClick={() => { setDetalhe(null); setLibertarOp(opDetalhe); }}>
+                    <Icon name="precision_manufacturing" className="text-lg" /> Atribuir operacional
+                  </Button>
+                </div>
+              )}
+
+              {temOperacional && (
+                <div className="space-y-4">
+                  <h3 className="text-sm font-normal text-foreground flex items-center gap-2">
+                    <Icon name="precision_manufacturing" className="text-[18px] text-primary" /> Registo do operacional — {opDetalhe.operacional}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                    {camposRegisto.map((f) => (
+                      <div key={f.key} className="flex flex-col gap-1.5">
+                        <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{f.label}</label>
+                        <input
+                          type={f.tipo}
+                          value={r[f.key] ?? ""}
+                          onChange={(e) => atualizarCampo(opDetalhe.id, f.key, f.tipo === "number" ? Number(e.target.value) : e.target.value)}
+                          className={inputCls}
+                        />
                       </div>
-                      <p className="text-xs text-muted-foreground">{o.cliente} — {o.produto} ({o.quantidade})</p>
+                    ))}
+                    <div className="flex flex-col gap-1.5 lg:col-span-5">
+                      <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Observações</label>
+                      <textarea
+                        rows={2}
+                        value={r.observacoes || ""}
+                        onChange={(e) => atualizarCampo(opDetalhe.id, "observacoes", e.target.value)}
+                        className={`${inputCls} resize-none`}
+                        placeholder="Notas sobre a utilização do operacional..."
+                      />
                     </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                    {temOperacional && (
-                      <>
-                        <span>Operador: <strong className="text-foreground">{o.operador || "—"}</strong></span>
-                        <span>Início: <strong className="text-foreground">{formatData(o.dataInicio)}</strong></span>
-                        <span>Produzido: <strong className="text-foreground">{o.quantidadeProduzida ?? "—"}</strong></span>
-                      </>
-                    )}
-                    {o.requisicao_estado === "libertada" && !temOperacional && (
-                      <span className="text-amber-600 font-semibold">Aguardando atribuição</span>
-                    )}
+                  <div className="flex justify-end">
+                    <Button size="sm" loading={guardando} onClick={() => guardarRegisto(opDetalhe)}>
+                      <Icon name="save" className="text-lg" /> Guardar registo
+                    </Button>
                   </div>
                 </div>
+              )}
 
-                {expandidoId === o.id && (
-                  <div className="border-t p-5 space-y-4">
-                    {o.requisicao_estado === "pendente" && (
-                      <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
-                        <Icon name="inventory" className="text-[20px] text-amber-600 shrink-0" />
-                        <div>
-                          <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Aguardando requisição de materiais</p>
-                          <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-0.5">
-                            Primeiro faça a saída de materiais na aba &quot;Ordens&quot; para poder atribuir o operacional.
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {o.requisicao_estado === "libertada" && !temOperacional && (
-                      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
-                        <p className="text-xs text-emerald-700 dark:text-emerald-400">
-                          Materiais libertados. Atribua o operacional para iniciar a produção.
-                        </p>
-                        <Button size="sm" onClick={() => setLibertarOp(o)}>
-                          <Icon name="precision_manufacturing" className="text-lg" /> Atribuir operacional
-                        </Button>
-                      </div>
-                    )}
-
-                    {temOperacional && (
-                      <div className="space-y-4">
-                        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                          <Icon name="precision_manufacturing" className="text-[18px] text-primary" /> Registo do operacional — {o.operacional}
-                        </h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                          {camposRegisto.map((f) => (
-                            <div key={f.key} className="flex flex-col gap-1">
-                              <label className="text-[10px] font-bold text-muted-foreground uppercase">{f.label}</label>
-                              <input
-                                type={f.tipo}
-                                value={r[f.key] ?? ""}
-                                onChange={(e) => atualizarCampo(o.id, f.key, f.tipo === "number" ? Number(e.target.value) : e.target.value)}
-                                className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30"
-                              />
-                            </div>
-                          ))}
-                          <div className="flex flex-col gap-1 lg:col-span-5">
-                            <label className="text-[10px] font-bold text-muted-foreground uppercase">Observações</label>
-                            <textarea
-                              rows={2}
-                              value={r.observacoes || ""}
-                              onChange={(e) => atualizarCampo(o.id, "observacoes", e.target.value)}
-                              className="px-3.5 py-2 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none"
-                              placeholder="Notas sobre a utilização do operacional..."
-                            />
-                          </div>
-                        </div>
-                        <div className="flex justify-end">
-                          <Button size="sm" loading={guardando} onClick={() => guardarRegisto(o)}>
-                            <Icon name="save" className="text-lg" /> Guardar registo
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-
-                    {o.requisicao_estado !== "libertada" && !temOperacional && o.status !== "aguardando" && (
-                      <p className="text-xs text-muted-foreground">
-                        Sem registo associado a este operacional.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </Card>
-            );
-          })}
-        </div>
-      )}
+              {opDetalhe.requisicao_estado !== "libertada" && !temOperacional && opDetalhe.status !== "aguardando" && (
+                <p className="text-xs text-muted-foreground">Sem registo associado a este operacional.</p>
+              )}
+            </div>
+          );
+        })()}
+      </Modal>
 
       <LibertarMaquinaModal
         key={libertarOp?.id ?? "nenhum-operacional"}
@@ -354,8 +407,6 @@ export default function OperacionalTab() {
         onConfirm={handleAtribuir}
         nomeUsuario={getUsuario()?.nome || ""}
       />
-        </>
-      )}
     </div>
   );
 }

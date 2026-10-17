@@ -345,7 +345,7 @@ export default function DesignSystemPage() {
 
   const handleShare = async (title, index) => {
     try {
-      await navigator.clipboard.writeText(`SIGRAF — ${title}`);
+      await navigator.clipboard.writeText(`KAMGEST — ${title}`);
     } catch {
       /* clipboard indisponível: a demo segue sem feedback extra */
     }
@@ -375,7 +375,7 @@ export default function DesignSystemPage() {
           <div>
             <Badge variant="info" className="mb-3">Design System · v1.0</Badge>
             <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-              Design System SIGRAF
+              Design System KAMGEST
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
               Conjunto de componentes de formulário e cards construídos sobre tokens
@@ -1014,7 +1014,7 @@ export default function DesignSystemPage() {
 
       <footer className="mt-20 rounded-2xl border border-border bg-card p-6 text-center">
         <p className="text-xs text-muted-foreground">
-          SIGRAF Design System — Formulários e Cards · Rotas:{" "}
+          KAMGEST Design System — Formulários e Cards · Rotas:{" "}
           <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">
             /design-system
           </code>

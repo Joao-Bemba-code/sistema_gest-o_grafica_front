@@ -1,13 +1,24 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Fragment, useState, useEffect, useMemo } from "react";
 import Modal from "@/components/Modal";
 import Icon from "@/components/Icon";
-import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
+import Paginacao, { usePaginacao } from "@/components/ui/Paginacao";
+import {
+  Ledger,
+  LedgerHeader,
+  FilterRow,
+  LedgerTable,
+  LedgerTh,
+  LedgerTr,
+  LedgerTd,
+  IdCell,
+  StatusBadge,
+  LedgerEmpty,
+} from "@/components/ui/Ledger";
 import { inputCls } from "@/lib/estoque";
 import { listarOrdens, salvarAcabamento } from "@/services/producao";
 
@@ -23,9 +34,40 @@ const servicos = [
 
 const processoOptions = ["pendente", "em_execucao", "concluido"];
 const processoLabels = { pendente: "Pendente", em_execucao: "Em Execução", concluido: "Concluído" };
-const processoVariants = { pendente: "outline", em_execucao: "warning", concluido: "success" };
+const processoVariants = { pendente: "neutral", em_execucao: "warning", concluido: "success" };
 const initialForm = { op: "", cliente: "", produto: "", prazo: "", responsavel: "" };
 const initialServicos = Object.fromEntries(servicos.map(s => [s.id, "pendente"]));
+
+const estadoMeta = {
+  concluido: { label: "Concluído", tom: "success" },
+  em_execucao: { label: "Em Andamento", tom: "warning" },
+  pendente: { label: "Pendente", tom: "neutral" },
+};
+
+const ESTADOS = [
+  { value: "todos", label: "Todos" },
+  { value: "concluido", label: "Concluídos" },
+  { value: "em_execucao", label: "Em Andamento" },
+  { value: "pendente", label: "Pendentes" },
+];
+
+const CAMPOS = [
+  { value: "geral", label: "Todos os campos", obter: (o) => [o.id, o.cliente, o.produto, o.responsavel].join(" ") },
+  { value: "id", label: "OP", obter: (o) => o.id || "" },
+  { value: "cliente", label: "Cliente", obter: (o) => o.cliente || "" },
+  { value: "produto", label: "Produto", obter: (o) => o.produto || "" },
+  { value: "responsavel", label: "Responsável", obter: (o) => o.responsavel || "" },
+];
+
+const pillBase = "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-sm font-medium whitespace-nowrap transition-colors";
+const pillAtiva = "border-primary/40 bg-primary/10 text-primary";
+const pillInativa = "border-border bg-card text-muted-foreground hover:bg-muted/60 hover:text-foreground";
+
+const estadoOrdem = (op) => {
+  const todosConcluidos = servicos.every(s => op.servicos[s.id] === "concluido");
+  const algumExec = servicos.some(s => op.servicos[s.id] === "em_execucao");
+  return todosConcluidos ? "concluido" : algumExec ? "em_execucao" : "pendente";
+};
 
 export default function AcabamentoPage() {
   const [ordens, setOrdens] = useState([]);
@@ -35,6 +77,9 @@ export default function AcabamentoPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(initialForm);
   const [servicosForm, setServicosForm] = useState(initialServicos);
+  const [filtro, setFiltro] = useState({ campo: "geral", operador: "contem", termo: "" });
+  const [filtrosAbertos, setFiltrosAbertos] = useState(true);
+  const [estadoFiltro, setEstadoFiltro] = useState("todos");
   const { addToast } = useToast();
 
   useEffect(() => {
@@ -91,79 +136,138 @@ export default function AcabamentoPage() {
     }
   };
 
+  const filtrados = useMemo(() => {
+    const termo = filtro.termo.trim().toLowerCase();
+    let res = [...ordens];
+    if (estadoFiltro !== "todos") res = res.filter((o) => estadoOrdem(o) === estadoFiltro);
+    if (termo) {
+      const cfg = CAMPOS.find((c) => c.value === filtro.campo) || CAMPOS[0];
+      res = res.filter((o) => {
+        const alvo = String(cfg.obter(o) || "").toLowerCase();
+        if (filtro.operador === "igual") return alvo === termo;
+        if (filtro.operador === "comeca") return alvo.startsWith(termo);
+        return alvo.includes(termo);
+      });
+    }
+    return res;
+  }, [ordens, filtro, estadoFiltro]);
+
+  const pag = usePaginacao({ items: filtrados });
+
+  const contagemEstado = (v) => v === "todos" ? ordens.length : ordens.filter((o) => estadoOrdem(o) === v).length;
+
   if (loading) return <CardSkeleton lines={6} />;
   if (error) return <div className="bg-destructive/10 text-destructive rounded-2xl p-6 text-center font-semibold">{error}</div>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Acabamento</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Acompanhamento dos serviços de acabamento</p>
-        </div>
+    <div className="space-y-4">
+      <div className="min-w-0">
+        <h1 className="text-base font-normal text-foreground">Acabamento</h1>
+        <p className="mt-1 text-xs text-muted-foreground">Acompanhamento dos serviços de acabamento</p>
       </div>
 
-      <div className="space-y-3">
-        {ordens.map((op) => {
-          const todosConcluidos = servicos.every(s => op.servicos[s.id] === "concluido");
-          const algumExec = servicos.some(s => op.servicos[s.id] === "em_execucao");
-          return (
-            <Card key={op.id} className="hover-lift cursor-pointer" onClick={() => setSelected(selected === op.id ? null : op.id)}>
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <Icon name="handyman" className="text-primary text-[20px]" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-foreground">{op.id}</span>
-                        <Badge variant={todosConcluidos ? "success" : algumExec ? "warning" : "outline"} className="text-[10px]">
-                          {todosConcluidos ? "Concluído" : algumExec ? "Em Andamento" : "Pendente"}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{op.cliente} — {op.produto}</p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] text-muted-foreground hidden sm:block">Prazo: {op.prazo}</span>
-                </div>
-
-                {selected === op.id && (
-                  <div className="mt-4 pt-4 border-t">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 mb-4">
-                      {servicos.map((s) => {
-                        const val = op.servicos[s.id];
-                        return (
-                          <button key={s.id} onClick={() => { toggleServico(op.id, s.id); }}
-                            className={`p-3 rounded-xl border text-center transition-all text-xs font-bold ${
-                              val === "concluido" ? "border-green-300 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400" :
-                              val === "em_execucao" ? "border-amber-300 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400" :
-                              "border-border bg-muted/50 text-muted-foreground"
-                            }`}>
-                            <Icon name={s.icon} className="text-lg block mb-1 mx-auto" />
-                            <span className="block">{s.label}</span>
-                            <span className="block text-[9px] mt-0.5 opacity-70">{processoLabels[val]}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={() => handleSave(op.id)}>Guardar</Button>
-                      <Button variant="outline" size="sm" onClick={() => handleEdit(op)}><Icon name="edit" className="text-sm" /> Editar Tudo</Button>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
-        {ordens.length === 0 && (
-          <div className="text-center p-12 text-muted-foreground">
-            <Icon name="handyman" className="text-4xl block mx-auto mb-2 opacity-30" />
-            <p className="font-medium">Nenhuma ordem de acabamento encontrada</p>
-          </div>
+      <Ledger rotulo="Acabamento ledger">
+        <LedgerHeader
+          titulo="Acabamento"
+          subtitulo={`${filtrados.length} de ${ordens.length} ordens`}
+          onToggleFiltros={() => setFiltrosAbertos((v) => !v)}
+          filtrosAbertos={filtrosAbertos}
+        />
+        {filtrosAbertos && (
+          <FilterRow
+            campo={filtro.campo}
+            setCampo={(v) => setFiltro((f) => ({ ...f, campo: v }))}
+            campos={CAMPOS.map(({ value, label }) => ({ value, label }))}
+            operador={filtro.operador}
+            setOperador={(v) => setFiltro((f) => ({ ...f, operador: v }))}
+            termo={filtro.termo}
+            setTermo={(v) => setFiltro((f) => ({ ...f, termo: v }))}
+            aoLimpar={() => setFiltro((f) => ({ ...f, termo: "" }))}
+            placeholder="Pesquisar ordens por OP, cliente, produto, responsável..."
+          />
         )}
-      </div>
+
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2">
+          {ESTADOS.map((e) => (
+            <button
+              key={e.value}
+              type="button"
+              onClick={() => setEstadoFiltro(e.value)}
+              aria-pressed={estadoFiltro === e.value}
+              className={`${pillBase} ${estadoFiltro === e.value ? pillAtiva : pillInativa}`}
+            >
+              {e.label}
+              <span className="text-[11px] text-muted-foreground">{contagemEstado(e.value)}</span>
+            </button>
+          ))}
+        </div>
+
+        <LedgerTable>
+          <thead>
+            <tr className="border-b border-border">
+              <LedgerTh>Ordem</LedgerTh>
+              <LedgerTh>Estado</LedgerTh>
+              <LedgerTh>Responsável</LedgerTh>
+              <LedgerTh>Prazo</LedgerTh>
+            </tr>
+          </thead>
+          <tbody>
+            {pag.visiveis.map((op) => {
+              const est = estadoMeta[estadoOrdem(op)];
+              return (
+                <Fragment key={op.id}>
+                  <LedgerTr onClick={() => setSelected(selected === op.id ? null : op.id)}>
+                    <LedgerTd className="max-w-56">
+                      <IdCell id={op.id} meta={`${op.cliente} — ${op.produto}`} />
+                    </LedgerTd>
+                    <LedgerTd>
+                      <StatusBadge tom={est.tom}>{est.label}</StatusBadge>
+                    </LedgerTd>
+                    <LedgerTd className="text-muted-foreground">{op.responsavel || "—"}</LedgerTd>
+                    <LedgerTd className="whitespace-nowrap text-muted-foreground">{op.prazo}</LedgerTd>
+                  </LedgerTr>
+
+                  {selected === op.id && (
+                    <LedgerTr>
+                      <LedgerTd colSpan={4} className="bg-muted/20">
+                        <div className="py-2">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 mb-4">
+                            {servicos.map((s) => {
+                              const val = op.servicos[s.id];
+                              return (
+                                <button key={s.id} type="button" onClick={() => toggleServico(op.id, s.id)}
+                                  className={`p-3 rounded-lg border text-center transition-colors ${
+                                    val === "concluido" ? "border-success/30 bg-success/10 text-success" :
+                                    val === "em_execucao" ? "border-warning/30 bg-warning/10 text-warning" :
+                                    "border-border bg-muted/50 text-muted-foreground"
+                                  }`}>
+                                  <Icon name={s.icon} className="text-lg block mb-1 mx-auto" />
+                                  <span className="block text-[11px] font-medium">{s.label}</span>
+                                  <span className="block text-[11px] mt-0.5 opacity-70">{processoLabels[val]}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={() => handleSave(op.id)}>Guardar</Button>
+                            <Button variant="outline" size="sm" onClick={() => handleEdit(op)}><Icon name="edit" className="text-sm" /> Editar Tudo</Button>
+                          </div>
+                        </div>
+                      </LedgerTd>
+                    </LedgerTr>
+                  )}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </LedgerTable>
+
+        {pag.total === 0 && (
+          <LedgerEmpty icone="handyman">Nenhuma ordem de acabamento encontrada</LedgerEmpty>
+        )}
+
+        <Paginacao {...pag} label="ordens" />
+      </Ledger>
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Editar Acabamento" icon="handyman" size="lg"
         footer={<><Button type="button" variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button><Button type="submit" form="form-acabamento">Guardar</Button></>}>
@@ -187,24 +291,20 @@ export default function AcabamentoPage() {
                   const next = processoOptions[(idx + 1) % processoOptions.length];
                   setServicosForm(prev => ({ ...prev, [s.id]: next }));
                 }}
-                  className={`p-3 rounded-xl border-2 text-center transition-all text-xs font-bold ${
-                    val === "concluido" ? "border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400" :
-                    val === "em_execucao" ? "border-amber-500 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400" :
+                  className={`p-3 rounded-xl border-2 text-center transition-all ${
+                    val === "concluido" ? "border-success/30 bg-success/10 text-success" :
+                    val === "em_execucao" ? "border-warning/30 bg-warning/10 text-warning" :
                     "border-border bg-background text-muted-foreground"
                   }`}>
                   <Icon name={s.icon} className="text-lg block mb-1 mx-auto" />
-                  <span>{s.label}</span>
-                  <Badge variant={processoVariants[val]} className="block mt-1 text-[9px]">{processoLabels[val]}</Badge>
+                  <span className="text-[11px] block">{s.label}</span>
+                  <StatusBadge tom={processoVariants[val]} className="mt-1">{processoLabels[val]}</StatusBadge>
                 </button>
               );
             })}
           </div>
         </form>
       </Modal>
-
-      <footer className="border-t pt-6 pb-2 text-center">
-        <p className="text-[11px] text-muted-foreground">SIGRAF · Sistema de Gestão para Indústria Gráfica</p>
-      </footer>
     </div>
   );
 }

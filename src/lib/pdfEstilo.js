@@ -108,7 +108,7 @@ export function cabecalhoPagina(doc, titulo, empresa = {}, direitos = []) {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(17);
   doc.setFont("helvetica", "bold");
-  doc.text(empresa.nome || "SIGRAF", 14, 16);
+  doc.text(empresa.nome || "KAMGEST", 14, 16);
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
   const contacto = [
@@ -125,7 +125,7 @@ export function cabecalhoPagina(doc, titulo, empresa = {}, direitos = []) {
   direitos.forEach((linha, i) => doc.text(linha, pw - 14, 24 + i * 6, { align: "right" }));
 }
 
-export function rodape(doc, texto = "Documento gerado por SIGRAF") {
+export function rodape(doc, texto = "Documento gerado por KAMGEST") {
   const pw = doc.internal.pageSize.getWidth();
   const ph = doc.internal.pageSize.getHeight();
   doc.setFontSize(7);
@@ -136,7 +136,7 @@ export function rodape(doc, texto = "Documento gerado por SIGRAF") {
 }
 
 // Rodapé monocromático de marca (usado nos relatórios)
-export function rodapeMarca(doc, texto = "Documento gerado por SIGRAF") {
+export function rodapeMarca(doc, texto = "Documento gerado por KAMGEST") {
   const pw = doc.internal.pageSize.getWidth();
   const ph = doc.internal.pageSize.getHeight();
   doc.setFontSize(7);
@@ -216,7 +216,7 @@ export async function desenharCabecalhoMarca(doc, { titulo = "", empresa = {}, d
   // título, para nunca invadir o título nem os metadados do lado direito
   // (evita letras sobrepostas com nomes de empresa longos).
   const textoX = boxX + box + 8;
-  doc.marcaNome = empresa.nome || "SIGRAF";
+  doc.marcaNome = empresa.nome || "KAMGEST";
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16.5);
   const larguraTitulo = doc.getTextWidth(String(titulo || "").toUpperCase());
@@ -225,7 +225,7 @@ export async function desenharCabecalhoMarca(doc, { titulo = "", empresa = {}, d
   doc.setTextColor(...COR_MARCA_PRINCIPAL);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
-  const linhasNome = doc.splitTextToSize(empresa.nome || "SIGRAF", larguraColunaEsquerda).slice(0, 2);
+  const linhasNome = doc.splitTextToSize(empresa.nome || "KAMGEST", larguraColunaEsquerda).slice(0, 2);
   doc.text(linhasNome[0], textoX, 17.5);
   if (linhasNome[1]) doc.text(linhasNome[1], textoX, 22);
   doc.setFont("helvetica", "normal");

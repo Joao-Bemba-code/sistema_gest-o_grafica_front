@@ -39,41 +39,41 @@ export default function EmptyState({ categorias = [], fornecedores = [], temMate
   const concluidos = passos.filter((p) => p.checado(dados)).length;
 
   return (
-    <section className="bg-card border border-border rounded-3xl p-8 sm:p-12 text-center max-w-3xl mx-auto shadow-card animate-fade-up">
-      <div className="mx-auto w-20 h-20 rounded-3xl icon-chip flex items-center justify-center mb-5">
-        <Icon name="inventory_2" className="text-4xl text-primary" />
+    <section className="mx-auto max-w-3xl rounded-xl border border-border bg-card p-8 text-center sm:p-12">
+      <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-lg border border-border bg-muted/50">
+        <Icon name="inventory_2" className="text-lg text-muted-foreground" />
       </div>
-      <h2 className="text-2xl font-extrabold text-foreground tracking-tight">
+      <h2 className="text-lg font-semibold tracking-tight text-foreground">
         Vamos montar o seu estoque
       </h2>
-      <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
+      <p className="mt-2 max-w-md mx-auto text-sm text-muted-foreground">
         Siga estes três passos rápidos e em poucos minutos terá o controlo total da sua matéria-prima.
       </p>
-      <p className="text-[11px] font-mono font-bold text-primary mt-4 uppercase tracking-widest">
+      <p className="mt-4 text-[11px] font-medium text-primary">
         {concluidos}/3 passos concluídos
       </p>
 
-      <ol className="grid gap-4 sm:grid-cols-3 text-left mt-8">
+      <ol className="mt-8 grid gap-4 text-left sm:grid-cols-3">
         {passos.map((p, i) => {
           const feito = p.checado(dados);
           return (
             <li
               key={p.n}
-              className={`relative rounded-xl border p-5 transition-all duration-300 ${feito ? "border-primary/30 bg-primary/5" : "border-outline-variant/30 bg-card/60 hover:border-outline-variant"}`}
+              className={`rounded-xl border p-5 transition-colors ${feito ? "border-primary/30 bg-primary/5" : "border-border bg-card hover:border-border"}`}
               style={{ "--stagger": `${i * 80}ms` }}
             >
               <div className="flex items-center justify-between">
-                <span className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-extrabold ${feito ? "bg-primary/15 text-primary border border-primary/30" : "bg-muted text-muted-foreground"}`}>
-                  {feito ? <Icon name="check" className="text-lg" /> : p.n}
+                <span className={`flex h-8 w-8 items-center justify-center rounded-lg text-sm font-semibold ${feito ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>
+                  {feito ? <Icon name="check" className="text-base" /> : p.n}
                 </span>
-                <Icon name={p.icon} className={`text-2xl ${feito ? "text-primary" : "text-muted-foreground"}`} />
+                <Icon name={p.icon} className={`text-lg ${feito ? "text-primary" : "text-muted-foreground"}`} />
               </div>
-              <h3 className="mt-4 text-sm font-extrabold text-foreground">{p.titulo}</h3>
-              <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{p.desc}</p>
+              <h3 className="mt-4 text-sm font-semibold text-foreground">{p.titulo}</h3>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{p.desc}</p>
               <div className="mt-4">
                 {feito ? (
-                  <span className="inline-flex items-center gap-1.5 text-[11px] font-mono font-bold text-primary uppercase tracking-widest">
-                    <Icon name="task_alt" className="text-base" /> Concluído
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-primary">
+                    <Icon name="task_alt" className="text-sm" /> Concluído
                   </span>
                 ) : (
                   <Link href={p.href}>

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Icon from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
+import { StatusBadge } from "@/components/ui/Ledger";
 import Modal from "@/components/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
@@ -554,7 +554,7 @@ export default function CategoriasPage() {
                         <h3 className="font-semibold text-foreground truncate">{fam.label}</h3>
                       </div>
                     </div>
-                    <Badge variant="outline" className="shrink-0">Grupo: {tipo.label}</Badge>
+                    <StatusBadge tom="neutral" className="shrink-0">Grupo: {tipo.label}</StatusBadge>
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground border-t border-border pt-3">
@@ -782,10 +782,6 @@ export default function CategoriasPage() {
 
       <ConfirmDialog open={Boolean(eliminarServico)} onClose={() => setEliminarServico(null)} onConfirm={confirmarEliminarServico} title="Remover serviço"
         description={eliminarServico ? `Remover "${eliminarServico.nome}"?` : ""} />
-
-      <footer className="border-t pt-6 pb-2 text-center">
-        <p className="text-[11px] text-muted-foreground">SIGRAF · Sistema de Gestão para Indústria Gráfica</p>
-      </footer>
     </div>
   );
 }

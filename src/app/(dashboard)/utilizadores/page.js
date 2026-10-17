@@ -1,22 +1,50 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import Icon from "@/components/Icon";
-import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 import Modal from "@/components/Modal";
+import KpiCard from "@/components/ui/KpiCard";
 import { ListSkeleton } from "@/components/Skeleton";
 import { useToast } from "@/components/Toast";
+import Avatar from "@/components/ui/Avatar";
+import RowMenu from "@/components/ui/RowMenu";
+import Paginacao, { usePaginacao } from "@/components/ui/Paginacao";
+import {
+  Ledger,
+  LedgerHeader,
+  LedgerTable,
+  LedgerTh,
+  LedgerTr,
+  LedgerTd,
+  IdCell,
+  StatusBadge,
+  LedgerEmpty,
+} from "@/components/ui/Ledger";
 import { listar, criar, atualizar, listarPerfis, listarAcessos } from "@/services/usuarios";
 import { getUsuario } from "@/services/auth";
-import { perfilLabel, MODULOS, ACOES, permissoesDoUsuario } from "@/lib/permissoes";
+import { perfilLabel, MODULOS, ACOES, permissoesDoUsuario, podeAtual } from "@/lib/permissoes";
 
 const inputCls =
   "w-full px-3 py-2.5 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30 transition-all";
 
-const perfilVariant = (p) =>
-  p === "admin" ? "destructive" : p === "gestao" ? "warning" : p === "leitura" ? "outline" : "info";
+const CAMPOS = [
+  { value: "geral", label: "Todos os campos", obter: (u) => [u.nome, u.email, perfilLabel(u.perfil)].join(" ") },
+  { value: "nome", label: "Nome", obter: (u) => u.nome || "" },
+  { value: "email", label: "Email", obter: (u) => u.email || "" },
+  { value: "perfil", label: "Perfil", obter: (u) => perfilLabel(u.perfil) || "" },
+];
+
+const tabClsBase = "-mb-px inline-flex items-center gap-1.5 whitespace-nowrap border-b-2 pb-2.5 pt-2 text-sm font-medium transition-colors";
+const tabClsAtiva = "border-blue-600 font-bold text-blue-600";
+const tabClsInativa = "border-transparent text-muted-foreground hover:text-foreground";
+
+const perfilTom = (p) =>
+  p === "admin" ? "error" : p === "gestao" ? "warning" : p === "leitura" ? "neutral" : "info";
+
+const valorOrdem = (u, chave) =>
+  chave === "perfil" ? perfilLabel(u.perfil) : chave === "estado" ? (u.ativo ? 1 : 0) : u[chave];
 
 const permissoesVazias = () => {
   const obj = {};
@@ -93,7 +121,7 @@ const dispositivoLabel = (ua) => {
 function PermissoesResumo({ usuario }) {
   const perm = permissoesDoUsuario(usuario);
   if (usuario.perfil === "admin") {
-    return <Badge variant="success" className="text-[10px]">Acesso total</Badge>;
+    return <StatusBadge tom="success">Acesso total</StatusBadge>;
   }
   const modulosComAcesso = MODULOS.filter((m) => perm[m.valor] && perm[m.valor].ver).length;
   return (
@@ -108,7 +136,10 @@ export default function UtilizadoresPage() {
   const [usuarios, setUsuarios] = useState([]);
   const [perfis, setPerfis] = useState([]);
   const [carregando, setCarregando] = useState(true);
-  const [search, setSearch] = useState("");
+  const [filtro, setFiltro] = useState({ campo: "geral", operador: "contem", termo: "" });
+  const [perfilFiltro, setPerfilFiltro] = useState("todos");
+  const [estadoFiltro, setEstadoFiltro] = useState("todos");
+  const [ordem, setOrdem] = useState({ chave: "", dir: 1 });
   const [modal, setModal] = useState({ aberto: false, edicao: null });
   const [form, setForm] = useState({ nome: "", email: "", senha: "", perfil: "producao" });
   const [permPersonalizadas, setPermPersonalizadas] = useState(false);
@@ -235,150 +266,218 @@ export default function UtilizadoresPage() {
     }
   };
 
+  const contagensPerfil = usuarios.reduce((acc, u) => {
+    const chave = u.perfil || "producao";
+    acc[chave] = (acc[chave] || 0) + 1;
+    return acc;
+  }, {});
+  const perfisDisponiveis = Object.keys(contagensPerfil).sort((a, b) => perfilLabel(a).localeCompare(perfilLabel(b)));
+
+  const tabs = [
+    { id: "todos", label: "Todos", count: usuarios.length },
+    ...perfisDisponiveis.map((p) => ({ id: p, label: perfilLabel(p), count: contagensPerfil[p] })),
+  ];
+
+  const contagemAtivos = usuarios.filter((u) => u.ativo).length;
+  const contagemAdmins = usuarios.filter((u) => u.perfil === "admin").length;
+
   const filtrados = (() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return usuarios;
-    return usuarios.filter((u) =>
-      [u.nome, u.email, perfilLabel(u.perfil)].some((c) => String(c || "").toLowerCase().includes(q))
-    );
+    const termo = filtro.termo.trim().toLowerCase();
+    let res = [...usuarios];
+    if (perfilFiltro !== "todos") res = res.filter((u) => (u.perfil || "") === perfilFiltro);
+    if (estadoFiltro === "ativo") res = res.filter((u) => u.ativo);
+    if (estadoFiltro === "inativo") res = res.filter((u) => !u.ativo);
+    if (termo) {
+      const cfg = CAMPOS.find((c) => c.value === filtro.campo) || CAMPOS[0];
+      res = res.filter((u) => {
+        const alvo = String(cfg.obter(u) || "").toLowerCase();
+        if (filtro.operador === "igual") return alvo === termo;
+        if (filtro.operador === "comeca") return alvo.startsWith(termo);
+        return alvo.includes(termo);
+      });
+    }
+    if (ordem.chave) {
+      res.sort((a, b) => {
+        const av = valorOrdem(a, ordem.chave);
+        const bv = valorOrdem(b, ordem.chave);
+        if (typeof av === "number" && typeof bv === "number") return (av - bv) * ordem.dir;
+        const as = String(av || "").toLowerCase();
+        const bs = String(bv || "").toLowerCase();
+        return (as < bs ? -1 : as > bs ? 1 : 0) * ordem.dir;
+      });
+    }
+    return res;
   })();
 
+  const pag = usePaginacao({ items: filtrados });
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Utilizadores</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Gestão de utilizadores e permissões · {usuarios.length} utilizadores</p>
+    <div className="space-y-4">
+      {/* Faixa do módulo - identificação Recursos Humanos (carmim) */}
+      <div className="flex items-center justify-between rounded-xl bg-[#9f1239] px-5 py-2.5 text-white shadow-sm">
+        <span className="text-lg font-extrabold uppercase tracking-wide">9. Recursos Humanos</span>
+        <span className="hidden text-[11px] font-semibold uppercase tracking-wider text-rose-100 sm:block">
+          Sistema Integrado de Gestão Empresarial
+        </span>
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Gestão de Pessoas</h1>
+          <p className="mt-0.5 text-xs font-medium text-muted-foreground">Colaboradores, perfis e permissões.</p>
         </div>
         {admin && (
-          <Button onClick={abrirNovo}>
-            <Icon name="person_add" className="text-lg" /> Novo Utilizador
-          </Button>
+          <div className="flex shrink-0 flex-wrap items-center gap-2.5">
+            {podeAtual("relatorios", "ver") && (
+              <Link
+                href="/relatorios"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#be123c] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#9f1239]"
+              >
+                <Icon name="description" className="text-base" /> Relatórios
+              </Link>
+            )}
+            <button
+              type="button"
+              onClick={abrirNovo}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#be123c] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#9f1239]"
+            >
+              <Icon name="add" className="text-base" /> Novo Utilizador
+            </button>
+          </div>
         )}
       </div>
 
       {!admin ? (
-        <Card>
-          <CardContent>
-            <div className="p-10 text-center">
-              <Icon name="lock" className="text-4xl text-muted-foreground/30 block mx-auto mb-3" />
-              <p className="text-sm font-semibold text-foreground">Acesso restrito</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Apenas utilizadores com perfil de Administrador podem gerir utilizadores e permissões.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border border-border bg-card p-10 text-center">
+          <Icon name="lock" className="text-4xl text-muted-foreground/30 block mx-auto mb-3" />
+          <p className="text-sm font-normal text-foreground">Acesso restrito</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Apenas utilizadores com perfil de Administrador podem gerir utilizadores e permissões.
+          </p>
+        </div>
       ) : (
         <>
-          <Card>
-            <div className="p-4 sm:p-5 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <div className="relative flex-1 sm:max-w-xs">
-                <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[18px]" />
-                <input
-                  className="pl-10 pr-4 py-2 bg-background border border-input rounded-full text-xs w-full focus:ring-2 focus:ring-primary/30 outline-none transition-all"
-                  placeholder="Buscar por nome, email, perfil..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
+          <section className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4" aria-label="Indicadores de recursos humanos">
+            <KpiCard icon="groups" label="Total Equipa" value={String(usuarios.length)} iconVariant="primary" />
+            <KpiCard icon="check_circle" label="Activos" value={String(contagemAtivos)} iconVariant="success" />
+            <KpiCard icon="person_off" label="Inativos" value={String(usuarios.length - contagemAtivos)} iconVariant="warning" />
+            <KpiCard icon="admin_panel_settings" label="Administradores" value={String(contagemAdmins)} iconVariant="error" />
+          </section>
+
+          <Ledger rotulo="Utilizadores ledger">
+            <LedgerHeader
+              titulo="Equipa"
+              subtitulo={`${filtrados.length} de ${usuarios.length} utilizadores · ${perfisDisponiveis.length} perfis`}
+            />
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-border px-4">
+              {tabs.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setPerfilFiltro(t.id)}
+                  aria-pressed={perfilFiltro === t.id}
+                  className={`${tabClsBase} ${perfilFiltro === t.id ? tabClsAtiva : tabClsInativa}`}
+                >
+                  {t.label}
+                  <span className="text-[11px] text-muted-foreground">{t.count}</span>
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2.5">
+              <select
+                value={estadoFiltro}
+                onChange={(e) => setEstadoFiltro(e.target.value)}
+                aria-label="Filtrar por estado"
+                className="h-8 rounded-lg border border-border bg-card px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary/25 cursor-pointer"
+              >
+                <option value="todos">Todos os estados</option>
+                <option value="ativo">Activos</option>
+                <option value="inativo">Inativos</option>
+              </select>
+              <input
+                value={filtro.termo}
+                onChange={(e) => setFiltro((f) => ({ ...f, termo: e.target.value }))}
+                placeholder="Pesquisar..."
+                aria-label="Pesquisar utilizadores"
+                className="h-8 min-w-0 ml-auto w-full basis-40 rounded-lg border border-border bg-card px-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus-visible:ring-2 focus-visible:ring-primary/25 transition-colors sm:w-64 sm:basis-auto"
+              />
+              {(filtro.termo || estadoFiltro !== "todos" || perfilFiltro !== "todos") && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFiltro((f) => ({ ...f, termo: "" }));
+                    setEstadoFiltro("todos");
+                    setPerfilFiltro("todos");
+                  }}
+                  className="inline-flex h-8 items-center rounded-lg border border-border bg-card px-2.5 text-sm font-medium text-foreground whitespace-nowrap transition-colors hover:bg-muted/60"
+                >
+                  Limpar
+                </button>
+              )}
             </div>
 
             {carregando && usuarios.length === 0 ? (
-              <ListSkeleton count={5} />
+              <div className="p-4"><ListSkeleton count={5} /></div>
             ) : (
               <>
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b bg-muted/50">
-                        {["Utilizador", "Email", "Perfil", "Permissões", "Estado", "Ações"].map((h) => (
-                          <th key={h} className="text-left px-5 py-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filtrados.map((u) => (
-                        <tr key={u.id} className="border-b border-border/10 hover:bg-muted/30 transition-colors">
-                          <td className="px-5 py-3">
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
-                                {(u.nome || "?").split(" ").map((x) => x[0]).slice(0, 2).join("").toUpperCase()}
-                              </div>
-                              <div>
-                                <p className="font-medium text-foreground">{u.nome}</p>
-                                {Number(u.id) === Number(atual?.id) && (
-                                  <span className="text-[10px] text-primary font-semibold">(você)</span>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-5 py-3 text-muted-foreground">{u.email}</td>
-                          <td className="px-5 py-3"><Badge variant={perfilVariant(u.perfil)} className="text-[10px]">{perfilLabel(u.perfil)}</Badge></td>
-                          <td className="px-5 py-3"><PermissoesResumo usuario={u} /></td>
-                          <td className="px-5 py-3">
-                            <Badge variant={u.ativo ? "success" : "outline"} className="text-[10px]">{u.ativo ? "Ativo" : "Inativo"}</Badge>
-                          </td>
-                          <td className="px-5 py-3 text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <Button variant="ghost" size="icon" onClick={() => abrirAcessos(u)} title="Histórico de acessos">
-                                <Icon name="history" className="text-[16px]" />
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={() => abrirEdicao(u)} title="Editar"><Icon name="edit" className="text-[16px]" /></Button>
-                              {Number(u.id) !== Number(atual?.id) && (
-                                <Button variant="ghost" size="icon" onClick={() => alternarAtivo(u)} title={u.ativo ? "Desativar" : "Ativar"} loading={desativando}>
-                                  <Icon name={u.ativo ? "person_off" : "person_add"} className="text-[16px] text-warning" />
-                                </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {filtrados.length === 0 && (
-                    <div className="p-12 text-center">
-                      <Icon name="person_search" className="text-4xl text-muted-foreground/40 block mx-auto mb-2" />
-                      <p className="text-sm text-muted-foreground">Nenhum utilizador encontrado</p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="md:hidden divide-y divide-border/20">
-                  {filtrados.map((u) => (
-                    <div key={u.id} className="p-4">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
-                            {(u.nome || "?").split(" ").map((x) => x[0]).slice(0, 2).join("").toUpperCase()}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-foreground truncate">{u.nome}</p>
-                            <p className="text-[10px] text-muted-foreground truncate">{u.email}</p>
-                          </div>
-                        </div>
-                        <Badge variant={perfilVariant(u.perfil)} className="text-[10px]">{perfilLabel(u.perfil)}</Badge>
-                      </div>
-                      <div className="flex items-center justify-between mt-3">
-                        <Badge variant={u.ativo ? "success" : "outline"} className="text-[10px]">{u.ativo ? "Ativo" : "Inativo"}</Badge>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => abrirAcessos(u)} title="Histórico de acessos">
-                            <Icon name="history" className="text-[14px]" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => abrirEdicao(u)} title="Editar"><Icon name="edit" className="text-[14px]" /></Button>
-                          {Number(u.id) !== Number(atual?.id) && (
-                            <Button variant="ghost" size="icon" onClick={() => alternarAtivo(u)} title={u.ativo ? "Desativar" : "Ativar"}>
-                              <Icon name={u.ativo ? "person_off" : "person_add"} className="text-[14px] text-warning" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <LedgerTable>
+                  <thead>
+                    <tr className="border-b border-border">
+                      <LedgerTh onSort={() => setOrdem((prev) => (prev.chave === "nome" ? { chave: "nome", dir: -prev.dir } : { chave: "nome", dir: 1 }))} ativo={ordem.chave === "nome"}>Utilizador</LedgerTh>
+                      <LedgerTh onSort={() => setOrdem((prev) => (prev.chave === "perfil" ? { chave: "perfil", dir: -prev.dir } : { chave: "perfil", dir: 1 }))} ativo={ordem.chave === "perfil"}>Perfil</LedgerTh>
+                      <LedgerTh>Permissões</LedgerTh>
+                      <LedgerTh onSort={() => setOrdem((prev) => (prev.chave === "estado" ? { chave: "estado", dir: -prev.dir } : { chave: "estado", dir: 1 }))} ativo={ordem.chave === "estado"}>Estado</LedgerTh>
+                      <LedgerTh className="w-10" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pag.visiveis.map((u) => {
+                      const eu = Number(u.id) === Number(atual?.id);
+                      return (
+                        <LedgerTr key={u.id}>
+                          <LedgerTd className="max-w-56">
+                            <span className="flex items-center gap-2.5">
+                              <Avatar nome={u.nome} tamanho="sm" />
+                              <span className="min-w-0">
+                                <IdCell id={u.nome || "—"} meta={eu ? `${u.email || "—"} · (você)` : (u.email || "—")} />
+                              </span>
+                            </span>
+                          </LedgerTd>
+                          <LedgerTd>
+                            <StatusBadge tom={perfilTom(u.perfil)}>{perfilLabel(u.perfil)}</StatusBadge>
+                          </LedgerTd>
+                          <LedgerTd>
+                            <PermissoesResumo usuario={u} />
+                          </LedgerTd>
+                          <LedgerTd>
+                            <StatusBadge tom={u.ativo ? "success" : "neutral"}>{u.ativo ? "Ativo" : "Inativo"}</StatusBadge>
+                          </LedgerTd>
+                          <LedgerTd>
+                            <RowMenu
+                              ariaLabel={`Ações de ${u.nome || "utilizador"}`}
+                              itens={[
+                                { icone: "history", rotulo: "Histórico de acessos", onClick: () => abrirAcessos(u) },
+                                { icone: "edit", rotulo: "Editar", onClick: () => abrirEdicao(u) },
+                                ...(!eu ? [
+                                  { icone: u.ativo ? "person_off" : "person_add", rotulo: u.ativo ? "Desativar" : "Ativar", danger: u.ativo, onClick: () => alternarAtivo(u) },
+                                ] : []),
+                              ]}
+                            />
+                          </LedgerTd>
+                        </LedgerTr>
+                      );
+                    })}
+                  </tbody>
+                </LedgerTable>
+                {pag.total === 0 && (
+                  usuarios.length === 0
+                    ? <LedgerEmpty icone="group">Nenhum utilizador registado</LedgerEmpty>
+                    : <LedgerEmpty icone="person_search">Nenhum utilizador corresponde ao filtro</LedgerEmpty>
+                )}
+                <Paginacao {...pag} label="utilizadores" />
               </>
             )}
-          </Card>
+          </Ledger>
 
           <Modal
             open={modal.aberto}
@@ -421,10 +520,10 @@ export default function UtilizadoresPage() {
               </div>
 
               {form.perfil !== "admin" && (
-                <div className="border border-border/20 rounded-xl p-4 space-y-3 bg-muted/10">
+                <div className="rounded-xl border border-border bg-card p-4 space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider">Permissões personalizadas</p>
+                      <p className="text-sm font-normal text-foreground">Permissões personalizadas</p>
                       <p className="text-[11px] text-muted-foreground mt-0.5">
                         Se ativadas, sobrepõem o perfil por defeito. Use as ações Ver, Criar, Editar, Eliminar e Aprovar por módulo.
                       </p>
@@ -523,7 +622,7 @@ export default function UtilizadoresPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-sm font-medium text-foreground break-words">{a.sucesso ? "Acesso com sucesso" : "Tentativa falhada"}</p>
-                        <Badge variant={a.sucesso ? "success" : "outline"} className="text-[10px] shrink-0 whitespace-nowrap">{a.sucesso ? "OK" : "Falha"}</Badge>
+                        <StatusBadge tom={a.sucesso ? "success" : "neutral"} className="shrink-0 whitespace-nowrap">{a.sucesso ? "OK" : "Falha"}</StatusBadge>
                       </div>
                       <p className="text-[11px] text-muted-foreground mt-0.5">{formatarDataHora(a.createdAt)}</p>
                       <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-[11px] text-muted-foreground">

@@ -1,17 +1,29 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useToast } from "@/components/Toast";
 import { ListSkeleton } from "@/components/Skeleton";
 import Modal from "@/components/Modal";
 import Icon from "@/components/Icon";
-import { Card } from "@/components/ui/Card";
-import KpiCard from "@/components/ui/KpiCard";
 import { inputCls } from "@/lib/estoque";
 import { Button } from "@/components/ui/Button";
 import FloatButton from "@/components/ui/FloatButton";
-import { Badge } from "@/components/ui/Badge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import Avatar from "@/components/ui/Avatar";
+import RowMenu from "@/components/ui/RowMenu";
+import Paginacao, { usePaginacao } from "@/components/ui/Paginacao";
+import {
+  Ledger,
+  LedgerHeader,
+  FilterRow,
+  LedgerTable,
+  LedgerTh,
+  LedgerTr,
+  LedgerTd,
+  IdCell,
+  StatusBadge,
+  LedgerEmpty,
+} from "@/components/ui/Ledger";
 import { listar, criar, atualizar, remover } from "@/services/clientes";
 
 const initialForm = {
@@ -20,23 +32,34 @@ const initialForm = {
   dataCadastro: new Date().toISOString().split("T")[0],
 };
 
-export default function CadastrosTab() {
+const CAMPOS = [
+  { value: "geral", label: "Todos os campos", obter: (c) => `${c.nome || ""} ${c.empresa || ""} ${c.codigo || ""} ${c.nif || ""}` },
+  { value: "nome", label: "Nome", obter: (c) => c.nome || "" },
+  { value: "empresa", label: "Empresa", obter: (c) => c.empresa || "" },
+  { value: "nif", label: "NIF", obter: (c) => c.nif || "" },
+  { value: "tipo", label: "Tipo", obter: (c) => (c.tipo === "fornecedor" ? "fornecedor" : "cliente") },
+];
+
+export default function CadastrosTab({ apenas } = {}) {
+  const tipoPadrao = apenas || "cliente";
+  const formVazio = { ...initialForm, tipo: tipoPadrao };
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(initialForm);
+  const [form, setForm] = useState(formVazio);
   const [clientes, setClientes] = useState([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filtroTipo, setFiltroTipo] = useState("todos");
-  const [carregando, setCarregando] = useState(false);
+  const [filtro, setFiltro] = useState({ campo: "geral", operador: "contem", termo: "" });
+  const [ordem, setOrdem] = useState({ chave: "", dir: 1 });
+  const [filtrosAbertos, setFiltrosAbertos] = useState(true);
+  const [carregando, setCarregando] = useState(true);
   const [editando, setEditando] = useState(null);
   const [detalhes, setDetalhes] = useState(null);
   const [eliminarItem, setEliminarItem] = useState(null);
   const [deletando, setDeletando] = useState(false);
   const { addToast } = useToast();
 
-  const carregar = useCallback(async (params = {}) => {
+  const carregar = useCallback(async () => {
     setCarregando(true);
     try {
-      const data = await listar(params);
+      const data = await listar({});
       setClientes(Array.isArray(data) ? data : data?.data ?? []);
     } catch (err) {
       addToast(err.response?.data?.erro || "Erro ao carregar clientes", "error");
@@ -44,52 +67,64 @@ export default function CadastrosTab() {
     } finally { setCarregando(false); }
   }, [addToast]);
 
-  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    carregar({});
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    carregar();
+  }, [carregar]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const params = {};
-      if (filtroTipo !== "todos") params.tipo = filtroTipo;
-      if (searchTerm) params.busca = searchTerm;
-      carregar(params);
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [searchTerm, filtroTipo]); // eslint-disable-line react-hooks/exhaustive-deps
-/* eslint-enable react-hooks/set-state-in-effect */
+  const campos = useMemo(() => (apenas ? CAMPOS.filter((c) => c.value !== "tipo") : CAMPOS), [apenas]);
+  const base = useMemo(
+    () => (apenas ? clientes.filter((c) => (c.tipo === "fornecedor" ? "fornecedor" : "cliente") === apenas) : clientes),
+    [clientes, apenas]
+  );
 
   const totalClientes = clientes.filter((c) => c.tipo === "cliente").length;
   const totalFornecedores = clientes.filter((c) => c.tipo === "fornecedor").length;
 
+  const resultado = useMemo(() => {
+    const termo = filtro.termo.trim().toLowerCase();
+    let res = [...base];
+    if (termo) {
+      const cfg = campos.find((c) => c.value === filtro.campo) || campos[0];
+      res = res.filter((c) => {
+        const alvo = String(cfg.obter(c) || "").toLowerCase();
+        if (filtro.operador === "igual") return alvo === termo;
+        if (filtro.operador === "comeca") return alvo.startsWith(termo);
+        return alvo.includes(termo);
+      });
+    }
+    if (ordem.chave) {
+      res.sort((a, b) => {
+        const av = String(a[ordem.chave] || "").toLowerCase();
+        const bv = String(b[ordem.chave] || "").toLowerCase();
+        return (av < bv ? -1 : av > bv ? 1 : 0) * ordem.dir;
+      });
+    }
+    return res;
+  }, [base, filtro, ordem, campos]);
+
+  const pag = usePaginacao({ items: resultado });
+
   const abrirNovo = () => {
     setEditando(null);
-    setForm(initialForm);
+    setForm(formVazio);
     setShowForm(true);
   };
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-  const recarregarAtual = () => {
-    const params = {};
-    if (filtroTipo !== "todos") params.tipo = filtroTipo;
-    if (searchTerm) params.busca = searchTerm;
-    carregar(params);
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const rotulo = form.tipo === "fornecedor" ? "Fornecedor" : "Cliente";
     try {
       if (editando) {
         await atualizar(editando, form);
-        addToast("Cliente atualizado com sucesso", "success");
+        addToast(`${rotulo} atualizado com sucesso`, "success");
       } else {
         await criar(form);
-        addToast("Cliente cadastrado com sucesso", "success");
+        addToast(`${rotulo} cadastrado com sucesso`, "success");
       }
-      setForm(initialForm); setShowForm(false); setEditando(null);
-      recarregarAtual();
+      setForm(formVazio); setShowForm(false); setEditando(null);
+      carregar();
     } catch (err) {
       addToast(err.response?.data?.erro || "Erro na operação", "error");
     }
@@ -101,7 +136,7 @@ export default function CadastrosTab() {
     try {
       await remover(eliminarItem.id ?? eliminarItem.codigo);
       addToast("Cadastro removido com sucesso", "success");
-      recarregarAtual();
+      carregar();
       setEliminarItem(null);
     } catch (err) {
       addToast(err.response?.data?.erro || "Erro na operação", "error");
@@ -112,7 +147,7 @@ export default function CadastrosTab() {
 
   const handleEdit = (item) => {
     setForm({
-      tipo: item.tipo || "cliente", nome: item.nome || "", empresa: item.empresa || "",
+      tipo: item.tipo || tipoPadrao, nome: item.nome || "", empresa: item.empresa || "",
       nif: item.nif || "", telefone: item.telefone || "", whatsapp: item.whatsapp || "",
       email: item.email || "", endereco: item.endereco || "",
       dataCadastro: item.dataCadastro ? item.dataCadastro.split("T")[0] : new Date().toISOString().split("T")[0],
@@ -121,41 +156,104 @@ export default function CadastrosTab() {
     setShowForm(true);
   };
 
+  const titulo = apenas === "fornecedor" ? "Fornecedores" : apenas === "cliente" ? "Clientes" : "Cadastros";
+  const rotuloSingular = apenas === "fornecedor" ? "Fornecedor" : apenas === "cliente" ? "Cliente" : "Cadastro";
+  const subtitulo = apenas
+    ? `${base.length} ${apenas === "fornecedor" ? "fornecedores" : "clientes"}`
+    : `Clientes e fornecedores · ${clientes.length} registos (${totalClientes} clientes, ${totalFornecedores} fornecedores)`;
+
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <div>
-          <h2 className="font-sans text-xl font-bold text-foreground tracking-tight flex items-center gap-2">
-            <Icon name="badge" className="text-primary text-[22px]" /> Cadastros
-          </h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Clientes e fornecedores · {clientes.length} registos ({totalClientes} clientes, {totalFornecedores} fornecedores)
-          </p>
-        </div>
-        <button onClick={abrirNovo} className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium shadow-sm hover:bg-primary/90 transition-colors ">
-          <Icon name="add" className="text-[16px]" /> Novo Cadastro
-        </button>
-      </div>
+    <div className="space-y-4">
+      <Ledger rotulo={`${titulo} ledger`}>
+        <LedgerHeader
+          titulo={titulo}
+          subtitulo={subtitulo}
+          novo={apenas === "fornecedor" ? "Novo fornecedor" : apenas === "cliente" ? "Novo cliente" : "Novo cadastro"}
+          aoNovo={abrirNovo}
+          onToggleFiltros={() => setFiltrosAbertos((v) => !v)}
+          filtrosAbertos={filtrosAbertos}
+        />
+        {filtrosAbertos && (
+          <FilterRow
+            campo={filtro.campo}
+            setCampo={(v) => setFiltro((f) => ({ ...f, campo: v }))}
+            campos={campos.map(({ value, label }) => ({ value, label }))}
+            operador={filtro.operador}
+            setOperador={(v) => setFiltro((f) => ({ ...f, operador: v }))}
+            termo={filtro.termo}
+            setTermo={(v) => setFiltro((f) => ({ ...f, termo: v }))}
+            aoLimpar={() => setFiltro((f) => ({ ...f, termo: "" }))}
+            placeholder="Pesquisar..."
+          />
+        )}
+        {carregando ? (
+          <div className="p-4"><ListSkeleton count={5} /></div>
+        ) : (
+          <>
+            <LedgerTable>
+              <thead>
+                <tr className="border-b border-border">
+                  <LedgerTh onSort={() => setOrdem((p) => (p.chave === "codigo" ? { chave: "codigo", dir: -p.dir } : { chave: "codigo", dir: 1 }))} ativo={ordem.chave === "codigo"}>Código</LedgerTh>
+                  <LedgerTh onSort={() => setOrdem((p) => (p.chave === "nome" ? { chave: "nome", dir: -p.dir } : { chave: "nome", dir: 1 }))} ativo={ordem.chave === "nome"}>Nome</LedgerTh>
+                  <LedgerTh>Empresa</LedgerTh>
+                  <LedgerTh>NIF</LedgerTh>
+                  <LedgerTh>Telefone</LedgerTh>
+                  <LedgerTh>Email</LedgerTh>
+                  <LedgerTh className="w-10" />
+                </tr>
+              </thead>
+              <tbody>
+                {pag.visiveis.map((item) => (
+                  <LedgerTr key={item.id ?? item.codigo} onClick={() => setDetalhes(item)}>
+                    <LedgerTd className="max-w-36">
+                      <IdCell
+                        id={item.codigo || "—"}
+                        meta={item.tipo === "fornecedor" ? "Fornecedor" : "Cliente"}
+                        aoAbrir={() => setDetalhes(item)}
+                      />
+                    </LedgerTd>
+                    <LedgerTd className="max-w-56">
+                      <span className="flex items-center gap-2.5">
+                        <Avatar nome={item.nome} tamanho="sm" />
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm">{item.nome || "—"}</span>
+                        </span>
+                      </span>
+                    </LedgerTd>
+                    <LedgerTd className="max-w-48"><span className="block truncate">{item.empresa || "—"}</span></LedgerTd>
+                    <LedgerTd className="font-mono text-xs text-muted-foreground">{item.nif || "—"}</LedgerTd>
+                    <LedgerTd className="text-muted-foreground">{item.telefone || "—"}</LedgerTd>
+                    <LedgerTd className="max-w-44"><span className="block truncate text-muted-foreground">{item.email || "—"}</span></LedgerTd>
+                    <LedgerTd>
+                      <RowMenu
+                        ariaLabel="Ações do cadastro"
+                        itens={[
+                          { icone: "visibility", rotulo: "Ver detalhes", onClick: () => setDetalhes(item) },
+                          { icone: "edit", rotulo: "Editar", onClick: () => handleEdit(item) },
+                          { icone: "delete", rotulo: "Remover", danger: true, onClick: () => setEliminarItem(item) },
+                        ]}
+                      />
+                    </LedgerTd>
+                  </LedgerTr>
+                ))}
+              </tbody>
+            </LedgerTable>
+            {pag.total === 0 && <LedgerEmpty icone="search_off">Nenhum {apenas === "fornecedor" ? "fornecedor" : apenas === "cliente" ? "cliente" : "cadastro"} encontrado</LedgerEmpty>}
+            <Paginacao {...pag} label="cadastros" />
+          </>
+        )}
+      </Ledger>
 
-      <section className="grid grid-cols-1 min-[480px]:grid-cols-2 sm:grid-cols-3 gap-4 md:gap-5">
-        {[
-          { label: "Total Cadastros", value: clientes.length, icon: "badge", iconVariant: "primary" },
-          { label: "Clientes", value: totalClientes, icon: "person", iconVariant: "secondary" },
-          { label: "Fornecedores", value: totalFornecedores, icon: "local_shipping", iconVariant: "info" },
-        ].map((kpi) => (
-          <KpiCard key={kpi.label} icon={kpi.icon} label={kpi.label} value={kpi.value} iconVariant={kpi.iconVariant} />
-        ))}
-      </section>
-
-      <Modal open={showForm} onClose={() => { setShowForm(false); setEditando(null); setForm(initialForm); }} title={editando ? "Editar Cadastro" : "Novo Cadastro"} icon="person_add" size="lg"
-        footer={<><Button type="button" variant="outline" onClick={() => { setShowForm(false); setEditando(null); setForm(initialForm); }}>Cancelar</Button><Button type="submit" form="form-cliente">Guardar {form.tipo === "cliente" ? "Cliente" : "Fornecedor"}</Button></>}>
+      <Modal open={showForm} onClose={() => { setShowForm(false); setEditando(null); setForm(formVazio); }} title={editando ? `Editar ${rotuloSingular}` : `Novo ${rotuloSingular}`} icon={apenas === "fornecedor" ? "local_shipping" : "person_add"} size="lg"
+        footer={<><Button type="button" variant="outline" onClick={() => { setShowForm(false); setEditando(null); setForm(formVazio); }}>Cancelar</Button><Button type="submit" form="form-cliente">Guardar {form.tipo === "cliente" ? "Cliente" : "Fornecedor"}</Button></>}>
         <form id="form-cliente" onSubmit={handleSubmit} className="space-y-5">
+          {!apenas && (
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Tipo de Cadastro *</label>
             <div className="flex gap-2">
               {["cliente", "fornecedor"].map((t) => (
                 <button key={t} type="button" onClick={() => setForm({ ...form, tipo: t })}
-                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 transition-all text-xs font-bold ${
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-all text-xs font-bold ${
                     form.tipo === t
                       ? "border-primary bg-primary/10 text-primary"
                       : "border-input bg-muted/50 text-muted-foreground"
@@ -166,6 +264,7 @@ export default function CadastrosTab() {
               ))}
             </div>
           </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
               { name: "nome", label: "Nome Completo / Razão Social *", placeholder: form.tipo === "cliente" ? "Ex: João Matos" : "Ex: Papelaria Angola Lda", required: true },
@@ -202,7 +301,7 @@ export default function CadastrosTab() {
           <dl className="divide-y divide-border/50">
             {[
               { label: "Código", value: detalhes.codigo },
-              { label: "Tipo", value: detalhes.tipo === "fornecedor" ? "Fornecedor" : "Cliente", badge: true },
+              { label: "Tipo", value: detalhes.tipo === "fornecedor" ? "Fornecedor" : "Cliente" },
               { label: "Nome", value: detalhes.nome },
               { label: "Empresa", value: detalhes.empresa || "—" },
               { label: "NIF", value: detalhes.nif || "—" },
@@ -217,10 +316,8 @@ export default function CadastrosTab() {
                   {linha.label}
                 </dt>
                 <dd className="min-w-0 truncate text-right font-medium text-foreground">
-                  {linha.badge ? (
-                    <Badge variant={detalhes.tipo === "fornecedor" ? "secondary" : "info"} className="text-[10px]">
-                      {linha.value}
-                    </Badge>
+                  {linha.label === "Tipo" ? (
+                    <StatusBadge tom={detalhes.tipo === "fornecedor" ? "info" : "success"}>{linha.value}</StatusBadge>
                   ) : (
                     linha.value
                   )}
@@ -244,117 +341,7 @@ export default function CadastrosTab() {
         }
       />
 
-      {carregando && clientes.length === 0 ? <ListSkeleton count={5} /> : (
-        <Card>
-          <div className="p-4 sm:p-5 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-            <div className="flex gap-2">
-              {["todos", "cliente", "fornecedor"].map((f) => (
-                <Button key={f} variant={filtroTipo === f ? "default" : "outline"} size="sm" onClick={() => setFiltroTipo(f)}>
-                  <Icon name={f === "todos" ? "badge" : f === "cliente" ? "person" : "local_shipping"} className="text-sm" />
-                  {f === "todos" ? "Todos" : f === "cliente" ? "Clientes" : "Fornecedores"}
-                </Button>
-              ))}
-            </div>
-            <div className="relative w-full sm:w-auto">
-              <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[18px]" />
-              <input className="pl-10 pr-4 py-2 bg-background border border-input rounded-full text-xs w-full sm:w-64 focus:ring-2 focus:ring-primary/30 outline-none transition-all"
-                placeholder="Buscar por nome, empresa, código ou NIF..."
-                value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="hidden lg:block overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  {["Código", "Tipo", "Nome", "Empresa", "NIF", "Telefone", "Email", "Cadastro", "Ações"].map((h) => (
-                    <th key={h} className={`text-left px-5 py-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wider ${["Empresa", "Telefone", "Email"].includes(h) ? "hidden xl:table-cell" : ""} ${h === "Email" ? "hidden 2xl:table-cell" : ""}`}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {clientes.map((item, index) => (
-                  <tr key={item.id ?? index} className="border-b border-border/10 hover:bg-muted/30 transition-colors">
-                    <td className="px-5 py-3"><span className="bg-primary/10 text-primary font-semibold px-2 py-1 rounded text-[10px]">{item.codigo}</span></td>
-                    <td className="px-5 py-3">
-                      <Badge variant={item.tipo === "cliente" ? "info" : "secondary"} className="text-[10px]">
-                        <Icon name={item.tipo === "cliente" ? "person" : "local_shipping"} className="text-xs mr-1" />
-                        {item.tipo === "cliente" ? "Cliente" : "Fornecedor"}
-                      </Badge>
-                    </td>
-                    <td className="px-5 py-3 font-medium text-foreground">{item.nome}</td>
-                    <td className="px-5 py-3 text-muted-foreground hidden xl:table-cell">{item.empresa}</td>
-                    <td className="px-5 py-3 text-muted-foreground font-mono text-xs">{item.nif}</td>
-                    <td className="px-5 py-3 text-muted-foreground hidden xl:table-cell">{item.telefone}</td>
-                    <td className="px-5 py-3 text-muted-foreground text-xs hidden 2xl:table-cell">{item.email}</td>
-                    <td className="px-5 py-3 text-muted-foreground text-xs whitespace-nowrap">{new Date(item.dataCadastro).toLocaleDateString("pt-BR")}</td>
-                    <td className="px-5 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => setDetalhes(item)} title="Ver detalhes"><Icon name="visibility" className="text-[16px]" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(item)} title="Editar"><Icon name="edit" className="text-[16px]" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => setEliminarItem(item)} title="Eliminar" className="text-error hover:text-error"><Icon name="delete" className="text-[16px]" /></Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {clientes.length === 0 && (
-              <div className="p-12 text-center">
-                <Icon name="search_off" className="text-4xl text-muted-foreground mb-2 block" />
-                <p className="text-muted-foreground font-medium">Nenhum cadastro encontrado</p>
-                <p className="text-muted-foreground text-xs mt-1">Tente ajustar os termos de pesquisa</p>
-              </div>
-            )}
-          </div>
-
-          <div className="lg:hidden divide-y divide-border/20">
-            {clientes.map((item, index) => (
-              <div key={item.id ?? index} className="p-4 hover:bg-muted/30 transition-colors">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="bg-primary/10 text-primary font-semibold px-2 py-0.5 rounded text-[10px]">{item.codigo}</span>
-                      <Badge variant={item.tipo === "cliente" ? "info" : "secondary"} className="text-[10px]">
-                        <Icon name={item.tipo === "cliente" ? "person" : "local_shipping"} className="text-[10px] mr-0.5" />
-                        {item.tipo === "cliente" ? "Cliente" : "Fornecedor"}
-                      </Badge>
-                    </div>
-                    <p className="text-sm font-medium text-foreground truncate">{item.nome}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{item.empresa}</p>
-                    <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5">
-                      <span className="text-[10px] text-muted-foreground flex items-center gap-1"><Icon name="call" className="text-[10px]" /> {item.telefone}</span>
-                      <span className="text-[10px] text-muted-foreground flex items-center gap-1"><Icon name="mail" className="text-[10px]" /> {item.email}</span>
-                      <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono">NIF: {item.nif}</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-1 shrink-0">
-                    <Button variant="ghost" size="icon" onClick={() => handleEdit(item)} title="Editar"><Icon name="edit" className="text-[14px]" /></Button>
-                    <Button variant="ghost" size="icon" onClick={() => setEliminarItem(item)} title="Eliminar" className="text-error"><Icon name="delete" className="text-[14px]" /></Button>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {clientes.length === 0 && (
-              <div className="p-12 text-center">
-                <Icon name="search_off" className="text-4xl text-muted-foreground mb-2 block" />
-                <p className="text-muted-foreground font-medium">Nenhum cadastro encontrado</p>
-                <p className="text-muted-foreground text-xs mt-1">Tente ajustar os termos de pesquisa</p>
-              </div>
-            )}
-          </div>
-
-          <div className="p-4 border-t flex justify-between items-center text-xs text-muted-foreground">
-            <span>A mostrar {clientes.length} de {clientes.length} cadastros</span>
-            <div className="flex gap-1">
-              <Button size="sm" variant="default" className="px-3">1</Button>
-              <Button size="sm" variant="outline" className="px-3">Próximo →</Button>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      <FloatButton onClick={abrirNovo} label="Novo Cadastro" icon="person_add" />
+      <FloatButton onClick={abrirNovo} label={`Novo ${rotuloSingular}`} icon={apenas === "fornecedor" ? "local_shipping" : "person_add"} />
     </div>
   );
 }

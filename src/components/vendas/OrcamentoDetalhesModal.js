@@ -22,7 +22,7 @@ function formatKz(v) {
   return `Kz ${Number(v || 0).toLocaleString("pt-AO")}`;
 }
 
-export default function OrcamentoDetalhesModal({ orcamento, empresa, onClose, onEditar, onEliminar, onEstado, onEnviarProducao }) {
+export default function OrcamentoDetalhesModal({ orcamento, empresa, onClose, onEditar, onEliminar, onEstado }) {
   const { addToast } = useToast();
   const o = orcamento;
   const [pdfAberto, setPdfAberto] = useState(false);
@@ -34,7 +34,7 @@ export default function OrcamentoDetalhesModal({ orcamento, empresa, onClose, on
       addToast("Cliente sem telefone registado", "error");
       return;
     }
-    const msg = encodeURIComponent(`Olá ${o.cliente?.nome || ""}! Segue o seu orçamento ${o.numero || o.id} da ${empresa?.nome || "SIGRAF"}.`);
+    const msg = encodeURIComponent(`Olá ${o.cliente?.nome || ""}! Segue o seu orçamento ${o.numero || o.id} da ${empresa?.nome || "KAMGEST"}.`);
     window.open(`https://wa.me/${tel}?text=${msg}`, "_blank", "noopener,noreferrer");
   };
 
@@ -48,9 +48,6 @@ export default function OrcamentoDetalhesModal({ orcamento, empresa, onClose, on
       footer={<>
         <Button variant="outline" onClick={() => onEditar(o)}><Icon name="edit" className="text-[16px]" /> Editar</Button>
         <Button variant="outline" onClick={() => onEliminar(o)} className="text-error hover:text-error"><Icon name="delete" className="text-[16px]" /> Eliminar</Button>
-        {o.estado === "aprovado" && !o.ordem_producao?.id && onEnviarProducao && (
-          <Button variant="outline" onClick={() => onEnviarProducao(o)}><Icon name="factory" className="text-[16px]" /> Enviar para Produção</Button>
-        )}
         <Button variant="outline" onClick={handleGerarPdf}><Icon name="picture_as_pdf" className="text-[16px]" /> PDF</Button>
         <Button variant="outline" onClick={handleWhatsApp}><Icon name="chat" className="text-[16px]" /> WhatsApp</Button>
         <Button onClick={onClose}>Fechar</Button>

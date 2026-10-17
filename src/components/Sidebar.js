@@ -1,154 +1,164 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { useTheme } from "@/contexts/ThemeContext";
-import { useAuth } from "@/contexts/AuthContext";
-import Icon from "./Icon";
-import { cn, getInitials } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { podeAtual } from "@/lib/permissoes";
+import { ITENS_NAVEGACAO, itemAtivo } from "@/lib/navegacao";
+import { LuChevronRight, LuX } from "react-icons/lu";
 
-const grupos = [
-  {
-    rotulo: "Principal",
-    itens: [{ icone: "dashboard", nome: "Painel", para: "/", perm: ["comercial", "ver"] }],
-  },
-  {
-    rotulo: "Gestão",
-    itens: [
-      { icone: "storefront", nome: "Área Comercial", para: "/vendas", perm: ["comercial", "ver"] },
-      { icone: "account_balance", nome: "Tesouraria", para: "/tesouraria", perm: ["tesouraria", "ver"] },
-    ],
-  },
-  {
-    rotulo: "Operação",
-    itens: [
-      { icone: "factory", nome: "Produção", para: "/producao", perm: ["producao", "ver"] },
-      { icone: "inventory_2", nome: "Provisionamento", para: "/estoque", perm: ["estoque", "ver"] },
-      { icone: "category", nome: "Recursos", para: "/categorias", perm: ["categorias", "ver"] },
-      { icone: "analytics", nome: "Relatórios", para: "/relatorios", perm: ["relatorios", "ver"] },
-    ],
-  },
-  {
-    rotulo: "Sistema",
-    itens: [
-      { icone: "settings", nome: "Configurações", para: "/configuracoes", perm: ["configuracao", "ver"] },
-      { icone: "manage_accounts", nome: "Utilizadores", para: "/utilizadores", perm: ["utilizadores", "ver"] },
-    ],
-  },
-];
+function Navegacao({ itens, ativo, onNavegar, colapsado = false }) {
+  return (
+    <nav className="flex-1 space-y-1 overflow-y-auto px-2.5 py-3 custom-scrollbar">
+      {itens.map(({ icone: Icone, nome, para }) => {
+        const activo = para === ativo;
+        return (
+          <Link
+            key={para + nome}
+            href={para}
+            onClick={onNavegar}
+            title={colapsado ? nome : undefined}
+            aria-label={nome}
+            className={cn(
+              "group flex items-center rounded-lg text-[13px] transition-colors",
+              colapsado ? "justify-center px-0 py-2.5" : "justify-between px-3 py-2.5",
+              activo
+                ? "bg-primary font-semibold text-primary-foreground shadow-sm"
+                : "font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            <span className={cn("flex items-center", colapsado ? "" : "gap-2.5")}>
+              <Icone className={cn("shrink-0", colapsado ? "h-[18px] w-[18px]" : "h-4 w-4")} />
+              {!colapsado && <span>{nome}</span>}
+            </span>
+            {!colapsado && !activo && (
+              <LuChevronRight className="h-3.5 w-3.5 opacity-60 transition-transform group-hover:translate-x-0.5" />
+            )}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
 
-export default function Sidebar() {
-  const [aberto, setAberto] = useState(false);
+function Marca() {
+  return (
+    <svg className="h-full w-full" fill="none" viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg">
+      <path d="M0 0H20V32H0V0Z" fill="#EE2A24" />
+      <path d="M20 0H40V32H20V0Z" fill="#0066FF" />
+      <path d="M0 16L20 0V32L0 16Z" fill="#FFB800" />
+      <path d="M20 0C25 10 35 15 40 16C35 20 25 22 20 32V0Z" fill="#0047AB" opacity="0.75" />
+    </svg>
+  );
+}
+
+function CabecalhoMarca({ colapsado = false }) {
+  return (
+    <div
+      className={cn(
+        "flex h-14 shrink-0 items-center border-b border-border",
+        colapsado ? "justify-center px-2" : "gap-2.5 px-4"
+      )}
+    >
+      <div className="flex h-8 w-10 shrink-0 items-center justify-center overflow-hidden rounded">
+        <Marca />
+      </div>
+      {!colapsado && (
+        <span className="flex items-baseline gap-1.5 leading-none">
+          <span className="text-lg font-black tracking-tight text-foreground">KAMGEST</span>
+          <span className="text-sm font-bold text-muted-foreground">1.0</span>
+        </span>
+      )}
+    </div>
+  );
+}
+
+function Rodape({ colapsado = false }) {
+  if (colapsado) {
+    return (
+      <div className="flex justify-center border-t border-border p-2.5">
+        <div className="flex h-8 w-10 items-center justify-center overflow-hidden rounded" title="KAMGEST">
+          <Marca />
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center gap-2 border-t border-border p-3">
+      <div className="flex h-8 w-10 shrink-0 items-center justify-center overflow-hidden rounded">
+        <Marca />
+      </div>
+      <div className="text-[10px] font-semibold leading-snug tracking-tight text-muted-foreground">
+        Da gestão à produção
+        <br />
+        <span className="text-primary">em resultados.</span>
+      </div>
+    </div>
+  );
+}
+
+export default function Sidebar({
+  aberto = false,
+  onFechar = () => {},
+  colapsado = false,
+}) {
   const caminho = usePathname();
-  const { dark, toggleTheme } = useTheme();
-  const { usuario } = useAuth();
+  const itens = ITENS_NAVEGACAO.filter((it) => podeAtual(...it.perm));
+  const ativo = itemAtivo(caminho, itens)?.para || null;
 
-  // No telemóvel, o menu deslizante bloqueia o scroll do fundo e fecha com Escape.
   useEffect(() => {
-    if (!aberto) return;
+    if (!aberto) return undefined;
     document.body.style.overflow = "hidden";
-    const fecharTecla = (e) => { if (e.key === "Escape") setAberto(false); };
+    const fecharTecla = (e) => {
+      if (e.key === "Escape") onFechar();
+    };
     document.addEventListener("keydown", fecharTecla);
     return () => {
       document.body.style.overflow = "";
       document.removeEventListener("keydown", fecharTecla);
     };
-  }, [aberto]);
+  }, [aberto, onFechar]);
 
   return (
     <>
-      <button
-        onClick={() => setAberto(!aberto)}
-        aria-label={aberto ? "Fechar menu" : "Abrir menu"}
-        aria-expanded={aberto}
-        className="fixed top-2.5 left-3 z-50 md:hidden h-11 w-11 rounded-xl bg-card border border-border shadow-md flex items-center justify-center hover:bg-accent transition-colors ring-focus-soft"
+      {/* Menu lateral fixo (desktop) */}
+      <aside
+        className={cn(
+          "hidden shrink-0 flex-col justify-between border-r border-border bg-background transition-[width] duration-200 ease-out md:flex",
+          colapsado ? "w-[60px]" : "w-60"
+        )}
       >
-        <Icon name={aberto ? "close" : "menu"} className="text-muted-foreground text-xl" />
-      </button>
+        <CabecalhoMarca colapsado={colapsado} />
+        <Navegacao itens={itens} ativo={ativo} colapsado={colapsado} />
+        <Rodape colapsado={colapsado} />
+      </aside>
 
+      {/* Menu deslizante (telemóvel) */}
       {aberto && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-[1px] z-40 md:hidden" onClick={() => setAberto(false)} />
+        <div
+          className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-[1px] md:hidden"
+          onClick={onFechar}
+        />
       )}
-
-      <aside className={cn(
-        "fixed left-0 top-0 h-full w-64 z-50",
-        "flex flex-col bg-card border-r border-border",
-        "transition-[transform] duration-300 ease-out",
-        "md:translate-x-0",
-        aberto ? "translate-x-0" : "-translate-x-full"
-      )}>
-        <div className="px-5 pt-6 pb-5">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center shrink-0 shadow-sm">
-              <Icon name="precision_manufacturing" className="text-lg ms-fill" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-[15px] font-semibold leading-none tracking-tight text-foreground">
-                SIGRAF
-              </h1>
-              <p className="text-[11px] text-muted-foreground mt-1 truncate">Gestão de Gráfica</p>
-            </div>
-          </div>
+      <aside
+        className={cn(
+          "fixed left-0 top-0 z-50 flex h-full w-56 flex-col justify-between border-r border-border bg-background transition-transform duration-300 ease-out md:hidden",
+          aberto ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <span className="text-sm font-black tracking-tight text-foreground">KAMGEST</span>
+          <button
+            onClick={onFechar}
+            aria-label="Fechar menu"
+            className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <LuX className="h-5 w-5" />
+          </button>
         </div>
-
-        <nav className="flex-1 px-3 pb-2 overflow-y-auto custom-scrollbar">
-          {grupos.map((g) => {
-            const visiveis = g.itens.filter((rota) => podeAtual(...rota.perm));
-            if (visiveis.length === 0) return null;
-            return (
-              <div key={g.rotulo} className="mt-4 first:mt-0">
-                <p className="px-3 pb-1.5 text-[11px] font-medium text-muted-foreground">
-                  {g.rotulo}
-                </p>
-                <div className="space-y-0.5">
-                  {visiveis.map((rota) => {
-                    const ativa = rota.para === "/" ? caminho === "/" : caminho.startsWith(rota.para);
-                    return (
-                      <Link
-                        key={rota.para}
-                        href={rota.para}
-                        onClick={() => setAberto(false)}
-                        className={cn(
-                          "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
-                          ativa
-                            ? "bg-primary/10 text-primary font-medium"
-                            : "font-medium text-muted-foreground hover:text-foreground hover:bg-muted"
-                        )}
-                      >
-                        <Icon name={rota.icone} className={cn("text-[18px] shrink-0", ativa && "text-primary ms-fill")} />
-                        <span>{rota.nome}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </nav>
-
-        <div className="p-3 border-t border-border">
-          <div className="flex items-center gap-3 px-1 py-1">
-            <div className="w-9 h-9 rounded-full bg-muted text-foreground flex items-center justify-center text-xs font-semibold shrink-0">
-              {getInitials(usuario?.nome)}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">{usuario?.nome || "Utilizador"}</p>
-              <p className="text-[11px] text-muted-foreground truncate">
-                {usuario?.funcao || "Online"}
-              </p>
-            </div>
-            <button
-              onClick={toggleTheme}
-              aria-label={dark ? "Ativar tema claro" : "Ativar tema escuro"}
-              title={dark ? "Tema claro" : "Tema escuro"}
-              className="h-9 w-9 shrink-0 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            >
-              <Icon name={dark ? "light_mode" : "dark_mode"} className="text-lg" />
-            </button>
-          </div>
-        </div>
+        <Navegacao itens={itens} ativo={ativo} onNavegar={onFechar} />
+        <Rodape />
       </aside>
     </>
   );

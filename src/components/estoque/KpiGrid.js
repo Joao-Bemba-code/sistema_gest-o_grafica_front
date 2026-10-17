@@ -5,114 +5,54 @@ import Icon from "@/components/Icon";
 import { toNum } from "@/lib/estoque";
 
 const cards = [
-  {
-    key: "itens",
-    icon: "inventory_2",
-    label: "Total de Itens",
-    unit: "itens",
-    barra: "bg-primary",
-  },
-  {
-    key: "alertas",
-    icon: "warning",
-    label: "Alertas Críticos",
-    unit: "req",
-    barra: "bg-error",
-    critico: true,
-  },
-  {
-    key: "valor",
-    icon: "attach_money",
-    label: "Valor em Stock",
-    unit: "",
-    barra: "bg-secondary",
-    prefixo: true,
-  },
-  {
-    key: "reservado",
-    icon: "pending_actions",
-    label: "Reservado (OPs)",
-    unit: "un",
-    barra: "bg-tertiary",
-  },
+  { key: "artigos", icon: "inventory_2", label: "Total de Artigos", tom: "border-primary/20 bg-primary/10 text-primary" },
+  { key: "valor", icon: "attach_money", label: "Stock em Valor", tom: "border-info/20 bg-info/10 text-info" },
+  { key: "emStock", icon: "task_alt", label: "Em Stock", tom: "border-success/20 bg-success/10 text-success" },
+  { key: "emFalta", icon: "warning", label: "Em Falta", tom: "border-error/20 bg-error/10 text-error", alerta: true },
 ];
 
-function KpiCard({ card, valor, barra }) {
+function KpiCard({ card, valor }) {
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl bg-card border p-5 flex flex-col gap-3 transition-shadow ${
-        card.critico ? "border-error/30 bg-error/5" : "border-border shadow-card hover:shadow-card-hover"
+      className={`flex items-center gap-3.5 rounded-xl border p-4 shadow-sm ${
+        card.alerta ? "border-error/25 bg-error/5" : "border-border bg-card"
       }`}
     >
-      <div className="flex items-center gap-2.5 min-w-0">
-        <span
-          className={`w-9 h-9 shrink-0 rounded-lg flex items-center justify-center ${
-            card.critico ? "bg-error/10 text-error border border-error/25" : "bg-muted text-primary border border-border"
-          }`}
-        >
-          <Icon name={card.icon} className="text-lg" />
-        </span>
-        <p className={`text-[11px] font-semibold uppercase tracking-wider truncate ${card.critico ? "text-error" : "text-muted-foreground"}`}>
+      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${card.tom}`}>
+        <Icon name={card.icon} className="text-xl" />
+      </span>
+      <div className="min-w-0">
+        <p className={`text-xs font-medium ${card.alerta ? "text-error" : "text-muted-foreground"}`}>
           {card.label}
         </p>
-      </div>
-      <div>
-        <p className={`font-mono text-3xl font-bold tracking-tight ${card.critico ? "text-error" : "text-foreground"}`}>
-          {card.prefixo && <span className={`text-sm mr-1 ${card.critico ? "text-error/70" : "text-muted-foreground"}`}>{valor.moeda}</span>}
-          {valor.numero}
-          {card.unit && (
-            <span className={`text-xs ml-1 font-normal ${card.critico ? "text-error/70" : "text-muted-foreground"}`}>{card.unit}</span>
-          )}
+        <p className={`mt-0.5 text-2xl font-bold leading-none tracking-tight tabular-nums ${card.alerta ? "text-error" : "text-foreground"}`}>
+          {valor}
         </p>
-      </div>
-      <div className="w-full h-1.5 mt-auto rounded-full overflow-hidden bg-muted">
-        <div
-          className={`h-full rounded-full ${card.critico ? "bg-error animate-pulse" : card.barra}`}
-          style={{ width: `${barra}%` }}
-        />
       </div>
     </div>
   );
 }
 
 function KpiGrid({ totais, alertas, materiais }) {
-  const stock = totais.stock || 1;
   const valorTotal = (materiais || []).reduce(
     (s, i) => s + toNum(i.custo_unit) * toNum(i.quantidade),
     0
   );
   const itens = totais.itens || 0;
+  const emStock = (materiais || []).filter((i) => toNum(i.estoque_disponivel) > 0).length;
+  const emFalta = (alertas || []).length;
 
   const data = {
-    itens: {
-      numero: itens.toLocaleString("pt-AO"),
-      moeda: "",
-    },
-    alertas: {
-      numero: String((alertas || []).length),
-      moeda: "",
-    },
-    valor: {
-      numero: Math.round(valorTotal).toLocaleString("pt-AO"),
-      moeda: "Kz",
-    },
-    reservado: {
-      numero: totais.reservado.toLocaleString("pt-AO"),
-      moeda: "",
-    },
-  };
-
-  const barras = {
-    itens: itens > 0 ? Math.min(100, Math.round((totais.disponivel / stock) * 100)) : 0,
-    alertas: (alertas || []).length > 0 ? 100 : 0,
-    valor: valorTotal > 0 ? Math.min(100, Math.max(15, Math.round((totais.reservado / stock) * 100))) : 0,
-    reservado: Math.min(100, Math.round((totais.reservado / stock) * 100)),
+    artigos: itens.toLocaleString("pt-AO"),
+    valor: `${Math.round(valorTotal).toLocaleString("pt-AO")} Kz`,
+    emStock: emStock.toLocaleString("pt-AO"),
+    emFalta: emFalta.toLocaleString("pt-AO"),
   };
 
   return (
-    <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" aria-label="Indicadores do estoque">
+    <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5" aria-label="Indicadores do stock">
       {cards.map((card) => (
-        <KpiCard key={card.key} card={card} valor={data[card.key]} barra={barras[card.key]} />
+        <KpiCard key={card.key} card={card} valor={data[card.key]} />
       ))}
     </section>
   );

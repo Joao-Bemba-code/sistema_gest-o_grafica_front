@@ -99,7 +99,7 @@ export default function Modal({
                     <Icon name={icon} className="text-base text-muted-foreground" />
                   </span>
                 )}
-                <h3 id={titleId} className="font-semibold text-foreground truncate">{title}</h3>
+                <h3 id={titleId} className="text-base font-semibold text-foreground truncate">{title}</h3>
               </div>
               <button
                 ref={closeRef}

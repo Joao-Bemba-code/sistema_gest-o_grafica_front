@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import Icon from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
 import FornecedorSelect from "./FornecedorSelect";
-import CategoriaSelect from "./CategoriaSelect";
 import UnidadeSelect from "./UnidadeSelect";
 import NumeroInput from "@/components/ui/NumeroInput";
-import { inputCls, unidades, unidadesParaFamilia, camposDeCategoria, familias, normalizarFamilia, normalizarUnidade, prefixoFamilia, especificacoesObjeto, tiposItem, normalizarTipoItem, moverEstoqueDe, ehProduto } from "@/lib/estoque";
+import { inputCls, unidadesParaFamilia, camposDeCategoria, familias, familiasServico, normalizarUnidade, familiaChaveDe, tipoChaveDe, especificacoesObjeto, tipoRecursoOptions, moverEstoqueDe, ehProduto } from "@/lib/estoque";
 
 const tabs = [
   { key: "identificacao", label: "Identificação", icon: "badge" },
@@ -15,6 +14,9 @@ const tabs = [
   { key: "estoque", label: "Stock", icon: "inventory" },
   { key: "composicao", label: "Composição", icon: "layers" },
 ];
+
+const FAMILIA_OPCOES = [...Object.values(familias), ...Object.values(familiasServico)].map((c) => c.label);
+const GRUPO_OPCOES = tipoRecursoOptions.map((o) => o.label);
 
 function Campo({ label, children, obrigatorio, full }) {
   return (
@@ -77,17 +79,24 @@ function CampoEspecificacao({ campo, valor, onChange }) {
   );
 }
 
-export default function MaterialForm({ formId = "form-material", form, onChange, onSubmit, categorias, fornecedores, materiais = [], idMaterial }) {
+export default function MaterialForm({ formId = "form-material", form, onChange, onSubmit, categorias = [], fornecedores, materiais = [], idMaterial }) {
   const [tab, setTab] = useState("identificacao");
   const id = (sufixo) => `${formId}-${sufixo}`;
-  const categoria = categorias.find((c) => String(c.id) === String(form.categoria_id));
-  const tipoLabel = categoria ? (tiposItem[normalizarTipoItem(categoria.tipo)]?.label || String(categoria.tipo || "")) : "";
-  const catFamiliaLabel = categoria ? (familias[normalizarFamilia(categoria.familia)]?.label || categoria.familia || "") : "";
-  const camposEspec = camposDeCategoria(categoria, form.unidade);
+  const espec = especificacoesObjeto(form.especificacoes);
+  const categoriaTexto = String(espec.categoria || "").trim();
+  const familiaTexto = String(espec.familia || "").trim();
+  const grupoTexto = String(espec.grupo || "").trim();
+  const pseudoCategoria = {
+    familia: familiaChaveDe(familiaTexto),
+    tipo: tipoChaveDe(grupoTexto),
+    subfamilia: String(espec.subfamilia || "").trim(),
+    campos_especificacao: [],
+  };
+  const camposEspec = camposDeCategoria(pseudoCategoria, form.unidade);
   const ePapel = ["folha", "resma"].includes(normalizarUnidade(form.unidade));
-  const unidadesDisponiveis = categoria ? unidadesParaFamilia(categoria.familia) : unidades;
-  const mover = form.mover_estoque === undefined ? moverEstoqueDe(categoria) : !!form.mover_estoque;
-  const eComposicao = ehProduto(categoria);
+  const unidadesDisponiveis = unidadesParaFamilia(pseudoCategoria.familia);
+  const mover = form.mover_estoque === undefined ? moverEstoqueDe(pseudoCategoria) : !!form.mover_estoque;
+  const eComposicao = ehProduto(pseudoCategoria);
   const tabsVisiveis = eComposicao ? tabs : tabs.filter((t) => t.key !== "composicao");
   const tabAtiva = tabsVisiveis.some((t) => t.key === tab) ? tab : tabsVisiveis[0]?.key || "identificacao";
   const candidatosComposicao = materiais.filter((m) => !idMaterial || String(m.id) !== String(idMaterial));
@@ -103,53 +112,28 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
   const removeComponente = (ci) => aoMudarComposicao(composicao.filter((_, i) => i !== ci));
 
   const subfamiliasSugeridas = (() => {
-    if (!categoria) return [];
-    const grupo = normalizarTipoItem(categoria.tipo);
+    const grupo = tipoChaveDe(grupoTexto);
     const vistas = new Set();
-    const subCategoria = String(categoria.subfamilia || "").trim();
+    const subCategoria = String(espec.subfamilia || "").trim();
     if (subCategoria) vistas.add(subCategoria);
     for (const c of categorias) {
-      if (normalizarTipoItem(c.tipo) !== grupo) continue;
+      if (grupo && tipoChaveDe(c.tipo) !== grupo) continue;
       const s = String(c.subfamilia || "").trim();
       if (s) vistas.add(s);
     }
     for (const m of materiais) {
-      const g = m.categoria ? normalizarTipoItem(m.categoria.tipo) : normalizarTipoItem(m.tipo);
-      if (g !== grupo) continue;
+      const g = m.categoria ? tipoChaveDe(m.categoria.tipo) : tipoChaveDe(especificacoesObjeto(m.especificacoes).grupo || m.tipo);
+      if (grupo && g !== grupo) continue;
       const s = String(especificacoesObjeto(m.especificacoes).subfamilia || m.categoria?.subfamilia || "").trim();
       if (s) vistas.add(s);
     }
     return [...vistas];
   })();
 
-  const aoMudarCategoria = useCallback((novaCatId) => {
-    const mudou = String(novaCatId) !== String(form.categoria_id);
-    onChange("categoria_id", novaCatId);
-    const cat = categorias.find((c) => String(c.id) === String(novaCatId));
-    if (cat) {
-      const prefixo = prefixoFamilia(cat.familia);
-      let maxNum = 0;
-      for (const m of materiais) {
-        const cod = m.codigo || "";
-        if (cod.startsWith(prefixo + "-")) {
-          const num = parseInt(cod.split("-")[1], 10);
-          if (num > maxNum) maxNum = num;
-        }
-      }
-      onChange("codigo", `${prefixo}-${String(maxNum + 1).padStart(4, "0")}`);
-      if (mudou) {
-        onChange("especificacoes", {
-          ...(form.especificacoes || {}),
-          subfamilia: String(cat.subfamilia || "").trim(),
-        });
-      }
-    }
-  }, [categorias, materiais, onChange, form]);
-
   const aoMudarEspec = (chave, valor) => {
-    const especificacoes = { ...(form.especificacoes || {}) };
-    especificacoes[chave] = valor;
-    onChange("especificacoes", especificacoes);
+    const novasEspec = { ...especificacoesObjeto(form.especificacoes) };
+    novasEspec[chave] = valor;
+    onChange("especificacoes", novasEspec);
   };
 
   return (
@@ -176,38 +160,50 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
         {tabAtiva === "identificacao" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Campo label="Código" obrigatorio>
-              <div className="flex items-center gap-2">
-                <input required aria-required="true" value={form.codigo} readOnly className={`${inputCls} bg-muted/50 cursor-not-allowed`} placeholder="Selecione a categoria" />
-                {form.codigo && <span className="text-[10px] font-mono text-primary whitespace-nowrap">AUTO</span>}
-              </div>
+              <input required aria-required="true" value={form.codigo} onChange={(e) => onChange("codigo", e.target.value)} className={inputCls} placeholder="Ex: PAP-0001" />
             </Campo>
             <Campo label="Nome" obrigatorio>
               <input required aria-required="true" value={form.nome} onChange={(e) => onChange("nome", e.target.value)} className={inputCls} placeholder="Ex: Papel Couché 150g A3" />
             </Campo>
             <Campo label="Categoria" obrigatorio>
-              <CategoriaSelect
-                value={form.categoria_id}
-                categorias={categorias}
-                onChange={(id) => aoMudarCategoria(id)}
+              <input
+                required
+                aria-required="true"
+                list={`${formId}-categorias`}
+                value={espec.categoria || ""}
+                onChange={(e) => aoMudarEspec("categoria", e.target.value)}
+                className={inputCls}
+                placeholder="Ex: Papel Couché 150g"
               />
+              <datalist id={`${formId}-categorias`}>
+                {[...new Set(categorias.map((c) => String(c.nome || "").trim()).filter(Boolean))].map((n) => <option key={n} value={n} />)}
+              </datalist>
             </Campo>
             <Campo label="Família">
               <input
-                value={catFamiliaLabel}
-                readOnly
-                className={`${inputCls} bg-muted/50 cursor-not-allowed`}
-                placeholder={form.categoria_id ? "Carregando família..." : "Escolha a categoria"}
+                list={`${formId}-familias`}
+                value={espec.familia || ""}
+                onChange={(e) => aoMudarEspec("familia", e.target.value)}
+                className={inputCls}
+                placeholder="Ex: Papéis, Tintas..."
               />
+              <datalist id={`${formId}-familias`}>
+                {FAMILIA_OPCOES.map((f) => <option key={f} value={f} />)}
+              </datalist>
             </Campo>
             <Campo label="Grupo" obrigatorio>
               <input
                 required
                 aria-required="true"
-                value={tipoLabel}
-                readOnly
-                className={`${inputCls} bg-muted/50 cursor-not-allowed`}
-                placeholder={form.categoria_id ? "Carregando grupo..." : "Escolha a categoria"}
+                list={`${formId}-grupos`}
+                value={espec.grupo || ""}
+                onChange={(e) => aoMudarEspec("grupo", e.target.value)}
+                className={inputCls}
+                placeholder="Ex: Matéria-Prima, Artigo..."
               />
+              <datalist id={`${formId}-grupos`}>
+                {GRUPO_OPCOES.map((g) => <option key={g} value={g} />)}
+              </datalist>
             </Campo>
             <Campo label="Subfamília">
               <input
@@ -268,9 +264,9 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
               </>
             )}
 
-            {!categoria && (
+            {!familiaTexto && !grupoTexto && (
               <div className="sm:col-span-2 rounded-xl border border-dashed border-outline-variant p-4 text-xs text-muted-foreground">
-                Selecione uma categoria para definir as especificações técnicas deste material.
+                Escreva a família ou o grupo para ver as especificações técnicas típicas deste material.
               </div>
             )}
 

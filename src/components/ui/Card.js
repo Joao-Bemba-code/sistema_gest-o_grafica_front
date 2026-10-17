@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 function Card({ className, ...props }) {
   return (
     <div
-      className={cn("rounded-xl border border-border bg-card text-card-foreground shadow-card", className)}
+      className={cn("rounded-xl border border-border bg-card text-card-foreground", className)}
       {...props}
     />
   );
@@ -12,7 +12,7 @@ function Card({ className, ...props }) {
 function CardHeader({ className, ...props }) {
   return (
     <div
-      className={cn("flex flex-col space-y-1.5 p-5 sm:p-6", className)}
+      className={cn("flex flex-col space-y-1.5 p-4", className)}
       {...props}
     />
   );
@@ -21,7 +21,7 @@ function CardHeader({ className, ...props }) {
 function CardTitle({ className, ...props }) {
   return (
     <h3
-      className={cn("text-sm sm:text-base font-semibold leading-none tracking-tight text-foreground", className)}
+      className={cn("text-sm font-semibold leading-none tracking-tight text-foreground", className)}
       {...props}
     />
   );
@@ -38,7 +38,7 @@ function CardDescription({ className, ...props }) {
 
 function CardContent({ className, ...props }) {
   return (
-    <div className={cn("p-5 sm:p-6 pt-0 sm:pt-0", className)} {...props} />
+    <div className={cn("p-4 pt-0", className)} {...props} />
   );
 }
 
@@ -46,7 +46,7 @@ function CardFooter({ className, ...props }) {
   return (
     <div
       className={cn(
-        "flex items-center p-5 sm:p-6 pt-0 sm:pt-0",
+        "flex items-center p-4 pt-0",
         className
       )}
       {...props}

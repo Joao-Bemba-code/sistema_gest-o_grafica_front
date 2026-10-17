@@ -3,30 +3,45 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Icon from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { CardSkeleton } from "@/components/Skeleton";
+import Modal from "@/components/Modal";
 import { useToast } from "@/components/Toast";
+import RowMenu from "@/components/ui/RowMenu";
 import Paginacao, { usePaginacao } from "@/components/ui/Paginacao";
+import {
+  Ledger,
+  LedgerHeader,
+  FilterRow,
+  LedgerTable,
+  LedgerTh,
+  LedgerTr,
+  LedgerTd,
+  IdCell,
+  StatusBadge,
+  LedgerEmpty,
+} from "@/components/ui/Ledger";
 import { podeAtual } from "@/lib/permissoes";
 import { getUsuario } from "@/services/auth";
 import { listar, auxiliares, criar, cancelar as cancelarRequisicao } from "@/services/requisicoesMaterial";
 import RequisicaoMaterialFormModal from "./RequisicaoMaterialFormModal";
 
 const ESTADO_META = {
-  pendente: { label: "Pendente", icon: "hourglass_top", classe: "text-amber-500 bg-amber-500/10" },
-  aprovada: { label: "Aprovada", icon: "check_circle", classe: "text-emerald-500 bg-emerald-500/10" },
-  rejeitada: { label: "Rejeitada", icon: "cancel", classe: "text-error bg-error/10" },
-  cancelada: { label: "Cancelada", icon: "block", classe: "text-muted-foreground bg-muted/50" },
-  consumida: { label: "Concluída", icon: "inventory", classe: "text-blue-500 bg-blue-500/10" },
+  pendente: { label: "Pendente", tom: "warning" },
+  aprovada: { label: "Aprovada", tom: "success" },
+  rejeitada: { label: "Rejeitada", tom: "error" },
+  cancelada: { label: "Cancelada", tom: "neutral" },
+  consumida: { label: "Concluída", tom: "info" },
 };
 
 // O backend etiqueta consumo interno assim; não é um cliente.
 const CONSUMO_INTERNO = "Consumo interno / produção";
 
-const FILTROS = [
-  { value: "todas", label: "Todas" },
-  { value: "pendente", label: "Pendentes" },
-  { value: "aprovada", label: "Aprovadas" },
-  { value: "rejeitada", label: "Rejeitadas" },
+const CAMPOS = [
+  { value: "numero", label: "Número", obter: (r) => r.numero || "" },
+  { value: "cliente", label: "Cliente", obter: (r) => r.cliente_nome || "" },
+  { value: "solicitante", label: "Solicitante", obter: (r) => r.solicitado_por || "" },
+  { value: "material", label: "Material", obter: (r) => (r.itens || []).map((i) => i.nome || "").join(" ") },
 ];
 
 function fmtData(v) {
@@ -42,11 +57,13 @@ export default function RequisicoesTab() {
   const [clientes, setClientes] = useState([]);
   const [materiais, setMateriais] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filtro, setFiltro] = useState("todas");
-  const [busca, setBusca] = useState("");
   const [aberto, setAberto] = useState(false);
   const [sessao, setSessao] = useState(0);
   const [cancelando, setCancelando] = useState(null);
+  const [detalhe, setDetalhe] = useState(null);
+  const [filtro, setFiltro] = useState({ campo: "numero", operador: "contem", termo: "" });
+  const [ordem, setOrdem] = useState({ chave: "", dir: 1 });
+  const [filtrosAbertos, setFiltrosAbertos] = useState(true);
 
   const podeCriar = podeAtual("producao", "criar");
 
@@ -130,189 +147,180 @@ export default function RequisicoesTab() {
     }
   };
 
-  const contagens = useMemo(() => {
-    const c = { todas: requisicoes.length };
-    for (const f of FILTROS) {
-      if (f.value !== "todas") c[f.value] = requisicoes.filter((r) => r.estado === f.value).length;
+  const resultado = useMemo(() => {
+    const termo = filtro.termo.trim().toLowerCase();
+    let res = [...requisicoes];
+    if (termo) {
+      const cfg = CAMPOS.find((c) => c.value === filtro.campo) || CAMPOS[0];
+      res = res.filter((r) => {
+        const alvo = String(cfg.obter(r) || "").toLowerCase();
+        if (filtro.operador === "igual") return alvo === termo;
+        if (filtro.operador === "comeca") return alvo.startsWith(termo);
+        return alvo.includes(termo);
+      });
     }
-    return c;
-  }, [requisicoes]);
+    if (ordem.chave === "numero") res.sort((a, b) => String(a.numero || "").localeCompare(String(b.numero || ""), "pt", { numeric: true }) * ordem.dir);
+    if (ordem.chave === "data") res.sort((a, b) => (new Date(a.data_requisicao || 0) - new Date(b.data_requisicao || 0)) * ordem.dir);
+    return res;
+  }, [requisicoes, filtro, ordem]);
 
-  const filtradas = useMemo(() => {
-    const termo = busca.trim().toLowerCase();
-    return requisicoes.filter((r) => {
-      if (filtro !== "todas" && r.estado !== filtro) return false;
-      if (!termo) return true;
-      return (
-        String(r.numero || "").toLowerCase().includes(termo) ||
-        String(r.cliente_nome || "").toLowerCase().includes(termo) ||
-        String(r.solicitado_por || "").toLowerCase().includes(termo) ||
-        (r.itens || []).some((i) => String(i.nome || "").toLowerCase().includes(termo))
-      );
-    });
-  }, [requisicoes, filtro, busca]);
-
-  const { visiveis, ...pag } = usePaginacao({ items: filtradas });
+  const { visiveis, ...pag } = usePaginacao({ items: resultado });
   const pendentes = requisicoes.filter((r) => r.estado === "pendente").length;
+
+  const reqDetalhe = detalhe ? requisicoes.find((r) => r.id === detalhe) || null : null;
 
   if (loading) return <CardSkeleton lines={6} />;
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-card border border-border shadow-card rounded-2xl p-5">
-        <div className="flex items-start gap-4">
-          <span className="w-12 h-12 rounded-2xl bg-muted border border-border flex items-center justify-center shrink-0">
-            <Icon name="inventory_2" className="text-2xl text-primary" />
-          </span>
-          <div>
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <h2 className="text-lg font-semibold text-foreground tracking-tight">Requisições de Material</h2>
-              {pendentes > 0 && (
-                <span className="pill pill-primary">
-                  <Icon name="hourglass_top" className="text-sm" /> {pendentes} pendente{pendentes === 1 ? "" : "s"}
-                </span>
-              )}
-            </div>
-            <p className="text-muted-foreground mt-1 text-xs">
-              Peça ao Estoque material para um cliente ou para consumo interno da fábrica. A aprovação e a saída de stock
-              são feitas no módulo de Estoque.
-            </p>
-          </div>
-        </div>
-        {podeCriar && (
-          <Button onClick={abrirFormulario}>
-            <Icon name="add_shopping_cart" className="text-lg" /> Nova requisição
-          </Button>
-        )}
-      </div>
-
-      <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
-        <div className="flex gap-1.5 flex-wrap">
-          {FILTROS.map((f) => (
-            <button
-              key={f.value}
-              type="button"
-              onClick={() => setFiltro(f.value)}
-              aria-pressed={filtro === f.value}
-              className={`pill transition-colors ${filtro === f.value ? "nav-pill" : "pill-muted hover:border-primary hover:text-primary"}`}
-            >
-              {f.label}
-              <span className={`ml-0.5 px-1.5 py-0.5 rounded text-[9px] ${filtro === f.value ? "bg-primary/20" : "bg-muted"}`}>
-                {contagens[f.value] ?? 0}
-              </span>
-            </button>
-          ))}
-        </div>
-        <div className="relative w-full sm:w-72">
-          <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-base" />
-          <input
-            type="search"
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Procurar por nº, cliente ou material..."
-            className="form-input h-9 pl-9 pr-3 text-xs"
-            aria-label="Pesquisar requisições"
+    <div className="space-y-4">
+      <Ledger rotulo="Requisições de material ledger">
+        <LedgerHeader
+          titulo="Requisições de material"
+          subtitulo={`${requisicoes.length} requisições${pendentes > 0 ? ` · ${pendentes} pendentes` : ""} · aprovação e saída de stock feitas no módulo de Estoque`}
+          novo={podeCriar ? "Nova requisição" : undefined}
+          aoNovo={abrirFormulario}
+          onToggleFiltros={() => setFiltrosAbertos((v) => !v)}
+          filtrosAbertos={filtrosAbertos}
+        />
+        {filtrosAbertos && (
+          <FilterRow
+            campo={filtro.campo}
+            setCampo={(v) => setFiltro((f) => ({ ...f, campo: v }))}
+            campos={CAMPOS.map(({ value, label }) => ({ value, label }))}
+            operador={filtro.operador}
+            setOperador={(v) => setFiltro((f) => ({ ...f, operador: v }))}
+            termo={filtro.termo}
+            setTermo={(v) => setFiltro((f) => ({ ...f, termo: v }))}
+            aoLimpar={() => setFiltro((f) => ({ ...f, termo: "" }))}
+            placeholder="Pesquisar por nº, cliente, solicitante ou material..."
           />
-        </div>
-      </div>
+        )}
+        <LedgerTable>
+          <thead>
+            <tr className="border-b border-border">
+              <LedgerTh onSort={() => setOrdem((p) => (p.chave === "numero" ? { chave: "numero", dir: -p.dir } : { chave: "numero", dir: 1 }))} ativo={ordem.chave === "numero"}>Requisição</LedgerTh>
+              <LedgerTh>Cliente</LedgerTh>
+              <LedgerTh>Solicitada por</LedgerTh>
+              <LedgerTh className="text-right">Itens</LedgerTh>
+              <LedgerTh onSort={() => setOrdem((p) => (p.chave === "data" ? { chave: "data", dir: -p.dir } : { chave: "data", dir: 1 }))} ativo={ordem.chave === "data"}>Data</LedgerTh>
+              <LedgerTh>Estado</LedgerTh>
+              <LedgerTh className="w-10" />
+            </tr>
+          </thead>
+          <tbody>
+            {visiveis.map((r) => {
+              const meta = ESTADO_META[r.estado] || ESTADO_META.pendente;
+              return (
+                <LedgerTr key={r.id} onClick={() => setDetalhe(r.id)}>
+                  <LedgerTd className="max-w-40">
+                    <IdCell id={r.numero} meta={`${(r.itens || []).length} material(is)`} aoAbrir={() => setDetalhe(r.id)} />
+                  </LedgerTd>
+                  <LedgerTd className="max-w-52">
+                    <span className="block truncate text-sm">{r.cliente_nome || CONSUMO_INTERNO}</span>
+                    {!r.cliente_id && <span className="block text-xs text-muted-foreground">Consumo interno</span>}
+                  </LedgerTd>
+                  <LedgerTd className="text-muted-foreground">{r.solicitado_por || "—"}</LedgerTd>
+                  <LedgerTd className="text-right tabular-nums">{(r.itens || []).length}</LedgerTd>
+                  <LedgerTd className="text-muted-foreground whitespace-nowrap">{fmtData(r.data_requisicao)}</LedgerTd>
+                  <LedgerTd>
+                    <StatusBadge tom={meta.tom}>{meta.label}</StatusBadge>
+                  </LedgerTd>
+                  <LedgerTd>
+                    <RowMenu
+                      ariaLabel="Ações da requisição"
+                      itens={[
+                        { icone: "visibility", rotulo: "Ver detalhes", onClick: () => setDetalhe(r.id) },
+                        ...(r.estado === "pendente" && podeAtual("producao", "editar") ? [{ icone: "close", rotulo: "Cancelar requisição", danger: true, onClick: () => setCancelando(r) }] : []),
+                      ]}
+                    />
+                  </LedgerTd>
+                </LedgerTr>
+              );
+            })}
+          </tbody>
+        </LedgerTable>
+        {pag.total === 0 && (
+          requisicoes.length === 0
+            ? <LedgerEmpty icone="inventory">{podeCriar ? "Nenhuma requisição de material — use “Nova requisição” para pedir material ao Estoque" : "Nenhuma requisição de material"}</LedgerEmpty>
+            : <LedgerEmpty icone="search_off">Nenhuma requisição corresponde ao filtro</LedgerEmpty>
+        )}
+        <Paginacao {...pag} label="requisições" />
+      </Ledger>
 
-      {requisicoes.length > 0 && filtradas.length === 0 ? (
-        <div className="text-center p-12 text-muted-foreground">
-          <Icon name="search_off" className="text-4xl block mx-auto mb-2 opacity-30" />
-          <p className="font-medium">Nenhuma requisição corresponde ao filtro</p>
-          <p className="text-xs mt-1">Ajuste a pesquisa ou mude o filtro acima.</p>
-        </div>
-      ) : filtradas.length === 0 ? (
-        <div className="text-center p-12 text-muted-foreground">
-          <Icon name="inventory" className="text-4xl block mx-auto mb-2 opacity-30" />
-          <p className="font-medium">Nenhuma requisição de material</p>
-          <p className="text-xs mt-1">
-            {podeCriar
-              ? "Use “Nova requisição” para pedir material ao Estoque — para um cliente ou para consumo interno."
-              : "Não tem permissão para criar requisições."}
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {visiveis.map((r) => {
-            const meta = ESTADO_META[r.estado] || ESTADO_META.pendente;
-            return (
-              <div key={r.id} className="bg-card border border-border rounded-xl p-5 space-y-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-mono text-sm font-bold text-primary">{r.numero}</span>
-                      <span className={`pill ${meta.classe}`}>
-                        <Icon name={meta.icon} className="text-sm" /> {meta.label}
-                      </span>
-                    </div>
-                    {r.cliente_id ? (
-                      <p className="text-sm text-foreground mt-1 font-semibold">{r.cliente_nome}</p>
-                    ) : (
-                      <p className="flex items-center gap-1.5 text-sm text-foreground mt-1 font-semibold">
-                        <Icon name="factory" className="text-base text-muted-foreground" />
-                        {r.cliente_nome || CONSUMO_INTERNO}
-                        <span className="pill pill-muted text-[9px]">Sem cliente</span>
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Solicitado por {r.solicitado_por || "—"} em {fmtData(r.data_requisicao)}
-                    </p>
-                  </div>
-                  {r.estado === "pendente" && podeAtual("producao", "editar") && (
-                    <Button variant="outline" size="sm" onClick={() => setCancelando(r)}>
-                      <Icon name="close" className="text-base" /> Cancelar
-                    </Button>
-                  )}
+      <Modal
+        open={Boolean(reqDetalhe)}
+        onClose={() => setDetalhe(null)}
+        title={`Requisição ${reqDetalhe?.numero || ""}`}
+        icon="inventory_2"
+        size="lg"
+      >
+        {reqDetalhe && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <StatusBadge tom={(ESTADO_META[reqDetalhe.estado] || ESTADO_META.pendente).tom}>
+                {(ESTADO_META[reqDetalhe.estado] || ESTADO_META.pendente).label}
+              </StatusBadge>
+              {!reqDetalhe.cliente_id && <StatusBadge tom="neutral">Consumo interno</StatusBadge>}
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+              {[
+                { label: "Cliente", value: reqDetalhe.cliente_nome || CONSUMO_INTERNO },
+                { label: "Solicitada por", value: reqDetalhe.solicitado_por || "—" },
+                { label: "Data", value: fmtData(reqDetalhe.data_requisicao) },
+                { label: "Aprovada por", value: reqDetalhe.aprovado_por || "—" },
+                { label: "Data de aprovação", value: fmtData(reqDetalhe.data_aprovacao) },
+                { label: "Itens", value: (reqDetalhe.itens || []).length },
+              ].map((f) => (
+                <div key={f.label}>
+                  <span className="text-muted-foreground text-xs block">{f.label}</span>
+                  <span className="font-medium text-foreground">{f.value || "—"}</span>
                 </div>
+              ))}
+            </div>
 
-                <div className="rounded-lg border border-border/60 overflow-hidden">
-                  <table className="w-full text-xs">
-                    <thead className="bg-muted/50">
-                      <tr className="text-left text-[10px] uppercase tracking-wider text-muted-foreground">
-                        <th className="px-3 py-2 font-semibold">Material</th>
-                        <th className="px-3 py-2 font-semibold text-right">Pedido</th>
-                        <th className="px-3 py-2 font-semibold text-right">Atendido</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/60">
-                      {(r.itens || []).map((i) => (
-                        <tr key={i.id}>
-                          <td className="px-3 py-2 text-foreground">
-                            <span className="font-mono text-[10px] text-muted-foreground mr-1.5">{i.codigo}</span>
-                            {i.nome}
-                            {i.observacoes ? <span className="block text-[10px] text-muted-foreground">{i.observacoes}</span> : null}
-                          </td>
-                          <td className="px-3 py-2 text-right font-mono">
-                            {i.quantidade} {i.unidade}
-                          </td>
-                          <td className="px-3 py-2 text-right font-mono text-muted-foreground">
-                            {i.quantidade_atendida > 0 ? `${i.quantidade_atendida} ${i.unidade}` : "—"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+            <div className="overflow-hidden rounded-lg border border-border">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/40 text-left">
+                    <LedgerTh>Material</LedgerTh>
+                    <LedgerTh className="text-right">Pedido</LedgerTh>
+                    <LedgerTh className="text-right">Atendido</LedgerTh>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(reqDetalhe.itens || []).map((i) => (
+                    <LedgerTr key={i.id}>
+                      <LedgerTd>
+                        <span className="block truncate">{i.nome}</span>
+                        {i.observacoes && <span className="block text-xs text-muted-foreground">{i.observacoes}</span>}
+                      </LedgerTd>
+                      <LedgerTd className="text-right tabular-nums whitespace-nowrap">{i.quantidade} {i.unidade}</LedgerTd>
+                      <LedgerTd className="text-right tabular-nums text-muted-foreground whitespace-nowrap">
+                        {i.quantidade_atendida > 0 ? `${i.quantidade_atendida} ${i.unidade}` : "—"}
+                      </LedgerTd>
+                    </LedgerTr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-                {r.observacoes && (
-                  <p className="text-xs text-muted-foreground">Obs: {r.observacoes}</p>
-                )}
-                {r.motivo_rejeicao && (
-                  <p className="text-xs text-error font-semibold">Rejeitada — {r.motivo_rejeicao}</p>
-                )}
-                {r.aprovado_por && r.estado !== "pendente" && (
-                  <p className="text-xs text-muted-foreground">
-                    Processada por <strong>{r.aprovado_por}</strong> em {fmtData(r.data_aprovacao)}
-                  </p>
-                )}
+            {reqDetalhe.observacoes && (
+              <p className="text-xs text-muted-foreground">Obs: {reqDetalhe.observacoes}</p>
+            )}
+            {reqDetalhe.motivo_rejeicao && (
+              <p className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-xs text-error">Rejeitada — {reqDetalhe.motivo_rejeicao}</p>
+            )}
+
+            {reqDetalhe.estado === "pendente" && podeAtual("producao", "editar") && (
+              <div className="flex justify-end">
+                <Button variant="destructive" size="sm" onClick={() => { setDetalhe(null); setCancelando(reqDetalhe); }}>
+                  <Icon name="close" className="text-[16px]" /> Cancelar requisição
+                </Button>
               </div>
-            );
-          })}
-        </div>
-      )}
-
-      {filtradas.length > 0 && <Paginacao {...pag} label="requisições" />}
+            )}
+          </div>
+        )}
+      </Modal>
 
       <RequisicaoMaterialFormModal
         key={`req-${sessao}`}
@@ -324,20 +332,13 @@ export default function RequisicoesTab() {
         onConfirm={confirmarCriacao}
       />
 
-      {cancelando && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-card border border-border rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-card">
-            <h3 className="text-base font-semibold text-foreground">Cancelar requisição</h3>
-            <p className="text-sm text-muted-foreground">
-              Tem a certeza que deseja cancelar a requisição <strong>{cancelando.numero}</strong>?
-            </p>
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setCancelando(null)}>Voltar</Button>
-              <Button variant="destructive" onClick={confirmarCancelamento}>Cancelar requisição</Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={Boolean(cancelando)}
+        onClose={() => setCancelando(null)}
+        onConfirm={confirmarCancelamento}
+        title="Cancelar requisição"
+        description={cancelando ? `Tem a certeza que deseja cancelar a requisição ${cancelando.numero}? Esta ação não pode ser desfeita.` : ""}
+      />
     </div>
   );
 }

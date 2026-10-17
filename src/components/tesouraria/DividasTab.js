@@ -8,21 +8,34 @@ import Icon from "@/components/Icon";
 import { Card, CardContent } from "@/components/ui/Card";
 import KpiCard from "@/components/ui/KpiCard";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 import { FormField } from "@/components/ui/FormField";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import Modal from "@/components/Modal";
 import NumeroInput from "@/components/ui/NumeroInput";
+import RowMenu from "@/components/ui/RowMenu";
+import Paginacao, { usePaginacao } from "@/components/ui/Paginacao";
+import {
+  Ledger,
+  LedgerHeader,
+  FilterRow,
+  LedgerTable,
+  LedgerTh,
+  LedgerTr,
+  LedgerTd,
+  IdCell,
+  StatusBadge,
+  LedgerEmpty,
+} from "@/components/ui/Ledger";
 import { useToast } from "@/components/Toast";
 import { inputCls } from "@/lib/estoque";
 import { ListSkeleton } from "@/components/Skeleton";
 
 const estadoCfg = {
-  pendente: { label: "Pendente", variant: "warning" },
-  parcial: { label: "Parcial", variant: "info" },
-  paga: { label: "Paga", variant: "success" },
-  vencida: { label: "Vencida", variant: "destructive" },
-  cancelada: { label: "Cancelada", variant: "secondary" },
+  pendente: { label: "Pendente", tom: "warning" },
+  parcial: { label: "Parcial", tom: "info" },
+  paga: { label: "Paga", tom: "success" },
+  vencida: { label: "Vencida", tom: "error" },
+  cancelada: { label: "Cancelada", tom: "neutral" },
 };
 
 const categorias = [
@@ -44,6 +57,25 @@ const metodos = [
   { value: "cheque", label: "Cheque" },
   { value: "tpa", label: "TPA" },
 ];
+
+const CAMPOS = [
+  { value: "geral", label: "Todos os campos", obter: (d) => `${d.descricao || ""} ${d.categoria || ""} ${d.cliente?.empresa || ""} ${d.cliente?.nome || ""}` },
+  { value: "descricao", label: "Descrição", obter: (d) => d.descricao || "" },
+  { value: "cliente", label: "Cliente", obter: (d) => `${d.cliente?.nome || ""} ${d.cliente?.empresa || ""}` },
+  { value: "categoria", label: "Tipo", obter: (d) => d.categoria || "" },
+];
+
+const ESTADOS_FILTRO = [
+  { id: "aberta", label: "Em aberto" },
+  { id: "vencida", label: "Vencidas" },
+  { id: "paga", label: "Pagas" },
+  { id: "cancelada", label: "Canceladas" },
+  { id: "todas", label: "Todas" },
+];
+
+const pillBase = "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-sm font-medium whitespace-nowrap transition-colors";
+const pillAtiva = "border-primary/40 bg-primary/10 text-primary";
+const pillInativa = "border-border bg-card text-muted-foreground hover:bg-muted/60 hover:text-foreground";
 
 // `toISOString()` converte para UTC e em Angola (UTC+1) a meia-noite local
 // recua um dia, o que faria as parcelas vencerem antes da data escolhida.
@@ -92,6 +124,14 @@ function diasAtraso(d) {
   return Math.floor((Date.parse(`${HOJE}T00:00:00`) - Date.parse(`${d.data_vencimento}T00:00:00`)) / 86400000);
 }
 
+function passaEstado(d, estado) {
+  if (estado === "aberta" && (saldoDe(d) <= 0.005 || d.estado === "cancelada")) return false;
+  if (estado === "vencida" && !(saldoDe(d) > 0.005 && diasAtraso(d) > 0)) return false;
+  if (estado === "paga" && saldoDe(d) > 0.005) return false;
+  if (estado === "cancelada" && d.estado !== "cancelada") return false;
+  return true;
+}
+
 function rotuloConta(conta) {
   if (!conta) return "—";
   return `${conta.banco_nome}${conta.numero_conta ? ` — Conta ${conta.numero_conta}` : ""}`;
@@ -111,7 +151,9 @@ export default function DividasTab() {
   const [editando, setEditando] = useState(null);
 
   const [filtroEstado, setFiltroEstado] = useState("aberta");
-  const [busca, setBusca] = useState("");
+  const [filtro, setFiltro] = useState({ campo: "geral", operador: "contem", termo: "" });
+  const [ordem, setOrdem] = useState({ chave: "", dir: 1 });
+  const [filtrosAbertos, setFiltrosAbertos] = useState(true);
 
   const [modalPagar, setModalPagar] = useState(null);
   const [pagamento, setPagamento] = useState({ valor: "", parcela_n: "", data_pagamento: HOJE, conta_bancaria_id: "", metodo_pagamento: "transferencia", observacoes: "" });
@@ -149,22 +191,43 @@ export default function DividasTab() {
   }, []);
 
   const filtradas = useMemo(() => {
-    const termo = busca.trim().toLowerCase();
-    return dividas.filter((d) => {
-      if (filtroEstado === "aberta" && (saldoDe(d) <= 0.005 || d.estado === "cancelada")) return false;
-      if (filtroEstado === "vencida" && !(saldoDe(d) > 0.005 && diasAtraso(d) > 0)) return false;
-      if (filtroEstado === "paga" && saldoDe(d) > 0.005) return false;
-      if (filtroEstado === "cancelada" && d.estado !== "cancelada") return false;
+    const termo = filtro.termo.trim().toLowerCase();
+    const res = dividas.filter((d) => {
+      if (!passaEstado(d, filtroEstado)) return false;
       if (!termo) return true;
-      const alvo = `${d.descricao || ""} ${d.categoria || ""} ${d.cliente?.empresa || ""} ${d.cliente?.nome || ""}`.toLowerCase();
+      const cfg = CAMPOS.find((c) => c.value === filtro.campo) || CAMPOS[0];
+      const alvo = String(cfg.obter(d) || "").toLowerCase();
+      if (filtro.operador === "igual") return alvo === termo;
+      if (filtro.operador === "comeca") return alvo.startsWith(termo);
       return alvo.includes(termo);
     });
-  }, [dividas, filtroEstado, busca]);
+    if (ordem.chave === "descricao") {
+      res.sort((a, b) => String(a.descricao || "").localeCompare(String(b.descricao || ""), "pt") * ordem.dir);
+    }
+    if (ordem.chave === "cliente") {
+      res.sort((a, b) => String(a.cliente?.nome || a.cliente?.empresa || "").localeCompare(String(b.cliente?.nome || b.cliente?.empresa || ""), "pt") * ordem.dir);
+    }
+    if (ordem.chave === "vencimento") {
+      res.sort((a, b) => String(a.data_vencimento || "").localeCompare(String(b.data_vencimento || ""), "pt") * ordem.dir);
+    }
+    if (ordem.chave === "saldo") {
+      res.sort((a, b) => (saldoDe(a) - saldoDe(b)) * ordem.dir);
+    }
+    return res;
+  }, [dividas, filtro, filtroEstado, ordem]);
+
+  const contagensEstado = useMemo(() => {
+    const c = {};
+    for (const f of ESTADOS_FILTRO) c[f.id] = dividas.filter((d) => passaEstado(d, f.id)).length;
+    return c;
+  }, [dividas]);
 
   const totalFiltrado = useMemo(
     () => filtradas.reduce((s, d) => s + Math.max(0, saldoDe(d)), 0),
     [filtradas]
   );
+
+  const { visiveis, ...pag } = usePaginacao({ items: filtradas });
 
   const abrirNovo = () => {
     setEditando(null);
@@ -331,7 +394,7 @@ export default function DividasTab() {
       {resumo.faixas && Object.values(resumo.faixas).some((v) => v > 0) && (
         <Card>
           <CardContent className="p-4">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">Saldo por faixa de atraso</p>
+            <p className="text-[11px] font-medium text-muted-foreground mb-3">Saldo por faixa de atraso</p>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               {[
                 { k: "0-30", label: "Até 30 dias", v: "success" },
@@ -340,9 +403,9 @@ export default function DividasTab() {
                 { k: "90+", label: "Mais de 90 dias", v: "error" },
                 { k: "sem_vencimento", label: "Sem vencimento", v: "secondary" },
               ].map((f) => (
-                <div key={f.k} className="rounded-xl border border-border/60 bg-muted/30 p-3">
-                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{f.label}</p>
-                  <p className="text-sm font-bold text-foreground mt-1">{formatKz(resumo.faixas[f.k])}</p>
+                <div key={f.k} className="rounded-lg border border-border bg-muted/30 p-3">
+                  <p className="text-[11px] text-muted-foreground">{f.label}</p>
+                  <p className="mt-1 text-sm font-medium tabular-nums text-foreground">{formatKz(resumo.faixas[f.k])}</p>
                 </div>
               ))}
             </div>
@@ -353,15 +416,15 @@ export default function DividasTab() {
       {resumo.topDevedores?.length > 0 && (
         <Card>
           <CardContent className="p-4 space-y-2">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Quem mais me deve</p>
+            <p className="text-[11px] font-medium text-muted-foreground">Quem mais me deve</p>
             <div className="space-y-1">
               {resumo.topDevedores.slice(0, 5).map((c) => (
-                <div key={c.cliente_id} className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                <div key={c.cliente_id} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{c.nome}</p>
                     <p className="text-[11px] text-muted-foreground">{c.qtd} dívida(s){c.vencida > 0.005 ? ` · ${formatKz(c.vencida)} vencido` : ""}</p>
                   </div>
-                  <span className="text-sm font-bold text-primary shrink-0">{formatKz(c.saldo)}</span>
+                  <span className="text-sm font-medium text-primary shrink-0 tabular-nums">{formatKz(c.saldo)}</span>
                 </div>
               ))}
             </div>
@@ -369,99 +432,113 @@ export default function DividasTab() {
         </Card>
       )}
 
-      <Card>
-        <CardContent className="p-4 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              {[
-                { id: "aberta", label: "Em aberto" },
-                { id: "vencida", label: "Vencidas" },
-                { id: "paga", label: "Pagas" },
-                { id: "cancelada", label: "Canceladas" },
-                { id: "todas", label: "Todas" },
-              ].map((f) => (
-                <button
-                  key={f.id}
-                  type="button"
-                  onClick={() => setFiltroEstado(f.id)}
-                  className={`seg-tab ${filtroEstado === f.id ? "is-active" : ""}`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                className={inputCls}
-                placeholder="Procurar dívida ou cliente..."
-              />
-              <Button size="sm" onClick={abrirNovo}>
-                <Icon name="add" className="text-base" />
-                Nova Dívida
-              </Button>
-            </div>
-          </div>
+      <Ledger rotulo="Dívidas ledger">
+        <LedgerHeader
+          titulo="Dívidas"
+          subtitulo={`${filtradas.length} dívida(s) · ${formatKz(totalFiltrado)} em saldo`}
+          novo="Nova Dívida"
+          aoNovo={abrirNovo}
+          onToggleFiltros={() => setFiltrosAbertos((v) => !v)}
+          filtrosAbertos={filtrosAbertos}
+        />
+        {filtrosAbertos && (
+          <FilterRow
+            campo={filtro.campo}
+            setCampo={(v) => setFiltro((f) => ({ ...f, campo: v }))}
+            campos={CAMPOS.map(({ value, label }) => ({ value, label }))}
+            operador={filtro.operador}
+            setOperador={(v) => setFiltro((f) => ({ ...f, operador: v }))}
+            termo={filtro.termo}
+            setTermo={(v) => setFiltro((f) => ({ ...f, termo: v }))}
+            aoLimpar={() => setFiltro((f) => ({ ...f, termo: "" }))}
+            placeholder="Procurar dívida ou cliente..."
+          />
+        )}
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2">
+          {ESTADOS_FILTRO.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setFiltroEstado(f.id)}
+              aria-pressed={filtroEstado === f.id}
+              className={`${pillBase} ${filtroEstado === f.id ? pillAtiva : pillInativa}`}
+            >
+              {f.label}
+              <span className="text-[11px] text-muted-foreground">{contagensEstado[f.id] ?? 0}</span>
+            </button>
+          ))}
+        </div>
 
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{filtradas.length} dívida(s) · {formatKz(totalFiltrado)} em saldo</span>
-          </div>
-
-          {filtradas.length === 0 ? (
-            <div className="text-center py-10 text-muted-foreground">
-              <Icon name="check_circle" className="text-3xl block mx-auto mb-2 opacity-30" />
-              <p className="text-xs">Nenhuma dívida neste filtro</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {filtradas.map((d) => {
-                const saldo = saldoDe(d);
-                const atraso = diasAtraso(d);
-                const cfg = estadoCfg[d.estado] || estadoCfg.pendente;
-                const listaParcelas = Array.isArray(d.parcelas) ? d.parcelas : [];
-                return (
-                  <div key={d.id} className="rounded-xl border border-border/60 bg-muted/30 p-3 hover:bg-muted/50 transition-colors">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-sm font-semibold text-foreground">{d.descricao}</p>
-                          <Badge variant={cfg.variant}>{cfg.label}</Badge>
-                          {saldo > 0.005 && atraso > 0 && (
-                            <Badge variant="destructive">{atraso} dia(s) em atraso</Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1 truncate">
-                          {d.cliente?.nome || d.cliente?.empresa || "Sem cliente"}{d.cliente?.nif ? ` (NIF: ${d.cliente.nif})` : ""} · {categorias.find((c) => c.value === d.categoria)?.label || d.categoria}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground mt-0.5">
-                          Emissão {formatData(d.data_emissao)} · Vencimento {formatData(d.data_vencimento)}
-                          {Number(d.valor_pago) > 0 && ` · Pago ${formatKz(d.valor_pago)} de ${formatKz(d.valor)}`}
-                          {listaParcelas.length > 0 && ` · ${listaParcelas.length} parcela(s)`}
-                        </p>
-                      </div>
-                      <div className="flex flex-col items-end gap-1 shrink-0">
-                        <span className="text-sm font-bold text-primary">{formatKz(saldo)}</span>
-                        <div className="flex items-center gap-1">
-                          {saldo > 0.005 && (
-                            <Button variant="outline" size="sm" onClick={() => abrirPagamento(d)}>
-                              <Icon name="payments" className="text-sm" />
-                              Receber
-                            </Button>
-                          )}
-                          <Button variant="ghost" size="icon" onClick={() => setVerFicha(d)} title="Ver parcelas"><Icon name="visibility" className="text-[16px]" /></Button>
-                          <Button variant="ghost" size="icon" onClick={() => abrirEdicao(d)} title="Editar"><Icon name="edit" className="text-[16px]" /></Button>
-                          <Button variant="ghost" size="icon" onClick={() => setConfirmarApagar(d)} title="Remover" className="text-error"><Icon name="delete" className="text-[16px]" /></Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        <LedgerTable>
+          <thead>
+            <tr className="border-b border-border">
+              <LedgerTh onSort={() => setOrdem((p) => (p.chave === "descricao" ? { chave: "descricao", dir: -p.dir } : { chave: "descricao", dir: 1 }))} ativo={ordem.chave === "descricao"}>Dívida</LedgerTh>
+              <LedgerTh onSort={() => setOrdem((p) => (p.chave === "cliente" ? { chave: "cliente", dir: -p.dir } : { chave: "cliente", dir: 1 }))} ativo={ordem.chave === "cliente"}>Cliente</LedgerTh>
+              <LedgerTh>Estado</LedgerTh>
+              <LedgerTh onSort={() => setOrdem((p) => (p.chave === "vencimento" ? { chave: "vencimento", dir: -p.dir } : { chave: "vencimento", dir: 1 }))} ativo={ordem.chave === "vencimento"}>Vencimento</LedgerTh>
+              <LedgerTh onSort={() => setOrdem((p) => (p.chave === "saldo" ? { chave: "saldo", dir: -p.dir } : { chave: "saldo", dir: 1 }))} ativo={ordem.chave === "saldo"}>Saldo</LedgerTh>
+              <LedgerTh className="w-10" />
+            </tr>
+          </thead>
+          <tbody>
+            {visiveis.map((d) => {
+              const saldo = saldoDe(d);
+              const atraso = diasAtraso(d);
+              const cfg = estadoCfg[d.estado] || estadoCfg.pendente;
+              const listaParcelas = Array.isArray(d.parcelas) ? d.parcelas : [];
+              return (
+                <LedgerTr key={d.id}>
+                  <LedgerTd className="max-w-56">
+                    <IdCell
+                      id={d.descricao || "Sem descrição"}
+                      meta={categorias.find((c) => c.value === d.categoria)?.label || d.categoria || "—"}
+                      aoAbrir={() => setVerFicha(d)}
+                    />
+                  </LedgerTd>
+                  <LedgerTd className="max-w-44">
+                    <span className="block truncate">{d.cliente?.nome || d.cliente?.empresa || "Sem cliente"}</span>
+                    {d.cliente?.nif && <span className="block text-xs text-muted-foreground">NIF {d.cliente.nif}</span>}
+                  </LedgerTd>
+                  <LedgerTd>
+                    <span className="flex flex-wrap items-center gap-1">
+                      <StatusBadge tom={cfg.tom}>{cfg.label}</StatusBadge>
+                      {saldo > 0.005 && atraso > 0 && <StatusBadge tom="error">{atraso} dia(s) em atraso</StatusBadge>}
+                    </span>
+                  </LedgerTd>
+                  <LedgerTd className="whitespace-nowrap">
+                    <span className="block tabular-nums">{formatData(d.data_vencimento)}</span>
+                    <span className="block text-xs text-muted-foreground">Emissão {formatData(d.data_emissao)}</span>
+                  </LedgerTd>
+                  <LedgerTd className="whitespace-nowrap">
+                    <span className="block text-sm font-medium text-primary tabular-nums">{formatKz(saldo)}</span>
+                    <span className="block text-xs text-muted-foreground tabular-nums">
+                      {Number(d.valor_pago) > 0 ? `Pago ${formatKz(d.valor_pago)} de ${formatKz(d.valor)}` : `Total ${formatKz(d.valor)}`}
+                      {listaParcelas.length > 0 && ` · ${listaParcelas.length} parcela(s)`}
+                    </span>
+                  </LedgerTd>
+                  <LedgerTd>
+                    <RowMenu
+                      ariaLabel="Ações da dívida"
+                      itens={[
+                        ...(saldo > 0.005 ? [{ icone: "payments", rotulo: "Receber", onClick: () => abrirPagamento(d) }] : []),
+                        { icone: "visibility", rotulo: "Ver parcelas", onClick: () => setVerFicha(d) },
+                        { icone: "edit", rotulo: "Editar", onClick: () => abrirEdicao(d) },
+                        { icone: "delete", rotulo: "Remover", danger: true, onClick: () => setConfirmarApagar(d) },
+                      ]}
+                    />
+                  </LedgerTd>
+                </LedgerTr>
+              );
+            })}
+          </tbody>
+        </LedgerTable>
+        {pag.total === 0 && (
+          dividas.length === 0
+            ? <LedgerEmpty icone="check_circle">Nenhuma dívida registada</LedgerEmpty>
+            : <LedgerEmpty icone="search_off">Nenhuma dívida neste filtro</LedgerEmpty>
+        )}
+        <Paginacao {...pag} label="dívidas" />
+      </Ledger>
 
       <Modal
         open={modalForm}
@@ -531,7 +608,7 @@ export default function DividasTab() {
           <div className="rounded-xl border border-border/60 bg-muted/40 p-4 space-y-3">
             <div className="flex items-center gap-2">
               <Icon name="calendar_month" className="text-primary text-[18px]" />
-              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Parcelamento (opcional)</p>
+              <p className="text-[11px] font-medium text-muted-foreground">Parcelamento (opcional)</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <FormField label="Nº de parcelas" hint="Deixe vazio para dívida de valor único">
@@ -627,7 +704,7 @@ export default function DividasTab() {
 
             {Array.isArray(modalPagar.parcelas) && modalPagar.parcelas.length > 0 && (
               <div className="space-y-1">
-                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Receber uma parcela</p>
+                <p className="text-[11px] font-medium text-muted-foreground">Receber uma parcela</p>
                 {modalPagar.parcelas.map((p) => {
                   const restante = Number(p.valor) - Number(p.valor_pago || 0);
                   return (
@@ -682,7 +759,7 @@ export default function DividasTab() {
 
             {parcelas.length > 0 && (
               <div className="space-y-1">
-                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Plano de parcelas</p>
+                <p className="text-[11px] font-medium text-muted-foreground">Plano de parcelas</p>
                 {parcelas.map((p) => {
                   const restante = Number(p.valor) - Number(p.valor_pago || 0);
                   const paga = restante <= 0.005;
@@ -692,7 +769,7 @@ export default function DividasTab() {
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-foreground">{formatKz(p.valor)}</span>
                         {paga ? (
-                          <Badge variant="success">Paga</Badge>
+                          <StatusBadge tom="success">Paga</StatusBadge>
                         ) : (
                           <Button variant="outline" size="sm" onClick={() => { setVerFicha(null); abrirPagamento(verFicha, p); }}>
                             Receber {formatKz(restante)}

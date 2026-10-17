@@ -19,7 +19,7 @@ import { listar as listarClientes } from "@/services/clientes";
 import { buscarOrganizacao } from "@/services/configuracoes";
 import { getUsuario } from "@/services/auth";
 import { useToast } from "@/components/Toast";
-import { statusDe, toNum, especificacoesObjeto, ehEquipamento, moverEstoqueDe } from "@/lib/estoque";
+import { statusDe, toNum, especificacoesObjeto, ehEquipamento, moverEstoqueDe, tipoChaveDe } from "@/lib/estoque";
 
 const camposNumericos = [
   "gramagem", "largura", "altura", "percentual_quebra",
@@ -111,17 +111,19 @@ export default function useEstoque() {
   const salvarMaterial = useCallback(async (dados, id) => {
     setCarregando(true);
     try {
-      const dadosNum = { ...dados, categoria_id: Number(dados.categoria_id) || null };
+      const dadosNum = { ...dados };
+      delete dadosNum.categoria_id;
       camposNumericos.forEach((k) => {
         dadosNum[k] = Number(dados[k]) || 0;
       });
-      const categoria = categorias.find((c) => String(c.id) === String(dadosNum.categoria_id));
+      const espec = especificacoesObjeto(dados.especificacoes);
+      const pseudoCategoria = { familia: espec.familia || "", tipo: tipoChaveDe(espec.grupo) };
       if (dadosNum.mover_estoque === undefined) {
-        dadosNum.mover_estoque = moverEstoqueDe(categoria);
+        dadosNum.mover_estoque = moverEstoqueDe(pseudoCategoria);
       }
       if (id) await atualizarMaterial(id, dadosNum);
       else await criarMaterial(dadosNum);
-      if (ehEquipamento(categoria)) {
+      if (ehEquipamento(pseudoCategoria)) {
         try {
           await sincronizarMaquina(dadosNum, id);
         } catch (err) {
@@ -137,7 +139,7 @@ export default function useEstoque() {
     } finally {
       setCarregando(false);
     }
-  }, [addToast, carregar, categorias]);
+  }, [addToast, carregar]);
 
   const registrarMovimentacao = useCallback(async ({ item, tipo, dados }) => {
     const qtd = Number(dados.quantidade);

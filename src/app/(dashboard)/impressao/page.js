@@ -1,20 +1,38 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Modal from "@/components/Modal";
-import Icon from "@/components/Icon";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import KpiCard from "@/components/ui/KpiCard";
 import { inputCls } from "@/lib/estoque";
 import NumeroInput from "@/components/ui/NumeroInput";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
+import Paginacao, { usePaginacao } from "@/components/ui/Paginacao";
+import {
+  Ledger,
+  LedgerHeader,
+  FilterRow,
+  LedgerTable,
+  LedgerTh,
+  LedgerTr,
+  LedgerTd,
+  IdCell,
+  LedgerEmpty,
+} from "@/components/ui/Ledger";
 import { listarOrdens, salvarImpressao } from "@/services/producao";
 import { listar as listarMaquinas } from "@/services/maquinas";
 
 const initialForm = { op: "", maquina: "", operador: "", inicio: "", fim: "", produzido: "", rejeitado: "", observacoes: "" };
+
+const CAMPOS = [
+  { value: "geral", label: "Todos os campos", obter: (r) => `${r.op || ""} ${r.cliente || ""} ${r.produto || ""} ${r.maquina || ""} ${r.operador || ""}` },
+  { value: "op", label: "OP", obter: (r) => r.op || "" },
+  { value: "cliente", label: "Cliente", obter: (r) => r.cliente || "" },
+  { value: "produto", label: "Produto", obter: (r) => r.produto || "" },
+  { value: "maquina", label: "Operacional", obter: (r) => r.maquina || "" },
+  { value: "operador", label: "Operador", obter: (r) => r.operador || "" },
+];
 
 export default function ImpressaoPage() {
   const [registros, setRegistros] = useState([]);
@@ -24,6 +42,9 @@ export default function ImpressaoPage() {
   const [error, setError] = useState(null);
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState(initialForm);
+  const [filtro, setFiltro] = useState({ campo: "geral", operador: "contem", termo: "" });
+  const [ordem, setOrdem] = useState({ chave: "", dir: 1 });
+  const [filtrosAbertos, setFiltrosAbertos] = useState(true);
   const { addToast } = useToast();
 
   const carregarDados = useCallback(async () => {
@@ -59,6 +80,30 @@ export default function ImpressaoPage() {
   const totalProduzido = registros.reduce((s, r) => s + Number(r.produzido), 0);
   const totalRejeitado = registros.reduce((s, r) => s + Number(r.rejeitado), 0);
 
+  const resultado = useMemo(() => {
+    const termo = filtro.termo.trim().toLowerCase();
+    let res = [...registros];
+    if (termo) {
+      const cfg = CAMPOS.find((c) => c.value === filtro.campo) || CAMPOS[0];
+      res = res.filter((r) => {
+        const alvo = String(cfg.obter(r) || "").toLowerCase();
+        if (filtro.operador === "igual") return alvo === termo;
+        if (filtro.operador === "comeca") return alvo.startsWith(termo);
+        return alvo.includes(termo);
+      });
+    }
+    if (ordem.chave) {
+      res.sort((a, b) => {
+        const av = String(a[ordem.chave] ?? "").toLowerCase();
+        const bv = String(b[ordem.chave] ?? "").toLowerCase();
+        return (av < bv ? -1 : av > bv ? 1 : 0) * ordem.dir;
+      });
+    }
+    return res;
+  }, [registros, filtro, ordem]);
+
+  const pag = usePaginacao({ items: resultado });
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.op) {
@@ -84,20 +129,13 @@ export default function ImpressaoPage() {
   };
 
   if (loading) return <CardSkeleton lines={6} />;
-  if (error) return <div className="bg-destructive/10 text-destructive rounded-2xl p-6 text-center font-semibold">{error}</div>;
+  if (error) return <div className="bg-destructive/10 text-destructive rounded-xl p-6 text-center font-semibold">{error}</div>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Impressão</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{registros.length} registos de impressão</p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <button onClick={() => setModal(true)} className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium shadow-sm hover:bg-primary/90 transition-colors ">
-            <Icon name="add" className="text-[16px]" /> Novo Registo
-          </button>
-        </div>
+    <div className="space-y-4">
+      <div className="min-w-0">
+        <h1 className="text-base font-normal text-foreground">Impressão</h1>
+        <p className="mt-1 text-xs text-muted-foreground">{registros.length} registos de impressão</p>
       </div>
 
       <section className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
@@ -111,33 +149,61 @@ export default function ImpressaoPage() {
         ))}
       </section>
 
-      <div className="space-y-3">
-        {registros.map((r) => (
-          <Card key={r.id} className="hover-lift">
-            <CardContent className="p-5">
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 text-sm">
-                <div><span className="text-[10px] text-muted-foreground block">OP</span><span className="font-semibold text-foreground">{r.op}</span></div>
-                <div><span className="text-[10px] text-muted-foreground block">Operacional</span><span className="text-foreground">{r.maquina}</span></div>
-                <div><span className="text-[10px] text-muted-foreground block">Operador</span><span className="text-foreground">{r.operador}</span></div>
-                <div><span className="text-[10px] text-muted-foreground block">Início</span><span className="text-foreground">{r.inicio}</span></div>
-                <div><span className="text-[10px] text-muted-foreground block">Fim</span><span className="text-foreground">{r.fim}</span></div>
-                <div className="flex items-center gap-2">
-                  <div><span className="text-[10px] text-muted-foreground block">Produzido</span><span className="font-bold text-primary">{r.produzido}</span></div>
-                  <span className="text-muted-foreground">/</span>
-                  <div><span className="text-[10px] text-muted-foreground block">Rejeitado</span><span className="font-bold text-destructive">{r.rejeitado}</span></div>
-                </div>
-                {r.observacoes && <div className="col-span-2 lg:col-span-2"><span className="text-[10px] text-muted-foreground block">Obs</span><span className="text-xs text-muted-foreground">{r.observacoes}</span></div>}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-        {registros.length === 0 && (
-          <div className="text-center p-12 text-muted-foreground">
-            <Icon name="print" className="text-4xl block mx-auto mb-2 opacity-30" />
-            <p className="font-medium">Nenhum registo de impressão encontrado</p>
-          </div>
+      <Ledger rotulo="Impressão ledger">
+        <LedgerHeader
+          titulo="Registos de impressão"
+          subtitulo={`${registros.length} registos · ${totalProduzido?.toLocaleString() ?? "0"} produzidos · ${totalRejeitado?.toLocaleString() ?? "0"} rejeitados`}
+          novo="Novo Registo"
+          aoNovo={() => setModal(true)}
+          onToggleFiltros={() => setFiltrosAbertos((v) => !v)}
+          filtrosAbertos={filtrosAbertos}
+        />
+        {filtrosAbertos && (
+          <FilterRow
+            campo={filtro.campo}
+            setCampo={(v) => setFiltro((f) => ({ ...f, campo: v }))}
+            campos={CAMPOS.map(({ value, label }) => ({ value, label }))}
+            operador={filtro.operador}
+            setOperador={(v) => setFiltro((f) => ({ ...f, operador: v }))}
+            termo={filtro.termo}
+            setTermo={(v) => setFiltro((f) => ({ ...f, termo: v }))}
+            aoLimpar={() => setFiltro((f) => ({ ...f, termo: "" }))}
+            placeholder="Pesquisar por OP, cliente, produto, operador..."
+          />
         )}
-      </div>
+        <LedgerTable>
+          <thead>
+            <tr className="border-b border-border">
+              <LedgerTh onSort={() => setOrdem((p) => (p.chave === "op" ? { chave: "op", dir: -p.dir } : { chave: "op", dir: 1 }))} ativo={ordem.chave === "op"}>OP</LedgerTh>
+              <LedgerTh>Operacional</LedgerTh>
+              <LedgerTh onSort={() => setOrdem((p) => (p.chave === "operador" ? { chave: "operador", dir: -p.dir } : { chave: "operador", dir: 1 }))} ativo={ordem.chave === "operador"}>Operador</LedgerTh>
+              <LedgerTh onSort={() => setOrdem((p) => (p.chave === "inicio" ? { chave: "inicio", dir: -p.dir } : { chave: "inicio", dir: 1 }))} ativo={ordem.chave === "inicio"}>Início</LedgerTh>
+              <LedgerTh>Fim</LedgerTh>
+              <LedgerTh className="text-right">Produzido</LedgerTh>
+              <LedgerTh className="text-right">Rejeitado</LedgerTh>
+              <LedgerTh>Observações</LedgerTh>
+            </tr>
+          </thead>
+          <tbody>
+            {pag.visiveis.map((r) => (
+              <LedgerTr key={r.id}>
+                <LedgerTd className="max-w-44">
+                  <IdCell id={r.op} meta={`${r.cliente} · ${r.produto}`} />
+                </LedgerTd>
+                <LedgerTd className="max-w-40"><span className="block truncate">{r.maquina}</span></LedgerTd>
+                <LedgerTd className="max-w-40"><span className="block truncate">{r.operador}</span></LedgerTd>
+                <LedgerTd className="whitespace-nowrap text-muted-foreground">{r.inicio}</LedgerTd>
+                <LedgerTd className="whitespace-nowrap text-muted-foreground">{r.fim}</LedgerTd>
+                <LedgerTd className="tabular-nums text-right font-medium text-foreground">{r.produzido}</LedgerTd>
+                <LedgerTd className="tabular-nums text-right text-error">{r.rejeitado}</LedgerTd>
+                <LedgerTd className="max-w-56"><span className="block truncate text-muted-foreground">{r.observacoes || "—"}</span></LedgerTd>
+              </LedgerTr>
+            ))}
+          </tbody>
+        </LedgerTable>
+        {pag.total === 0 && <LedgerEmpty icone="print">Nenhum registo de impressão encontrado</LedgerEmpty>}
+        <Paginacao {...pag} label="registos" />
+      </Ledger>
 
       <Modal open={modal} onClose={() => setModal(false)} title="Novo Registo de Impressão" icon="print" size="lg"
         footer={<><Button type="button" variant="outline" onClick={() => setModal(false)}>Cancelar</Button><Button type="submit" form="form-impressao">Registar</Button></>}>
@@ -184,10 +250,6 @@ export default function ImpressaoPage() {
           </div>
         </form>
       </Modal>
-
-      <footer className="border-t pt-6 pb-2 text-center">
-        <p className="text-[11px] text-muted-foreground">SIGRAF · Sistema de Gestão para Indústria Gráfica</p>
-      </footer>
     </div>
   );
 }

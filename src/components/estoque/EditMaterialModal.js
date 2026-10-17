@@ -4,14 +4,24 @@ import { useState } from "react";
 import Modal from "@/components/Modal";
 import { Button } from "@/components/ui/Button";
 import MaterialForm from "./MaterialForm";
-import { toNum, especificacoesObjeto } from "@/lib/estoque";
+import { toNum, especificacoesObjeto, familias, familiasServico, tiposItem, tipoRecursoOptions, normalizarFamilia, normalizarTipoItem } from "@/lib/estoque";
+
+const todosFamilias = { ...familias, ...familiasServico };
 
 function deItem(item) {
+  const espec = especificacoesObjeto(item.especificacoes);
+  if (item.categoria && !espec.categoria) {
+    const famCfg = todosFamilias[normalizarFamilia(item.categoria.familia)];
+    const tipoCfg = tiposItem[normalizarTipoItem(item.categoria.tipo)] || tipoRecursoOptions.find((o) => o.valor === item.categoria.tipo);
+    if (!espec.categoria) espec.categoria = item.categoria.nome || "";
+    if (!espec.familia) espec.familia = famCfg?.label || item.categoria.familia || "";
+    if (!espec.grupo) espec.grupo = tipoCfg?.label || item.categoria.tipo || "";
+    if (!espec.subfamilia) espec.subfamilia = item.categoria.subfamilia || "";
+  }
   return {
     codigo: item.codigo || "",
     nome: item.nome || "",
     nome_tecnico: item.nome_tecnico || "",
-    categoria_id: item.categoria_id != null ? String(item.categoria_id) : "",
     fornecedor: item.fornecedor || "",
     unidade: item.unidade || "un",
     formato: item.formato || "",
@@ -31,7 +41,7 @@ function deItem(item) {
     especificidade: item.especificidade || "",
     condicao_armazenagem: item.condicao_armazenagem || "",
     localizacao: item.localizacao || "",
-    especificacoes: especificacoesObjeto(item.especificacoes),
+    especificacoes: espec,
     composicao: Array.isArray(item.composicao) ? item.composicao : [],
   };
 }

@@ -59,6 +59,16 @@ export function normalizarFamilia(f) {
   return f || "";
 }
 
+export function familiaChaveDe(texto) {
+  const t = String(texto || "").trim().toLowerCase();
+  if (!t) return "";
+  const todos = { ...familias, ...familiasServico };
+  for (const [chave, cfg] of Object.entries(todos)) {
+    if (cfg.label.toLowerCase() === t) return chave;
+  }
+  return normalizarFamilia(texto);
+}
+
 export const FAMILIA_PREFIXO = {
   papeis: "PAP", tintas: "TIN", chapas: "CHA", produto_quimico: "PQU",
   equipamentos: "EQU", ferramentas: "FER", suporte_especial: "SPE",
@@ -80,6 +90,14 @@ export function normalizarTipoItem(t) {
   if (v === "materia-prima" || v === "matéria-prima" || v === "vulgar" || v === "ordinaria" || v === "importado" || v === "nacional") return v;
   if (v === "materia_prima" || v === "produto_acabado") return v;
   return v;
+}
+
+export function tipoChaveDe(texto) {
+  const t = String(texto || "").trim().toLowerCase();
+  if (!t) return "";
+  const opcao = tipoRecursoOptions.find((o) => o.label.toLowerCase() === t);
+  if (opcao) return opcao.valor;
+  return normalizarTipoItem(texto);
 }
 
 export function normalizarUnidade(u) {
@@ -338,6 +356,9 @@ export function especificacoesObjeto(espec) {
 }
 
 const ROTULOS_ESPEC = {
+  categoria: "Categoria",
+  familia: "Família",
+  grupo: "Grupo",
   subfamilia: "Subfamília",
   composicao: "Composição",
   perigo: "Nível de Perigo",
@@ -366,7 +387,7 @@ export function entradasEspecificacao(espec) {
 }
 
 export const blankItem = {
-  codigo: "", nome: "", nome_tecnico: "", categoria_id: "", fornecedor: "",
+  codigo: "", nome: "", nome_tecnico: "", fornecedor: "",
   unidade: "un", formato: "", gramagem: "", tipo_estoque: "unidade",
   largura: "", altura: "", controla_lote: false, percentual_quebra: "",
   estoque_min: "", estoque_max: "", ponto_ressuprimento: "", custo_unit: "", lucro: "",
@@ -420,4 +441,4 @@ export function statusDe(item) {
 }
 
 export const inputCls =
-  "w-full px-3 py-2.5 bg-background border border-input rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/30 transition-all";
+  "w-full px-3 py-2.5 bg-background border border-input rounded-lg text-sm text-foreground placeholder:text-muted-foreground/50 outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all";

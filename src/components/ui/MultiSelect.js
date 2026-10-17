@@ -49,7 +49,7 @@ export default function MultiSelect({ value = [], options = [], onChange, placeh
         type="button"
         onClick={abrirFechar}
         aria-expanded={aberto}
-        className={`flex items-center gap-2 w-full px-3 py-2 rounded-xl border text-xs shadow-card transition-colors ${
+        className={`flex items-center gap-2 w-full px-3 py-2 rounded-lg border text-xs shadow-card transition-colors ${
           aberto ? "border-primary bg-primary/5 text-foreground" : "border-border bg-card text-foreground hover:border-primary/40"
         }`}
       >
@@ -97,7 +97,7 @@ export default function MultiSelect({ value = [], options = [], onChange, placeh
                       ativo ? "text-primary font-medium" : "text-foreground hover:bg-accent"
                     }`}
                   >
-                    <span className={`w-4 h-4 shrink-0 rounded border flex items-center justify-center ${ativo ? "bg-primary border-primary text-white" : "border-border bg-card"}`}>
+                    <span className={`w-4 h-4 shrink-0 rounded border flex items-center justify-center ${ativo ? "bg-primary border-primary text-primary-foreground" : "border-border bg-card"}`}>
                       {ativo && <Icon name="check" className="text-[12px]" />}
                     </span>
                     <span className="flex-1 min-w-0 truncate">{o.label}</span>

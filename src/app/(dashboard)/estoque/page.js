@@ -1,16 +1,29 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
 import FloatButton from "@/components/ui/FloatButton";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { CardSkeleton } from "@/components/Skeleton";
+import RowMenu from "@/components/ui/RowMenu";
+import Paginacao, { usePaginacao } from "@/components/ui/Paginacao";
+import {
+  Ledger,
+  LedgerHeader,
+  FilterRow,
+  LedgerTable,
+  LedgerTh,
+  LedgerTr,
+  LedgerTd,
+  IdCell,
+  StatusBadge,
+  LedgerEmpty,
+} from "@/components/ui/Ledger";
 import useEstoque from "@/hooks/useEstoque";
 import useMovimentacoes from "@/hooks/useMovimentacoes";
-import FilterBar, { useFilter } from "@/components/ui/FilterBar";
 import KpiGrid from "@/components/estoque/KpiGrid";
-import MaterialCard, { MaterialCardSkeleton } from "@/components/estoque/MaterialCard";
 import MovimentacaoModal from "@/components/estoque/MovimentacaoModal";
 import MovimentacoesModal from "@/components/estoque/MovimentacoesModal";
 import ConversorModal from "@/components/estoque/ConversorModal";
@@ -19,30 +32,35 @@ import EditMaterialModal from "@/components/estoque/EditMaterialModal";
 import TransferModal from "@/components/estoque/TransferModal";
 import PerdasDesperdicioModal from "@/components/estoque/PerdasDesperdicioModal";
 import EmptyState from "@/components/estoque/EmptyState";
-import PedidosModal from "@/components/estoque/PedidosModal";
 import PedidoFormModal from "@/components/estoque/PedidoFormModal";
-import PedidoReceberModal from "@/components/estoque/PedidoReceberModal";
 import RequisicoesMaterialModal from "@/components/estoque/RequisicoesMaterialModal";
 import { listar as listarRequisicoes, aprovar as aprovarRequisicao, rejeitar as rejeitarRequisicao } from "@/services/requisicoesMaterial";
-import { familias, normalizarFamilia, normalizarTipoItem } from "@/lib/estoque";
-import { gerarFichaMaterialPDF, gerarPedidoPDF } from "@/lib/estoquePdf";
-import { listar as listarPedidos, criar as criarPedido, cancelar as cancelarPedido, receber as apiReceberPedido } from "@/services/pedidos";
+import { familias, normalizarFamilia, normalizarTipoItem, toNum, especificacoesObjeto, tipoChaveDe } from "@/lib/estoque";
+import { gerarFichaMaterialPDF } from "@/lib/estoquePdf";
+import { criar as criarPedido } from "@/services/pedidos";
 import { remover as removerMaterial } from "@/services/materiais";
 import { podeAtual } from "@/lib/permissoes";
 import { useToast } from "@/components/Toast";
 
 const TIPO_META = {
-  materia_prima: { label: "Matéria-Prima", icon: "inventory", classe: "text-blue-500 bg-blue-500/10" },
-  artigo: { label: "Artigo / Produto", icon: "inventory_2", classe: "text-emerald-500 bg-emerald-500/10" },
-  produto_acabado: { label: "Produto Acabado", icon: "inventory_2", classe: "text-emerald-500 bg-emerald-500/10" },
-  servico: { label: "Serviço", icon: "home_repair_service", classe: "text-violet-500 bg-violet-500/10" },
-  maquina: { label: "Maquinaria", icon: "precision_manufacturing", classe: "text-slate-500 bg-slate-500/10" },
-  funcionario: { label: "Funcionário", icon: "groups", classe: "text-amber-500 bg-amber-500/10" },
-  colaborador: { label: "Colaborador", icon: "group", classe: "text-cyan-500 bg-cyan-500/10" },
-  consumiveis: { label: "Consumíveis", icon: "local_fire_department", classe: "text-orange-500 bg-orange-500/10" },
-  materiais: { label: "Materiais", icon: "inventory", classe: "text-blue-500 bg-blue-500/10" },
-  ferramentas: { label: "Ferramentas", icon: "handyman", classe: "text-gray-500 bg-gray-500/10" },
-  equipamentos: { label: "Equipamentos", icon: "precision_manufacturing", classe: "text-indigo-500 bg-indigo-500/10" },
+  materia_prima: { label: "Matéria-Prima", icon: "inventory" },
+  artigo: { label: "Artigo / Produto", icon: "inventory_2" },
+  produto_acabado: { label: "Produto Acabado", icon: "inventory_2" },
+  servico: { label: "Serviço", icon: "home_repair_service" },
+  maquina: { label: "Maquinaria", icon: "precision_manufacturing" },
+  funcionario: { label: "Funcionário", icon: "groups" },
+  colaborador: { label: "Colaborador", icon: "group" },
+  consumiveis: { label: "Consumíveis", icon: "local_fire_department" },
+  materiais: { label: "Materiais", icon: "inventory" },
+  ferramentas: { label: "Ferramentas", icon: "handyman" },
+  equipamentos: { label: "Equipamentos", icon: "precision_manufacturing" },
+};
+
+/* Paleta do módulo stocks (referência KAMGEST) */
+const STATUS_META = {
+  ok: { label: "Normal", badge: "border-transparent bg-emerald-100 text-emerald-700" },
+  repor: { label: "Atenção", badge: "border-transparent bg-amber-100 text-amber-700" },
+  esgotado: { label: "Crítico", badge: "border-transparent bg-red-100 text-red-600" },
 };
 
 // Agrupa o tipo de uma categoria/material num identificador canónico:
@@ -58,7 +76,31 @@ function tipoGrupo(v) {
   return `custom:${txt}`;
 }
 
+// Categoria/grupo/família podem vir da categoria ligada ou dos campos digitados à mão.
+const espDe = (i) => especificacoesObjeto(i.especificacoes);
+const nomeCategoriaDe = (i) => (i.categoria && i.categoria.nome) || espDe(i).categoria || "";
+const familiaDe = (i) => (i.categoria && i.categoria.familia) || espDe(i).familia || "";
+const tipoDe = (i) => (i.categoria && i.categoria.tipo) || tipoChaveDe(espDe(i).grupo);
+
+const CAMPOS = [
+  { value: "geral", label: "Todos os campos", obter: (i) => [i.nome, i.codigo, i.fornecedor, nomeCategoriaDe(i), familiaDe(i), espDe(i).grupo, espDe(i).subfamilia].join(" ") },
+  { value: "nome", label: "Nome", obter: (i) => i.nome || "" },
+  { value: "codigo", label: "Código / SKU", obter: (i) => i.codigo || "" },
+  { value: "fornecedor", label: "Fornecedor", obter: (i) => i.fornecedor || "" },
+  { value: "categoria", label: "Categoria", obter: (i) => nomeCategoriaDe(i) },
+  { value: "familia", label: "Família", obter: (i) => familiaDe(i) },
+];
+
+const pillBase = "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-sm font-medium whitespace-nowrap transition-colors";
+const pillAtiva = "border-blue-600/40 bg-blue-50 text-blue-600";
+const pillInativa = "border-border bg-card text-muted-foreground hover:bg-muted/60 hover:text-foreground [&_svg]:text-blue-600 [&_.material-symbols-outlined]:text-blue-600";
+
+const tabBase = "-mb-px inline-flex items-center gap-1.5 whitespace-nowrap border-b-2 pb-2.5 pt-2 text-sm font-medium transition-colors";
+const tabAtiva = "border-blue-600 font-bold text-blue-600";
+const tabInativa = "border-transparent text-muted-foreground hover:text-foreground";
+
 export default function EstoquePage() {
+  const router = useRouter();
   const { addToast } = useToast();
   const {
     materiais, categorias, fornecedores, clientes, org, formatos,
@@ -68,9 +110,6 @@ export default function EstoquePage() {
   } = useEstoque();
   const movs = useMovimentacoes({ org });
 
-
-  const [pedidos, setPedidos] = useState([]);
-  const [pedOpen, setPedOpen] = useState(false);
   const [requisicoes, setRequisicoes] = useState([]);
   const [reqCarregando, setReqCarregando] = useState(false);
   const [reqOpen, setReqOpen] = useState(false);
@@ -80,11 +119,13 @@ export default function EstoquePage() {
     () => Object.fromEntries(materiais.map((x) => [x.id, x])),
     [materiais]
   );
-  const [pedCarregando, setPedCarregando] = useState(false);
   const [novoPedido, setNovoPedido] = useState({ open: false, materialInicial: null, sessao: 0 });
-  const [receberPedido, setReceberPedido] = useState({ open: false, pedido: null, sessao: 0 });
 
-  const [filtro, setFiltro] = useState("todos");
+  const [filtro, setFiltro] = useState({ campo: "geral", operador: "contem", termo: "" });
+  const [ordem, setOrdem] = useState({ chave: "", dir: 1 });
+  const [filtrosAbertos, setFiltrosAbertos] = useState(true);
+  const [tipoFiltro, setTipoFiltro] = useState("todos");
+  const [subFiltro, setSubFiltro] = useState("todas");
   const [mov, setMov] = useState({ open: false, item: null, tipo: "entrada" });
   const [movSessao, setMovSessao] = useState(0);
   const [edit, setEdit] = useState({ open: false, item: null });
@@ -96,7 +137,6 @@ export default function EstoquePage() {
   const [deletando, setDeletando] = useState(false);
   const [transfer, setTransfer] = useState({ open: false, item: null });
   const [pdModal, setPdModal] = useState({ open: false, item: null, tipo: "perda" });
-  const [subFiltro, setSubFiltro] = useState("todas");
 
   const tiposRegistados = useMemo(() => {
     const mapa = new Map();
@@ -108,40 +148,43 @@ export default function EstoquePage() {
         value: g,
         label: meta.label || c.tipo,
         icon: meta.icon || "label",
-        classe: meta.classe || "bg-surface-variant",
       });
     });
     return [...mapa.values()];
   }, [categorias]);
 
-  const filterConfig = useMemo(() => [
-    { value: "todos", label: "Todos", icon: "filter_list" },
-    ...tiposRegistados.map((f) => ({
-      value: f.value,
-      label: f.label,
-      icon: f.icon,
-      predicate: (item) => tipoGrupo(item.categoria?.tipo) === f.value,
-    })),
-  ], [tiposRegistados]);
+  const filtrados = useMemo(() => {
+    const termo = filtro.termo.trim().toLowerCase();
+    let res = [...materiais];
+    if (termo) {
+      const cfg = CAMPOS.find((c) => c.value === filtro.campo) || CAMPOS[0];
+      res = res.filter((i) => {
+        const alvo = String(cfg.obter(i) || "").toLowerCase();
+        if (filtro.operador === "igual") return alvo === termo;
+        if (filtro.operador === "comeca") return alvo.startsWith(termo);
+        return alvo.includes(termo);
+      });
+    }
+    if (tipoFiltro !== "todos") {
+      res = res.filter((i) => tipoGrupo(tipoDe(i)) === tipoFiltro);
+    }
+    if (ordem.chave === "nome") res.sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt") * ordem.dir);
+    if (ordem.chave === "codigo") res.sort((a, b) => String(a.codigo || "").localeCompare(String(b.codigo || ""), "pt") * ordem.dir);
+    if (ordem.chave === "stock") res.sort((a, b) => (toNum(a.estoque_disponivel) - toNum(b.estoque_disponivel)) * ordem.dir);
+    return res;
+  }, [materiais, filtro, tipoFiltro, ordem]);
 
-  const { search, setSearch, activeFilter, setActiveFilter, filtered, total } = useFilter({
-    items: materiais,
-    searchFields: ["nome", "codigo", "fornecedor", "categoria.nome"],
-    filterConfig,
-  });
-
-  const filtrados = filtered;
-
-  const aoMudarFiltro = (v) => {
-    setActiveFilter(v);
-    setSubFiltro("todas");
-  };
+  const contagensTipo = useMemo(() => {
+    const c = { todos: materiais.length };
+    for (const t of tiposRegistados) c[t.value] = materiais.filter((i) => tipoGrupo(tipoDe(i)) === t.value).length;
+    return c;
+  }, [materiais, tiposRegistados]);
 
   const subFiltros = useMemo(() => {
-    if (activeFilter === "todos") return [];
+    if (tipoFiltro === "todos") return [];
     const metas = new Map();
     categorias.forEach((c) => {
-      if (tipoGrupo(c.tipo) !== activeFilter) return;
+      if (tipoGrupo(c.tipo) !== tipoFiltro) return;
       const chave = normalizarFamilia(c.familia);
       if (!chave || metas.has(chave)) return;
       const cfg = familias[chave] || {};
@@ -152,26 +195,19 @@ export default function EstoquePage() {
       });
     });
     return [...metas.values()];
-  }, [categorias, activeFilter]);
+  }, [categorias, tipoFiltro]);
 
   const visiveis = useMemo(() => {
     if (!subFiltro || subFiltro === "todas") return filtrados;
-    return filtrados.filter((i) => normalizarFamilia(i.categoria?.familia) === subFiltro);
+    return filtrados.filter((i) => normalizarFamilia(familiaDe(i)) === subFiltro);
   }, [filtrados, subFiltro]);
 
-  const porTipo = useMemo(() => {
-    const chaves = new Set(tiposRegistados.map((t) => t.value));
-    const mapa = { _outras: [] };
-    visiveis.forEach((i) => {
-      const t = tipoGrupo(i.categoria?.tipo);
-      if (chaves.has(t)) {
-        (mapa[t] || (mapa[t] = [])).push(i);
-      } else {
-        mapa._outras.push(i);
-      }
-    });
-    return mapa;
-  }, [visiveis, tiposRegistados]);
+  const { visiveis: paginaVisiveis, ...pag } = usePaginacao({ items: visiveis });
+
+  const aoMudarTipo = (v) => {
+    setTipoFiltro(v);
+    setSubFiltro("todas");
+  };
 
   const abrirEntrada = useCallback((item) => {
     setMovSessao((s) => s + 1);
@@ -231,7 +267,6 @@ export default function EstoquePage() {
   }, [reservarMaterial, carregarReservas]);
 
   const fichaPdf = useCallback((item) => gerarFichaMaterialPDF(item, org), [org]);
-  const pedidoPdf = useCallback((pedido) => gerarPedidoPDF(pedido, org), [org]);
 
   const abrirTransferencia = useCallback((item) => setTransfer({ open: true, item }), []);
   const fecharTransferencia = useCallback(() => setTransfer({ open: false, item: null }), []);
@@ -261,15 +296,6 @@ export default function EstoquePage() {
       setDeletando(false);
     }
   }, [eliminar, carregar, addToast]);
-
-  const recarregarPedidos = useCallback(async () => {
-    try {
-      const data = await listarPedidos();
-      setPedidos(Array.isArray(data) ? data : []);
-    } catch {
-      // silencioso: o modal mostra o estado atual
-    }
-  }, []);
 
   const recarregarRequisicoes = useCallback(async () => {
     try {
@@ -333,19 +359,6 @@ export default function EstoquePage() {
     [recarregarRequisicoes, addToast]
   );
 
-  const abrirPedidos = useCallback(async () => {
-    setPedOpen(true);
-    setPedCarregando(true);
-    try {
-      const data = await listarPedidos();
-      setPedidos(Array.isArray(data) ? data : []);
-    } catch (err) {
-      addToast(err.response?.data?.erro || "Erro ao carregar pedidos", "error");
-    } finally {
-      setPedCarregando(false);
-    }
-  }, [addToast]);
-
   const abrirNovoPedido = useCallback((item = null) => {
     setNovoPedido((s) => ({ open: true, materialInicial: item, sessao: s.sessao + 1 }));
   }, []);
@@ -354,48 +367,17 @@ export default function EstoquePage() {
   const confirmarCriacao = useCallback(async (dados) => {
     try {
       await criarPedido(dados);
-      await recarregarPedidos();
       addToast("Pedido de compra criado", "success");
       return true;
     } catch (err) {
       addToast(err.response?.data?.erro || "Erro ao criar pedido", "error");
       return false;
     }
-  }, [recarregarPedidos, addToast]);
-
-  const abrirRecebimento = useCallback((pedido) => {
-    setReceberPedido((s) => ({ open: true, pedido, sessao: s.sessao + 1 }));
-  }, []);
-  const fecharRecebimento = useCallback(() => setReceberPedido((s) => ({ ...s, open: false })), []);
-
-  const confirmarRecebimento = useCallback(async (itens) => {
-    const pedido = receberPedido.pedido;
-    if (!pedido) return false;
-    try {
-      await apiReceberPedido(pedido.id, itens);
-      await Promise.all([recarregarPedidos(), carregar()]);
-      addToast("Entrada registada — stock atualizado", "success");
-      return true;
-    } catch (err) {
-      addToast(err.response?.data?.erro || "Erro ao registar entrada", "error");
-      return false;
-    }
-  }, [receberPedido.pedido, recarregarPedidos, carregar, addToast]);
-
-  const cancelarPedidoAtual = useCallback(async (pedido) => {
-    if (!window.confirm(`Cancelar o pedido ${pedido.numero}?`)) return;
-    try {
-      await cancelarPedido(pedido.id);
-      await recarregarPedidos();
-      addToast("Pedido cancelado", "success");
-    } catch (err) {
-      addToast(err.response?.data?.erro || "Erro ao cancelar pedido", "error");
-    }
-  }, [recarregarPedidos, addToast]);
+  }, [addToast]);
 
   if (erro && materiais.length === 0) {
     return (
-      <div role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/10 p-8 text-center">
+      <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-8 text-center">
         <Icon name="error" className="text-4xl text-destructive mb-2 block mx-auto" />
         <p className="font-semibold text-destructive">Erro ao carregar estoque</p>
         <p className="text-xs text-muted-foreground mt-1">Não foi possível obter os materiais do servidor. Verifica a ligação à internet e tenta de novo.</p>
@@ -409,198 +391,225 @@ export default function EstoquePage() {
 
   const carregandoInicial = carregando && materiais.length === 0;
 
-  return (
-    <div className="space-y-6">
-      {carregandoInicial && (
-        <div className="space-y-6" aria-label="A carregar estoque">
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-5">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="glass rounded-2xl p-6 h-28 animate-pulse" />
-            ))}
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
-            {Array.from({ length: 4 }).map((_, i) => <MaterialCardSkeleton key={i} />)}
-          </div>
-        </div>
-      )}
+  const acoesTopo = [
+    { icon: "inventory_2", label: "Requisições", onClick: abrirRequisicoes },
+    { icon: "calculate", label: "Conversor", onClick: abrirConversor },
+  ];
 
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-5 bg-card border border-border shadow-card rounded-2xl p-5 sm:p-6 mb-6">
-        <div className="flex items-start gap-4">
-          <span className="w-12 h-12 rounded-2xl bg-muted border border-border flex items-center justify-center hidden sm:flex shrink-0">
-            <Icon name="inventory_2" className="text-2xl text-primary" />
-          </span>
-          <div>
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground">Provisionamento</h1>
-              <span className="pill pill-primary">
-                <Icon name="inventory" className="text-sm" /> {total} {total === 1 ? "material" : "materiais"}
-              </span>
-            </div>
-            <p className="text-muted-foreground mt-1 text-xs">Gestão e controlo de stock e inventário</p>
-          </div>
+  return (
+    <div className="space-y-4">
+      {/* Faixa do módulo - identificação stocks (indigo) */}
+      <div className="flex items-center justify-between rounded-xl bg-[#3B4CA8] px-5 py-2.5 text-white shadow-sm">
+        <span className="text-lg font-black tracking-wide drop-shadow-sm">4. STOCKS</span>
+        <span className="hidden text-[11px] font-semibold uppercase tracking-wider text-indigo-100 sm:block">
+          Sistema de Gestão Integrada · KAMGEST
+        </span>
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Gestão de Stocks</h1>
+          <p className="mt-0.5 text-xs font-medium text-muted-foreground">
+            Materiais, consumíveis e produtos acabados · {materiais.length} {materiais.length === 1 ? "artigo" : "artigos"}
+          </p>
         </div>
-        <div className="relative flex flex-wrap gap-2">
-          <button onClick={abrirPedidos} className="pill pill-muted hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors">
-            <Icon name="shopping_cart" className="text-[16px]" /> Pedidos
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+          {acoesTopo.map((a) => (
+            <button key={a.label} type="button" onClick={a.onClick} className={`${pillBase} ${pillInativa}`}>
+              <Icon name={a.icon} className="text-sm" /> {a.label}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={movs.abrir}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
+          >
+            <Icon name="sync_alt" className="text-base" /> Movimentações
           </button>
-          <button onClick={abrirRequisicoes} className="pill pill-muted hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors">
-            <Icon name="inventory_2" className="text-[16px]" /> Requisições
+          <button
+            type="button"
+            onClick={() => router.push("/estoque/novo")}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
+          >
+            <Icon name="add" className="text-base" /> Novo Artigo
           </button>
-          <button onClick={movs.abrir} className="pill pill-muted hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors">
-            <Icon name="sync_alt" className="text-[16px]" /> Movimentações
-          </button>
-          <button onClick={abrirConversor} className="pill pill-muted hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors">
-            <Icon name="calculate" className="text-[16px]" /> Conversor
-          </button>
-          <Link href="/estoque/novo" className="pill nav-pill hover:opacity-90 transition-opacity">
-            <Icon name="add" className="text-[16px]" /> Novo
-          </Link>
         </div>
       </div>
 
       <KpiGrid totais={totais} alertas={alertas} materiais={materiais} />
 
       {alertas.length > 0 && (
-        <div className="rounded-2xl border border-error/30 bg-error/5 p-4 flex items-start gap-3 mb-8">
-          <span className="w-10 h-10 shrink-0 rounded-xl bg-error/10 flex items-center justify-center border border-error/20">
+        <div className="rounded-lg border border-error/25 bg-error/10 p-4 flex items-start gap-3">
+          <span className="w-10 h-10 shrink-0 rounded-lg bg-error/15 flex items-center justify-center border border-error/25">
             <Icon name="warning" className="text-xl text-error" />
           </span>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-error">Materiais abaixo do ponto de pedido</p>
+            <p className="text-sm font-medium text-error">Materiais abaixo do ponto de pedido</p>
             <div className="flex flex-wrap gap-2 mt-2">
               {alertas.map((a) => (
-                <div key={a.id} className="pill text-error bg-error/10 border border-error/25">
+                <span key={a.id} className="inline-flex items-center gap-1.5 rounded-md border border-error/25 bg-error/15 px-[5px] py-0.5 text-xs font-medium text-error">
                   <span className="font-mono">{a.nome}: {a.estoque_disponivel}/{a.ponto_ressuprimento || a.estoque_min} {a.unidade}</span>
                   <button
                     onClick={() => abrirNovoPedido(a)}
-                    className="ml-1 px-2 py-0.5 rounded-full bg-error/20 hover:bg-error hover:text-white transition-colors"
+                    className="inline-flex items-center gap-1 rounded border border-error/25 px-1.5 py-0.5 text-[11px] transition-colors hover:bg-error hover:text-white"
                     title={`Criar pedido de compra para ${a.nome}`}
                   >
                     <Icon name="add_shopping_cart" className="text-[12px]" /> Pedir
                   </button>
-                </div>
+                </span>
               ))}
             </div>
           </div>
         </div>
       )}
 
-      <FilterBar
-        search={search}
-        onSearchChange={setSearch}
-        placeholder="Pesquisar materiais por nome, SKU, fornecedor..."
-        filters={filterConfig}
-        activeFilter={activeFilter}
-        onFilterChange={aoMudarFiltro}
-        count={total}
-        countLabel="materiais"
-      />
-
-      {subFiltros.length > 0 && (
-        <div className="flex flex-wrap gap-2">
+      <Ledger rotulo="Materiais ledger">
+        <LedgerHeader
+          titulo="Materiais"
+          subtitulo={`${visiveis.length} de ${materiais.length} materiais · ${tiposRegistados.length} tipos`}
+          onToggleFiltros={() => setFiltrosAbertos((v) => !v)}
+          filtrosAbertos={filtrosAbertos}
+        />
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-border px-4">
           <button
             type="button"
-            onClick={() => setSubFiltro("todas")}
-            className={`pill transition-colors ${subFiltro === "todas" ? "nav-pill" : "pill-muted hover:border-primary hover:text-primary"}`}
+            onClick={() => aoMudarTipo("todos")}
+            aria-pressed={tipoFiltro === "todos"}
+            className={`${tabBase} ${tipoFiltro === "todos" ? tabAtiva : tabInativa}`}
           >
-            Todas famílias
+            Todos <span className="text-[11px] font-medium text-muted-foreground">{contagensTipo.todos}</span>
           </button>
-          {subFiltros.map((f) => (
+          {tiposRegistados.map((t) => (
             <button
-              key={f.value}
+              key={t.value}
               type="button"
-              onClick={() => setSubFiltro(f.value)}
-              className={`pill transition-colors ${subFiltro === f.value ? "nav-pill" : "pill-muted hover:border-primary hover:text-primary"}`}
+              onClick={() => aoMudarTipo(t.value)}
+              aria-pressed={tipoFiltro === t.value}
+              className={`${tabBase} ${tipoFiltro === t.value ? tabAtiva : tabInativa}`}
             >
-              <Icon name={f.icon} className="text-sm" />
-              {f.label}
+              <Icon name={t.icon} className="text-base" /> {t.label}
+              <span className="text-[11px] font-medium text-muted-foreground">{contagensTipo[t.value] ?? 0}</span>
             </button>
           ))}
         </div>
-      )}
+        {filtrosAbertos && (
+          <FilterRow
+            campo={filtro.campo}
+            setCampo={(v) => setFiltro((f) => ({ ...f, campo: v }))}
+            campos={CAMPOS.map(({ value, label }) => ({ value, label }))}
+            operador={filtro.operador}
+            setOperador={(v) => setFiltro((f) => ({ ...f, operador: v }))}
+            termo={filtro.termo}
+            setTermo={(v) => setFiltro((f) => ({ ...f, termo: v }))}
+            aoLimpar={() => setFiltro((f) => ({ ...f, termo: "" }))}
+            placeholder="Pesquisar materiais por nome, código, fornecedor..."
+          />
+        )}
+        {subFiltros.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2">
+            <button
+              type="button"
+              onClick={() => setSubFiltro("todas")}
+              aria-pressed={subFiltro === "todas"}
+              className={`${pillBase} ${subFiltro === "todas" ? pillAtiva : pillInativa}`}
+            >
+              Todas famílias
+            </button>
+            {subFiltros.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                onClick={() => setSubFiltro(f.value)}
+                aria-pressed={subFiltro === f.value}
+                className={`${pillBase} ${subFiltro === f.value ? pillAtiva : pillInativa}`}
+              >
+                <Icon name={f.icon} className="text-sm" /> {f.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {carregandoInicial ? (
+          <div className="p-4"><CardSkeleton lines={6} /></div>
+        ) : (
+          <>
+            <LedgerTable>
+              <thead>
+                <tr className="border-b border-border">
+                  <LedgerTh onSort={() => setOrdem((p) => (p.chave === "codigo" ? { chave: "codigo", dir: -p.dir } : { chave: "codigo", dir: 1 }))} ativo={ordem.chave === "codigo"}>Código</LedgerTh>
+                  <LedgerTh onSort={() => setOrdem((p) => (p.chave === "nome" ? { chave: "nome", dir: -p.dir } : { chave: "nome", dir: 1 }))} ativo={ordem.chave === "nome"}>Artigo</LedgerTh>
+                  <LedgerTh>Unidade</LedgerTh>
+                  <LedgerTh onSort={() => setOrdem((p) => (p.chave === "stock" ? { chave: "stock", dir: -p.dir } : { chave: "stock", dir: 1 }))} ativo={ordem.chave === "stock"}>Stock</LedgerTh>
+                  <LedgerTh>Stock Mínimo</LedgerTh>
+                  <LedgerTh>Situação</LedgerTh>
+                  <LedgerTh className="w-10" />
+                </tr>
+              </thead>
+              <tbody>
+                {paginaVisiveis.map((item) => {
+                  const mover = item.mover_estoque !== false;
+                  const st = STATUS_META[item.status] || STATUS_META.ok;
+                  const famTexto = familiaDe(item);
+                  const familiaCfg = familias[normalizarFamilia(famTexto)] || { label: famTexto || "—" };
+                  const unidade = item.unidade?.toUpperCase() || "UN";
+                  return (
+                    <LedgerTr key={item.id}>
+                      <LedgerTd className="whitespace-nowrap">
+                        <span className="block font-mono text-xs tabular-nums">{item.codigo || "—"}</span>
+                      </LedgerTd>
+                      <LedgerTd className="max-w-56">
+                        <IdCell id={item.nome || "Item sem nome"} meta={familiaCfg.label} />
+                      </LedgerTd>
+                      <LedgerTd className="whitespace-nowrap text-muted-foreground">{unidade}</LedgerTd>
+                      <LedgerTd>
+                        {mover ? (
+                          <span className="tabular-nums">{toNum(item.estoque_disponivel).toLocaleString("pt-AO")}</span>
+                        ) : (
+                          <span className="text-muted-foreground">Não controlado</span>
+                        )}
+                      </LedgerTd>
+                      <LedgerTd className="tabular-nums whitespace-nowrap">
+                        {mover ? toNum(item.estoque_min).toLocaleString("pt-AO") : "—"}
+                      </LedgerTd>
+                      <LedgerTd>
+                        <StatusBadge tom="neutral" className={st.badge}>{st.label}</StatusBadge>
+                      </LedgerTd>
+                      <LedgerTd>
+                        <RowMenu
+                          ariaLabel="Ações do material"
+                          itens={[
+                            { icone: "add", rotulo: "Entrada", onClick: () => abrirEntrada(item) },
+                            { icone: "remove", rotulo: "Saída", onClick: () => abrirSaida(item) },
+                            { icone: "description", rotulo: "Ficha do material (PDF)", onClick: () => fichaPdf(item) },
+                            { icone: "add_shopping_cart", rotulo: "Pedido de compra", onClick: () => abrirNovoPedido(item) },
+                            ...(mover ? [
+                              { icone: "swap_horiz", rotulo: "Transferência", onClick: () => abrirTransferencia(item) },
+                              { icone: "warning", rotulo: "Registar perda", onClick: () => abrirPerda(item) },
+                              { icone: "delete_sweep", rotulo: "Registar desperdício", onClick: () => abrirDesperdicio(item) },
+                              { icone: "lock", rotulo: "Reservas", onClick: () => abrirReservas(item) },
+                            ] : []),
+                            { icone: "edit", rotulo: "Editar", onClick: () => abrirEdicao(item) },
+                            { icone: "delete", rotulo: "Remover", danger: true, onClick: () => setEliminar(item) },
+                          ]}
+                        />
+                      </LedgerTd>
+                    </LedgerTr>
+                  );
+                })}
+              </tbody>
+            </LedgerTable>
+            {pag.total === 0 && (
+              materiais.length === 0
+                ? <LedgerEmpty icone="inventory_2">Nenhum material registado</LedgerEmpty>
+                : <LedgerEmpty icone="search_off">Nenhum material corresponde ao filtro</LedgerEmpty>
+            )}
+            <Paginacao {...pag} label="materiais" />
+          </>
+        )}
+      </Ledger>
 
       {!carregandoInicial && materiais.length === 0 && (
         <EmptyState categorias={categorias} fornecedores={fornecedores} />
-      )}
-
-      {!carregandoInicial && materiais.length > 0 && visiveis.length === 0 && (
-        <div className="bg-card border border-border rounded-xl p-10 text-center">
-          <Icon name="search_off" className="text-4xl text-muted-foreground mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">Nenhum material nesta família.</p>
-        </div>
-      )}
-
-      {!carregandoInicial && materiais.length > 0 && visiveis.length > 0 && (
-        <>
-          {tiposRegistados.map((g) => {
-            const itens = porTipo[g.value] || [];
-            if (itens.length === 0) return null;
-            return (
-              <section key={g.value} className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <span className={`w-10 h-10 rounded-xl flex items-center justify-center ${g.classe} border border-outline-variant/30`}>
-                    <Icon name={g.icon} className="text-xl" />
-                  </span>
-                  <h2 className="text-sm font-semibold text-foreground tracking-tight">{g.label}</h2>
-                  <span className="pill pill-muted">
-                    {itens.length} {itens.length === 1 ? "material" : "materiais"}
-                  </span>
-                </div>
-                <div className="space-y-3">
-                  {itens.map((item, i) => (
-                    <MaterialCard
-                      key={item.id}
-                      item={item}
-                      index={i}
-                      onEntrada={abrirEntrada}
-                      onSaida={abrirSaida}
-                      onReservas={abrirReservas}
-                      onEditar={abrirEdicao}
-                      onFichaPdf={fichaPdf}
-                      onPedido={abrirNovoPedido}
-                      onEliminar={setEliminar}
-                      onTransferencia={abrirTransferencia}
-                      onPerda={abrirPerda}
-                      onDesperdicio={abrirDesperdicio}
-                    />
-                  ))}
-                </div>
-              </section>
-            );
-          })}
-          {porTipo._outras.length > 0 && (
-            <section className="space-y-3">
-              <div className="flex items-center gap-3">
-                <span className="w-10 h-10 rounded-xl flex items-center justify-center bg-surface-variant border border-outline-variant/30">
-                  <Icon name="label" className="text-xl text-muted-foreground" />
-                </span>
-                <h2 className="text-sm font-semibold text-foreground tracking-tight">Outros tipos</h2>
-                <span className="pill pill-muted">
-                  {porTipo._outras.length} {porTipo._outras.length === 1 ? "material" : "materiais"}
-                </span>
-              </div>
-              <div className="space-y-3">
-                {porTipo._outras.map((item, i) => (
-                  <MaterialCard
-                    key={item.id}
-                    item={item}
-                    index={i}
-                    onEntrada={abrirEntrada}
-                    onSaida={abrirSaida}
-                    onReservas={abrirReservas}
-                    onEditar={abrirEdicao}
-                    onFichaPdf={fichaPdf}
-                    onPedido={abrirNovoPedido}
-                    onEliminar={setEliminar}
-                    onTransferencia={abrirTransferencia}
-                    onPerda={abrirPerda}
-                    onDesperdicio={abrirDesperdicio}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-        </>
       )}
 
       <MovimentacaoModal
@@ -632,17 +641,6 @@ export default function EstoquePage() {
         pdfId={movs.pdfId}
       />
 
-      <PedidosModal
-        open={pedOpen}
-        onClose={() => setPedOpen(false)}
-        pedidos={pedidos}
-        carregando={pedCarregando}
-        onNovo={() => abrirNovoPedido()}
-        onPdf={pedidoPdf}
-        onReceber={abrirRecebimento}
-        onCancelar={cancelarPedidoAtual}
-      />
-
       <PedidoFormModal
         key={`novo-${novoPedido.sessao}`}
         open={novoPedido.open}
@@ -663,14 +661,6 @@ export default function EstoquePage() {
         podeAprovar={podeAtual("estoque", "editar")}
         onAprovar={confirmarAprovacaoRequisicao}
         onRejeitar={confirmarRejeicaoRequisicao}
-      />
-
-      <PedidoReceberModal
-        key={`receber-${receberPedido.sessao}`}
-        open={receberPedido.open}
-        pedido={receberPedido.pedido}
-        onClose={fecharRecebimento}
-        onConfirm={confirmarRecebimento}
       />
 
       <ConversorModal
@@ -726,10 +716,6 @@ export default function EstoquePage() {
         title="Remover material"
         description={eliminar ? `Tem a certeza que deseja remover o material "${eliminar.nome}"? Esta ação não pode ser desfeita.` : ""}
       />
-
-      <footer className="border-t pt-6 pb-2 text-center">
-        <p className="text-[11px] text-muted-foreground">SIGRAF · Sistema de Gestão para Indústria Gráfica</p>
-      </footer>
 
       <FloatButton href="/estoque/novo" label="Novo" icon="inventory_2" />
     </div>

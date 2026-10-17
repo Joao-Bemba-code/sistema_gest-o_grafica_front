@@ -1,4 +1,3 @@
-import { CardContent } from "@/components/ui/Card";
 import Icon from "@/components/Icon";
 import { cn } from "@/lib/utils";
 
@@ -44,39 +43,33 @@ export default function KpiCard({ icon, label, value, unit, badge, barPct, iconV
       onClick={onClick}
       aria-pressed={onClick ? !!active : undefined}
       className={cn(
-        "relative overflow-hidden w-full text-left",
-        onClick && "focus-ring-soft cursor-pointer transition-transform duration-200 ease-in-out hover:-translate-y-0.5",
+        "relative w-full rounded-xl border border-border bg-card p-4 text-left shadow-sm",
+        onClick && "cursor-pointer transition-colors hover:border-outline-variant hover:bg-muted/30 focus-ring-soft",
         active && "ring-2 ring-primary/50",
         className
       )}
     >
-      <div className={cn("absolute inset-x-0 top-0 h-0.5", v.bar)} aria-hidden="true" />
-      <CardContent className="flex items-start gap-4 sm:gap-5 p-5 sm:p-6">
-        <div
-          className={cn(
-            "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border",
-            v.chip
-          )}
-        >
-          <Icon name={icon} className="text-xl" />
-        </div>
-        <div className="flex flex-1 flex-col gap-1 min-w-0">
-          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight leading-none">
-              {value}
-            </span>
-            {unit && <span className="text-sm text-muted-foreground">{unit}</span>}
+      <div className="flex items-start gap-3.5">
+        {icon && (
+          <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border", v.chip)}>
+            <Icon name={icon} className="text-lg" />
+          </span>
+        )}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <p className="truncate text-xs font-medium text-muted-foreground">{label}</p>
+          <div className="mt-0.5 flex items-baseline gap-1.5 flex-wrap">
+            <span className="text-[28px] font-bold leading-none tracking-tight text-foreground tabular-nums">{value}</span>
+            {unit && <span className="text-xs text-muted-foreground">{unit}</span>}
           </div>
-          {badge && <span className={cn("text-[11px] font-medium mt-0.5", v.badge)}>{badge}</span>}
-          {barPct !== undefined && (
-            <div className="w-full h-1 bg-muted rounded-full overflow-hidden mt-2">
-              <div className={cn("h-full rounded-full transition-all duration-500", v.bar)} style={{ width: `${barPct}%` }} />
-            </div>
-          )}
-          {children}
+          {badge && <span className={cn("mt-1 text-[11px] font-medium", v.badge)}>{badge}</span>}
         </div>
-      </CardContent>
+      </div>
+      {barPct !== undefined && (
+        <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-muted">
+          <div className={cn("h-full rounded-full", v.bar)} style={{ width: `${Math.max(0, Math.min(100, barPct))}%` }} />
+        </div>
+      )}
+      {children}
     </Wrapper>
   );
 }

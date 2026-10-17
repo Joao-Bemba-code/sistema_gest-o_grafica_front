@@ -78,7 +78,7 @@ const TextField = forwardRef(function TextField(
   };
 
   const wrapperClass = cn(
-    "ds-motion relative w-full rounded-xl border bg-background/60 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/25",
+    "ds-motion relative w-full rounded-lg border bg-background/60 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/25",
     !multiline && "h-12",
     state === "default" && "border-outline-variant/50 hover:border-muted-foreground/50",
     isError && "border-error/80 focus-within:border-error focus-within:ring-error/15",

@@ -6,7 +6,15 @@ import Icon from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
 import MaterialForm from "@/components/estoque/MaterialForm";
 import useEstoque from "@/hooks/useEstoque";
-import { blankItem, formatKz, toNum, tiposEstoque } from "@/lib/estoque";
+import { blankItem, formatKz, toNum, tiposEstoque, tipoChaveDe } from "@/lib/estoque";
+
+const ICONE_GRUPO = {
+  materia_prima: "inventory",
+  artigo: "inventory_2",
+  produto_acabado: "inventory_2",
+  servico: "home_repair_service",
+  maquina: "precision_manufacturing",
+};
 
 function PreviewLinha({ label, valor, acento }) {
   return (
@@ -31,7 +39,9 @@ export default function NovoMaterialPage() {
     if (ok) router.push("/estoque");
   };
 
-  const categoria = categorias.find((c) => String(c.id) === String(form.categoria_id));
+  const espec = form.especificacoes || {};
+  const categoriaNome = espec.categoria || "—";
+  const iconeCategoria = ICONE_GRUPO[tipoChaveDe(espec.grupo)] || "category";
   const custoTotal = toNum(form.custo_unit) * toNum(form.estoque_max);
 
   return (
@@ -93,7 +103,7 @@ export default function NovoMaterialPage() {
           </div>
 
           <div className="relative w-24 h-24 rounded-2xl bg-card border border-border flex items-center justify-center mx-auto">
-            <Icon name={categoria?.grupo && { papel: "description", acabamento: "palette", insumo: "blur_on", produto: "inventory_2", outros: "category" }[categoria.grupo] || "category"} className="text-4xl text-primary" />
+            <Icon name={iconeCategoria} className="text-4xl text-primary" />
             <span className="absolute -top-2 -right-2 w-6 h-6 rounded-lg bg-success flex items-center justify-center">
               <Icon name="check" className="text-sm text-on-success" />
             </span>
@@ -105,7 +115,10 @@ export default function NovoMaterialPage() {
           </div>
 
           <div>
-            <PreviewLinha label="Categoria" valor={categoria?.nome} />
+            <PreviewLinha label="Categoria" valor={categoriaNome} />
+            <PreviewLinha label="Família" valor={espec.familia} />
+            <PreviewLinha label="Grupo" valor={espec.grupo} />
+            <PreviewLinha label="Subfamília" valor={espec.subfamilia} />
             <PreviewLinha label="Unidade" valor={form.unidade} />
             <PreviewLinha label="Formato" valor={form.formato} />
             <PreviewLinha label="Gramagem" valor={form.gramagem ? `${form.gramagem} g/m²` : ""} />

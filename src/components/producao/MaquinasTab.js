@@ -1,14 +1,25 @@
 "use client";
 
-import { Fragment, useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useToast } from "@/components/Toast";
-import { ListSkeleton } from "@/components/Skeleton";
+import { CardSkeleton } from "@/components/Skeleton";
 import Icon from "@/components/Icon";
-import { Card } from "@/components/ui/Card";
-import KpiCard from "@/components/ui/KpiCard";
-import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import Modal from "@/components/Modal";
+import RowMenu from "@/components/ui/RowMenu";
+import Paginacao, { usePaginacao } from "@/components/ui/Paginacao";
+import {
+  Ledger,
+  LedgerHeader,
+  FilterRow,
+  LedgerTable,
+  LedgerTh,
+  LedgerTr,
+  LedgerTd,
+  IdCell,
+  StatusBadge,
+  LedgerEmpty,
+} from "@/components/ui/Ledger";
 import MaquinaModal from "@/components/maquinas/MaquinaModal";
 import RegistarEstadoModal from "@/components/maquinas/RegistarEstadoMaquinaModal";
 import { listar, remover } from "@/services/maquinas";
@@ -23,14 +34,14 @@ function fmtData(v) {
   return isNaN(d.getTime()) ? String(v) : d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
-const estadoVariant = (e) =>
-  e === "operacional" ? "success" : e === "manutencao" ? "warning" : e === "avariada" ? "destructive" : "secondary";
+const estadoTom = (e) =>
+  e === "operacional" ? "success" : e === "manutencao" ? "warning" : e === "avariada" ? "error" : "neutral";
 
 const estadoIcone = (e) =>
   e === "operacional" ? "check_circle" : e === "manutencao" ? "handyman" : e === "avariada" ? "error" : "block";
 
 const estadoCor = (e) =>
-  e === "operacional" ? "bg-emerald-500/15 text-emerald-600" : e === "manutencao" ? "bg-amber-500/15 text-amber-600" : e === "avariada" ? "bg-red-500/15 text-red-600" : "bg-on-surface-variant/15 text-on-surface-variant";
+  e === "operacional" ? "bg-success/15 text-success" : e === "manutencao" ? "bg-warning/15 text-warning" : e === "avariada" ? "bg-error/15 text-error" : "bg-muted/50 text-muted-foreground";
 
 const ehStock = (m) => m?.origem === "stock";
 
@@ -51,7 +62,6 @@ function LinhaTempo({ itens, vazio }) {
               <div className="flex flex-wrap items-center gap-1.5">
                 <p className="font-bold text-foreground">{it.titulo}</p>
                 {it.data && it.data !== "—" && <span className="font-mono text-[10px] text-muted-foreground">{it.data}</span>}
-                {it.badge && <Badge variant={it.badgeVariant} className="text-[9px]">{it.badge}</Badge>}
               </div>
               {it.sub && <p className="text-[11px] text-muted-foreground mt-0.5">{it.sub}</p>}
               {it.detalhes && it.detalhes.length > 0 && (
@@ -72,7 +82,7 @@ function LinhaTempo({ itens, vazio }) {
 
 function SecaoLinha({ icon, cor, titulo }) {
   return (
-    <p className="cyber-label flex items-center gap-1.5 mb-2">
+    <p className="flex items-center gap-1.5 mb-2 text-[11px] font-semibold text-muted-foreground">
       <span className={`w-5 h-5 rounded-md flex items-center justify-center ${cor || "bg-primary/10 text-primary"}`}>
         <Icon name={icon} className="text-[12px]" />
       </span>
@@ -110,7 +120,7 @@ function HistoricoMaquina({ maquina, ordens }) {
 
   const itensManut = manutencoes.map((x) => ({
     icon: "handyman",
-    cor: "bg-amber-500/15 text-amber-600",
+    cor: "bg-warning/15 text-warning",
     titulo: x.intervencao || x.descricao || "Manutenção",
     data: fmtData(x.data || x.data_manutencao),
     sub: [x.tecnico ? `Técnico: ${x.tecnico}` : "", x.tipo ? `Tipo: ${x.tipo}` : ""].filter(Boolean).join(" · "),
@@ -146,30 +156,46 @@ function HistoricoMaquina({ maquina, ordens }) {
         <LinhaTempo itens={itensEstados} vazio="Sem mudanças de estado registadas." />
       </div>
       <div>
-        <SecaoLinha icon="handyman" cor="bg-amber-500/15 text-amber-600" titulo="Manutenções" />
+        <SecaoLinha icon="handyman" cor="bg-warning/15 text-warning" titulo="Manutenções" />
         <LinhaTempo itens={itensManut} vazio="Sem manutenções registadas." />
       </div>
       <div>
-        <SecaoLinha icon="print" cor="bg-blue-500/15 text-blue-600" titulo="Uso em produção" />
+        <SecaoLinha icon="print" cor="bg-primary/15 text-primary" titulo="Uso em produção" />
         <LinhaTempo itens={itensUso} vazio="Sem utilização em ordens de produção." />
       </div>
     </div>
   );
 }
 
+const CAMPOS = [
+  { value: "geral", label: "Todos os campos", obter: (m) => [m.nome_comum, m.nome_tecnico, m.codigo, m.marca, m.modelo, m.numero_patrimonial, m.localizacao].join(" ") },
+  { value: "nome", label: "Nome", obter: (m) => `${m.nome_comum || ""} ${m.nome_tecnico || ""}` },
+  { value: "codigo", label: "Código", obter: (m) => m.codigo || "" },
+  { value: "marca", label: "Marca / modelo", obter: (m) => `${m.marca || ""} ${m.modelo || ""}` },
+  { value: "localizacao", label: "Localização", obter: (m) => m.localizacao || "" },
+];
+
+const ESTADOS_FILTRO = ["todos", "operacional", "manutencao", "avariada", "desativada"];
+
+const pillBase = "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-sm font-medium whitespace-nowrap transition-colors";
+const pillAtiva = "border-primary/40 bg-primary/10 text-primary";
+const pillInativa = "border-border bg-card text-muted-foreground hover:bg-muted/60 hover:text-foreground";
+
 export default function MaquinasTab({ showHeader = false, registarEstado = false }) {
   const { addToast } = useToast();
   const [maquinas, setMaquinas] = useState([]);
   const [ordens, setOrdens] = useState([]);
   const [carregando, setCarregando] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filtroEstado, setFiltroEstado] = useState("todos");
   const [eliminarItem, setEliminarItem] = useState(null);
   const [deletando, setDeletando] = useState(false);
   const [formMaq, setFormMaq] = useState({ aberto: false, id: null });
-  const [expansoes, setExpansoes] = useState({});
+  const [historicoMaq, setHistoricoMaq] = useState(null);
   const [estadoModal, setEstadoModal] = useState({ aberto: false, id: null });
   const [empresa, setEmpresa] = useState({});
+  const [filtro, setFiltro] = useState({ campo: "geral", operador: "contem", termo: "" });
+  const [filtroEstado, setFiltroEstado] = useState("todos");
+  const [ordem, setOrdem] = useState({ chave: "", dir: 1 });
+  const [filtrosAbertos, setFiltrosAbertos] = useState(true);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -190,15 +216,33 @@ export default function MaquinasTab({ showHeader = false, registarEstado = false
     return () => clearTimeout(t);
   }, [carregar]);
 
-  const filtrados = maquinas.filter((m) => {
-    if (filtroEstado !== "todos" && m.estado !== filtroEstado) return false;
-    const t = searchTerm.toLowerCase();
-    if (!t) return true;
-    return [m.nome_comum, m.nome_tecnico, m.codigo, m.marca, m.modelo, m.numero_patrimonial]
-      .some((campo) => String(campo || "").toLowerCase().includes(t));
-  });
+  const filtrados = useMemo(() => {
+    const termo = filtro.termo.trim().toLowerCase();
+    let res = [...maquinas];
+    if (filtroEstado !== "todos") res = res.filter((m) => m.estado === filtroEstado);
+    if (termo) {
+      const cfg = CAMPOS.find((c) => c.value === filtro.campo) || CAMPOS[0];
+      res = res.filter((m) => {
+        const alvo = String(cfg.obter(m) || "").toLowerCase();
+        if (filtro.operador === "igual") return alvo === termo;
+        if (filtro.operador === "comeca") return alvo.startsWith(termo);
+        return alvo.includes(termo);
+      });
+    }
+    if (ordem.chave === "nome") res.sort((a, b) => String(a.nome_comum || "").localeCompare(String(b.nome_comum || ""), "pt") * ordem.dir);
+    if (ordem.chave === "codigo") res.sort((a, b) => String(a.codigo || "").localeCompare(String(b.codigo || ""), "pt") * ordem.dir);
+    return res;
+  }, [maquinas, filtro, filtroEstado, ordem]);
 
-  const toggleExpansao = (id) => setExpansoes((p) => ({ ...p, [id]: !p[id] }));
+  const contagensEstado = useMemo(() => {
+    const c = { todos: maquinas.length };
+    for (const e of ESTADOS_FILTRO) {
+      if (e !== "todos") c[e] = maquinas.filter((m) => m.estado === e).length;
+    }
+    return c;
+  }, [maquinas]);
+
+  const { visiveis, ...pag } = usePaginacao({ items: filtrados });
 
   const confirmarEliminacao = async () => {
     if (!eliminarItem) return;
@@ -217,208 +261,132 @@ export default function MaquinasTab({ showHeader = false, registarEstado = false
   const totalManutencao = maquinas.filter((m) => m.estado === "manutencao" || m.estado === "avariada").length;
 
   const abrirNova = () => setFormMaq({ aberto: true, id: null });
-  const abrirEdicao = (m) => setFormMaq({ aberto: true, id: m.id });
   const abrirEstadoModal = (m) => setEstadoModal({ aberto: true, id: m ? m.id : null });
 
+  const maqHistorico = historicoMaq ? maquinas.find((m) => m.id === historicoMaq) || null : null;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {showHeader && (
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Maquinária</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Gestão de máquinas e equipamentos · {maquinas.length} máquinas</p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={abrirNova}
-              className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium shadow-sm hover:bg-primary/90 transition-colors"
-            >
-              <Icon name="add" className="text-[16px]" /> Nova Máquina
-            </button>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-base font-normal tracking-tight text-foreground">Maquinária</h1>
+            <p className="mt-1 text-xs text-muted-foreground">Gestão de máquinas e equipamentos · {maquinas.length} máquinas</p>
           </div>
         </div>
       )}
 
-      <section className="grid grid-cols-1 min-[480px]:grid-cols-2 sm:grid-cols-3 gap-4 md:gap-5">
-        <KpiCard icon="precision_manufacturing" label="Total Máquinas" value={maquinas.length} iconVariant="primary" />
-        <KpiCard icon="check_circle" label="Operacionais" value={totalOperacionais} iconVariant="success" />
-        <KpiCard icon="handyman" label="Manutenção / Avaria" value={totalManutencao} iconVariant="warning" />
-      </section>
-
-      <div className="flex justify-end">
-        <Button variant="outline" size="sm" onClick={() => gerarRelatorioMaquinas(filtrados, ordens, empresa)} className="gap-1.5">
-          <Icon name="picture_as_pdf" className="text-lg" /> Relatório em PDF
-        </Button>
-      </div>
-
-      <Card>
-        <div className="p-4 sm:p-5 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-          <div className="flex gap-2 flex-wrap">
-            {["todos", "operacional", "manutencao", "avariada", "desativada"].map((f) => (
-              <Button key={f} variant={filtroEstado === f ? "default" : "outline"} size="sm" onClick={() => setFiltroEstado(f)}>
-                {f === "todos" ? "Todos" : estadoMaquinaCfg[f]?.label}
-              </Button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <div className="relative flex-1 sm:flex-none">
-              <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[18px]" />
-              <input
-                className="pl-10 pr-4 py-2 bg-background border border-input rounded-full text-xs w-full sm:w-64 focus:ring-2 focus:ring-primary/30 outline-none transition-all"
-                placeholder="Buscar por nome, código, marca, modelo..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <Button onClick={registarEstado ? () => abrirEstadoModal(null) : abrirNova} size="sm" className="shrink-0">
-              <Icon name={registarEstado ? "swap_horiz" : "add"} className="text-lg" /> {registarEstado ? "Registar Estado" : "Nova Máquina"}
-            </Button>
-          </div>
+      <Ledger rotulo="Máquinas ledger">
+        <LedgerHeader
+          titulo={registarEstado ? "Estado das máquinas" : "Máquinas"}
+          subtitulo={`${maquinas.length} máquinas · ${totalOperacionais} operacionais · ${totalManutencao} em manutenção/avaria`}
+          novo={registarEstado ? "Registar estado" : "Nova máquina"}
+          aoNovo={registarEstado ? () => abrirEstadoModal(null) : abrirNova}
+          onToggleFiltros={() => setFiltrosAbertos((v) => !v)}
+          filtrosAbertos={filtrosAbertos}
+        />
+        {filtrosAbertos && (
+          <FilterRow
+            campo={filtro.campo}
+            setCampo={(v) => setFiltro((f) => ({ ...f, campo: v }))}
+            campos={CAMPOS.map(({ value, label }) => ({ value, label }))}
+            operador={filtro.operador}
+            setOperador={(v) => setFiltro((f) => ({ ...f, operador: v }))}
+            termo={filtro.termo}
+            setTermo={(v) => setFiltro((f) => ({ ...f, termo: v }))}
+            aoLimpar={() => setFiltro((f) => ({ ...f, termo: "" }))}
+            placeholder="Pesquisar por nome, código, marca, modelo..."
+          />
+        )}
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2">
+          {ESTADOS_FILTRO.map((e) => (
+            <button
+              key={e}
+              type="button"
+              onClick={() => setFiltroEstado(e)}
+              aria-pressed={filtroEstado === e}
+              className={`${pillBase} ${filtroEstado === e ? pillAtiva : pillInativa}`}
+            >
+              {e === "todos" ? "Todos" : estadoMaquinaCfg[e]?.label || e}
+              <span className="text-[11px] text-muted-foreground">{contagensEstado[e] ?? 0}</span>
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => gerarRelatorioMaquinas(filtrados, ordens, empresa)}
+            className={`${pillBase} ${pillInativa} ml-auto`}
+          >
+            <Icon name="picture_as_pdf" className="text-sm" /> Relatório em PDF
+          </button>
         </div>
 
-        {carregando && maquinas.length === 0 ? <ListSkeleton count={5} /> : (
+        {carregando && maquinas.length === 0 ? (
+          <div className="p-4"><CardSkeleton lines={5} /></div>
+        ) : (
           <>
-            <div className="hidden lg:block overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    {["Código", "Máquina", "Marca / Modelo", "Estado", "Capacidade", "Custo (Kz)", "Localização", "Ações"].map((h) => (
-                      <th key={h} className={`text-left px-5 py-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wider ${["Marca / Modelo", "Capacidade", "Custo (Kz)"].includes(h) ? "hidden xl:table-cell" : ""}`}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtrados.map((m) => {
-                    const aberto = !!expansoes[m.id];
-                    return (
-                      <Fragment key={m.id}>
-                        <tr className="border-b border-border/10 hover:bg-muted/30 transition-colors">
-                          <td className="px-5 py-3"><span className="bg-primary/10 text-primary font-semibold px-2 py-1 rounded text-[10px]">{m.codigo || "—"}</span></td>
-                          <td className="px-5 py-3">
-                            <p className="font-medium text-foreground">{m.nome_comum}</p>
-                            <p className="text-[10px] text-muted-foreground">{m.nome_tecnico}</p>
-                          </td>
-                          <td className="px-5 py-3 text-muted-foreground hidden xl:table-cell">{[m.marca, m.modelo].filter(Boolean).join(" ") || "—"}</td>
-                          <td className="px-5 py-3">
-                            <Badge variant={estadoVariant(m.estado)} className="text-[10px]">
-                              {estadoMaquinaCfg[m.estado]?.label || m.estado || "—"}
-                            </Badge>
-                          </td>
-                          <td className="px-5 py-3 text-muted-foreground hidden xl:table-cell">{toNumMaq(m.capacidade_nominal) ? `${Number(m.capacidade_nominal).toLocaleString("pt-AO")} un/h` : "—"}</td>
-                          <td className="px-5 py-3 text-muted-foreground font-mono text-xs hidden xl:table-cell">{m.custo_unit ? Number(m.custo_unit).toLocaleString("pt-AO") : "—"}</td>
-                          <td className="px-5 py-3 text-muted-foreground text-xs">{m.localizacao || "—"}</td>
-                          <td className="px-5 py-3 text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <Button variant="ghost" size="icon" onClick={() => toggleExpansao(m.id)} title="Histórico">
-                                <Icon name={aberto ? "expand_less" : "expand_more"} className="text-[16px]" />
-                              </Button>
-                              {ehStock(m) ? (
-                                <>
-                                  {registarEstado && (
-                                    <Button variant="ghost" size="icon" onClick={() => abrirEstadoModal(m)} title="Registar estado">
-                                      <Icon name="swap_horiz" className="text-[16px] text-primary" />
-                                    </Button>
-                                  )}
-                                  <Badge variant="secondary" className="text-[9px]">Stock</Badge>
-                                </>
-                              ) : (
-                                <>
-                                  {registarEstado && (
-                                    <Button variant="ghost" size="icon" onClick={() => abrirEstadoModal(m)} title="Registar estado">
-                                      <Icon name="swap_horiz" className="text-[16px] text-primary" />
-                                    </Button>
-                                  )}
-                                  <Button variant="ghost" size="icon" onClick={() => abrirEdicao(m)} title="Editar"><Icon name="edit" className="text-[16px]" /></Button>
-                                  <Button variant="ghost" size="icon" onClick={() => setEliminarItem(m)} title="Eliminar" className="text-error hover:text-error"><Icon name="delete" className="text-[16px]" /></Button>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                        {aberto && (
-                          <tr className="border-b border-border/10 bg-muted/20">
-                            <td colSpan={8} className="px-5 py-4">
-                              <HistoricoMaquina maquina={m} ordens={ordens} />
-                            </td>
-                          </tr>
-                        )}
-                      </Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-              {filtrados.length === 0 && (
-                <div className="p-12 text-center">
-                  <Icon name="precision_manufacturing" className="text-4xl text-muted-foreground mb-2 block" />
-                  <p className="text-muted-foreground font-medium">Nenhuma máquina encontrada</p>
-                  {!registarEstado && (
-                    <Button variant="outline" size="sm" className="mt-3" onClick={abrirNova}>
-                      <Icon name="add" className="text-sm" /> Registar Primeira Máquina
-                    </Button>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="lg:hidden divide-y divide-border/20">
-              {filtrados.map((m) => (
-                <div key={m.id} className="p-4 hover:bg-muted/30 transition-colors">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="bg-primary/10 text-primary font-semibold px-2 py-0.5 rounded text-[10px]">{m.codigo || "—"}</span>
-                        <Badge variant={estadoVariant(m.estado)} className="text-[10px]">
-                          {estadoMaquinaCfg[m.estado]?.label || m.estado || "—"}
-                        </Badge>
-                      </div>
-                      <p className="text-sm font-medium text-foreground truncate">{m.nome_comum}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{m.nome_tecnico}</p>
-                      <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 text-[10px] text-muted-foreground">
-                        {[m.marca, m.modelo].filter(Boolean).length > 0 && <span>{[m.marca, m.modelo].filter(Boolean).join(" ")}</span>}
-                        {m.localizacao && <span className="flex items-center gap-1"><Icon name="place" className="text-[10px]" /> {m.localizacao}</span>}
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-1 shrink-0">
-                      <Button variant="ghost" size="icon" onClick={() => toggleExpansao(m.id)} title="Histórico"><Icon name={expansoes[m.id] ? "expand_less" : "expand_more"} className="text-[14px]" /></Button>
-                      {ehStock(m) ? (
-                        <>
-                          {registarEstado && (
-                            <Button variant="ghost" size="icon" onClick={() => abrirEstadoModal(m)} title="Registar estado">
-                              <Icon name="swap_horiz" className="text-[14px] text-primary" />
-                            </Button>
-                          )}
-                          <Badge variant="secondary" className="text-[9px]">Stock</Badge>
-                        </>
-                      ) : (
-                        <>
-                          {registarEstado && (
-                            <Button variant="ghost" size="icon" onClick={() => abrirEstadoModal(m)} title="Registar estado">
-                              <Icon name="swap_horiz" className="text-[14px] text-primary" />
-                            </Button>
-                          )}
-                          <Button variant="ghost" size="icon" onClick={() => abrirEdicao(m)} title="Editar"><Icon name="edit" className="text-[14px]" /></Button>
-                          <Button variant="ghost" size="icon" onClick={() => setEliminarItem(m)} title="Eliminar" className="text-error"><Icon name="delete" className="text-[14px]" /></Button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  {expansoes[m.id] && (
-                    <div className="mt-4 pt-3 border-t border-border/10">
-                      <HistoricoMaquina maquina={m} ordens={ordens} />
-                    </div>
-                  )}
-                </div>
-              ))}
-              {filtrados.length === 0 && (
-                <div className="p-12 text-center">
-                  <Icon name="precision_manufacturing" className="text-4xl text-muted-foreground mb-2 block" />
-                  <p className="text-muted-foreground font-medium">Nenhuma máquina encontrada</p>
-                </div>
-              )}
-            </div>
+            <LedgerTable>
+              <thead>
+                <tr className="border-b border-border">
+                  <LedgerTh onSort={() => setOrdem((p) => (p.chave === "nome" ? { chave: "nome", dir: -p.dir } : { chave: "nome", dir: 1 }))} ativo={ordem.chave === "nome"}>Máquina</LedgerTh>
+                  <LedgerTh onSort={() => setOrdem((p) => (p.chave === "codigo" ? { chave: "codigo", dir: -p.dir } : { chave: "codigo", dir: 1 }))} ativo={ordem.chave === "codigo"}>Código</LedgerTh>
+                  <LedgerTh>Marca / Modelo</LedgerTh>
+                  <LedgerTh>Estado</LedgerTh>
+                  <LedgerTh>Capacidade</LedgerTh>
+                  <LedgerTh>Localização</LedgerTh>
+                  <LedgerTh className="w-10" />
+                </tr>
+              </thead>
+              <tbody>
+                {visiveis.map((m) => (
+                  <LedgerTr key={m.id} onClick={() => setHistoricoMaq(m.id)}>
+                    <LedgerTd className="max-w-52">
+                      <IdCell id={m.nome_comum} meta={m.nome_tecnico || "—"} aoAbrir={() => setHistoricoMaq(m.id)} />
+                    </LedgerTd>
+                    <LedgerTd className="font-mono text-xs text-muted-foreground">{m.codigo || "—"}</LedgerTd>
+                    <LedgerTd className="max-w-40"><span className="block truncate text-muted-foreground">{[m.marca, m.modelo].filter(Boolean).join(" ") || "—"}</span></LedgerTd>
+                    <LedgerTd>
+                      <span className="flex flex-wrap items-center gap-1">
+                        <StatusBadge tom={estadoTom(m.estado)}>{estadoMaquinaCfg[m.estado]?.label || m.estado || "—"}</StatusBadge>
+                        {ehStock(m) && <StatusBadge tom="neutral">Stock</StatusBadge>}
+                      </span>
+                    </LedgerTd>
+                    <LedgerTd className="text-muted-foreground whitespace-nowrap">{toNumMaq(m.capacidade_nominal) ? `${Number(m.capacidade_nominal).toLocaleString("pt-AO")} un/h` : "—"}</LedgerTd>
+                    <LedgerTd className="text-muted-foreground">{m.localizacao || "—"}</LedgerTd>
+                    <LedgerTd>
+                      <RowMenu
+                        ariaLabel="Ações da máquina"
+                        itens={[
+                          { icone: "history", rotulo: "Histórico", onClick: () => setHistoricoMaq(m.id) },
+                          ...(registarEstado ? [{ icone: "swap_horiz", rotulo: "Registar estado", onClick: () => abrirEstadoModal(m) }] : []),
+                          ...(!ehStock(m) ? [
+                            { icone: "delete", rotulo: "Remover", danger: true, onClick: () => setEliminarItem(m) },
+                          ] : []),
+                        ]}
+                      />
+                    </LedgerTd>
+                  </LedgerTr>
+                ))}
+              </tbody>
+            </LedgerTable>
+            {pag.total === 0 && (
+              <LedgerEmpty icone="precision_manufacturing">
+                {maquinas.length === 0 && !registarEstado ? "Nenhuma máquina registada" : "Nenhuma máquina corresponde ao filtro"}
+              </LedgerEmpty>
+            )}
+            <Paginacao {...pag} label="máquinas" />
           </>
         )}
-      </Card>
+      </Ledger>
+
+      <Modal
+        open={Boolean(maqHistorico)}
+        onClose={() => setHistoricoMaq(null)}
+        title={`${maqHistorico?.nome_comum || ""} — Histórico`}
+        icon="history"
+        size="xl"
+      >
+        {maqHistorico && <HistoricoMaquina maquina={maqHistorico} ordens={ordens} />}
+      </Modal>
 
       <ConfirmDialog
         open={Boolean(eliminarItem)}

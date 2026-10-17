@@ -31,7 +31,7 @@ const faturaEstados = {
 
 function formatKz(v) { return `Kz ${Number(v || 0).toLocaleString("pt-AO")}`; }
 
-export default function FaturaDetalhesModal({ fatura, empresa, onClose, onChanged, onEliminar }) {
+export default function FaturaDetalhesModal({ fatura, empresa, onClose, onChanged, onEliminar, podeRemover = true }) {
   const { addToast } = useToast();
   const [pagamentoExtra, setPagamentoExtra] = useState("");
   const [registrando, setRegistrando] = useState(false);
@@ -132,7 +132,7 @@ export default function FaturaDetalhesModal({ fatura, empresa, onClose, onChange
           </div>
         )}
         <div className="w-full flex flex-wrap items-center justify-end gap-3 mt-3">
-          {f.tipo !== "recibo" && (
+          {podeRemover && f.tipo !== "recibo" && (
             <Button type="button" variant="outline" onClick={() => onEliminar(f)} className="text-error hover:text-error"><Icon name="delete" className="text-sm" /> Remover</Button>
           )}
           <Button type="button" variant="outline" onClick={() => gerarPDF(f, empresa || {})}><Icon name="download" className="text-sm" /> Baixar PDF</Button>

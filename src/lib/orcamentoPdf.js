@@ -256,12 +256,12 @@ export default async function gerarOrcamentoPdf(orcamento, empresa = {}, opcoesE
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);
   doc.setTextColor(...COR_MARCA_CINZA);
-  doc.text(`${(empresa.nome || "SIGRAF").toUpperCase()}   ·   ${empresa.email || "—"}   ·   ${empresa.telefone || "—"}`, pw / 2, y + 14, { align: "center" });
+  doc.text(`${(empresa.nome || "KAMGEST").toUpperCase()}   ·   ${empresa.email || "—"}   ·   ${empresa.telefone || "—"}`, pw / 2, y + 14, { align: "center" });
 
   // ===== Rodapé =====
   doc.setFontSize(7);
   doc.setTextColor(...COR_MARCA_CINZA);
-  doc.text(`Documento gerado por SIGRAF em ${formatarData(new Date())}`, pw / 2, ph - 9, { align: "center" });
+  doc.text(`Documento gerado por KAMGEST em ${formatarData(new Date())}`, pw / 2, ph - 9, { align: "center" });
 
   doc.save(`Orcamento_${orcamento.numero || orcamento.id || "documento"}.pdf`);
 }

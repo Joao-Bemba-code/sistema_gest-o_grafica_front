@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import Icon from "@/components/Icon";
 import { Input } from "@/components/ui/Input";
-import { Button } from "@/components/ui/Button";
+import { cn } from "@/lib/utils";
 
 export function useFilter({ items = [], searchFields = [], filterConfig = [], sortOptions = [] }) {
   const [search, setSearch] = useState("");
@@ -51,77 +51,112 @@ export function useFilter({ items = [], searchFields = [], filterConfig = [], so
   return { search, setSearch, activeFilter, setActiveFilter, sortBy, setSortBy, filtered, total: filtered.length };
 }
 
-export default function FilterBar({ search, onSearchChange, placeholder = "Pesquisar...", filters = [], activeFilter, onFilterChange, sortBy, onSortChange, sortOptions = [], count, countLabel = "registos" }) {
+// Barra de filtros no modelo da referência:
+// [Filtros como pills segmentados] · [busca] · [ordenação] · [Limpar]
+export default function FilterBar({
+  search,
+  onSearchChange,
+  placeholder = "Pesquisar...",
+  filters = [],
+  activeFilter,
+  onFilterChange,
+  sortBy,
+  onSortChange,
+  sortOptions = [],
+  count,
+  countLabel = "registos",
+}) {
   return (
     <div className="rounded-xl border border-border bg-card p-3 space-y-3">
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-        <div className="flex-1 w-full sm:w-auto">
-          <Input
-            icon="search"
-            value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder={placeholder}
-            className="h-9 text-xs"
-          />
-        </div>
-
-        {sortOptions.length > 0 && (
-          <div className="flex items-center gap-2 shrink-0">
-            <Icon name="sort" className="text-sm text-muted-foreground" />
-            <select
-              value={sortBy}
-              onChange={(e) => onSortChange(e.target.value)}
-              className="h-9 px-3 rounded-lg border border-border bg-background text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 cursor-pointer"
-            >
-              {sortOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center">
+        {/* Pills segmentados (todos + filtros) */}
+        {filters.length > 0 && (
+          <div
+            className="flex flex-wrap items-center gap-0.5 rounded-lg border border-border bg-muted/50 p-0.5"
+            role="group"
+            aria-label="Filtros"
+          >
+            {filters.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                onClick={() => onFilterChange(f.value)}
+                aria-pressed={activeFilter === f.value}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                  activeFilter === f.value
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {f.icon && <Icon name={f.icon} className="text-sm" />}
+                {f.label}
+                {f.count !== undefined && (
+                  <span
+                    className={cn(
+                      "rounded px-1.5 py-0.5 text-[9px] tabular-nums",
+                      activeFilter === f.value ? "bg-muted" : "bg-muted/70"
+                    )}
+                  >
+                    {f.count}
+                  </span>
+                )}
+              </button>
+            ))}
           </div>
         )}
 
-        {count !== undefined && (
-          <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
-            {count} {countLabel}
-          </span>
-        )}
-      </div>
+        <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
+          {/* Busca */}
+          <div className="w-full min-w-40 sm:w-64">
+            <Input
+              icon="search"
+              value={search}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder={placeholder}
+              className="h-10 rounded-lg text-xs"
+            />
+          </div>
 
-      {filters.length > 0 && (
-        <div className="flex gap-1.5 flex-wrap">
-          {filters.map((f) => (
+          {/* Ordenação */}
+          {sortOptions.length > 0 && (
+            <div className="relative shrink-0">
+              <select
+                value={sortBy}
+                onChange={(e) => onSortChange(e.target.value)}
+                aria-label="Ordenar por"
+                className="h-10 appearance-none rounded-lg border border-border bg-card pl-3 pr-8 text-xs font-medium text-foreground outline-none transition hover:bg-muted focus:border-primary cursor-pointer"
+              >
+                {sortOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <Icon
+                name="unfold_more"
+                className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-sm text-muted-foreground"
+              />
+            </div>
+          )}
+
+          {/* Limpar */}
+          {search && (
             <button
-              key={f.value}
-              type="button"
-              onClick={() => onFilterChange(f.value)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${
-                activeFilter === f.value
-                  ? "border-primary/30 bg-primary/10 text-primary"
-                  : "border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted"
-              }`}
+              onClick={() => onSearchChange("")}
+              className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
-              {f.icon && <Icon name={f.icon} className="text-xs" />}
-              {f.label}
-              {f.count !== undefined && (
-                <span className={`ml-0.5 px-1.5 py-0.5 rounded text-[9px] ${activeFilter === f.value ? "bg-primary/20" : "bg-muted"}`}>
-                  {f.count}
-                </span>
-              )}
+              Limpar
             </button>
-          ))}
-        </div>
-      )}
+          )}
 
-      {search && (
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => onSearchChange("")}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-muted text-muted-foreground text-xs font-medium hover:text-foreground hover:bg-accent transition-colors"
-          >
-            <Icon name="close" className="text-xs" /> Limpar busca
-          </button>
+          {count !== undefined && (
+            <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+              {count} {countLabel}
+            </span>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

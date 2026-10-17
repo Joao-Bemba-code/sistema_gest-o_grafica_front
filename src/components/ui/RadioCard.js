@@ -11,7 +11,7 @@ function RadioCard({ selected, onChange, icon, title, description, id, name }) {
       aria-checked={selected}
       onClick={onChange}
       className={cn(
-        "ds-motion min-h-touch flex w-full items-center gap-3 rounded-xl border-2 px-4 py-3 text-left",
+        "ds-motion min-h-touch flex w-full items-center gap-3 rounded-lg border-2 px-4 py-3 text-left",
         selected
           ? "border-primary bg-primary/5 text-primary"
           : "border-outline-variant/50 bg-background/60 text-muted-foreground hover:border-primary/50 hover:text-foreground"
