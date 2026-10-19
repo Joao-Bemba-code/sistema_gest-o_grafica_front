@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
 import { cn } from "@/lib/utils";
@@ -126,6 +126,9 @@ export default function AreaComercialPage() {
   const [pdfOrcamento, setPdfOrcamento] = useState(null);
   const [fatDetalhe, setFatDetalhe] = useState(null);
   const [filtrosAbertos, setFiltrosAbertos] = useState(true);
+  const [mesFiltro, setMesFiltro] = useState(null);
+  const [menuMesAberto, setMenuMesAberto] = useState(false);
+  const menuMesRef = useRef(null);
   const { addToast } = useToast();
 
   const trocarTab = (t) => {
@@ -161,6 +164,29 @@ export default function AreaComercialPage() {
     setOrcamentos(Array.isArray(d) ? d : d?.data ?? []);
   };
 
+  useEffect(() => {
+    if (!menuMesAberto) return undefined;
+    const fecharFora = (e) => {
+      if (menuMesRef.current && !menuMesRef.current.contains(e.target)) setMenuMesAberto(false);
+    };
+    const fecharTecla = (e) => {
+      if (e.key === "Escape") setMenuMesAberto(false);
+    };
+    document.addEventListener("mousedown", fecharFora);
+    document.addEventListener("keydown", fecharTecla);
+    return () => {
+      document.removeEventListener("mousedown", fecharFora);
+      document.removeEventListener("keydown", fecharTecla);
+    };
+  }, [menuMesAberto]);
+
+  const chaveMes = mesFiltro
+    ? `${mesFiltro.getFullYear()}-${String(mesFiltro.getMonth() + 1).padStart(2, "0")}`
+    : null;
+  const noMes = (valor) => !chaveMes || String(valor || "").startsWith(chaveMes);
+  const orcamentosVisiveis = orcamentos.filter((o) => noMes(o.data || o.createdAt));
+  const faturasVisiveis = faturas.filter((f) => noMes(f.data_emissao || f.data || f.createdAt));
+
   const abrirOrcDetalhe = (o) => {
     setOrcDetalhe(o);
     setOrcForm({ open: false, id: null });
@@ -195,11 +221,11 @@ export default function AreaComercialPage() {
     }
   };
 
-  const pedidosAprovados = orcamentos.filter((o) => o.estado === "aprovado");
+  const pedidosAprovados = orcamentosVisiveis.filter((o) => o.estado === "aprovado");
   const totalPedidos = pedidosAprovados.reduce((s, o) => s + (Number(o.total) || 0), 0);
 
   const orcLedger = usarFiltroLedger({
-    items: tab === "pedidos" ? pedidosAprovados : orcamentos,
+    items: tab === "pedidos" ? pedidosAprovados : orcamentosVisiveis,
     campos: [
       { value: "cliente", label: "Cliente", obter: (o) => `${o.cliente?.empresa || ""} ${o.cliente?.nome || ""}` },
       { value: "numero", label: "Número", obter: (o) => o.numero || "" },
@@ -208,7 +234,7 @@ export default function AreaComercialPage() {
     ],
   });
   const fatLedger = usarFiltroLedger({
-    items: faturas,
+    items: faturasVisiveis,
     campos: [
       { value: "cliente", label: "Cliente", obter: (f) => `${f.cliente?.empresa || ""} ${f.cliente?.nome || ""}` },
       { value: "numero", label: "Número", obter: (f) => f.numero || "" },
@@ -219,21 +245,36 @@ export default function AreaComercialPage() {
   const orcPag = usePaginacao({ items: orcLedger.resultado });
   const fatPag = usePaginacao({ items: fatLedger.resultado });
 
-  const totalOrc = orcamentos.reduce((s, o) => s + (Number(o.total) || 0), 0);
-  const totalFat = faturas.reduce((s, f) => s + Number(f.total || f.valor || 0), 0);
-  const totalReceber = faturas.filter((f) => !["paga", "cancelada"].includes(f.estado)).reduce((s, f) => s + Number(f.total || f.valor || 0), 0);
-  const pendentes = orcamentos.filter((o) => o.estado === "pendente").length;
-  const aprovados = orcamentos.filter((o) => o.estado === "aprovado").length;
+  const totalOrc = orcamentosVisiveis.reduce((s, o) => s + (Number(o.total) || 0), 0);
+  const totalFat = faturasVisiveis.reduce((s, f) => s + Number(f.total || f.valor || 0), 0);
+  const totalReceber = faturasVisiveis.filter((f) => !["paga", "cancelada"].includes(f.estado)).reduce((s, f) => s + Number(f.total || f.valor || 0), 0);
+  const pendentes = orcamentosVisiveis.filter((o) => o.estado === "pendente").length;
+  const aprovados = orcamentosVisiveis.filter((o) => o.estado === "aprovado").length;
 
   const mesLabel = (() => {
     const m = new Date().toLocaleDateString("pt-PT", { month: "long", year: "numeric" });
     return m.charAt(0).toUpperCase() + m.slice(1);
   })();
 
+  const capitalizar = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const opcoesMes = [
+    { rotulo: "Todos os meses", valor: null },
+    ...Array.from({ length: 12 }, (_, i) => {
+      const d = new Date(new Date().getFullYear(), new Date().getMonth() - (11 - i), 1);
+      return {
+        rotulo: capitalizar(d.toLocaleDateString("pt-PT", { month: "long", year: "numeric" })),
+        valor: d,
+      };
+    }),
+  ];
+  const rotuloMes = mesFiltro
+    ? capitalizar(mesFiltro.toLocaleDateString("pt-PT", { month: "long", year: "numeric" }))
+    : mesLabel;
+
   const kpis = [
-    { label: "Orçamentos", valor: orcamentos.length, icone: "request_quote", tom: "bg-primary/10 text-primary" },
+    { label: "Orçamentos", valor: orcamentosVisiveis.length, icone: "request_quote", tom: "bg-primary/10 text-primary" },
     { label: "Pedidos", valor: aprovados, icone: "pending_actions", tom: "bg-info/10 text-info" },
-    { label: "Vendas", valor: faturas.length, icone: "receipt_long", tom: "bg-success/10 text-success" },
+    { label: "Vendas", valor: faturasVisiveis.length, icone: "receipt_long", tom: "bg-success/10 text-success" },
   ];
 
   const confirmarEliminacao = async () => {
@@ -269,14 +310,45 @@ export default function AreaComercialPage() {
           <p className="mt-0.5 text-xs font-medium text-muted-foreground">Clientes, orçamentos, pedidos e vendas.</p>
         </div>
         <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 self-start rounded-lg border border-border bg-card px-4 py-2 text-xs font-semibold text-foreground shadow-sm transition-colors hover:bg-muted/60 sm:self-auto"
-          >
-            <Icon name="calendar_month" className="h-4 w-4 text-muted-foreground" />
-            <span>{mesLabel}</span>
-            <Icon name="expand_more" className="h-3.5 w-3.5 text-muted-foreground" />
-          </button>
+          {tab !== "clientes" && (
+            <div className="relative self-start sm:self-auto" ref={menuMesRef}>
+              <button
+                type="button"
+                onClick={() => setMenuMesAberto((v) => !v)}
+                className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-xs font-semibold text-foreground shadow-sm transition-colors hover:bg-muted/60"
+              >
+                <Icon name="calendar_month" className="h-4 w-4 text-muted-foreground" />
+                <span>{rotuloMes}</span>
+                <Icon name="expand_more" className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+              {menuMesAberto && (
+                <div className="absolute right-0 top-full z-50 mt-1.5 w-52 overflow-hidden rounded-xl border border-border bg-popover py-1 shadow-dropdown">
+                  {opcoesMes.map((o) => {
+                    const ativo = o.valor
+                      ? mesFiltro && mesFiltro.getFullYear() === o.valor.getFullYear() && mesFiltro.getMonth() === o.valor.getMonth()
+                      : !mesFiltro;
+                    return (
+                      <button
+                        key={o.rotulo}
+                        type="button"
+                        onClick={() => {
+                          setMesFiltro(o.valor);
+                          setMenuMesAberto(false);
+                        }}
+                        className={cn(
+                          "flex w-full items-center justify-between px-3.5 py-2 text-left text-xs transition-colors hover:bg-muted",
+                          ativo ? "font-semibold text-primary" : "text-foreground"
+                        )}
+                      >
+                        <span>{o.rotulo}</span>
+                        {ativo && <Icon name="check" className="text-sm" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -325,7 +397,7 @@ export default function AreaComercialPage() {
             subtitulo={
               tab === "pedidos"
                 ? `${pedidosAprovados.length} pedidos aprovados · ${formatKz(totalPedidos)}`
-                : `${orcamentos.length} orçamentos · ${pendentes} pendentes · ${formatKz(totalOrc)}`
+                : `${orcamentosVisiveis.length} orçamentos · ${pendentes} pendentes · ${formatKz(totalOrc)}`
             }
             novo={tab === "orcamentos" ? "Novo orçamento" : undefined}
             aoNovo={() => setOrcForm({ open: true, id: null })}
@@ -404,7 +476,7 @@ export default function AreaComercialPage() {
         <Ledger rotulo="Facturas ledger">
           <LedgerHeader
             titulo="Vendas"
-            subtitulo={`${faturas.length} facturas · ${totalReceber > 0 ? `${formatKz(totalReceber)} a receber` : formatKz(totalFat)}`}
+            subtitulo={`${faturasVisiveis.length} facturas · ${totalReceber > 0 ? `${formatKz(totalReceber)} a receber` : formatKz(totalFat)}`}
             onToggleFiltros={() => setFiltrosAbertos((v) => !v)}
             filtrosAbertos={filtrosAbertos}
           />

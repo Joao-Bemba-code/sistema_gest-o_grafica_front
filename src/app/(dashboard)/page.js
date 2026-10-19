@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +33,7 @@ import {
   LuBriefcase,
   LuUserPlus,
   LuFilePlus2,
+  LuCheck,
 } from "react-icons/lu";
 
 const DIA_MS = 86400000;
@@ -158,6 +159,12 @@ export default function DashboardPage() {
   const [maquinas, setMaquinas] = useState([]);
   const [movimentos, setMovimentos] = useState([]);
   const [periodo, setPeriodo] = useState("mes");
+  const [mesRef, setMesRef] = useState(null);
+  const [nMeses, setNMeses] = useState(6);
+  const [menuMesAberto, setMenuMesAberto] = useState(false);
+  const [menuGraficoAberto, setMenuGraficoAberto] = useState(false);
+  const menuMesRef = useRef(null);
+  const menuGraficoRef = useRef(null);
 
   const carregar = useCallback(async () => {
     try {
@@ -184,6 +191,37 @@ export default function DashboardPage() {
     carregar();
   }, [carregar]);
 
+  useEffect(() => {
+    if (!menuMesAberto && !menuGraficoAberto) return undefined;
+    const fecharFora = (e) => {
+      if (menuMesAberto && menuMesRef.current && !menuMesRef.current.contains(e.target)) setMenuMesAberto(false);
+      if (menuGraficoAberto && menuGraficoRef.current && !menuGraficoRef.current.contains(e.target)) setMenuGraficoAberto(false);
+    };
+    const fecharTecla = (e) => {
+      if (e.key === "Escape") {
+        setMenuMesAberto(false);
+        setMenuGraficoAberto(false);
+      }
+    };
+    document.addEventListener("mousedown", fecharFora);
+    document.addEventListener("keydown", fecharTecla);
+    return () => {
+      document.removeEventListener("mousedown", fecharFora);
+      document.removeEventListener("keydown", fecharTecla);
+    };
+  }, [menuMesAberto, menuGraficoAberto]);
+
+  const trocarPeriodo = (v) => {
+    setPeriodo(v);
+    if (v !== "mes") setMesRef(null);
+  };
+
+  const escolherMes = (d) => {
+    setMesRef(d);
+    setPeriodo("mes");
+    setMenuMesAberto(false);
+  };
+
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
 
@@ -203,6 +241,11 @@ export default function DashboardPage() {
     if (periodo === "ano") {
       const ini = new Date(y, 0, 1);
       return { ini, fim: new Date(y + 1, 0, 1), iniAnt: new Date(y - 1, 0, 1), fimAnt: ini };
+    }
+    if (mesRef) {
+      const ry = mesRef.getFullYear();
+      const rm = mesRef.getMonth();
+      return { ini: new Date(ry, rm, 1), fim: new Date(ry, rm + 1, 1), iniAnt: new Date(ry, rm - 1, 1), fimAnt: new Date(ry, rm, 1) };
     }
     const ini = new Date(y, m, 1);
     return { ini, fim: new Date(y, m + 1, 1), iniAnt: new Date(y, m - 1, 1), fimAnt: ini };
@@ -285,12 +328,13 @@ export default function DashboardPage() {
     return { ...s, len, offset };
   });
 
-  /* ─── Gráfico 6 meses: vendas vs produção ─── */
+  /* ─── Gráfico meses: vendas vs produção ─── */
   const dadosMeses = (() => {
+    const ref = mesRef || hoje;
     const arr = [];
-    for (let i = 5; i >= 0; i--) {
-      const ini = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
-      const fim = new Date(hoje.getFullYear(), hoje.getMonth() - i + 1, 1);
+    for (let i = nMeses - 1; i >= 0; i--) {
+      const ini = new Date(ref.getFullYear(), ref.getMonth() - i, 1);
+      const fim = new Date(ref.getFullYear(), ref.getMonth() - i + 1, 1);
       const vendas = faturas.reduce((s, f) => {
         const dd = dataFatura(f);
         return dd && dd >= ini && dd < fim ? s + parseFloat(f.total || f.valor || 0) : s;
@@ -323,6 +367,22 @@ export default function DashboardPage() {
 
   const mesLabel = hoje.toLocaleDateString("pt-PT", { month: "long", year: "numeric" });
   const mesAtual = mesLabel.charAt(0).toUpperCase() + mesLabel.slice(1);
+
+  const capitalizar = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const opcoesMes = [
+    { rotulo: "Mês atual", valor: null },
+    ...Array.from({ length: 11 }, (_, i) => {
+      const d = new Date(hoje.getFullYear(), hoje.getMonth() - (11 - i), 1);
+      return {
+        rotulo: capitalizar(d.toLocaleDateString("pt-PT", { month: "long", year: "numeric" })),
+        valor: d,
+      };
+    }),
+  ];
+  const rotuloMes = mesRef
+    ? capitalizar(mesRef.toLocaleDateString("pt-PT", { month: "long", year: "numeric" }))
+    : mesAtual;
+  const opcoesGrafico = [3, 6, 12].map((n) => ({ rotulo: `Últimos ${n} meses`, valor: n }));
 
   const kpis = [
     { icon: LuChartColumn, chipCls: "bg-primary/10", iconCls: "text-primary", label: "Vendas", value: `${formatNum(vendasAtual)} Kz`, delta: deltaVendas, sub: "vs. mês anterior" },
@@ -385,10 +445,39 @@ export default function DashboardPage() {
               <p className="mt-0.5 text-xs text-muted-foreground">Acompanhe o desempenho da sua gráfica em tempo real.</p>
             </div>
             <div className="flex items-center space-x-3">
-              <div className="flex cursor-pointer items-center space-x-2 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground shadow-sm">
-                <LuCalendar className="h-4 w-4 text-muted-foreground" />
-                <span>{mesAtual}</span>
-                <LuChevronDown className="ml-1 h-3 w-3 text-muted-foreground" />
+              <div className="relative" ref={menuMesRef}>
+                <button
+                  type="button"
+                  onClick={() => setMenuMesAberto((v) => !v)}
+                  className="flex items-center space-x-2 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-muted/60"
+                >
+                  <LuCalendar className="h-4 w-4 text-muted-foreground" />
+                  <span>{rotuloMes}</span>
+                  <LuChevronDown className="ml-1 h-3 w-3 text-muted-foreground" />
+                </button>
+                {menuMesAberto && (
+                  <div className="absolute right-0 top-full z-50 mt-1.5 w-52 overflow-hidden rounded-xl border border-border bg-popover py-1 shadow-dropdown">
+                    {opcoesMes.map((o) => {
+                      const ativo = o.valor
+                        ? mesRef && mesRef.getFullYear() === o.valor.getFullYear() && mesRef.getMonth() === o.valor.getMonth()
+                        : !mesRef;
+                      return (
+                        <button
+                          key={o.rotulo}
+                          type="button"
+                          onClick={() => escolherMes(o.valor)}
+                          className={cn(
+                            "flex w-full items-center justify-between px-3.5 py-2 text-left text-xs transition-colors hover:bg-muted",
+                            ativo ? "font-semibold text-primary" : "text-foreground"
+                          )}
+                        >
+                          <span>{o.rotulo}</span>
+                          {ativo && <LuCheck className="h-3.5 w-3.5" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               <div className="flex rounded-lg border border-border bg-card p-0.5 text-xs font-medium text-muted-foreground shadow-sm">
                 {[
@@ -400,7 +489,7 @@ export default function DashboardPage() {
                   <button
                     key={o.value}
                     type="button"
-                    onClick={() => setPeriodo(o.value)}
+                    onClick={() => trocarPeriodo(o.value)}
                     className={cn(
                       "rounded px-2.5 py-1 transition-colors hover:text-foreground",
                       periodo === o.value ? "bg-primary font-semibold text-primary-foreground" : ""
@@ -440,10 +529,37 @@ export default function DashboardPage() {
             {/* Vendas vs Produção */}
             <div className="flex flex-col justify-between rounded-xl border border-border bg-card p-4 shadow-sm md:col-span-7 lg:col-span-5">
               <div className="mb-2 flex items-center justify-between">
-                <h3 className="text-xs font-bold text-foreground">Vendas vs Produção (últimos 6 meses)</h3>
-                <div className="flex cursor-pointer items-center space-x-1 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                  <span>Últimos 6 meses</span>
-                  <LuChevronDown className="h-2.5 w-2.5 text-muted-foreground" />
+                <h3 className="text-xs font-bold text-foreground">Vendas vs Produção (últimos {nMeses} meses)</h3>
+                <div className="relative" ref={menuGraficoRef}>
+                  <button
+                    type="button"
+                    onClick={() => setMenuGraficoAberto((v) => !v)}
+                    className="flex items-center space-x-1 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-muted"
+                  >
+                    <span>Últimos {nMeses} meses</span>
+                    <LuChevronDown className="h-2.5 w-2.5 text-muted-foreground" />
+                  </button>
+                  {menuGraficoAberto && (
+                    <div className="absolute right-0 top-full z-50 mt-1 w-40 overflow-hidden rounded-xl border border-border bg-popover py-1 shadow-dropdown">
+                      {opcoesGrafico.map((o) => (
+                        <button
+                          key={o.valor}
+                          type="button"
+                          onClick={() => {
+                            setNMeses(o.valor);
+                            setMenuGraficoAberto(false);
+                          }}
+                          className={cn(
+                            "flex w-full items-center justify-between px-3.5 py-2 text-left text-[11px] transition-colors hover:bg-muted",
+                            nMeses === o.valor ? "font-semibold text-primary" : "text-foreground"
+                          )}
+                        >
+                          <span>{o.rotulo}</span>
+                          {nMeses === o.valor && <LuCheck className="h-3.5 w-3.5" />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="relative mt-2 h-44 w-full">

@@ -25,7 +25,6 @@ import {
   LuOctagonAlert,
   LuTriangleAlert,
   LuInfo,
-  LuMessageCircle,
 } from "react-icons/lu";
 
 const ICONE_NIVEL = {
@@ -147,10 +146,6 @@ export default function TopBar({ onOpenMenu = () => {}, onToggleColapso = () => 
           className={cn(iconBtn, "md:hidden")}
         >
           <LuSearch className="h-[18px] w-[18px]" />
-        </button>
-
-        <button aria-label="Mensagens" className="hidden p-1 text-muted-foreground transition-colors hover:text-foreground sm:block">
-          <LuMessageCircle className="h-5 w-5" />
         </button>
 
         {/* Notificações */}
