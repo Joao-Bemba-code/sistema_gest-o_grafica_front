@@ -111,7 +111,7 @@ export default function NovoMaterialPage() {
 
           <div className="text-center">
             <p className="text-lg font-extrabold text-foreground truncate">{form.nome || "Novo Material"}</p>
-            <p className="text-xs font-mono text-primary">{form.codigo || "SEM-CÓDIGO"}</p>
+            <p className="text-xs font-mono text-primary">{form.codigo || "A GERAR"}</p>
           </div>
 
           <div>

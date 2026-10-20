@@ -159,8 +159,14 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
       <div role="tabpanel" id={`${formId}-painel-${tabAtiva}`} aria-labelledby={id(`tab-${tabAtiva}`)} className="animate-fade-up">
         {tabAtiva === "identificacao" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Campo label="Código" obrigatorio>
-              <input required aria-required="true" value={form.codigo} onChange={(e) => onChange("codigo", e.target.value)} className={inputCls} placeholder="Ex: PAP-0001" />
+            <Campo label="Código">
+              <input
+                value={form.codigo}
+                readOnly
+                disabled
+                className={`${inputCls} bg-muted/60 cursor-not-allowed`}
+                placeholder="Gerado automaticamente (K + categoria)"
+              />
             </Campo>
             <Campo label="Nome" obrigatorio>
               <input required aria-required="true" value={form.nome} onChange={(e) => onChange("nome", e.target.value)} className={inputCls} placeholder="Ex: Papel Couché 150g A3" />
