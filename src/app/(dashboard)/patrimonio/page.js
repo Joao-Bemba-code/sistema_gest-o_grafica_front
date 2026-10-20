@@ -32,13 +32,28 @@ import { podeAtual } from "@/lib/permissoes";
 const ESTADOS = {
   ativo: { label: "Em uso", tom: "neutral", badge: "bg-emerald-50 text-emerald-600" },
   manutencao: { label: "Em manutenção", tom: "neutral", badge: "bg-red-50 text-red-600" },
+  avariado: { label: "Avariado", tom: "neutral", badge: "bg-amber-50 text-amber-700" },
   abate: { label: "Abatido", tom: "neutral", badge: "bg-slate-100 text-slate-600" },
 };
 
 const OPCOES_ESTADO = [
   { valor: "ativo", label: "Em uso" },
   { valor: "manutencao", label: "Em manutenção" },
+  { valor: "avariado", label: "Avariado" },
   { valor: "abate", label: "Abatido" },
+];
+
+const CATEGORIAS_PADRAO = [
+  "Maquinaria e Equipamento Industrial",
+  "Equipamentos Informáticos",
+  "Equipamento Administrativo",
+  "Logística e Movimentação",
+  "Ferramentas e Instrumentais",
+  "Segurança e Proteção",
+  "Instalações e Benfeitorias",
+  "Comunicação",
+  "Activos Intangíveis",
+  "Outros Activos",
 ];
 
 const CATEGORIA_ICONE = {
@@ -46,13 +61,20 @@ const CATEGORIA_ICONE = {
   equipamento: "precision_manufacturing",
   mobiliario: "chair",
   "mobiliário": "chair",
-  mobília: "chair",
   ferramentas: "handyman",
   ferramenta: "handyman",
   veiculos: "local_shipping",
   "veículos": "local_shipping",
-  veiculo: "local_shipping",
-  "veículo": "local_shipping",
+  "maquinaria e equipamento industrial": "precision_manufacturing",
+  "equipamentos informáticos": "devices",
+  "equipamento administrativo": "chair",
+  "logística e movimentação": "local_shipping",
+  "ferramentas e instrumentais": "handyman",
+  "segurança e proteção": "shield",
+  "instalações e benfeitorias": "apartment",
+  "comunicação": "chat",
+  "activos intangíveis": "bolt",
+  "outros activos": "category",
 };
 
 // Vida útil estimada usada no cálculo da depreciação (método linear).
@@ -86,6 +108,10 @@ function bemParaForm(bem) {
     codigo: bem?.codigo || "",
     nome: bem?.nome || "",
     categoria: bem?.categoria || "",
+    familia: bem?.familia || "",
+    subfamilia: bem?.subfamilia || "",
+    grupo: bem?.grupo || "",
+    tipo: bem?.tipo || "",
     valor_aquisicao: bem?.valor_aquisicao ?? "",
     data_aquisicao: bem?.data_aquisicao || "",
     estado: bem?.estado || "ativo",
@@ -94,7 +120,7 @@ function bemParaForm(bem) {
   };
 }
 
-function BemModal({ open, bem, guardando, onClose, onConfirm }) {
+function BemModal({ open, bem, categorias, familias, subfamilias, guardando, onClose, onConfirm }) {
   const [form, setForm] = useState(() => bemParaForm(bem));
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -129,13 +155,53 @@ function BemModal({ open, bem, guardando, onClose, onConfirm }) {
       }
     >
       <form id="bem-form" onSubmit={submeter} className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-        <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-semibold text-muted-foreground">Código</span>
-          <input className={inputCls} value={form.codigo} onChange={(e) => set("codigo", e.target.value)} placeholder="Ex.: BEM-001" />
-        </label>
+        {bem ? (
+          <label className="flex flex-col gap-1">
+            <span className="text-[11px] font-semibold text-muted-foreground">Código</span>
+            <input className={inputCls} value={form.codigo} disabled readOnly />
+          </label>
+        ) : (
+          <div className="flex flex-col gap-1">
+            <span className="text-[11px] font-semibold text-muted-foreground">Código</span>
+            <div className="flex h-11 items-center rounded-lg border border-dashed border-border bg-muted/40 px-3 text-sm text-muted-foreground">
+              Gerado automaticamente (ex.: KPAT-MEI-0001)
+            </div>
+          </div>
+        )}
         <label className="flex flex-col gap-1">
           <span className="text-[11px] font-semibold text-muted-foreground">Categoria</span>
-          <input className={inputCls} value={form.categoria} onChange={(e) => set("categoria", e.target.value)} placeholder="Ex.: Equipamentos, Mobiliário, Veículos" />
+          <input list="bem-categorias" className={inputCls} value={form.categoria} onChange={(e) => set("categoria", e.target.value)} placeholder="Escreva ou escolha uma existente" />
+          <datalist id="bem-categorias">
+            {categorias.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] font-semibold text-muted-foreground">Família</span>
+          <input list="bem-familias" className={inputCls} value={form.familia} onChange={(e) => set("familia", e.target.value)} placeholder="Escreva ou escolha uma existente" />
+          <datalist id="bem-familias">
+            {familias.map((f) => (
+              <option key={f} value={f} />
+            ))}
+          </datalist>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] font-semibold text-muted-foreground">Subfamília</span>
+          <input list="bem-subfamilias" className={inputCls} value={form.subfamilia} onChange={(e) => set("subfamilia", e.target.value)} placeholder="Escreva ou escolha uma existente" />
+          <datalist id="bem-subfamilias">
+            {subfamilias.map((s) => (
+              <option key={s} value={s} />
+            ))}
+          </datalist>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] font-semibold text-muted-foreground">Grupo</span>
+          <input className={inputCls} value={form.grupo} onChange={(e) => set("grupo", e.target.value)} placeholder="Ex.: Produção" />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] font-semibold text-muted-foreground">Tipo</span>
+          <input className={inputCls} value={form.tipo} onChange={(e) => set("tipo", e.target.value)} placeholder="Ex.: Digital" />
         </label>
         <label className="flex flex-col gap-1 sm:col-span-2">
           <span className="text-[11px] font-semibold text-muted-foreground">Descrição</span>
@@ -215,6 +281,24 @@ export default function PatrimonioPage() {
     return [...set].sort((a, b) => a.localeCompare(b, "pt"));
   }, [bens]);
 
+  const familias = useMemo(() => {
+    const set = new Set();
+    bens.forEach((b) => {
+      const f = String(b.familia || "").trim();
+      if (f) set.add(f);
+    });
+    return [...set].sort((a, b) => a.localeCompare(b, "pt"));
+  }, [bens]);
+
+  const subfamilias = useMemo(() => {
+    const set = new Set();
+    bens.forEach((b) => {
+      const s = String(b.subfamilia || "").trim();
+      if (s) set.add(s);
+    });
+    return [...set].sort((a, b) => a.localeCompare(b, "pt"));
+  }, [bens]);
+
   const totalValor = useMemo(() => bens.reduce((s, b) => s + toNum(b.valor_aquisicao), 0), [bens]);
   const emUso = useMemo(() => bens.filter((b) => b.estado === "ativo").length, [bens]);
   const emManutencao = useMemo(() => bens.filter((b) => b.estado === "manutencao").length, [bens]);
@@ -234,13 +318,13 @@ export default function PatrimonioPage() {
 
   const { visiveis, ...pag } = usePaginacao({ items: filtrados });
 
-  const tabs = useMemo(
-    () => [
-      { id: "", label: "Todos", icon: "category" },
-      ...categorias.map((c) => ({ id: c, label: tituloCategoria(c), icon: iconeCategoria(c) })),
-    ],
-    [categorias]
-  );
+  const tabs = useMemo(() => {
+    const padrao = CATEGORIAS_PADRAO.map((c) => ({ id: c, label: tituloCategoria(c), icon: iconeCategoria(c) }));
+    const extras = categorias
+      .filter((c) => !CATEGORIAS_PADRAO.includes(c))
+      .map((c) => ({ id: c, label: tituloCategoria(c), icon: iconeCategoria(c) }));
+    return [{ id: "", label: "Todos", icon: "category" }, ...padrao, ...extras];
+  }, [categorias]);
 
   const kpis = useMemo(
     () => [
@@ -412,6 +496,22 @@ export default function PatrimonioPage() {
 
         <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2.5">
           <select
+            value={categoriaAtiva}
+            onChange={(e) => setCategoriaAtiva(e.target.value)}
+            aria-label="Filtrar por categoria"
+            className="h-8 rounded-lg border border-border bg-card px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary/25 cursor-pointer"
+          >
+            <option value="">Todas as categorias</option>
+            {CATEGORIAS_PADRAO.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+            {categorias
+              .filter((c) => !CATEGORIAS_PADRAO.includes(c))
+              .map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+          </select>
+          <select
             value={estadoFiltro}
             onChange={(e) => setEstadoFiltro(e.target.value)}
             aria-label="Filtrar por estado"
@@ -468,6 +568,7 @@ export default function PatrimonioPage() {
                     itens.push({ icone: "edit", rotulo: "Editar", onClick: () => abrirEditar(b) });
                     if (b.estado === "ativo") {
                       itens.push({ icone: "build", rotulo: "Marcar em manutenção", onClick: () => alterarEstado(b, "manutencao") });
+                      itens.push({ icone: "warning", rotulo: "Marcar avariado", onClick: () => alterarEstado(b, "avariado") });
                     } else {
                       itens.push({ icone: "check_circle", rotulo: "Marcar em uso", onClick: () => alterarEstado(b, "ativo") });
                     }
@@ -513,6 +614,9 @@ export default function PatrimonioPage() {
         key={`bem-${formModal.sessao}`}
         open={formModal.open}
         bem={formModal.bem}
+        categorias={categorias}
+        familias={familias}
+        subfamilias={subfamilias}
         guardando={formModal.aGuardar}
         onClose={() => setFormModal((s) => ({ ...s, open: false }))}
         onConfirm={guardar}
