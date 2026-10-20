@@ -25,9 +25,12 @@ import {
   criar as criarBem,
   atualizar as atualizarBem,
   remover as removerBem,
+  eliminarCategoria as eliminarCategoriaBem,
 } from "@/services/bens";
 import { formatKz, toNum, inputCls } from "@/lib/estoque";
 import { podeAtual } from "@/lib/permissoes";
+import { gerarFichaBemPDF } from "@/lib/patrimonioPdf";
+import { buscarOrganizacao } from "@/services/configuracoes";
 
 const ESTADOS = {
   ativo: { label: "Em uso", tom: "neutral", badge: "bg-emerald-50 text-emerald-600" },
@@ -88,7 +91,7 @@ const tabClsInativa = "border-transparent text-muted-foreground hover:text-foreg
 function tituloCategoria(c) {
   const s = String(c || "").trim();
   if (!s) return "Sem categoria";
-  return s.charAt(0).toUpperCase() + s.slice(1);
+  return s.toUpperCase();
 }
 
 function iconeCategoria(c) {
@@ -131,7 +134,7 @@ function BemModal({ open, bem, categorias, familias, subfamilias, guardando, onC
       ...form,
       codigo: form.codigo.trim(),
       nome: form.nome.trim(),
-      categoria: form.categoria.trim(),
+      categoria: form.categoria.trim().toUpperCase(),
       valor_aquisicao: toNum(form.valor_aquisicao),
       data_aquisicao: form.data_aquisicao || null,
     });
@@ -173,7 +176,7 @@ function BemModal({ open, bem, categorias, familias, subfamilias, guardando, onC
           <input list="bem-categorias" className={inputCls} value={form.categoria} onChange={(e) => set("categoria", e.target.value)} placeholder="Escreva ou escolha uma existente" />
           <datalist id="bem-categorias">
             {categorias.map((c) => (
-              <option key={c} value={c} />
+              <option key={c} value={tituloCategoria(c)} />
             ))}
           </datalist>
         </label>
@@ -246,7 +249,9 @@ export default function PatrimonioPage() {
   const [busca, setBusca] = useState("");
   const [formModal, setFormModal] = useState({ open: false, bem: null, sessao: 0, aGuardar: false });
   const [remocao, setRemocao] = useState({ open: false, bem: null, aRemover: false });
+  const [removerCategoria, setRemoverCategoria] = useState({ open: false, categoria: "", aRemover: false });
   const [infoTipo, setInfoTipo] = useState("");
+  const [org, setOrg] = useState({});
 
   const recarregar = useCallback(async () => {
     try {
@@ -261,12 +266,29 @@ export default function PatrimonioPage() {
     let activo = true;
     (async () => {
       await recarregar();
+      try {
+        const o = await buscarOrganizacao();
+        if (activo && o) setOrg(o);
+      } catch {
+        // sem organização carregada, o PDF usa o cabeçalho padrão
+      }
       if (activo) setCarregando(false);
     })();
     return () => {
       activo = false;
     };
   }, [recarregar]);
+
+  const gerarPdfBem = useCallback(
+    async (b) => {
+      try {
+        await gerarFichaBemPDF(b, org);
+      } catch {
+        addToast("Erro ao gerar o PDF do bem", "error");
+      }
+    },
+    [org, addToast]
+  );
 
   const podeCriar = podeAtual("patrimonio", "criar");
   const podeEditar = podeAtual("patrimonio", "editar");
@@ -280,6 +302,18 @@ export default function PatrimonioPage() {
     });
     return [...set].sort((a, b) => a.localeCompare(b, "pt"));
   }, [bens]);
+
+  const todasCategorias = useMemo(() => {
+    const vistas = new Set(CATEGORIAS_PADRAO.map((c) => c.toLowerCase()));
+    const lista = [...CATEGORIAS_PADRAO];
+    categorias.forEach((c) => {
+      if (!vistas.has(c.toLowerCase())) {
+        lista.push(c);
+        vistas.add(c.toLowerCase());
+      }
+    });
+    return lista.sort((a, b) => a.localeCompare(b, "pt"));
+  }, [categorias]);
 
   const familias = useMemo(() => {
     const set = new Set();
@@ -306,7 +340,7 @@ export default function PatrimonioPage() {
   const termo = busca.trim().toLowerCase();
   const filtrados = useMemo(() => {
     return bens.filter((b) => {
-      if (categoriaAtiva && String(b.categoria || "").trim() !== categoriaAtiva) return false;
+      if (categoriaAtiva && String(b.categoria || "").trim().toLowerCase() !== categoriaAtiva.toLowerCase()) return false;
       if (estadoFiltro && b.estado !== estadoFiltro) return false;
       if (termo) {
         const alvo = `${b.codigo || ""} ${b.nome || ""} ${b.categoria || ""} ${b.localizacao || ""}`.toLowerCase();
@@ -319,12 +353,16 @@ export default function PatrimonioPage() {
   const { visiveis, ...pag } = usePaginacao({ items: filtrados });
 
   const tabs = useMemo(() => {
-    const padrao = CATEGORIAS_PADRAO.map((c) => ({ id: c, label: tituloCategoria(c), icon: iconeCategoria(c) }));
-    const extras = categorias
-      .filter((c) => !CATEGORIAS_PADRAO.includes(c))
-      .map((c) => ({ id: c, label: tituloCategoria(c), icon: iconeCategoria(c) }));
-    return [{ id: "", label: "Todos", icon: "category" }, ...padrao, ...extras];
-  }, [categorias]);
+    return [
+      { id: "", label: "Todos", icon: "category", extra: false },
+      ...todasCategorias.map((c) => ({
+        id: c,
+        label: tituloCategoria(c),
+        icon: iconeCategoria(c),
+        extra: !CATEGORIAS_PADRAO.some((p) => p.toLowerCase() === c.toLowerCase()),
+      })),
+    ];
+  }, [todasCategorias]);
 
   const kpis = useMemo(
     () => [
@@ -415,6 +453,22 @@ export default function PatrimonioPage() {
     }
   }, [remocao.bem, recarregar, addToast]);
 
+  const confirmarRemoverCategoria = useCallback(async () => {
+    const cat = removerCategoria.categoria;
+    if (!cat) return;
+    setRemoverCategoria((s) => ({ ...s, aRemover: true }));
+    try {
+      await eliminarCategoriaBem(cat);
+      await recarregar();
+      setCategoriaAtiva((c) => (c.toLowerCase() === cat.toLowerCase() ? "" : c));
+      addToast("Categoria eliminada com sucesso", "success");
+      setRemoverCategoria({ open: false, categoria: "", aRemover: false });
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao eliminar a categoria", "error");
+      setRemoverCategoria((s) => ({ ...s, aRemover: false }));
+    }
+  }, [removerCategoria.categoria, recarregar, addToast]);
+
   const filtrarManutencao = useCallback(() => {
     setCategoriaAtiva("");
     setEstadoFiltro("manutencao");
@@ -486,10 +540,24 @@ export default function PatrimonioPage() {
               key={t.id || "todos"}
               type="button"
               onClick={() => setCategoriaAtiva(t.id)}
-              aria-pressed={categoriaAtiva === t.id}
-              className={`${tabClsBase} ${categoriaAtiva === t.id ? tabClsAtiva : tabClsInativa}`}
+              aria-pressed={categoriaAtiva.toLowerCase() === t.id.toLowerCase()}
+              className={`${tabClsBase} ${categoriaAtiva.toLowerCase() === t.id.toLowerCase() ? tabClsAtiva : tabClsInativa}`}
             >
               <Icon name={t.icon} className="text-base" /> {t.label}
+              {t.extra && podeEliminar && (
+                <span
+                  role="button"
+                  tabIndex={-1}
+                  title={`Eliminar a categoria "${t.label}"`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setRemoverCategoria({ open: true, categoria: t.id, aRemover: false });
+                  }}
+                  className="ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-error"
+                >
+                  <Icon name="close" className="text-[13px]" />
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -502,14 +570,9 @@ export default function PatrimonioPage() {
             className="h-8 rounded-lg border border-border bg-card px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary/25 cursor-pointer"
           >
             <option value="">Todas as categorias</option>
-            {CATEGORIAS_PADRAO.map((c) => (
-              <option key={c} value={c}>{c}</option>
+            {todasCategorias.map((c) => (
+              <option key={c} value={c}>{tituloCategoria(c)}</option>
             ))}
-            {categorias
-              .filter((c) => !CATEGORIAS_PADRAO.includes(c))
-              .map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
           </select>
           <select
             value={estadoFiltro}
@@ -564,6 +627,7 @@ export default function PatrimonioPage() {
                 {visiveis.map((b) => {
                   const st = ESTADOS[b.estado] || ESTADOS.ativo;
                   const itens = [];
+                  itens.push({ icone: "picture_as_pdf", rotulo: "Gerar PDF", onClick: () => gerarPdfBem(b) });
                   if (podeEditar) {
                     itens.push({ icone: "edit", rotulo: "Editar", onClick: () => abrirEditar(b) });
                     if (b.estado === "ativo") {
@@ -588,7 +652,7 @@ export default function PatrimonioPage() {
                       <LedgerTd className="max-w-64">
                         <span className="block truncate">{b.nome}</span>
                       </LedgerTd>
-                      <LedgerTd className="whitespace-nowrap text-muted-foreground">{b.categoria || "—"}</LedgerTd>
+                      <LedgerTd className="whitespace-nowrap text-muted-foreground">{b.categoria ? String(b.categoria).toUpperCase() : "—"}</LedgerTd>
                       <LedgerTd>
                         <StatusBadge tom={st.tom} className={st.badge}>{st.label}</StatusBadge>
                       </LedgerTd>
@@ -614,7 +678,7 @@ export default function PatrimonioPage() {
         key={`bem-${formModal.sessao}`}
         open={formModal.open}
         bem={formModal.bem}
-        categorias={categorias}
+        categorias={todasCategorias}
         familias={familias}
         subfamilias={subfamilias}
         guardando={formModal.aGuardar}
@@ -629,6 +693,15 @@ export default function PatrimonioPage() {
         loading={remocao.aRemover}
         title="Eliminar bem"
         description={remocao.bem ? `Tem a certeza que deseja eliminar "${remocao.bem.nome}"?` : ""}
+      />
+
+      <ConfirmDialog
+        open={removerCategoria.open}
+        onClose={() => setRemoverCategoria({ open: false, categoria: "", aRemover: false })}
+        onConfirm={confirmarRemoverCategoria}
+        loading={removerCategoria.aRemover}
+        title="Eliminar categoria"
+        description={removerCategoria.categoria ? `Tem a certeza que deseja eliminar a categoria "${String(removerCategoria.categoria).toUpperCase()}"? Os bens desta categoria ficam sem categoria.` : ""}
       />
 
       <Modal

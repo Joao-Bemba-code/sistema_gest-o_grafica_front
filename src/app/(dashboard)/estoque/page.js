@@ -126,6 +126,7 @@ export default function EstoquePage() {
   const [filtrosAbertos, setFiltrosAbertos] = useState(true);
   const [tipoFiltro, setTipoFiltro] = useState("todos");
   const [subFiltro, setSubFiltro] = useState("todas");
+  const [categoriaFiltro, setCategoriaFiltro] = useState("");
   const [mov, setMov] = useState({ open: false, item: null, tipo: "entrada" });
   const [movSessao, setMovSessao] = useState(0);
   const [edit, setEdit] = useState({ open: false, item: null });
@@ -197,10 +198,29 @@ export default function EstoquePage() {
     return [...metas.values()];
   }, [categorias, tipoFiltro]);
 
+  const nomesCategorias = useMemo(() => {
+    const nomes = new Set();
+    categorias.forEach((c) => {
+      const n = String(c.nome || "").trim();
+      if (n) nomes.add(n);
+    });
+    materiais.forEach((m) => {
+      const n = String(nomeCategoriaDe(m) || "").trim();
+      if (n) nomes.add(n);
+    });
+    return [...nomes].sort((a, b) => a.localeCompare(b, "pt"));
+  }, [categorias, materiais]);
+
   const visiveis = useMemo(() => {
-    if (!subFiltro || subFiltro === "todas") return filtrados;
-    return filtrados.filter((i) => normalizarFamilia(familiaDe(i)) === subFiltro);
-  }, [filtrados, subFiltro]);
+    let res = filtrados;
+    if (subFiltro && subFiltro !== "todas") {
+      res = res.filter((i) => normalizarFamilia(familiaDe(i)) === subFiltro);
+    }
+    if (categoriaFiltro) {
+      res = res.filter((i) => String(nomeCategoriaDe(i) || "").trim() === categoriaFiltro);
+    }
+    return res;
+  }, [filtrados, subFiltro, categoriaFiltro]);
 
   const { visiveis: paginaVisiveis, ...pag } = usePaginacao({ items: visiveis });
 
@@ -491,6 +511,19 @@ export default function EstoquePage() {
               <span className="text-[11px] font-medium text-muted-foreground">{contagensTipo[t.value] ?? 0}</span>
             </button>
           ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2">
+          <select
+            value={categoriaFiltro}
+            onChange={(e) => setCategoriaFiltro(e.target.value)}
+            aria-label="Filtrar por categoria"
+            className="h-8 rounded-lg border border-border bg-card px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary/25 cursor-pointer"
+          >
+            <option value="">Todas as categorias</option>
+            {nomesCategorias.map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
         </div>
         {filtrosAbertos && (
           <FilterRow

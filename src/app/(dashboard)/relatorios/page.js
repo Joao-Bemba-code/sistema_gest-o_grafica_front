@@ -14,6 +14,9 @@ import { listar } from "@/services/clientes";
 import { listar as listarFaturas } from "@/services/faturacao";
 import { listar as listarMateriais } from "@/services/materiais";
 import { listar as listarCategorias } from "@/services/categorias";
+import { listar as listarBens } from "@/services/bens";
+import { listar as listarPedidos } from "@/services/pedidos";
+import { listar as listarUsuarios } from "@/services/usuarios";
 import { resumoTesouraria } from "@/services/tesouraria";
 import { gerarRelatorioStockPDF, gerarRelatorioCadastrosPDF, gerarRelatorioCategoriasPDF, gerarRelatorioFaturacoesPDF, gerarRelatorioProducaoPDF } from "@/lib/estoquePdf";
 import { exportarRelatorioExcel, exportarRelatorioPDF } from "@/lib/relatoriosExport";
@@ -69,6 +72,22 @@ const ESTADOS_ORDEM = [
   { value: "entregue", label: "Entregue", cor: "#a855f7", icon: "local_shipping" },
 ];
 
+const ESTADOS_BEM = [
+  { value: "ativo", label: "Em uso", cor: "#047857", icon: "check_circle" },
+  { value: "manutencao", label: "Em manutenção", cor: "#b45309", icon: "build" },
+  { value: "avariado", label: "Avariado", cor: "#b91c1c", icon: "warning" },
+  { value: "abate", label: "Abatido", cor: "#64748b", icon: "block" },
+];
+
+const ESTADOS_PEDIDO = [
+  { value: "pendente", label: "Pendente", cor: "#f59e0b", icon: "schedule" },
+  { value: "aprovado", label: "Aprovado", cor: "#4338ca", icon: "check_circle" },
+  { value: "enviado", label: "Enviado", cor: "#0ea5e9", icon: "local_shipping" },
+  { value: "recebido", label: "Recebido", cor: "#047857", icon: "inventory_2" },
+  { value: "rejeitado", label: "Rejeitado", cor: "#b91c1c", icon: "block" },
+  { value: "cancelado", label: "Cancelado", cor: "#64748b", icon: "close" },
+];
+
 const STATUS_MATERIAL = [
   { value: "ok", label: "Saudável", cor: "#047857", icon: "check_circle" },
   { value: "repor", label: "Abaixo do mínimo", cor: "#b45309", icon: "warning" },
@@ -81,8 +100,11 @@ const MODULOS_REL = [
   { value: "comercial", label: "Comercial", icon: "trending_up" },
   { value: "producao", label: "Produção", icon: "precision_manufacturing" },
   { value: "stocks", label: "Stocks", icon: "inventory_2" },
+  { value: "compras", label: "Compras", icon: "add_shopping_cart" },
   { value: "financeiro", label: "Financeiro", icon: "account_balance" },
   { value: "tesouraria", label: "Tesouraria", icon: "savings" },
+  { value: "patrimonio", label: "Património", icon: "apartment" },
+  { value: "rh", label: "Recursos Humanos", icon: "groups" },
 ];
 
 const tabClsBase =
@@ -237,6 +259,9 @@ export default function RelatoriosPage() {
   const [faturas, setFaturas] = useState([]);
   const [materiais, setMateriais] = useState([]);
   const [categorias, setCategorias] = useState([]);
+  const [bens, setBens] = useState([]);
+  const [pedidos, setPedidos] = useState([]);
+  const [usuarios, setUsuarios] = useState([]);
   const [org, setOrg] = useState({});
   const [periodo, setPeriodo] = useState(getUltimos6Meses()[5].labelCurto);
   const [aba, setAba] = useState("comercial");
@@ -257,20 +282,26 @@ export default function RelatoriosPage() {
   const carregarDados = useCallback(async () => {
     setLoading(true);
     try {
-      const [ords, clis, fats, mats, cats, o, tes] = await Promise.all([
+      const [ords, clis, fats, mats, cats, o, tes, bs, peds, usrs] = await Promise.all([
         listarOrdens(),
         listar(),
         listarFaturas(),
         listarMateriais(),
         listarCategorias(),
         buscarOrganizacao(),
-        resumoTesouraria().catch(() => null)
+        resumoTesouraria().catch(() => null),
+        listarBens().catch(() => []),
+        listarPedidos().catch(() => []),
+        listarUsuarios().catch(() => []),
       ]);
       setOrdens(Array.isArray(ords) ? ords : ords?.ordens || []);
       setClientes(Array.isArray(clis) ? clis : clis?.data || []);
       setFaturas(Array.isArray(fats) ? fats : fats?.data || []);
       setMateriais(Array.isArray(mats) ? mats : []);
       setCategorias(Array.isArray(cats) ? cats : []);
+      setBens(Array.isArray(bs) ? bs : bs?.data || []);
+      setPedidos(Array.isArray(peds) ? peds : peds?.data || []);
+      setUsuarios(Array.isArray(usrs) ? usrs : usrs?.data || []);
       setOrg(o || {});
       setTesouraria(tes || null);
     } catch (err) {
@@ -485,6 +516,60 @@ export default function RelatoriosPage() {
     [tesouraria]
   );
 
+  const bensPorCategoria = useMemo(() => {
+    const m = {};
+    bens.forEach((b) => {
+      const c = String(b.categoria || "Sem categoria").trim();
+      if (!m[c]) m[c] = { nome: c, itens: 0, valor: 0 };
+      m[c].itens += 1;
+      m[c].valor += toNum(b.valor_aquisicao);
+    });
+    return Object.values(m).sort((a, b) => b.valor - a.valor);
+  }, [bens]);
+
+  const bensPorEstado = useMemo(() => {
+    const m = {};
+    bens.forEach((b) => { const e = b.estado || "ativo"; m[e] = (m[e] || 0) + 1; });
+    return m;
+  }, [bens]);
+
+  const pedidosPorEstado = useMemo(() => {
+    const m = {};
+    pedidos.forEach((p) => { const e = p.estado || p.status || "pendente"; m[e] = (m[e] || 0) + 1; });
+    return m;
+  }, [pedidos]);
+
+  const comprasPorMes = useMemo(() => {
+    const hoje = new Date();
+    const mesesIndices = ultimosMeses.map((m) => m.mes);
+    const counts = ultimosMeses.map((m) => ({ mes: m.mes, label: m.label, valor: 0, quantidade: 0 }));
+    pedidos.forEach((p) => {
+      const raw = p.data_pedido || p.createdAt || p.data;
+      const d = raw ? new Date(raw) : null;
+      if (d && !isNaN(d.getTime()) && d.getFullYear() === hoje.getFullYear() && mesesIndices.includes(d.getMonth())) {
+        const idx = ultimosMeses.findIndex((m) => m.mes === d.getMonth());
+        counts[idx].valor += toNum(p.total);
+        counts[idx].quantidade += 1;
+      }
+    });
+    return counts;
+  }, [pedidos, ultimosMeses]);
+
+  const usuariosPorPerfil = useMemo(() => {
+    const m = {};
+    usuarios.forEach((u) => { const p = u.perfil?.nome || u.perfil || u.funcao || "Sem perfil"; m[p] = (m[p] || 0) + 1; });
+    return Object.entries(m).map(([nome, qtd]) => ({ nome, qtd })).sort((a, b) => b.qtd - a.qtd);
+  }, [usuarios]);
+
+  const usuariosAtivos = useMemo(
+    () => usuarios.filter((u) => u.ativo !== false).length,
+    [usuarios]
+  );
+  const usuariosInativos = useMemo(
+    () => usuarios.filter((u) => u.ativo === false).length,
+    [usuarios]
+  );
+
   const relatorios = useMemo(() => {
     const texto = (r, v) => (r.formato || ((x) => String(Math.round(Number(x) || 0))))(v);
     const mk = (r) => ({
@@ -622,6 +707,29 @@ export default function RelatoriosPage() {
           colunas: ["Estado", "Materiais"], linhas: matStatusSerie.map((x) => [x.label, x.valor]),
         }),
       ],
+      compras: [
+        mk({
+          id: "pedidos-mes", titulo: "Pedidos de compra por mês", icon: "add_shopping_cart",
+          sub: "Pedidos de compra registados nos últimos 6 meses.",
+          serie: comprasPorMes.map((m) => ({ label: m.label, valor: m.quantidade })),
+          total: pedidos.length, variacao: variacaoDe(comprasPorMes.map((m) => ({ valor: m.quantidade }))),
+          colunas: ["Período", "Pedidos"], linhas: comprasPorMes.map((m) => [m.label, m.quantidade]),
+        }),
+        mk({
+          id: "compras-valor", titulo: "Valor de compras por mês", icon: "payments",
+          sub: "Valor dos pedidos de compra nos últimos 6 meses.",
+          serie: comprasPorMes.map((m) => ({ label: m.label, valor: m.valor })),
+          total: comprasPorMes.reduce((s, m) => s + m.valor, 0), variacao: variacaoDe(comprasPorMes.map((m) => ({ valor: m.valor }))), formato: fmtKz, formatoAxis: compactKz,
+          colunas: ["Período", "Valor"], linhas: comprasPorMes.map((m) => [m.label, fmtKz(m.valor)]),
+        }),
+        mk({
+          id: "pedidos-estado", titulo: "Pedidos por estado", icon: "description",
+          sub: "Distribuição dos pedidos de compra por estado.",
+          serie: ESTADOS_PEDIDO.map((s) => ({ label: s.label, valor: pedidosPorEstado[s.value] || 0 })),
+          total: pedidos.length,
+          colunas: ["Estado", "Pedidos"], linhas: ESTADOS_PEDIDO.map((s) => [s.label, pedidosPorEstado[s.value] || 0]),
+        }),
+      ],
       financeiro: [
         mk({
           id: "faturacao", titulo: "Faturação emitida", icon: "receipt_long",
@@ -668,13 +776,56 @@ export default function RelatoriosPage() {
           colunas: ["Conta", "Saldo"], linhas: contasSerie.map((x) => [x.label, fmtKz(x.valor)]),
         }),
       ],
+      patrimonio: [
+        mk({
+          id: "bens-categoria", titulo: "Bens por categoria", icon: "category",
+          sub: "Número de bens patrimoniais por categoria.",
+          serie: bensPorCategoria.map((c) => ({ label: c.nome, valor: c.itens })),
+          total: bens.length,
+          colunas: ["Categoria", "Bens", "Valor"], linhas: bensPorCategoria.map((c) => [c.nome, c.itens, fmtKz(c.valor)]),
+        }),
+        mk({
+          id: "valor-categoria", titulo: "Valor patrimonial por categoria", icon: "account_balance_wallet",
+          sub: "Valor de aquisição acumulado por categoria.",
+          serie: bensPorCategoria.map((c) => ({ label: c.nome, valor: c.valor })),
+          total: bensPorCategoria.reduce((s, c) => s + c.valor, 0), formato: fmtKz, formatoAxis: compactKz,
+          colunas: ["Categoria", "Valor"], linhas: bensPorCategoria.map((c) => [c.nome, fmtKz(c.valor)]),
+        }),
+        mk({
+          id: "bens-estado", titulo: "Bens por estado", icon: "verified",
+          sub: "Distribuição dos bens patrimoniais por estado.",
+          serie: ESTADOS_BEM.map((s) => ({ label: s.label, valor: bensPorEstado[s.value] || 0 })),
+          total: bens.length,
+          colunas: ["Estado", "Bens"], linhas: ESTADOS_BEM.map((s) => [s.label, bensPorEstado[s.value] || 0]),
+        }),
+      ],
+      rh: [
+        mk({
+          id: "utilizadores-perfil", titulo: "Utilizadores por perfil", icon: "groups",
+          sub: "Número de utilizadores por perfil de acesso.",
+          serie: usuariosPorPerfil.map((u) => ({ label: u.nome, valor: u.qtd })),
+          total: usuarios.length,
+          colunas: ["Perfil", "Utilizadores"], linhas: usuariosPorPerfil.map((u) => [u.nome, u.qtd]),
+        }),
+        mk({
+          id: "utilizadores-ativos", titulo: "Utilizadores ativos", icon: "verified",
+          sub: "Estado das contas dos utilizadores.",
+          serie: [
+            { label: "Ativos", valor: usuariosAtivos },
+            { label: "Inativos", valor: usuariosInativos },
+          ],
+          total: usuarios.length,
+          colunas: ["Estado", "Utilizadores"], linhas: [["Ativos", usuariosAtivos], ["Inativos", usuariosInativos]],
+        }),
+      ],
     };
 
     return porModulo[aba] || [];
   }, [
     aba, org, vendasPorMes, recebidoPorMes, clientesTop, producaoPorMes, opsPorStatus,
     ultimosMeses, categoriasStock, contagemStatusMaterial, contagemEstadosFatura, tesourariaPorMes,
-    contasTesouraria,
+    contasTesouraria, bens, bensPorCategoria, bensPorEstado, pedidos, pedidosPorEstado,
+    comprasPorMes, usuarios, usuariosPorPerfil, usuariosAtivos, usuariosInativos,
   ]);
 
   const relatorioAtivo = relatorios.find((r) => r.id === relatorioId) || relatorios[0] || null;
@@ -1434,6 +1585,196 @@ export default function RelatoriosPage() {
                 <Icon name="picture_as_pdf" className="text-sm" /> Exportar
               </button>
             </div>
+          </>
+        );
+      })()}
+
+      {aba === "patrimonio" && (() => {
+        const totalValorBens = bens.reduce((s, b) => s + toNum(b.valor_aquisicao), 0);
+        const labelEstado = (e) => ESTADOS_BEM.find((s) => s.value === e)?.label || e || "—";
+        return (
+          <>
+            <PainelFiltros
+              icon="filter_list"
+              titulo="Filtros de Património"
+              acoes={
+                <button
+                  type="button"
+                  onClick={() => exportarRelatorioPDF({
+                    titulo: "Relatório de Bens",
+                    org,
+                    cabecalhos: ["Código", "Nome", "Categoria", "Estado", "Valor de Aquisição"],
+                    linhas: bens.map((b) => [b.codigo || "—", b.nome, b.categoria || "—", labelEstado(b.estado), fmtKz(b.valor_aquisicao)]),
+                    resumo: [`Total de bens: ${bens.length}`, `Valor patrimonial: ${fmtKz(totalValorBens)}`],
+                  })}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                >
+                  <Icon name="picture_as_pdf" className="text-sm" /> Exportar PDF
+                </button>
+              }
+            >
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <KpiCard icon="category" label="Total de bens" value={bens.length} />
+                <KpiCard icon="account_balance_wallet" label="Valor patrimonial" value={fmtKz(totalValorBens)} />
+                <KpiCard icon="verified" label="Em uso" value={bensPorEstado.ativo || 0} />
+                <KpiCard icon="build" label="Manutenção/avariados" value={(bensPorEstado.manutencao || 0) + (bensPorEstado.avariado || 0)} />
+              </div>
+            </PainelFiltros>
+
+            <Ledger rotulo="Bens ledger">
+              <LedgerHeader titulo="Bens patrimoniais" subtitulo={`${bens.length} bens registados`} />
+              <LedgerTable>
+                <thead>
+                  <tr className="border-b border-border">
+                    <LedgerTh>Código</LedgerTh>
+                    <LedgerTh>Nome</LedgerTh>
+                    <LedgerTh>Categoria</LedgerTh>
+                    <LedgerTh>Estado</LedgerTh>
+                    <LedgerTh>Valor de Aquisição</LedgerTh>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bens.map((b) => (
+                    <LedgerTr key={b.id}>
+                      <LedgerTd className="font-mono text-xs whitespace-nowrap">{b.codigo || "—"}</LedgerTd>
+                      <LedgerTd>{b.nome}</LedgerTd>
+                      <LedgerTd className="whitespace-nowrap text-muted-foreground">{b.categoria || "—"}</LedgerTd>
+                      <LedgerTd>
+                        <StatusBadge>{labelEstado(b.estado)}</StatusBadge>
+                      </LedgerTd>
+                      <LedgerTd className="tabular-nums">{fmtKz(b.valor_aquisicao)}</LedgerTd>
+                    </LedgerTr>
+                  ))}
+                </tbody>
+              </LedgerTable>
+              {bens.length === 0 && <LedgerEmpty icone="category">Nenhum bem patrimonial registado</LedgerEmpty>}
+            </Ledger>
+          </>
+        );
+      })()}
+
+      {aba === "compras" && (() => {
+        const totalCompras = pedidos.reduce((s, p) => s + toNum(p.total), 0);
+        const labelEstado = (e) => ESTADOS_PEDIDO.find((s) => s.value === e)?.label || e || "—";
+        return (
+          <>
+            <PainelFiltros
+              icon="filter_list"
+              titulo="Filtros de Compras"
+              acoes={
+                <button
+                  type="button"
+                  onClick={() => exportarRelatorioPDF({
+                    titulo: "Relatório de Compras",
+                    org,
+                    cabecalhos: ["Número", "Fornecedor", "Estado", "Data", "Total"],
+                    linhas: pedidos.map((p) => [p.numero || `#${p.id}`, p.fornecedor_nome || "—", labelEstado(p.estado), p.data_pedido ? new Date(p.data_pedido).toLocaleDateString("pt-AO") : "—", fmtKz(p.total)]),
+                    resumo: [`Total de pedidos: ${pedidos.length}`, `Valor de compras: ${fmtKz(totalCompras)}`],
+                  })}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                >
+                  <Icon name="picture_as_pdf" className="text-sm" /> Exportar PDF
+                </button>
+              }
+            >
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <KpiCard icon="add_shopping_cart" label="Pedidos" value={pedidos.length} />
+                <KpiCard icon="payments" label="Valor de compras" value={fmtKz(totalCompras)} />
+                <KpiCard icon="schedule" label="Pendentes" value={pedidosPorEstado.pendente || 0} />
+                <KpiCard icon="inventory_2" label="Recebidos" value={pedidosPorEstado.recebido || 0} />
+              </div>
+            </PainelFiltros>
+
+            <Ledger rotulo="Pedidos ledger">
+              <LedgerHeader titulo="Pedidos de compra" subtitulo={`${pedidos.length} pedidos registados`} />
+              <LedgerTable>
+                <thead>
+                  <tr className="border-b border-border">
+                    <LedgerTh>Número</LedgerTh>
+                    <LedgerTh>Fornecedor</LedgerTh>
+                    <LedgerTh>Estado</LedgerTh>
+                    <LedgerTh>Data</LedgerTh>
+                    <LedgerTh>Total</LedgerTh>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pedidos.map((p) => (
+                    <LedgerTr key={p.id}>
+                      <LedgerTd className="font-mono text-xs whitespace-nowrap">{p.numero || `#${p.id}`}</LedgerTd>
+                      <LedgerTd>{p.fornecedor_nome || "—"}</LedgerTd>
+                      <LedgerTd>
+                        <StatusBadge>{labelEstado(p.estado)}</StatusBadge>
+                      </LedgerTd>
+                      <LedgerTd className="whitespace-nowrap text-muted-foreground">{p.data_pedido ? new Date(p.data_pedido).toLocaleDateString("pt-AO") : "—"}</LedgerTd>
+                      <LedgerTd className="tabular-nums">{fmtKz(p.total)}</LedgerTd>
+                    </LedgerTr>
+                  ))}
+                </tbody>
+              </LedgerTable>
+              {pedidos.length === 0 && <LedgerEmpty icone="add_shopping_cart">Nenhum pedido de compra registado</LedgerEmpty>}
+            </Ledger>
+          </>
+        );
+      })()}
+
+      {aba === "rh" && (() => {
+        return (
+          <>
+            <PainelFiltros
+              icon="filter_list"
+              titulo="Filtros de Recursos Humanos"
+              acoes={
+                <button
+                  type="button"
+                  onClick={() => exportarRelatorioPDF({
+                    titulo: "Relatório de Recursos Humanos",
+                    org,
+                    cabecalhos: ["Nome", "Email", "Perfil", "Função", "Estado"],
+                    linhas: usuarios.map((u) => [u.nome || "—", u.email || "—", u.perfil || "—", u.funcao || "—", u.ativo === false ? "Inativo" : "Ativo"]),
+                    resumo: [`Total de utilizadores: ${usuarios.length}`, `Ativos: ${usuariosAtivos}`, `Inativos: ${usuariosInativos}`],
+                  })}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                >
+                  <Icon name="picture_as_pdf" className="text-sm" /> Exportar PDF
+                </button>
+              }
+            >
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <KpiCard icon="groups" label="Utilizadores" value={usuarios.length} />
+                <KpiCard icon="verified" label="Ativos" value={usuariosAtivos} />
+                <KpiCard icon="block" label="Inativos" value={usuariosInativos} />
+                <KpiCard icon="badge" label="Perfis" value={usuariosPorPerfil.length} />
+              </div>
+            </PainelFiltros>
+
+            <Ledger rotulo="Utilizadores ledger">
+              <LedgerHeader titulo="Utilizadores" subtitulo={`${usuarios.length} utilizadores registados`} />
+              <LedgerTable>
+                <thead>
+                  <tr className="border-b border-border">
+                    <LedgerTh>Nome</LedgerTh>
+                    <LedgerTh>Email</LedgerTh>
+                    <LedgerTh>Perfil</LedgerTh>
+                    <LedgerTh>Função</LedgerTh>
+                    <LedgerTh>Estado</LedgerTh>
+                  </tr>
+                </thead>
+                <tbody>
+                  {usuarios.map((u) => (
+                    <LedgerTr key={u.id}>
+                      <LedgerTd>{u.nome || "—"}</LedgerTd>
+                      <LedgerTd className="text-muted-foreground">{u.email || "—"}</LedgerTd>
+                      <LedgerTd>{u.perfil || "—"}</LedgerTd>
+                      <LedgerTd className="text-muted-foreground">{u.funcao || "—"}</LedgerTd>
+                      <LedgerTd>
+                        <StatusBadge tom={u.ativo === false ? "neutral" : "success"}>{u.ativo === false ? "Inativo" : "Ativo"}</StatusBadge>
+                      </LedgerTd>
+                    </LedgerTr>
+                  ))}
+                </tbody>
+              </LedgerTable>
+              {usuarios.length === 0 && <LedgerEmpty icone="groups">Nenhum utilizador registado</LedgerEmpty>}
+            </Ledger>
           </>
         );
       })()}
