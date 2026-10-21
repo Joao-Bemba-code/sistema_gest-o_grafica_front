@@ -13,13 +13,39 @@ import {
   listarFormatos,
 } from "@/services/materiais";
 import { criar as criarMaquina, atualizar as atualizarMaquina, listar as listarMaquinas } from "@/services/maquinas";
-import { listar as listarCategorias } from "@/services/categorias";
+import { listar as listarCategorias, criar as criarCategoria } from "@/services/categorias";
 import { listar as listarFornecedores } from "@/services/fornecedores";
 import { listar as listarClientes } from "@/services/clientes";
 import { buscarOrganizacao } from "@/services/configuracoes";
 import { getUsuario } from "@/services/auth";
 import { useToast } from "@/components/Toast";
-import { statusDe, toNum, especificacoesObjeto, ehEquipamento, moverEstoqueDe, tipoChaveDe } from "@/lib/estoque";
+import { statusDe, toNum, especificacoesObjeto, ehEquipamento, moverEstoqueDe, tipoChaveDe, familiaChaveDe } from "@/lib/estoque";
+
+function chaveCategoria(texto) {
+  return String(texto || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+}
+
+// Quando o utilizador escreve uma categoria que ainda não existe no cadastro,
+// regista-a com a família, subfamília e grupo indicados no formulário, para
+// passar a aparecer nas sugestões e nos filtros como as restantes.
+async function registarCategoriaNova(espec, categorias) {
+  const nome = String(espec.categoria || "").trim();
+  if (!nome) return false;
+  const chave = chaveCategoria(nome);
+  if (categorias.some((c) => chaveCategoria(c.nome) === chave)) return false;
+  try {
+    await criarCategoria({
+      nome,
+      familia: familiaChaveDe(espec.familia) || "papeis",
+      subfamilia: String(espec.subfamilia || "").trim(),
+      tipo: tipoChaveDe(espec.grupo) || "materia_prima",
+    });
+    return true;
+  } catch (err) {
+    if (err.response?.status === 409) return false;
+    throw err;
+  }
+}
 
 const camposNumericos = [
   "gramagem", "largura", "altura", "percentual_quebra",
@@ -68,7 +94,7 @@ export default function useEstoque() {
 
   const nomeUsuario = useMemo(() => getUsuario()?.nome || "", []);
 
-  const carregar = useCallback(async (tentativa = 0) => {
+  const carregar = useCallback(async function carregarDados(tentativa = 0) {
     setCarregando(true);
     const resultados = await Promise.allSettled([
       listar(),
@@ -80,7 +106,7 @@ export default function useEstoque() {
     ]);
     const [m, c, f, cl, fm, o] = resultados;
     if (m.status === "rejected" && tentativa === 0) {
-      return carregar(1);
+      return carregarDados(1);
     }
     setMateriais(m.status === "fulfilled" && Array.isArray(m.value) ? m.value : []);
     setCategorias(c.status === "fulfilled" && Array.isArray(c.value) ? c.value.filter((cat) => cat.tipo !== "servico") : []);
@@ -123,6 +149,12 @@ export default function useEstoque() {
       }
       if (id) await atualizarMaterial(id, dadosNum);
       else await criarMaterial(dadosNum);
+      let categoriaNova = false;
+      try {
+        categoriaNova = await registarCategoriaNova(espec, categorias);
+      } catch (err) {
+        addToast(err.response?.data?.erro || "Material guardado, mas a nova categoria não ficou registada", "warning");
+      }
       if (ehEquipamento(pseudoCategoria)) {
         try {
           await sincronizarMaquina(dadosNum, id);
@@ -131,7 +163,12 @@ export default function useEstoque() {
         }
       }
       await carregar();
-      addToast(id ? "Material atualizado com sucesso" : "Material cadastrado com sucesso", "success");
+      addToast(
+        categoriaNova
+          ? "Material guardado e nova categoria registada com sucesso"
+          : id ? "Material atualizado com sucesso" : "Material cadastrado com sucesso",
+        "success"
+      );
       return true;
     } catch (err) {
       addToast(err.response?.data?.erro || "Erro na operação", "error");
@@ -139,7 +176,7 @@ export default function useEstoque() {
     } finally {
       setCarregando(false);
     }
-  }, [addToast, carregar]);
+  }, [addToast, carregar, categorias]);
 
   const registrarMovimentacao = useCallback(async ({ item, tipo, dados }) => {
     const qtd = Number(dados.quantidade);

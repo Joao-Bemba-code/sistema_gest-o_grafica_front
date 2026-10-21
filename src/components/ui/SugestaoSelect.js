@@ -18,8 +18,7 @@ export default function SugestaoSelect({
   required = false,
 }) {
   const [aberto, setAberto] = useState(false);
-  const [filtrar, setFiltrar] = useState(false);
-  const [ativo, setAtivo] = useState(0);
+  const [ativo, setAtivo] = useState(-1);
   const ref = useRef(null);
 
   const itens = useMemo(
@@ -33,11 +32,10 @@ export default function SugestaoSelect({
   );
 
   const filtrados = useMemo(() => {
-    if (!filtrar) return itens;
     const termo = semAcentos(value).trim();
     if (!termo) return itens;
     return itens.filter((o) => semAcentos(o.label).includes(termo));
-  }, [itens, filtrar, value]);
+  }, [itens, value]);
 
   useEffect(() => {
     if (!aberto) return;
@@ -52,24 +50,36 @@ export default function SugestaoSelect({
 
   const escolher = (item) => {
     onChange?.(item.label);
-    setFiltrar(false);
     setAberto(false);
   };
 
   const tecla = (e) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      if (!aberto) { setAberto(true); setFiltrar(false); return; }
-      setAtivo((a) => Math.min(a + 1, filtrados.length - 1));
+      if (!aberto) {
+        setAberto(true);
+        setAtivo(filtrados.length ? 0 : -1);
+        return;
+      }
+      setAtivo((a) => (filtrados.length ? (a < 0 ? 0 : Math.min(a + 1, filtrados.length - 1)) : -1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setAtivo((a) => Math.max(a - 1, 0));
-    } else if (e.key === "Enter" && aberto && filtrados[ativo]) {
-      e.preventDefault();
-      escolher(filtrados[ativo]);
+      if (!aberto) {
+        setAberto(true);
+        setAtivo(filtrados.length ? filtrados.length - 1 : -1);
+        return;
+      }
+      setAtivo((a) => (filtrados.length ? (a < 0 ? filtrados.length - 1 : Math.max(a - 1, 0)) : -1));
+    } else if (e.key === "Enter" && aberto) {
+      // Só assume uma sugestão escolhida com as setas; caso contrário mantém o texto escrito.
+      if (ativo >= 0 && filtrados[ativo]) {
+        e.preventDefault();
+        escolher(filtrados[ativo]);
+      } else {
+        setAberto(false);
+      }
     } else if (e.key === "Escape") {
       setAberto(false);
-      setFiltrar(false);
     }
   };
 
@@ -86,10 +96,9 @@ export default function SugestaoSelect({
           onChange={(e) => {
             onChange?.(e.target.value);
             setAberto(true);
-            setFiltrar(true);
-            setAtivo(0);
+            setAtivo(-1);
           }}
-          onFocus={() => { setAberto(true); setFiltrar(false); setAtivo(0); }}
+          onFocus={() => { setAberto(true); setAtivo(-1); }}
           onKeyDown={tecla}
           placeholder={placeholder}
           role="combobox"

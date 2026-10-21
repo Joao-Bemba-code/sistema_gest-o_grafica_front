@@ -31,8 +31,7 @@ export default function CategoriaMaterialSelect({
   required = false,
 }) {
   const [aberto, setAberto] = useState(false);
-  const [filtrar, setFiltrar] = useState(false);
-  const [ativo, setAtivo] = useState(0);
+  const [ativo, setAtivo] = useState(-1);
   const ref = useRef(null);
 
   const opcoes = useMemo(
@@ -41,13 +40,12 @@ export default function CategoriaMaterialSelect({
   );
 
   const filtrados = useMemo(() => {
-    if (!filtrar) return opcoes;
     const termo = semAcentos(value).trim();
     if (!termo) return opcoes;
     return opcoes.filter(
       (o) => semAcentos(o.rotulo).includes(termo) || semAcentos(o.categoria.nome || "").includes(termo)
     );
-  }, [opcoes, filtrar, value]);
+  }, [opcoes, value]);
 
   useEffect(() => {
     if (!aberto) return;
@@ -62,24 +60,37 @@ export default function CategoriaMaterialSelect({
 
   const escolher = (opcao) => {
     onSelecionar?.(opcao.categoria);
-    setFiltrar(false);
     setAberto(false);
   };
 
   const tecla = (e) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      if (!aberto) { setAberto(true); setFiltrar(false); return; }
-      setAtivo((a) => Math.min(a + 1, filtrados.length - 1));
+      if (!aberto) {
+        setAberto(true);
+        setAtivo(filtrados.length ? 0 : -1);
+        return;
+      }
+      setAtivo((a) => (filtrados.length ? (a < 0 ? 0 : Math.min(a + 1, filtrados.length - 1)) : -1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setAtivo((a) => Math.max(a - 1, 0));
-    } else if (e.key === "Enter" && aberto && filtrados[ativo]) {
-      e.preventDefault();
-      escolher(filtrados[ativo]);
+      if (!aberto) {
+        setAberto(true);
+        setAtivo(filtrados.length ? filtrados.length - 1 : -1);
+        return;
+      }
+      setAtivo((a) => (filtrados.length ? (a < 0 ? filtrados.length - 1 : Math.max(a - 1, 0)) : -1));
+    } else if (e.key === "Enter" && aberto) {
+      // Só assume uma sugestão existente se o utilizador a escolheu com as setas.
+      // Caso contrário mantém o texto escrito (que será registado como nova categoria).
+      if (ativo >= 0 && filtrados[ativo]) {
+        e.preventDefault();
+        escolher(filtrados[ativo]);
+      } else {
+        setAberto(false);
+      }
     } else if (e.key === "Escape") {
       setAberto(false);
-      setFiltrar(false);
     }
   };
 
@@ -87,6 +98,9 @@ export default function CategoriaMaterialSelect({
     const atual = semAcentos(String(value).trim());
     return atual === semAcentos(opcao.rotulo) || atual === semAcentos(opcao.categoria.nome || "");
   };
+
+  const textoNovo = value.trim();
+  const novaCategoria = textoNovo !== "" && !opcoes.some((o) => selecionado(o));
 
   return (
     <div ref={ref} className="relative">
@@ -99,10 +113,9 @@ export default function CategoriaMaterialSelect({
           onChange={(e) => {
             onChangeTexto?.(e.target.value);
             setAberto(true);
-            setFiltrar(true);
-            setAtivo(0);
+            setAtivo(-1);
           }}
-          onFocus={() => { setAberto(true); setFiltrar(false); setAtivo(0); }}
+          onFocus={() => { setAberto(true); setAtivo(-1); }}
           onKeyDown={tecla}
           placeholder={placeholder}
           role="combobox"
@@ -121,7 +134,16 @@ export default function CategoriaMaterialSelect({
           aria-label="Categorias registadas"
           className="absolute z-30 mt-1 w-full max-h-60 overflow-y-auto custom-scrollbar bg-card border border-border rounded-xl shadow-lg py-1"
         >
-          {filtrados.length === 0 && (
+          {novaCategoria && (
+            <li className="px-3 py-2 text-[11px] text-primary border-b border-border/60 flex items-start gap-2">
+              <Icon name="add_circle" className="text-sm shrink-0 mt-0.5" />
+              <span>
+                Nova categoria: <strong className="font-semibold">{textoNovo}</strong>.
+                <span className="block text-[10px] text-muted-foreground">Será registada ao guardar o material e passa a aparecer nesta lista.</span>
+              </span>
+            </li>
+          )}
+          {filtrados.length === 0 && !novaCategoria && (
             <li className="px-3 py-3 text-xs text-muted-foreground text-center">
               Nenhuma categoria encontrada.
               <span className="block mt-1 text-[10px]">Podes escrever a categoria à mão.</span>
@@ -131,6 +153,9 @@ export default function CategoriaMaterialSelect({
             const cat = opcao.categoria;
             const famCfg = todosFamilias[normalizarFamilia(cat.familia)];
             const marcado = selecionado(opcao);
+            const nome = String(cat.nome || "").trim();
+            const famLabel = famCfg?.label || String(cat.familia || "");
+            const mostraNome = nome && semAcentos(nome) !== semAcentos(famLabel) && semAcentos(nome) !== semAcentos(opcao.rotulo);
             return (
               <li key={cat.id} role="option" aria-selected={marcado}>
                 <button
@@ -140,7 +165,10 @@ export default function CategoriaMaterialSelect({
                   className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 transition-colors ${marcado ? "bg-primary/10 text-primary font-semibold" : ativo === i ? "bg-accent" : ""}`}
                 >
                   <Icon name={famCfg?.icon || "label"} className="text-sm text-primary shrink-0" />
-                  <span className="flex-1 min-w-0 truncate">{opcao.rotulo}</span>
+                  <span className="flex-1 min-w-0">
+                    {mostraNome && <span className="block truncate font-medium">{nome}</span>}
+                    <span className={`block truncate ${mostraNome ? "text-[10px] text-muted-foreground" : ""}`}>{opcao.rotulo}</span>
+                  </span>
                   {marcado && <Icon name="check" className="text-sm text-primary shrink-0" />}
                 </button>
               </li>

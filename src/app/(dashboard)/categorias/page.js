@@ -69,11 +69,17 @@ function normalizarSubfamilia(s) {
 function categoriaLabel(c) {
   const famCfg = todosFamilias[normalizarFamilia(c?.familia)];
   const tipoCfg = tiposItem[normalizarTipoItem(c?.tipo)];
-  return [
+  const trio = [
     famCfg?.label || c?.familia,
     c?.subfamilia,
     tipoCfg?.label || c?.tipo,
   ].filter(Boolean).join(" › ");
+  const nome = String(c?.nome || "").trim();
+  const famLabel = String(famCfg?.label || c?.familia || "").trim();
+  if (nome && nome.toLowerCase() !== famLabel.toLowerCase() && !trio.toLowerCase().includes(nome.toLowerCase())) {
+    return `${nome} — ${trio}`;
+  }
+  return trio;
 }
 
 function useArrastavel({ ativo }) {
@@ -185,6 +191,7 @@ export default function CategoriasPage() {
     const famCfg = todosFamilias[normalizarFamilia(c.familia)];
     const tipoCfg = tiposItem[normalizarTipoItem(c.tipo)];
     const buscavel = [
+      c.nome,
       famCfg?.label || c.familia,
       c.subfamilia,
       tipoCfg?.label || c.tipo,
@@ -195,7 +202,7 @@ export default function CategoriasPage() {
 
   const { search, setSearch, activeFilter, setActiveFilter, filtered, total } = useFilter({
     items: categoriasComBusca,
-    searchFields: ["_busca", "familia", "subfamilia", "descricao"],
+    searchFields: ["_busca", "nome", "familia", "subfamilia", "descricao"],
     filterConfig,
   });
 
@@ -543,6 +550,8 @@ export default function CategoriasPage() {
             {visiveis.map((c) => {
               const fam = todosFamilias[normalizarFamilia(c.familia)] || { label: c.familia || "—", icon: "label", classe: "text-muted-foreground" };
               const tipo = tiposItem[normalizarTipoItem(c.tipo)] || { label: c.tipo || "—" };
+              const nomeCat = String(c.nome || "").trim();
+              const nomeProprio = nomeCat && nomeCat.toLowerCase() !== String(fam.label || "").toLowerCase();
               return (
                 <div key={c.id} className="bg-card border border-border rounded-xl p-5 space-y-3">
                   <div className="flex items-start justify-between gap-3">
@@ -551,13 +560,14 @@ export default function CategoriasPage() {
                         <Icon name={fam.icon} className="text-lg text-muted-foreground" />
                       </span>
                       <div className="min-w-0">
-                        <h3 className="font-semibold text-foreground truncate">{fam.label}</h3>
+                        <h3 className="font-semibold text-foreground truncate">{nomeProprio ? nomeCat : fam.label}</h3>
                       </div>
                     </div>
                     <StatusBadge tom="neutral" className="shrink-0">Grupo: {tipo.label}</StatusBadge>
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground border-t border-border pt-3">
+                    <span>Família: <strong className="text-foreground font-medium">{fam.label}</strong></span>
                     <span>Subfamília: <strong className="text-foreground font-medium">{c.subfamilia || "—"}</strong></span>
                   </div>
                   {c.descricao && (
