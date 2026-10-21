@@ -17,8 +17,17 @@ const tabs = [
   { key: "composicao", label: "Composição", icon: "layers" },
 ];
 
-const GRUPO_OPCOES = tipoRecursoOptions.map((o) => o.label);
 const TODAS_FAMILIAS = { ...familias, ...familiasServico };
+
+function rotuloGrupo(valor) {
+  const bruto = String(valor || "").trim();
+  if (!bruto) return "";
+  const opcao = tipoRecursoOptions.find(
+    (o) => o.valor === bruto || o.label.toLowerCase() === bruto.toLowerCase()
+  );
+  if (opcao) return opcao.label;
+  return tiposItem[normalizarTipoItem(bruto)]?.label || bruto;
+}
 
 function detalhesCategoria(categoria) {
   const famCfg = TODAS_FAMILIAS[normalizarFamilia(categoria.familia)];
@@ -168,6 +177,24 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
     return [...vistas].sort((a, b) => a.localeCompare(b, "pt"));
   })();
 
+  const gruposSugeridos = (() => {
+    const mapa = new Map();
+    const adicionar = (valor) => {
+      const label = rotuloGrupo(valor);
+      if (!label) return;
+      const chave = label.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      if (!mapa.has(chave)) mapa.set(chave, { valor: label, label, icon: "layers" });
+    };
+    tipoRecursoOptions.forEach((o) => adicionar(o.label));
+    for (const c of categorias) adicionar(c.tipo);
+    for (const m of materiais) {
+      const espM = especificacoesObjeto(m.especificacoes);
+      adicionar(espM.grupo || m.categoria?.tipo);
+    }
+    adicionar(espec.grupo);
+    return [...mapa.values()].sort((a, b) => a.label.localeCompare(b.label, "pt"));
+  })();
+
   const aoMudarEspec = (chave, valor) => {
     const novasEspec = { ...especificacoesObjeto(form.especificacoes) };
     novasEspec[chave] = valor;
@@ -242,18 +269,15 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
               />
             </Campo>
             <Campo label="Grupo" obrigatorio>
-              <input
+              <SugestaoSelect
+                id={`${formId}-grupos`}
                 required
-                aria-required="true"
-                list={`${formId}-grupos`}
                 value={espec.grupo || ""}
-                onChange={(e) => aoMudarEspec("grupo", e.target.value)}
-                className={inputCls}
-                placeholder="Ex: Matéria-Prima, Artigo..."
+                opcoes={gruposSugeridos}
+                onChange={(valor) => aoMudarEspec("grupo", valor)}
+                placeholder="Pesquisar, escrever ou criar grupo..."
+                icon="layers"
               />
-              <datalist id={`${formId}-grupos`}>
-                {GRUPO_OPCOES.map((g) => <option key={g} value={g} />)}
-              </datalist>
             </Campo>
             <Campo label="Subfamília">
               <SugestaoSelect

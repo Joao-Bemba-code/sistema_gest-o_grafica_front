@@ -19,10 +19,18 @@ import { listar as listarClientes } from "@/services/clientes";
 import { buscarOrganizacao } from "@/services/configuracoes";
 import { getUsuario } from "@/services/auth";
 import { useToast } from "@/components/Toast";
-import { statusDe, toNum, especificacoesObjeto, ehEquipamento, moverEstoqueDe, tipoChaveDe, familiaChaveDe } from "@/lib/estoque";
+import { statusDe, toNum, especificacoesObjeto, ehEquipamento, moverEstoqueDe, tipoChaveDe, familiaChaveDe, tipoRecursoOptions } from "@/lib/estoque";
 
 function chaveCategoria(texto) {
   return String(texto || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+}
+
+// Grupos conhecidos são guardados pela chave; grupos escritos à mão mantêm o texto.
+function tipoDeGrupo(texto) {
+  const bruto = String(texto || "").trim();
+  if (!bruto) return "materia_prima";
+  const chave = tipoChaveDe(bruto);
+  return tipoRecursoOptions.some((o) => o.valor === chave) ? chave : bruto;
 }
 
 // Quando o utilizador escreve uma categoria que ainda não existe no cadastro,
@@ -38,7 +46,7 @@ async function registarCategoriaNova(espec, categorias) {
       nome,
       familia: familiaChaveDe(espec.familia) || "papeis",
       subfamilia: String(espec.subfamilia || "").trim(),
-      tipo: tipoChaveDe(espec.grupo) || "materia_prima",
+      tipo: tipoDeGrupo(espec.grupo),
     });
     return true;
   } catch (err) {
