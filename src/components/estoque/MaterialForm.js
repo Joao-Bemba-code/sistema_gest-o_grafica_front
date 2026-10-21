@@ -5,8 +5,10 @@ import Icon from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
 import FornecedorSelect from "./FornecedorSelect";
 import UnidadeSelect from "./UnidadeSelect";
+import CategoriaMaterialSelect, { rotuloCategoria } from "./CategoriaMaterialSelect";
+import SugestaoSelect from "@/components/ui/SugestaoSelect";
 import NumeroInput from "@/components/ui/NumeroInput";
-import { inputCls, unidadesParaFamilia, camposDeCategoria, familias, familiasServico, normalizarUnidade, familiaChaveDe, tipoChaveDe, especificacoesObjeto, tipoRecursoOptions, moverEstoqueDe, ehProduto } from "@/lib/estoque";
+import { inputCls, unidadesParaFamilia, camposDeCategoria, familias, familiasServico, normalizarUnidade, normalizarFamilia, normalizarTipoItem, tiposItem, familiaChaveDe, tipoChaveDe, especificacoesObjeto, tipoRecursoOptions, moverEstoqueDe, ehProduto } from "@/lib/estoque";
 
 const tabs = [
   { key: "identificacao", label: "Identificação", icon: "badge" },
@@ -15,8 +17,19 @@ const tabs = [
   { key: "composicao", label: "Composição", icon: "layers" },
 ];
 
-const FAMILIA_OPCOES = [...Object.values(familias), ...Object.values(familiasServico)].map((c) => c.label);
 const GRUPO_OPCOES = tipoRecursoOptions.map((o) => o.label);
+const TODAS_FAMILIAS = { ...familias, ...familiasServico };
+
+function detalhesCategoria(categoria) {
+  const famCfg = TODAS_FAMILIAS[normalizarFamilia(categoria.familia)];
+  const tipoCfg = tiposItem[normalizarTipoItem(categoria.tipo)] || tipoRecursoOptions.find((o) => o.valor === categoria.tipo);
+  return {
+    categoria: String(categoria.nome || "").trim() || rotuloCategoria(categoria),
+    familia: famCfg?.label || String(categoria.familia || ""),
+    grupo: tipoCfg?.label || String(categoria.tipo || ""),
+    subfamilia: String(categoria.subfamilia || "").trim(),
+  };
+}
 
 function Campo({ label, children, obrigatorio, full }) {
   return (
@@ -83,7 +96,6 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
   const [tab, setTab] = useState("identificacao");
   const id = (sufixo) => `${formId}-${sufixo}`;
   const espec = especificacoesObjeto(form.especificacoes);
-  const categoriaTexto = String(espec.categoria || "").trim();
   const familiaTexto = String(espec.familia || "").trim();
   const grupoTexto = String(espec.grupo || "").trim();
   const pseudoCategoria = {
@@ -111,29 +123,66 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
   };
   const removeComponente = (ci) => aoMudarComposicao(composicao.filter((_, i) => i !== ci));
 
-  const subfamiliasSugeridas = (() => {
-    const grupo = tipoChaveDe(grupoTexto);
-    const vistas = new Set();
-    const subCategoria = String(espec.subfamilia || "").trim();
-    if (subCategoria) vistas.add(subCategoria);
+  const familiasSugeridas = (() => {
+    const mapa = new Map();
+    const adicionar = (nome, icone) => {
+      const label = String(nome || "").trim();
+      if (!label) return;
+      const chave = label.toLowerCase();
+      if (!mapa.has(chave)) mapa.set(chave, { valor: label, label, icon: icone || "category" });
+    };
+    Object.values(familias).forEach((cfg) => adicionar(cfg.label, cfg.icon));
+    Object.values(familiasServico).forEach((cfg) => adicionar(cfg.label, cfg.icon));
     for (const c of categorias) {
-      if (grupo && tipoChaveDe(c.tipo) !== grupo) continue;
-      const s = String(c.subfamilia || "").trim();
-      if (s) vistas.add(s);
+      const cfg = TODAS_FAMILIAS[normalizarFamilia(c.familia)];
+      adicionar(cfg?.label || c.familia, cfg?.icon || "label");
     }
     for (const m of materiais) {
-      const g = m.categoria ? tipoChaveDe(m.categoria.tipo) : tipoChaveDe(especificacoesObjeto(m.especificacoes).grupo || m.tipo);
-      if (grupo && g !== grupo) continue;
-      const s = String(especificacoesObjeto(m.especificacoes).subfamilia || m.categoria?.subfamilia || "").trim();
-      if (s) vistas.add(s);
+      const espM = especificacoesObjeto(m.especificacoes);
+      const bruta = espM.familia || m.categoria?.familia;
+      const cfg = TODAS_FAMILIAS[normalizarFamilia(bruta)];
+      adicionar(cfg?.label || bruta, cfg?.icon || "category");
     }
-    return [...vistas];
+    adicionar(espec.familia, TODAS_FAMILIAS[normalizarFamilia(espec.familia)]?.icon);
+    return [...mapa.values()].sort((a, b) => a.label.localeCompare(b.label, "pt"));
+  })();
+
+  const subfamiliasSugeridas = (() => {
+    const familiaAtual = familiaChaveDe(espec.familia);
+    const vistas = new Set();
+    const adicionar = (s) => {
+      const texto = String(s || "").trim();
+      if (texto) vistas.add(texto);
+    };
+    adicionar(espec.subfamilia);
+    for (const c of categorias) {
+      if (familiaAtual && normalizarFamilia(c.familia) !== familiaAtual) continue;
+      adicionar(c.subfamilia);
+    }
+    for (const m of materiais) {
+      const espM = especificacoesObjeto(m.especificacoes);
+      const famM = familiaChaveDe(espM.familia || m.categoria?.familia);
+      if (familiaAtual && famM !== familiaAtual) continue;
+      adicionar(espM.subfamilia || m.categoria?.subfamilia);
+    }
+    return [...vistas].sort((a, b) => a.localeCompare(b, "pt"));
   })();
 
   const aoMudarEspec = (chave, valor) => {
     const novasEspec = { ...especificacoesObjeto(form.especificacoes) };
     novasEspec[chave] = valor;
     onChange("especificacoes", novasEspec);
+  };
+
+  const aoSelecionarCategoria = (categoria) => {
+    const detalhes = detalhesCategoria(categoria);
+    onChange("especificacoes", {
+      ...espec,
+      categoria: detalhes.categoria,
+      familia: detalhes.familia || espec.familia || "",
+      grupo: detalhes.grupo || espec.grupo || "",
+      subfamilia: detalhes.subfamilia,
+    });
   };
 
   return (
@@ -165,37 +214,32 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
                 readOnly
                 disabled
                 className={`${inputCls} bg-muted/60 cursor-not-allowed`}
-                placeholder="Gerado automaticamente (K + categoria)"
+                placeholder="Gerado automaticamente (K + iniciais da categoria)"
               />
             </Campo>
             <Campo label="Nome" obrigatorio>
               <input required aria-required="true" value={form.nome} onChange={(e) => onChange("nome", e.target.value)} className={inputCls} placeholder="Ex: Papel Couché 150g A3" />
             </Campo>
             <Campo label="Categoria" obrigatorio>
-              <input
+              <CategoriaMaterialSelect
+                id={`${formId}-categoria`}
                 required
-                aria-required="true"
-                list={`${formId}-categorias`}
                 value={espec.categoria || ""}
-                onChange={(e) => aoMudarEspec("categoria", e.target.value)}
-                className={inputCls}
-                placeholder="Ex: Papel Couché 150g"
+                categorias={categorias}
+                onChangeTexto={(texto) => aoMudarEspec("categoria", texto)}
+                onSelecionar={aoSelecionarCategoria}
+                placeholder="Pesquisar ou escrever categoria..."
               />
-              <datalist id={`${formId}-categorias`}>
-                {[...new Set(categorias.map((c) => String(c.nome || "").trim()).filter(Boolean))].map((n) => <option key={n} value={n} />)}
-              </datalist>
             </Campo>
             <Campo label="Família">
-              <input
-                list={`${formId}-familias`}
+              <SugestaoSelect
+                id={`${formId}-familia`}
                 value={espec.familia || ""}
-                onChange={(e) => aoMudarEspec("familia", e.target.value)}
-                className={inputCls}
-                placeholder="Ex: Papéis, Tintas..."
+                opcoes={familiasSugeridas}
+                onChange={(valor) => aoMudarEspec("familia", valor)}
+                placeholder="Pesquisar ou escrever família..."
+                icon="category"
               />
-              <datalist id={`${formId}-familias`}>
-                {FAMILIA_OPCOES.map((f) => <option key={f} value={f} />)}
-              </datalist>
             </Campo>
             <Campo label="Grupo" obrigatorio>
               <input
@@ -212,16 +256,14 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
               </datalist>
             </Campo>
             <Campo label="Subfamília">
-              <input
-                list={`${formId}-subfamilias`}
-                value={form.especificacoes?.subfamilia || ""}
-                onChange={(e) => aoMudarEspec("subfamilia", e.target.value)}
-                className={inputCls}
-                placeholder="Ex: Couché, Offset, etc."
+              <SugestaoSelect
+                id={`${formId}-subfamilia`}
+                value={espec.subfamilia || ""}
+                opcoes={subfamiliasSugeridas}
+                onChange={(valor) => aoMudarEspec("subfamilia", valor)}
+                placeholder="Pesquisar ou escrever subfamília..."
+                icon="label"
               />
-              <datalist id={`${formId}-subfamilias`}>
-                {subfamiliasSugeridas.map((s) => <option key={s} value={s} />)}
-              </datalist>
             </Campo>
             <Campo label="Fornecedor">
               <FornecedorSelect
