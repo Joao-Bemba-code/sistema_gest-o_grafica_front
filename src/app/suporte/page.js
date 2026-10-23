@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Icon from "@/components/Icon";
-import { Badge, Frame, FramePanel } from "@/components/suporte/ui";
+import { Badge, Frame, FramePanel, CartaoKpi, BarraProgresso } from "@/components/suporte/ui";
 import { obterResumo, listarAcessos, listarOrganizacoes } from "@/services/suporte";
 import {
   AreaChart,
@@ -18,42 +18,13 @@ import {
   LuBuilding,
   LuGroup,
   LuLogIn,
+  LuShield,
   LuShieldAlert,
   LuTriangleAlert,
   LuCircleCheck,
   LuArrowRight,
   LuFolder,
 } from "react-icons/lu";
-
-function Barra({ activos, total, cor = "var(--success)" }) {
-  const pct = total > 0 ? Math.min(100, Math.round((activos / total) * 100)) : 0;
-  return (
-    <div className="mt-3 flex h-2 w-full overflow-hidden rounded-full bg-background/60" aria-hidden="true">
-      <span className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: cor }} />
-    </div>
-  );
-}
-
-function CartaoEstatistica({ icone: Icone, titulo, descricao, valor, nota, notaCor = "text-success", children }) {
-  return (
-    <div className="flex min-w-0 flex-col rounded-xl border-2 border-background bg-muted p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="truncate text-base leading-tight font-semibold text-foreground">{titulo}</h3>
-          <p className="mt-0.5 truncate text-sm text-muted-foreground">{descricao}</p>
-        </div>
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border-2 border-background bg-card text-primary shadow-sm">
-          <Icone className="size-5" />
-        </span>
-      </div>
-      <div className="mt-4">
-        <div className="text-[26px] leading-none font-medium tabular-nums text-foreground">{valor}</div>
-        {nota && <div className={`mt-1.5 text-xs ${notaCor}`}>{nota}</div>}
-        {children}
-      </div>
-    </div>
-  );
-}
 
 function Tabs({ opcoes, activo, onChange, label }) {
   return (
@@ -135,15 +106,51 @@ export default function SuporteResumoPage() {
         </FramePanel>
       )}
 
+      {/* Faixa de cabeçalho */}
+      <div className="gradient-hero relative overflow-hidden rounded-xl border border-border px-5 py-5">
+        <span className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-primary via-primary/60 to-tertiary" aria-hidden="true" />
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <span className="pill pill-primary">
+              <LuShield className="size-3" />
+              Consola de suporte
+            </span>
+            <h2 className="mt-2.5 text-2xl leading-tight font-black tracking-tight text-foreground">
+              Visão geral da plataforma
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+              Acompanha organizações, utilizadores e tentativas de acesso registadas no KAMGEST.
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <span className="pill pill-muted">
+              <LuBuilding className="size-3" />
+              {resumo?.organizacoes?.total ?? 0} organizações
+            </span>
+            <span className="pill pill-muted">
+              <LuGroup className="size-3" />
+              {resumo?.utilizadores?.total ?? 0} utilizadores
+            </span>
+            <Link
+              href="/suporte/acessos"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/85"
+            >
+              Ver acessos
+              <LuArrowRight className="size-3.5" />
+            </Link>
+          </div>
+        </div>
+      </div>
+
       {/* Estatísticas principais */}
       <div className="grid grid-cols-1 gap-4 @5xl:grid-cols-3">
         {carregando || !resumo ? (
           [...Array(3)].map((_, i) => (
-            <div key={i} className="h-[172px] animate-pulse rounded-xl border-2 border-background bg-muted shadow-sm" />
+            <div key={i} className="h-[172px] animate-pulse rounded-xl border border-border bg-card shadow-card" />
           ))
         ) : (
           <>
-            <CartaoEstatistica
+            <CartaoKpi
               icone={LuBuilding}
               titulo="Organizações"
               descricao="Total de clientes na plataforma"
@@ -151,10 +158,15 @@ export default function SuporteResumoPage() {
               nota={`${resumo.organizacoes.ativas} activas · ${resumo.organizacoes.inativas} inactivas`}
               notaCor="text-success"
             >
-              <Barra activos={resumo.organizacoes.ativas} total={resumo.organizacoes.total} />
-            </CartaoEstatistica>
+              <BarraProgresso
+                className="mt-3"
+                valor={resumo.organizacoes.ativas}
+                total={resumo.organizacoes.total}
+                cor="var(--success)"
+              />
+            </CartaoKpi>
 
-            <CartaoEstatistica
+            <CartaoKpi
               icone={LuGroup}
               titulo="Utilizadores"
               descricao="Contas de acesso registadas"
@@ -162,10 +174,15 @@ export default function SuporteResumoPage() {
               nota={`${resumo.utilizadores.ativos} activos`}
               notaCor="text-success"
             >
-              <Barra activos={resumo.utilizadores.ativos} total={resumo.utilizadores.total} cor="var(--primary)" />
-            </CartaoEstatistica>
+              <BarraProgresso
+                className="mt-3"
+                valor={resumo.utilizadores.ativos}
+                total={resumo.utilizadores.total}
+                cor="var(--primary)"
+              />
+            </CartaoKpi>
 
-            <CartaoEstatistica
+            <CartaoKpi
               icone={LuLogIn}
               titulo="Logins (7 dias)"
               descricao="Sessões iniciadas com sucesso"
@@ -173,12 +190,13 @@ export default function SuporteResumoPage() {
               nota={`${resumo.organizacoes.comAcesso7d} organizações com acesso`}
               notaCor={temFalhas ? "text-warning" : "text-success"}
             >
-              <Barra
-                activos={resumo.acessos7d.sucesso}
+              <BarraProgresso
+                className="mt-3"
+                valor={resumo.acessos7d.sucesso}
                 total={resumo.acessos7d.sucesso + resumo.acessos7d.falhas}
                 cor={temFalhas ? "var(--warning)" : "var(--success)"}
               />
-            </CartaoEstatistica>
+            </CartaoKpi>
           </>
         )}
       </div>

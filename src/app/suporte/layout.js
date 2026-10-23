@@ -8,7 +8,8 @@ import SuporteSidebar from "@/components/suporte/SuporteSidebar";
 import { ToastProvider } from "@/components/Toast";
 import { useTheme } from "@/contexts/ThemeContext";
 import Icon from "@/components/Icon";
-import { listarAcessos } from "@/services/suporte";
+import { listarAcessos, getSuporte, logout } from "@/services/suporte";
+import { cn, getInitials } from "@/lib/utils";
 import {
   LuMenu,
   LuHouse,
@@ -19,6 +20,11 @@ import {
   LuSend,
   LuX,
   LuTriangleAlert,
+  LuPanelLeftClose,
+  LuPanelLeft,
+  LuChevronDown,
+  LuLogOut,
+  LuSettings,
 } from "react-icons/lu";
 
 const TITULOS = {
@@ -27,6 +33,17 @@ const TITULOS = {
   "/suporte/acessos": "Acessos",
   "/suporte/configuracoes": "Configurações",
 };
+
+function MarcaSuporte() {
+  return (
+    <svg className="h-full w-full" fill="none" viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg">
+      <path d="M0 0H20V32H0V0Z" fill="#EE2A24" />
+      <path d="M20 0H40V32H20V0Z" fill="#0066FF" />
+      <path d="M0 16L20 0V32L0 16Z" fill="#FFB800" />
+      <path d="M20 0C25 10 35 15 40 16C35 20 25 22 20 32V0Z" fill="#0047AB" opacity="0.75" />
+    </svg>
+  );
+}
 
 function Breadcrumbs({ caminho }) {
   const partes = caminho.split("/").filter(Boolean);
@@ -222,10 +239,12 @@ export default function SuporteLayout({ children }) {
   const [recolhida, setRecolhida] = useState(false);
   const [sinoAberto, setSinoAberto] = useState(false);
   const [chatAberto, setChatAberto] = useState(false);
+  const [perfilAberto, setPerfilAberto] = useState(false);
   const [semNotificacoes, setSemNotificacoes] = useState(false);
   const caminho = usePathname();
   const emLogin = caminho === "/suporte/login";
   const { dark, toggleTheme } = useTheme();
+  const utilizador = getSuporte();
 
   useEffect(() => {
     const guardado = localStorage.getItem("sigraf-suporte-sidebar") === "recolhida";
@@ -265,7 +284,7 @@ export default function SuporteLayout({ children }) {
             aria-label={recolhida ? "Expandir barra lateral" : "Recolher barra lateral"}
             title={recolhida ? "Expandir barra" : "Recolher barra"}
             className="group/rail fixed top-1/2 z-30 hidden h-12 w-7 -translate-y-1/2 cursor-pointer items-center pl-2 outline-none transition-[left] duration-200 ease-linear md:flex"
-            style={{ left: recolhida ? 52 : 250 }}
+            style={{ left: recolhida ? 60 : 240 }}
           >
             <span className="flex flex-col items-center">
               <span className="block h-2 w-0.5 rounded-t-full bg-foreground/40 origin-bottom transition-all duration-100 ease-linear group-hover/rail:rotate-40 group-hover/rail:bg-foreground/60" />
@@ -289,45 +308,77 @@ export default function SuporteLayout({ children }) {
           )}
 
           <div className="relative flex min-w-0 flex-1 flex-col bg-background">
-            <header className="sticky top-0 z-30 flex h-12 w-full shrink-0 items-center border-b border-border bg-background px-4">
-              <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-2">
+            <header className="sticky top-0 z-30 flex h-14 w-full shrink-0 items-center border-b border-border bg-card px-3 sm:px-4">
+              <div className="mx-auto flex w-full max-w-[1500px] items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setMenuAberto(true)}
                     aria-label="Abrir menu"
-                    className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-transparent bg-background text-muted-foreground transition-all hover:bg-muted hover:text-foreground md:hidden"
+                    className="-ml-1 inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
                   >
-                    <LuMenu className="size-4" />
+                    <LuMenu className="size-5" />
                   </button>
+                  <button
+                    type="button"
+                    onClick={alternarSidebar}
+                    aria-label={recolhida ? "Expandir menu" : "Recolher menu"}
+                    title={recolhida ? "Expandir menu" : "Recolher menu"}
+                    className="hidden size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:inline-flex"
+                  >
+                    {recolhida ? <LuPanelLeft className="size-[18px]" /> : <LuPanelLeftClose className="size-[18px]" />}
+                  </button>
+
+                  <span className="hidden min-w-0 items-center gap-2.5 border-r border-border pr-4 sm:flex">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center">
+                      <MarcaSuporte />
+                    </span>
+                    <span className="hidden leading-none lg:flex">
+                      <span className="flex items-baseline gap-1.5">
+                        <span className="text-xl font-black tracking-tight text-foreground">KAMGEST</span>
+                        <span className="text-base font-bold text-muted-foreground">1.0</span>
+                      </span>
+                      <span className="mt-1 block text-[10px] font-semibold tracking-tight text-muted-foreground">
+                        Consola de suporte
+                      </span>
+                    </span>
+                  </span>
+
                   <Breadcrumbs caminho={caminho} />
                 </div>
 
-                <div className="relative flex shrink-0 items-center gap-2">
+                <div className="relative flex shrink-0 items-center gap-1 sm:gap-1.5">
                   <button
                     type="button"
                     aria-label="Pesquisar"
-                    className="hidden h-8 w-64 items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 text-sm font-medium text-muted-foreground transition-all hover:bg-muted hover:text-foreground lg:w-80 md:flex"
+                    className="hidden h-9 w-64 items-center rounded-lg border border-border bg-muted/50 pl-9 pr-3 text-left text-xs text-muted-foreground transition-colors hover:border-outline-variant hover:bg-card md:flex lg:w-80"
                   >
-                    <LuSearch className="size-3.5 opacity-60" />
-                    <span>Pesquisar ou saltar para…</span>
-                    <kbd className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-sm bg-muted px-1 font-sans text-xs font-medium text-muted-foreground select-none">
-                      ⌘K
-                    </kbd>
+                    <LuSearch className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    Pesquisar na consola...
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Pesquisar"
+                    className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
+                  >
+                    <LuSearch className="size-[18px]" />
                   </button>
 
-                  <span className="hidden h-4 w-px bg-border md:block" />
+                  <span className="hidden h-6 w-px bg-border sm:block" />
 
                   {/* Caixa de mensagens */}
                   <div className="relative">
                     <button
                       type="button"
-                      onClick={() => { setChatAberto((v) => !v); setSinoAberto(false); }}
+                      onClick={() => { setChatAberto((v) => !v); setSinoAberto(false); setPerfilAberto(false); }}
                       aria-label="Mensagens"
                       aria-expanded={chatAberto}
-                      className={`inline-flex size-8 items-center justify-center rounded-lg border border-transparent bg-background text-muted-foreground transition-all hover:bg-muted hover:text-foreground [&_svg]:opacity-60 hover:[&_svg]:opacity-100 ${chatAberto ? "bg-muted text-foreground" : ""}`}
+                      className={cn(
+                        "inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                        chatAberto && "bg-muted text-foreground"
+                      )}
                     >
-                      <LuMessageSquare className="size-4" />
+                      <LuMessageSquare className="size-[18px]" />
                     </button>
                     <CaixaMensagens aberto={chatAberto} onFechar={() => setChatAberto(false)} />
                   </div>
@@ -336,22 +387,25 @@ export default function SuporteLayout({ children }) {
                   <div className="relative">
                     <button
                       type="button"
-                      onClick={() => { setSinoAberto((v) => !v); setChatAberto(false); }}
+                      onClick={() => { setSinoAberto((v) => !v); setChatAberto(false); setPerfilAberto(false); }}
                       aria-label={semNotificacoes ? "Notificações, com novas" : "Notificações"}
                       aria-expanded={sinoAberto}
-                      className={`relative inline-flex size-8 items-center justify-center rounded-lg border border-transparent bg-background text-muted-foreground transition-all hover:bg-muted hover:text-foreground [&_svg]:opacity-60 hover:[&_svg]:opacity-100 ${sinoAberto ? "bg-muted text-foreground" : ""}`}
+                      className={cn(
+                        "relative inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                        sinoAberto && "bg-muted text-foreground"
+                      )}
                     >
-                      <LuBell className="size-4" />
+                      <LuBell className="size-[18px]" />
                       {semNotificacoes && (
-                        <span className="absolute top-0.5 right-1 size-1.5 rounded-full bg-primary" aria-hidden="true" />
+                        <span className="absolute top-1 right-1 size-2 rounded-full border-2 border-card bg-error" aria-hidden="true" />
                       )}
                     </button>
                     <PainelNotificacoes aberto={sinoAberto} onFechar={() => setSinoAberto(false)} />
                   </div>
 
-                  <span className="hidden h-4 w-px bg-border sm:block" />
+                  <span className="hidden h-6 w-px bg-border sm:block" />
 
-                  <span className="hidden items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-muted-foreground sm:flex">
+                  <span className="hidden items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-muted-foreground lg:flex">
                     <LuShield className="size-3.5 text-primary" />
                     Área restrita
                   </span>
@@ -361,16 +415,76 @@ export default function SuporteLayout({ children }) {
                     onClick={toggleTheme}
                     aria-label={dark ? "Mudar para tema claro" : "Mudar para tema escuro"}
                     title={dark ? "Tema claro" : "Tema escuro"}
-                    className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-transparent bg-background text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
+                    className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   >
                     <Icon name={dark ? "light_mode" : "dark_mode"} className="text-base" />
                   </button>
+
+                  {/* Perfil do técnico de suporte */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => { setPerfilAberto((v) => !v); setSinoAberto(false); setChatAberto(false); }}
+                      aria-expanded={perfilAberto}
+                      aria-haspopup="menu"
+                      className="flex select-none items-center gap-2 rounded-lg border-l border-border py-1 pl-2 pr-1.5 transition-colors hover:bg-muted"
+                    >
+                      <span className="flex size-8 items-center justify-center rounded-full bg-[#0b2447] text-xs font-bold tracking-wide text-white">
+                        {getInitials(utilizador?.nome)}
+                      </span>
+                      <span className="hidden flex-col text-left leading-tight xl:flex">
+                        <span className="text-xs font-bold leading-tight text-foreground">{utilizador?.nome || "Suporte"}</span>
+                        <span className="text-[10px] leading-tight text-muted-foreground">
+                          {utilizador?.email || "Sessão ativa"}
+                        </span>
+                      </span>
+                      <LuChevronDown className="ml-0.5 size-4 text-muted-foreground" />
+                    </button>
+
+                    {perfilAberto && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setPerfilAberto(false)} />
+                        <div className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-xl border border-border bg-popover shadow-dropdown">
+                          <div className="border-b border-border px-4 py-3">
+                            <p className="truncate text-sm font-semibold text-foreground">{utilizador?.nome || "Suporte"}</p>
+                            <p className="truncate text-[11px] text-muted-foreground">
+                              {utilizador?.email || "Sessão ativa"}
+                            </p>
+                          </div>
+                          <div className="p-1.5">
+                            <Link
+                              href="/suporte/configuracoes"
+                              onClick={() => setPerfilAberto(false)}
+                              className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            >
+                              <LuSettings className="size-4" /> Configurações
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={toggleTheme}
+                              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            >
+                              <Icon name={dark ? "light_mode" : "dark_mode"} className="text-base" />
+                              {dark ? "Tema claro" : "Tema escuro"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={logout}
+                              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-error transition-colors hover:bg-error/10"
+                            >
+                              <LuLogOut className="size-4" /> Sair
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             </header>
 
-            <main className="flex flex-1 flex-col gap-4 p-4">
-              <div className="@container mx-auto flex w-full max-w-7xl flex-col gap-5 text-foreground">
+            <main className="flex flex-1 flex-col p-4 sm:p-5 lg:p-6">
+              <div className="@container mx-auto flex w-full max-w-[1500px] flex-col gap-5 text-foreground">
                 <div key={caminho} className="flex flex-col gap-4 sm:gap-5 animate-page-fade">{children}</div>
               </div>
             </main>
