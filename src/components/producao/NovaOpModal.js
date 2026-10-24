@@ -17,8 +17,22 @@ function clienteLabel(c) {
   return c.empresa ? `${c.empresa} · ${c.nome}` : c.nome;
 }
 
+// Lista todos os artigos/produtos do orçamento (um orçamento pode ter vários itens).
+function produtosDe(orc) {
+  const nomes = (orc?.itens || [])
+    .map((i) => String(i.descricao || "").trim())
+    .filter(Boolean);
+  const espec = String(orc?.especificacao?.produto || "").trim();
+  if (nomes.length === 0 && espec) return [espec];
+  return nomes;
+}
+
+// O campo produto da OP é guardado em STRING(200) no backend.
 function produtoDe(orc) {
-  return orc?.especificacao?.produto || orc?.itens?.[0]?.descricao || (orc ? `Orçamento ${orc.numero}` : "");
+  const nomes = produtosDe(orc);
+  if (nomes.length === 0) return orc ? `Orçamento ${orc.numero}` : "";
+  const texto = nomes.join(" · ");
+  return texto.length > 190 ? `${texto.slice(0, 189).trimEnd()}…` : texto;
 }
 
 function quantidadeDe(orc) {
@@ -106,6 +120,7 @@ export default function NovaOpModal({ open, onClose, onCriada }) {
   );
   const materiais = useMemo(() => materiaisDe(orcamento), [orcamento]);
   const quantidade = useMemo(() => quantidadeDe(orcamento), [orcamento]);
+  const produtos = useMemo(() => produtosDe(orcamento), [orcamento]);
   const produto = useMemo(() => produtoDe(orcamento), [orcamento]);
 
   const submeter = async (e) => {
@@ -222,7 +237,15 @@ export default function NovaOpModal({ open, onClose, onCriada }) {
               </div>
               <div>
                 <p className="text-[11px] font-semibold text-muted-foreground">Artigo / Produto</p>
-                <p className="text-sm text-foreground">{produto}</p>
+                {produtos.length > 0 ? (
+                  <ul className="space-y-0.5">
+                    {produtos.map((nome, i) => (
+                      <li key={`${nome}-${i}`} className="text-sm text-foreground">{nome}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-foreground">{produto}</p>
+                )}
               </div>
               <div>
                 <p className="text-[11px] font-semibold text-muted-foreground">Tiragem</p>

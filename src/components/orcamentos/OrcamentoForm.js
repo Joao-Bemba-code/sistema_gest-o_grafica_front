@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Icon from "@/components/Icon";
 import NumeroInput from "@/components/ui/NumeroInput";
 import { Button } from "@/components/ui/Button";
-import { inputCls, especificacoesObjeto, normalizarFamilia, dimensaoPadrao, dimensoesFolhaMaterial, dimensoesFormatoFinal, encaixeGuilhotina, calcCustoParcialFolha, temComposicao, ehProduto } from "@/lib/estoque";
+import { inputCls, especificacoesObjeto, normalizarFamilia, dimensaoPadrao, dimensoesFolhaMaterial, dimensoesFormatoFinal, encaixeGuilhotina, calcCustoParcialFolha, temComposicao, ehProduto, tipoChaveDe } from "@/lib/estoque";
 
 export const formatosSugeridos = ["A3", "A4", "A5", "A6", "A7", "A8", "A9", "B4", "B5", "66x96", "70x100"];
 
@@ -98,6 +98,19 @@ function ehPapel(m) {
   return !!m && normalizarFamilia(m.categoria?.familia) === "papeis";
 }
 
+// Categoria efetiva do material: a ligada no cadastro ou, quando não existe,
+// a que foi escrita à mão (família/grupo) nas especificações.
+function categoriaEfetiva(m) {
+  if (m?.categoria?.tipo) return m.categoria;
+  const esp = especificacoesObjeto(m?.especificacoes);
+  const grupo = esp.grupo || esp.categoria;
+  return grupo ? { tipo: tipoChaveDe(grupo) } : null;
+}
+
+function ehArtigoProduto(m) {
+  return ehProduto(categoriaEfetiva(m));
+}
+
 function ehFolhaMaterial(m) {
   if (!m) return false;
   const unidade = String(m.unidade || "").toLowerCase();
@@ -177,7 +190,14 @@ export default function OrcamentoForm({ formId = "form-orcamento", form, setFiel
   const id = (sufixo) => `${formId}-${sufixo}`;
   const produtosComposicao = materiais.filter((m) => temComposicao(m));
   const materiaisEstoque = materiais.filter((m) => m.mover_estoque !== false);
-  const produtosArquivo = materiais.filter((m) => m.mover_estoque === false && ehProduto(m.categoria));
+  // Todos os artigos/produtos registados, controlem stock ou não: o campo de
+  // descrição tem de listar os produtos do cadastro, não apenas os que já
+  // estão marcados como "não movimenta estoque".
+  const produtosArquivo = materiais
+    .filter((m) => ehArtigoProduto(m) || temComposicao(m))
+    .sort((a, b) =>
+      String(a.nome || a.nome_tecnico || "").localeCompare(String(b.nome || b.nome_tecnico || ""), "pt")
+    );
 
   useEffect(() => {
     const vh = Number(valorHoraServicos) || 0;
