@@ -25,6 +25,18 @@ export async function removerMovimento(id) {
   return data;
 }
 
+// Anula um movimento: o registo mantém-se e o saldo da conta é reposto.
+export async function anularMovimento(id, motivo) {
+  const { data } = await api.post(`/tesouraria/${id}/anular`, { motivo });
+  return data;
+}
+
+// Conciliação bancária: marca/desmarca movimentos como conferidos com o extrato.
+export async function conciliarMovimentos(ids, conciliado = true) {
+  const { data } = await api.post("/tesouraria/conciliar", { ids, conciliado });
+  return data;
+}
+
 export async function resumoTesouraria(params = {}) {
   const { data } = await api.get("/tesouraria/resumo", { params });
   return data;

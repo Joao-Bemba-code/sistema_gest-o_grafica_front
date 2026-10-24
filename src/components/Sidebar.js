@@ -1,23 +1,28 @@
 "use client";
 
-import { useEffect } from "react";
-import { usePathname } from "next/navigation";
+import { Suspense, useState, useEffect } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Icon from "@/components/Icon";
 import { cn } from "@/lib/utils";
 import { podeAtual } from "@/lib/permissoes";
 import { ITENS_NAVEGACAO, itemAtivo } from "@/lib/navegacao";
-import { LuChevronRight, LuX } from "react-icons/lu";
+import { LuArrowLeft, LuChevronRight, LuX } from "react-icons/lu";
 
-function Navegacao({ itens, ativo, onNavegar, colapsado = false }) {
+function Navegacao({ itens, ativo, onNavegar, onItem, colapsado = false }) {
   return (
     <nav className="flex-1 space-y-1 overflow-y-auto px-2.5 py-3 custom-scrollbar">
-      {itens.map(({ icone: Icone, nome, para }) => {
+      {itens.map((item) => {
+        const { icone: Icone, nome, para } = item;
         const activo = para === ativo;
         return (
           <Link
             key={para + nome}
             href={para}
-            onClick={onNavegar}
+            onClick={() => {
+              onItem?.(item);
+              onNavegar?.();
+            }}
             title={colapsado ? nome : undefined}
             aria-label={nome}
             className={cn(
@@ -39,6 +44,120 @@ function Navegacao({ itens, ativo, onNavegar, colapsado = false }) {
         );
       })}
     </nav>
+  );
+}
+
+// Itens do módulo Comercial, na vertical. Lê o separador actual (?tab=)
+// para destacar a opção certa.
+function SubmenuComercial({ item, tabAtual, onNavegar, colapsado = false }) {
+  return item.subitens.map(({ nome, tab, icone }) => {
+    const activo = tab === tabAtual;
+    return (
+      <Link
+        key={tab}
+        href={`${item.para}?tab=${tab}`}
+        onClick={onNavegar}
+        title={colapsado ? nome : undefined}
+        aria-label={nome}
+        aria-current={activo ? "page" : undefined}
+        className={cn(
+          "flex items-center rounded-lg text-[13px] transition-colors",
+          colapsado ? "justify-center px-0 py-2.5" : "px-3 py-2.5",
+          activo
+            ? "bg-primary font-semibold text-primary-foreground shadow-sm"
+            : "font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+        )}
+      >
+        {colapsado ? <Icon name={icone} className="text-base" /> : nome}
+      </Link>
+    );
+  });
+}
+
+function SubmenuComercialComParametros({ item, onNavegar, colapsado }) {
+  const params = useSearchParams();
+  const tabUrl = params.get("tab");
+  const tabAtual = item.subitens.some((s) => s.tab === tabUrl) ? tabUrl : item.tabPadrao;
+  return (
+    <SubmenuComercial
+      item={item}
+      tabAtual={tabAtual}
+      onNavegar={onNavegar}
+      colapsado={colapsado}
+    />
+  );
+}
+
+// Enquanto o módulo Comercial está aberto, o menu principal dá lugar ao
+// menu do módulo. A seta volta a mostrar o menu principal sem sair da página.
+function NavegacaoComercial({ item, onVoltar, onNavegar, colapsado = false }) {
+  return (
+    <div className="flex-1 overflow-y-auto px-2.5 py-3 custom-scrollbar">
+      <div className={cn("mb-2 flex items-center", colapsado ? "justify-center" : "gap-2 px-1")}>
+        <button
+          type="button"
+          onClick={onVoltar}
+          title="Voltar ao menu principal"
+          aria-label="Voltar ao menu principal"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <LuArrowLeft className="h-4 w-4" />
+        </button>
+        {!colapsado && (
+          <span className="min-w-0 truncate text-[12px] font-semibold text-muted-foreground">
+            M02 <span className="text-muted-foreground/50">/</span>{" "}
+            <span className="text-foreground">Comercial</span>
+          </span>
+        )}
+      </div>
+      <nav className="space-y-1">
+        <Suspense
+          fallback={
+            <SubmenuComercial
+              item={item}
+              tabAtual={item.tabPadrao}
+              onNavegar={onNavegar}
+              colapsado={colapsado}
+            />
+          }
+        >
+          <SubmenuComercialComParametros
+            item={item}
+            onNavegar={onNavegar}
+            colapsado={colapsado}
+          />
+        </Suspense>
+      </nav>
+    </div>
+  );
+}
+
+function AreaNavegacao({ caminho, itens, ativo, colapsado = false, onNavegar }) {
+  const [menuPrincipal, setMenuPrincipal] = useState(false);
+  const comercial = itens.find((it) => it.para === "/vendas");
+  const emComercial = caminho === "/vendas" || caminho.startsWith("/vendas/");
+
+  if (comercial && emComercial && !menuPrincipal) {
+    return (
+      <NavegacaoComercial
+        item={comercial}
+        onVoltar={() => setMenuPrincipal(true)}
+        onNavegar={onNavegar}
+        colapsado={colapsado}
+      />
+    );
+  }
+
+  return (
+    <Navegacao
+      itens={itens}
+      ativo={ativo}
+      colapsado={colapsado}
+      onNavegar={onNavegar}
+      onItem={(item) => {
+        if (item.para === "/vendas") setMenuPrincipal(false);
+      }}
+    />
   );
 }
 
@@ -130,7 +249,13 @@ export default function Sidebar({
         )}
       >
         <CabecalhoMarca colapsado={colapsado} />
-        <Navegacao itens={itens} ativo={ativo} colapsado={colapsado} />
+        <AreaNavegacao
+          key={caminho}
+          caminho={caminho}
+          itens={itens}
+          ativo={ativo}
+          colapsado={colapsado}
+        />
         <Rodape colapsado={colapsado} />
       </aside>
 
@@ -157,7 +282,13 @@ export default function Sidebar({
             <LuX className="h-5 w-5" />
           </button>
         </div>
-        <Navegacao itens={itens} ativo={ativo} onNavegar={onFechar} />
+        <AreaNavegacao
+          key={caminho}
+          caminho={caminho}
+          itens={itens}
+          ativo={ativo}
+          onNavegar={onFechar}
+        />
         <Rodape />
       </aside>
     </>

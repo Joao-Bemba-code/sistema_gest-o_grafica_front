@@ -14,10 +14,28 @@ import {
   LuUser,
 } from "react-icons/lu";
 
+// Submenus por módulo — substituem o menu principal enquanto o módulo está aberto.
+export const SUBITENS_COMERCIAL = [
+  { nome: "Clientes", tab: "clientes", icone: "groups" },
+  { nome: "Propostas", tab: "propostas", icone: "description" },
+  { nome: "Orçamentos", tab: "orcamentos", icone: "request_quote" },
+  { nome: "Encomendas", tab: "pedidos", icone: "pending_actions" },
+  { nome: "Facturação", tab: "vendas", icone: "receipt_long" },
+  { nome: "Entregas", tab: "entregas", icone: "local_shipping" },
+  { nome: "Acompanhamento", tab: "acompanhamento", icone: "history" },
+];
+
 // Itens do menu lateral (com permissão associada)
 export const ITENS_NAVEGACAO = [
   { icone: LuHouse, nome: "Visão Geral", para: "/", perm: ["comercial", "ver"] },
-  { icone: LuShoppingCart, nome: "Comercial", para: "/vendas", perm: ["comercial", "ver"] },
+  {
+    icone: LuShoppingCart,
+    nome: "Comercial",
+    para: "/vendas",
+    perm: ["comercial", "ver"],
+    subitens: SUBITENS_COMERCIAL,
+    tabPadrao: "orcamentos",
+  },
   { icone: LuCog, nome: "Produção", para: "/producao", perm: ["producao", "ver"] },
   { icone: LuBox, nome: "Stocks", para: "/estoque", perm: ["estoque", "ver"] },
   { icone: LuShoppingBag, nome: "Compras", para: "/compras", perm: ["estoque", "ver"] },

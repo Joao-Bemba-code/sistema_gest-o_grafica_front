@@ -15,7 +15,6 @@ import Paginacao, { usePaginacao } from "@/components/ui/Paginacao";
 import {
   Ledger,
   LedgerHeader,
-  FilterRow,
   LedgerTable,
   LedgerTh,
   LedgerTr,
@@ -25,6 +24,7 @@ import {
   LedgerEmpty,
 } from "@/components/ui/Ledger";
 import { listar, criar, atualizar, remover } from "@/services/clientes";
+import { listarFaturas } from "@/services/faturacao";
 
 const initialForm = {
   tipo: "cliente", nome: "", empresa: "", nif: "", telefone: "",
@@ -32,23 +32,31 @@ const initialForm = {
   dataCadastro: new Date().toISOString().split("T")[0],
 };
 
-const CAMPOS = [
-  { value: "geral", label: "Todos os campos", obter: (c) => `${c.nome || ""} ${c.empresa || ""} ${c.codigo || ""} ${c.nif || ""}` },
-  { value: "nome", label: "Nome", obter: (c) => c.nome || "" },
-  { value: "empresa", label: "Empresa", obter: (c) => c.empresa || "" },
-  { value: "nif", label: "NIF", obter: (c) => c.nif || "" },
-  { value: "tipo", label: "Tipo", obter: (c) => (c.tipo === "fornecedor" ? "fornecedor" : "cliente") },
+const FILTRO_VAZIO = { termo: "", segmento: "", estado: "" };
+
+const SEGMENTOS = [
+  { value: "cliente", label: "Cliente" },
+  { value: "fornecedor", label: "Fornecedor" },
 ];
 
-export default function CadastrosTab({ apenas } = {}) {
+const ESTADOS = [
+  { value: "ativo", label: "Ativo" },
+  { value: "inativo", label: "Inativo" },
+];
+
+const campoCls =
+  "h-9 w-full rounded-lg border border-border bg-card px-2.5 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/25";
+
+export default function CadastrosTab({ apenas, mesFiltro = null, faturas } = {}) {
   const tipoPadrao = apenas || "cliente";
+  const ehCliente = apenas === "cliente";
   const formVazio = { ...initialForm, tipo: tipoPadrao };
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(formVazio);
   const [clientes, setClientes] = useState([]);
-  const [filtro, setFiltro] = useState({ campo: "geral", operador: "contem", termo: "" });
-  const [ordem, setOrdem] = useState({ chave: "", dir: 1 });
-  const [filtrosAbertos, setFiltrosAbertos] = useState(true);
+  const [faturasLocal, setFaturasLocal] = useState([]);
+  const [rascunho, setRascunho] = useState(FILTRO_VAZIO);
+  const [aplicado, setAplicado] = useState(FILTRO_VAZIO);
   const [carregando, setCarregando] = useState(true);
   const [editando, setEditando] = useState(null);
   const [detalhes, setDetalhes] = useState(null);
@@ -57,7 +65,6 @@ export default function CadastrosTab({ apenas } = {}) {
   const { addToast } = useToast();
 
   const carregar = useCallback(async () => {
-    setCarregando(true);
     try {
       const data = await listar({});
       setClientes(Array.isArray(data) ? data : data?.data ?? []);
@@ -68,10 +75,29 @@ export default function CadastrosTab({ apenas } = {}) {
   }, [addToast]);
 
   useEffect(() => {
-    carregar();
-  }, [carregar]);
+    let ativo = true;
+    listar({})
+      .then((data) => { if (ativo) setClientes(Array.isArray(data) ? data : data?.data ?? []); })
+      .catch((err) => {
+        if (!ativo) return;
+        addToast(err.response?.data?.erro || "Erro ao carregar clientes", "error");
+        setClientes([]);
+      })
+      .finally(() => { if (ativo) setCarregando(false); });
+    return () => { ativo = false; };
+  }, [addToast]);
 
-  const campos = useMemo(() => (apenas ? CAMPOS.filter((c) => c.value !== "tipo") : CAMPOS), [apenas]);
+  // Na página Clientes (fora do Comercial) ainda não há faturas carregadas:
+  // busca-as aqui para calcular as pendências. No Comercial chegam por prop.
+  useEffect(() => {
+    if (!ehCliente || Array.isArray(faturas)) return undefined;
+    let ativo = true;
+    listarFaturas()
+      .then((d) => { if (ativo) setFaturasLocal(Array.isArray(d) ? d : d?.data ?? []); })
+      .catch(() => { if (ativo) setFaturasLocal([]); });
+    return () => { ativo = false; };
+  }, [ehCliente, faturas]);
+
   const base = useMemo(
     () => (apenas ? clientes.filter((c) => (c.tipo === "fornecedor" ? "fornecedor" : "cliente") === apenas) : clientes),
     [clientes, apenas]
@@ -80,27 +106,63 @@ export default function CadastrosTab({ apenas } = {}) {
   const totalClientes = clientes.filter((c) => c.tipo === "cliente").length;
   const totalFornecedores = clientes.filter((c) => c.tipo === "fornecedor").length;
 
+  const faturasDisponiveis = Array.isArray(faturas) ? faturas : faturasLocal;
+
+  const periodo = useMemo(() => {
+    const ref = mesFiltro instanceof Date ? mesFiltro : new Date();
+    const chave = `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, "0")}`;
+    const rotulo = ref.toLocaleDateString("pt-PT", { month: "long", year: "numeric" });
+    return { chave, rotulo: rotulo.charAt(0).toUpperCase() + rotulo.slice(1) };
+  }, [mesFiltro]);
+
+  const totalAtivos = useMemo(() => base.filter((c) => c.ativo !== false).length, [base]);
+
+  const novosNoPeriodo = useMemo(
+    () => base.filter((c) => String(c.dataCadastro || c.data_cadastro || "").startsWith(periodo.chave)).length,
+    [base, periodo.chave]
+  );
+
+  // Saldo em aberto por cliente: faturas não pagas/anuladas e recibos não contam.
+  const dividaPorCliente = useMemo(() => {
+    const mapa = new Map();
+    for (const f of faturasDisponiveis) {
+      if (!f || ["recibo", "proforma", "nota_credito"].includes(f.tipo) || ["paga", "cancelada"].includes(f.estado)) continue;
+      const cid = Number(f.cliente_id ?? f.cliente?.id);
+      if (!Number.isInteger(cid) || cid <= 0) continue;
+      const saldo = Number(f.total ?? f.valor ?? 0) - Number(f.valor_pago ?? 0);
+      if (saldo <= 0) continue;
+      mapa.set(cid, (mapa.get(cid) || 0) + saldo);
+    }
+    return mapa;
+  }, [faturasDisponiveis]);
+
+  const clientesComPendencia = useMemo(
+    () => base.filter((c) => (dividaPorCliente.get(Number(c.id)) || 0) > 0).length,
+    [base, dividaPorCliente]
+  );
+
   const resultado = useMemo(() => {
-    const termo = filtro.termo.trim().toLowerCase();
+    const termo = aplicado.termo.trim().toLowerCase();
     let res = [...base];
     if (termo) {
-      const cfg = campos.find((c) => c.value === filtro.campo) || campos[0];
-      res = res.filter((c) => {
-        const alvo = String(cfg.obter(c) || "").toLowerCase();
-        if (filtro.operador === "igual") return alvo === termo;
-        if (filtro.operador === "comeca") return alvo.startsWith(termo);
-        return alvo.includes(termo);
-      });
+      res = res.filter((c) =>
+        `${c.nome || ""} ${c.nif || ""} ${c.codigo || ""}`.toLowerCase().includes(termo)
+      );
     }
-    if (ordem.chave) {
-      res.sort((a, b) => {
-        const av = String(a[ordem.chave] || "").toLowerCase();
-        const bv = String(b[ordem.chave] || "").toLowerCase();
-        return (av < bv ? -1 : av > bv ? 1 : 0) * ordem.dir;
-      });
+    if (aplicado.segmento) {
+      res = res.filter((c) => (c.tipo === "fornecedor" ? "fornecedor" : "cliente") === aplicado.segmento);
     }
+    if (aplicado.estado === "ativo") res = res.filter((c) => c.ativo !== false);
+    if (aplicado.estado === "inativo") res = res.filter((c) => c.ativo === false);
     return res;
-  }, [base, filtro, ordem, campos]);
+  }, [base, aplicado]);
+
+  const temFiltro = Boolean(aplicado.termo || aplicado.segmento || aplicado.estado);
+  const aplicar = () => setAplicado({ ...rascunho });
+  const limpar = () => {
+    setRascunho(FILTRO_VAZIO);
+    setAplicado(FILTRO_VAZIO);
+  };
 
   const pag = usePaginacao({ items: resultado });
 
@@ -164,28 +226,91 @@ export default function CadastrosTab({ apenas } = {}) {
 
   return (
     <div className="space-y-4">
+      {ehCliente && (
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+          {[
+            { label: "Clientes ativos", valor: totalAtivos, icone: "groups", tom: "bg-primary/10 text-primary" },
+            { label: "Novos no período", valor: novosNoPeriodo, icone: "person_add", tom: "bg-info/10 text-info", legenda: periodo.rotulo },
+            { label: "Pendências", valor: clientesComPendencia, icone: "pending_actions", tom: "bg-warning/10 text-warning" },
+          ].map((k) => (
+            <div key={k.label} className="flex items-center gap-4 rounded-xl border border-border bg-card p-4 shadow-sm">
+              <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${k.tom}`}>
+                <Icon name={k.icone} className="text-xl" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-muted-foreground">{k.label}</p>
+                <p className="text-2xl font-black leading-tight tracking-tight text-foreground tabular-nums">{k.valor}</p>
+                {k.legenda && <p className="text-[10px] font-medium text-muted-foreground">{k.legenda}</p>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <Ledger rotulo={`${titulo} ledger`}>
-        <LedgerHeader
-          titulo={titulo}
-          subtitulo={subtitulo}
-          novo={apenas === "fornecedor" ? "Novo fornecedor" : apenas === "cliente" ? "Novo cliente" : "Novo cadastro"}
-          aoNovo={abrirNovo}
-          onToggleFiltros={() => setFiltrosAbertos((v) => !v)}
-          filtrosAbertos={filtrosAbertos}
-        />
-        {filtrosAbertos && (
-          <FilterRow
-            campo={filtro.campo}
-            setCampo={(v) => setFiltro((f) => ({ ...f, campo: v }))}
-            campos={campos.map(({ value, label }) => ({ value, label }))}
-            operador={filtro.operador}
-            setOperador={(v) => setFiltro((f) => ({ ...f, operador: v }))}
-            termo={filtro.termo}
-            setTermo={(v) => setFiltro((f) => ({ ...f, termo: v }))}
-            aoLimpar={() => setFiltro((f) => ({ ...f, termo: "" }))}
-            placeholder="Pesquisar..."
-          />
-        )}
+        <LedgerHeader titulo={titulo} subtitulo={subtitulo} />
+
+        <div className="border-b border-border bg-muted/30 px-4 py-3">
+          <p className="mb-2 text-xs font-semibold text-muted-foreground">Filtros</p>
+          <div className="flex flex-wrap items-end gap-2.5">
+            <label className="flex min-w-44 flex-1 flex-col gap-1 sm:max-w-64 sm:flex-none">
+              <span className="text-[11px] font-medium text-muted-foreground">Nome / NIF</span>
+              <input
+                value={rascunho.termo}
+                onChange={(e) => setRascunho((f) => ({ ...f, termo: e.target.value }))}
+                onKeyDown={(e) => { if (e.key === "Enter") aplicar(); }}
+                placeholder="Pesquisar nome ou NIF"
+                aria-label="Nome ou NIF"
+                className={campoCls}
+              />
+            </label>
+
+            <label className="flex min-w-36 flex-1 flex-col gap-1 sm:flex-none">
+              <span className="text-[11px] font-medium text-muted-foreground">Segmento</span>
+              <select
+                value={rascunho.segmento}
+                onChange={(e) => setRascunho((f) => ({ ...f, segmento: e.target.value }))}
+                className={campoCls}
+              >
+                <option value="">Todos</option>
+                {SEGMENTOS.map((s) => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex min-w-32 flex-1 flex-col gap-1 sm:flex-none">
+              <span className="text-[11px] font-medium text-muted-foreground">Estado</span>
+              <select
+                value={rascunho.estado}
+                onChange={(e) => setRascunho((f) => ({ ...f, estado: e.target.value }))}
+                className={campoCls}
+              >
+                <option value="">Todos</option>
+                {ESTADOS.map((s) => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+            </label>
+
+            <button
+              type="button"
+              onClick={aplicar}
+              className="inline-flex h-9 items-center rounded-lg bg-primary px-4 text-xs font-bold uppercase tracking-wider text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 active:scale-[0.98]"
+            >
+              Aplicar
+            </button>
+            {temFiltro && (
+              <button
+                type="button"
+                onClick={limpar}
+                className="inline-flex h-9 items-center rounded-lg border border-border bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted/60"
+              >
+                Limpar
+              </button>
+            )}
+          </div>
+        </div>
         {carregando ? (
           <div className="p-4"><ListSkeleton count={5} /></div>
         ) : (
@@ -193,37 +318,35 @@ export default function CadastrosTab({ apenas } = {}) {
             <LedgerTable>
               <thead>
                 <tr className="border-b border-border">
-                  <LedgerTh onSort={() => setOrdem((p) => (p.chave === "codigo" ? { chave: "codigo", dir: -p.dir } : { chave: "codigo", dir: 1 }))} ativo={ordem.chave === "codigo"}>Código</LedgerTh>
-                  <LedgerTh onSort={() => setOrdem((p) => (p.chave === "nome" ? { chave: "nome", dir: -p.dir } : { chave: "nome", dir: 1 }))} ativo={ordem.chave === "nome"}>Nome</LedgerTh>
-                  <LedgerTh>Empresa</LedgerTh>
+                  <LedgerTh>Código</LedgerTh>
+                  <LedgerTh>{apenas === "fornecedor" ? "Fornecedor" : "Cliente"}</LedgerTh>
                   <LedgerTh>NIF</LedgerTh>
-                  <LedgerTh>Telefone</LedgerTh>
-                  <LedgerTh>Email</LedgerTh>
+                  <LedgerTh>Contacto</LedgerTh>
+                  <LedgerTh>Estado</LedgerTh>
                   <LedgerTh className="w-10" />
                 </tr>
               </thead>
               <tbody>
                 {pag.visiveis.map((item) => (
                   <LedgerTr key={item.id ?? item.codigo} onClick={() => setDetalhes(item)}>
-                    <LedgerTd className="max-w-36">
-                      <IdCell
-                        id={item.codigo || "—"}
-                        meta={item.tipo === "fornecedor" ? "Fornecedor" : "Cliente"}
-                        aoAbrir={() => setDetalhes(item)}
-                      />
+                    <LedgerTd className="max-w-40">
+                      <IdCell id={item.codigo || "—"} aoAbrir={() => setDetalhes(item)} />
                     </LedgerTd>
                     <LedgerTd className="max-w-56">
                       <span className="flex items-center gap-2.5">
                         <Avatar nome={item.nome} tamanho="sm" />
-                        <span className="min-w-0">
-                          <span className="block truncate text-sm">{item.nome || "—"}</span>
-                        </span>
+                        <span className="block min-w-0 truncate text-sm">{item.nome || "—"}</span>
                       </span>
                     </LedgerTd>
-                    <LedgerTd className="max-w-48"><span className="block truncate">{item.empresa || "—"}</span></LedgerTd>
-                    <LedgerTd className="font-mono text-xs text-muted-foreground">{item.nif || "—"}</LedgerTd>
-                    <LedgerTd className="text-muted-foreground">{item.telefone || "—"}</LedgerTd>
-                    <LedgerTd className="max-w-44"><span className="block truncate text-muted-foreground">{item.email || "—"}</span></LedgerTd>
+                    <LedgerTd className="whitespace-nowrap font-mono text-xs text-muted-foreground">{item.nif || "—"}</LedgerTd>
+                    <LedgerTd className="max-w-44 whitespace-nowrap">
+                      <span className="block truncate">{item.telefone || item.whatsapp || item.email || "—"}</span>
+                    </LedgerTd>
+                    <LedgerTd>
+                      <StatusBadge tom={item.ativo === false ? "neutral" : "success"}>
+                        {item.ativo === false ? "Inativo" : "Ativo"}
+                      </StatusBadge>
+                    </LedgerTd>
                     <LedgerTd>
                       <RowMenu
                         ariaLabel="Ações do cadastro"
@@ -296,7 +419,39 @@ export default function CadastrosTab({ apenas } = {}) {
         </form>
       </Modal>
 
-      <Modal open={Boolean(detalhes)} onClose={() => setDetalhes(null)} title="Detalhes do cadastro" icon={detalhes?.tipo === "fornecedor" ? "local_shipping" : "person"} size="sm">
+      <Modal
+        open={Boolean(detalhes)}
+        onClose={() => setDetalhes(null)}
+        title="Detalhes do cadastro"
+        icon={detalhes?.tipo === "fornecedor" ? "local_shipping" : "person"}
+        size="sm"
+        footer={detalhes && (
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                const item = detalhes;
+                setDetalhes(null);
+                handleEdit(item);
+              }}
+            >
+              <Icon name="edit" className="text-base" /> Editar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                const item = detalhes;
+                setDetalhes(null);
+                setEliminarItem(item);
+              }}
+            >
+              <Icon name="delete" className="text-base" /> Eliminar
+            </Button>
+          </>
+        )}
+      >
         {detalhes && (
           <dl className="divide-y divide-border/50">
             {[

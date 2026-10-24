@@ -104,6 +104,7 @@ const TONS = {
   warning: "bg-warning/15 text-warning border-warning/25",
   error: "bg-error/15 text-error border-error/25",
   info: "bg-info/15 text-info border-info/25",
+  primary: "bg-primary/15 text-primary border-primary/25",
   neutral: "bg-muted/60 text-muted-foreground border-border",
 };
 

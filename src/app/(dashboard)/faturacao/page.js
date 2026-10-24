@@ -1,14 +1,12 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import Modal from "@/components/Modal";
 import Icon from "@/components/Icon";
 import { inputCls, toNum } from "@/lib/estoque";
 import NumeroInput from "@/components/ui/NumeroInput";
 import { Button } from "@/components/ui/Button";
 import FloatButton from "@/components/ui/FloatButton";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
 import RowMenu from "@/components/ui/RowMenu";
@@ -25,7 +23,7 @@ import {
   StatusBadge,
   LedgerEmpty,
 } from "@/components/ui/Ledger";
-import { criarFatura, listarFaturas, exportarFaturas, marcarPaga, buscarFatura, removerFatura, consultarEstadoAGT, enviarFaturaAGT } from "@/services/faturacao";
+import { criarFatura, listarFaturas, exportarFaturas, marcarPaga, buscarFatura, anularFatura, consultarEstadoAGT, enviarFaturaAGT } from "@/services/faturacao";
 import { listar as listarOrcamentos } from "@/services/orcamentos";
 import { listarOrdens } from "@/services/producao";
 import { listar as listarClientes } from "@/services/clientes";
@@ -34,6 +32,8 @@ import { buscarOrganizacao } from "@/services/configuracoes";
 import { resumoTesouraria, listarMovimentos } from "@/services/tesouraria";
 import { podeAtual } from "@/lib/permissoes";
 import gerarPDF from "@/lib/faturacaoPdf";
+import DespesaModal from "@/components/financeiro/DespesaModal";
+import CustosRateiosTab from "@/components/financeiro/CustosRateiosTab";
 
 const metodos = {
   dinheiro: { label: "Dinheiro", icon: "payments" },
@@ -56,7 +56,7 @@ const faturaEstados = {
   paga: { label: "Paga", tom: "success" },
   parcial: { label: "Parcial", tom: "info" },
   vencida: { label: "Vencida", tom: "error" },
-  cancelada: { label: "Cancelada", tom: "neutral" },
+  cancelada: { label: "Anulada", tom: "neutral" },
 };
 
 const agtEstados = {
@@ -86,7 +86,6 @@ const tabClsAtiva = "border-blue-600 font-bold text-blue-600";
 const tabClsInativa = "border-transparent text-muted-foreground hover:text-foreground";
 
 export default function FaturacaoPage() {
-  const router = useRouter();
   const [faturas, setFaturas] = useState([]);
   const [movimentos, setMovimentos] = useState([]);
   const [ordens, setOrdens] = useState([]);
@@ -99,12 +98,14 @@ export default function FaturacaoPage() {
   const [selectedFatura, setSelectedFatura] = useState(null);
   const [faturaForm, setFaturaForm] = useState(blankFaturaForm);
   const [empresa, setEmpresa] = useState({ nome: "", nif: "", endereco: "", telefone: "", email: "" });
-  const [eliminarItem, setEliminarItem] = useState(null);
+  const [anularItem, setAnularItem] = useState(null);
+  const [motivoAnulacao, setMotivoAnulacao] = useState("");
   const [deletando, setDeletando] = useState(false);
   const [contas, setContas] = useState([]);
   const [contaPagamento, setContaPagamento] = useState("");
   const [tesouraria, setTesouraria] = useState({});
   const [filtroMes, setFiltroMes] = useState("");
+  const [despesaModalOpen, setDespesaModalOpen] = useState(false);
   const { addToast } = useToast();
 
   const carregarDados = () => {
@@ -183,7 +184,7 @@ export default function FaturacaoPage() {
   const totalVencidas = faturas.filter((f) => f.estado === "vencida").reduce((s, f) => s + valorDoc(f), 0);
   const recebidoHoje = faturas.filter((f) => f.estado === "paga" && (f.data_pagamento || f.data_emissao) === hoje).reduce((s, f) => s + pagoDoc(f), 0);
 
-  const despesas = useMemo(() => movimentos.filter((m) => m.tipo === "saida"), [movimentos]);
+  const despesas = useMemo(() => movimentos.filter((m) => m.tipo === "saida" && m.estado !== "anulado"), [movimentos]);
   const { visiveis: despesasVisiveis, ...pagDesp } = usePaginacao({ items: despesas });
 
   const faturaSubtotal = faturaForm.itens.reduce((s, i) => s + (Number(i.quantidade) || 0) * (Number(i.preco_unit) || 0), 0);
@@ -297,17 +298,24 @@ export default function FaturacaoPage() {
     }
   };
 
-  const confirmarEliminacao = async () => {
-    if (!eliminarItem) return;
+  const confirmarAnulacao = async () => {
+    if (!anularItem) return;
     setDeletando(true);
     try {
-      await removerFatura(eliminarItem.id);
-      setFaturas((prev) => prev.filter((f) => f.id !== eliminarItem.id));
-      if (selectedFatura?.id === eliminarItem.id) setSelectedFatura(null);
-      addToast("Fatura removida com sucesso", "success");
-      setEliminarItem(null);
+      const atual = await anularFatura(anularItem.id, { motivo: motivoAnulacao.trim() || undefined });
+      setFaturas((prev) => prev.map((f) => (f.id === atual.id ? atual : f)));
+      if (selectedFatura?.id === anularItem.id) setSelectedFatura(atual);
+      addToast(
+        Number(atual.estornos) > 0
+          ? `Fatura anulada e ${atual.estornos} movimento(s) estornado(s) na tesouraria`
+          : "Fatura anulada com sucesso",
+        "success"
+      );
+      setAnularItem(null);
+      setMotivoAnulacao("");
+      carregarDados();
     } catch (err) {
-      addToast(err.response?.data?.erro || "Erro ao remover fatura", "error");
+      addToast(err.response?.data?.erro || "Erro ao anular fatura", "error");
     } finally {
       setDeletando(false);
     }
@@ -384,7 +392,7 @@ export default function FaturacaoPage() {
     { key: "resultado", icon: "bar_chart", label: "Resultado", valor: Math.round(resultado).toLocaleString("pt-AO"), sufixo: "Kz", icone: "bg-success/10 text-success", cor: resultado < 0 ? "text-error" : "text-success" },
     { key: "margem", icon: "speed", label: "Margem", valor: `${margem.toFixed(1)}%`, icone: "bg-success/10 text-success", cor: "text-foreground" },
   ];
-  const podeDespesas = podeAtual("tesouraria", "ver");
+  const podeNovaDespesa = podeAtual("tesouraria", "criar");
 
   return (
     <div className="space-y-4">
@@ -404,8 +412,8 @@ export default function FaturacaoPage() {
               <Icon name="download" className="text-base" /> Exportar
             </button>
           )}
-          {podeDespesas && (
-            <button type="button" onClick={() => router.push("/tesouraria")} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#2563eb] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700">
+          {podeNovaDespesa && (
+            <button type="button" onClick={() => setDespesaModalOpen(true)} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#2563eb] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700">
               <Icon name="add" className="text-base" /> Nova Despesa
             </button>
           )}
@@ -437,6 +445,7 @@ export default function FaturacaoPage() {
           {[
             { id: "faturas", label: "Facturação", icon: "receipt_long" },
             { id: "despesas", label: "Despesas", icon: "account_balance_wallet" },
+            { id: "custos", label: "Custos e Rateios", icon: "call_split" },
             { id: "resultados", label: "Resultados", icon: "bar_chart" },
           ].map((t) => (
             <button
@@ -549,7 +558,9 @@ export default function FaturacaoPage() {
                       itens={[
                         { icone: "visibility", rotulo: "Ver detalhes", onClick: () => abrirFatura(f) },
                         { icone: "download", rotulo: "Baixar PDF", onClick: () => gerarPDF(f, empresa) },
-                        { icone: "delete", rotulo: "Remover", danger: true, onClick: () => setEliminarItem(f) },
+                        ...(f.estado !== "cancelada"
+                          ? [{ icone: "block", rotulo: "Anular", danger: true, onClick: () => { setAnularItem(f); setMotivoAnulacao(""); } }]
+                          : []),
                       ]}
                     />
                   </LedgerTd>
@@ -602,6 +613,8 @@ export default function FaturacaoPage() {
           <Paginacao {...pagDesp} label="movimentos" />
         </Ledger>
       )}
+
+      {tab === "custos" && <CustosRateiosTab />}
 
       {tab === "resultados" && (
         <Ledger rotulo="Resultados ledger">
@@ -811,6 +824,19 @@ export default function FaturacaoPage() {
                   </>
                 )}
                 <Button type="button" variant="outline" onClick={() => gerarPDF(selectedFatura, empresa)}><Icon name="download" className="text-sm" /> Baixar PDF</Button>
+                {selectedFatura.estado !== "cancelada" && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={() => {
+                      setAnularItem(selectedFatura);
+                      setMotivoAnulacao("");
+                      setSelectedFatura(null);
+                    }}
+                  >
+                    <Icon name="block" className="text-sm" /> Anular fatura
+                  </Button>
+                )}
                 <Button type="button" onClick={() => setSelectedFatura(null)}>Fechar</Button>
               </div>
             </div>
@@ -856,6 +882,20 @@ export default function FaturacaoPage() {
                 </div>
               </div>
             </div>
+
+            {selectedFatura.estado === "cancelada" && (
+              <div className="rounded-xl border border-error/20 bg-error/5 p-3 text-xs">
+                <p className="font-semibold text-error">Fatura anulada</p>
+                <p className="mt-0.5 text-muted-foreground">
+                  {selectedFatura.anulado_por ? `Por ${selectedFatura.anulado_por}` : "Anulada"}
+                  {selectedFatura.data_anulacao ? ` em ${new Date(selectedFatura.data_anulacao).toLocaleString("pt-BR")}` : ""}
+                  {" · "}Os pagamentos ligados foram estornados na tesouraria.
+                </p>
+                {selectedFatura.motivo_anulacao && (
+                  <p className="mt-1 text-foreground">Motivo: {selectedFatura.motivo_anulacao}</p>
+                )}
+              </div>
+            )}
 
             {selectedFatura.itens?.length > 0 && (
               <div>
@@ -955,15 +995,50 @@ export default function FaturacaoPage() {
         </Modal>
       )}
 
-      <ConfirmDialog
-        open={Boolean(eliminarItem)}
-        onClose={() => setEliminarItem(null)}
-        onConfirm={confirmarEliminacao}
-        loading={deletando}
-        title="Remover fatura"
-        description={eliminarItem ? `Tem a certeza que deseja remover a fatura "${eliminarItem.numero}"? Esta ação não pode ser desfeita.` : ""}
-      />
+      <Modal
+        open={Boolean(anularItem)}
+        onClose={() => { setAnularItem(null); setMotivoAnulacao(""); }}
+        title="Anular fatura"
+        icon="block"
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => { setAnularItem(null); setMotivoAnulacao(""); }}>Cancelar</Button>
+            <Button type="button" variant="destructive" loading={deletando} onClick={confirmarAnulacao}>Anular fatura</Button>
+          </>
+        }
+      >
+        {anularItem && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-error/20 bg-error/5 p-3">
+              <p className="text-sm font-semibold text-foreground">Fatura {anularItem.numero}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {anularItem.cliente?.nome || "Sem cliente"} · {formatKz(valorDoc(anularItem))} · {faturaEstados[anularItem.estado]?.label || anularItem.estado}
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              A fatura não é apagada: fica com o estado “Cancelada” no histórico. Os pagamentos confirmados na tesouraria são estornados e o saldo das contas é reposto.
+            </p>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Motivo da anulação (opcional)</label>
+              <textarea
+                rows={3}
+                value={motivoAnulacao}
+                onChange={(e) => setMotivoAnulacao(e.target.value)}
+                className={inputCls}
+                placeholder="Ex: fatura emitida com dados incorrectos"
+              />
+            </div>
+          </div>
+        )}
+      </Modal>
 
+      {despesaModalOpen && (
+        <DespesaModal
+          onClose={() => setDespesaModalOpen(false)}
+          onSaved={carregarDados}
+          movimentos={movimentos}
+        />
+      )}
 
       <FloatButton onClick={() => setFatModalOpen(true)} label="Nova Fatura" icon="receipt_long" />
     </div>

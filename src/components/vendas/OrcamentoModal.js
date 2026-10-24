@@ -33,7 +33,7 @@ function PreviewLinha({ label, valor, acento }) {
   );
 }
 
-export default function OrcamentoModal({ open, editingId, onClose, onSaved }) {
+export default function OrcamentoModal({ open, editingId, prefill, onClose, onSaved }) {
   const { addToast } = useToast();
 
   const [clientes, setClientes] = useState([]);
@@ -62,6 +62,23 @@ export default function OrcamentoModal({ open, editingId, onClose, onSaved }) {
         setMateriais(Array.isArray(matData) ? matData : matData?.data ?? []);
         setServicosCatalogo(Array.isArray(srvData) ? srvData : srvData?.data ?? []);
         setValorHoraServicos(Number(orgData?.valor_hora_servicos) || 0);
+        if (!editingId && prefill) {
+          // Orçamento criado a partir de uma proposta: herda cliente, prazo e o
+          // objecto/descrição da proposta nas observações.
+          const listaClientes = Array.isArray(cliData) ? cliData : cliData?.data ?? [];
+          const cli = listaClientes.find((c) => String(c.id) === String(prefill.cliente_id));
+          setForm((p) => ({
+            ...p,
+            cliente_id: prefill.cliente_id ? String(prefill.cliente_id) : p.cliente_id,
+            cliente: cli?.nome || p.cliente,
+            empresa: cli?.empresa || p.empresa,
+            nif: cli?.nif || p.nif,
+            telefone: cli?.telefone || p.telefone,
+            email: cli?.email || p.email,
+            prazoExecucao: prefill.prazoExecucao || p.prazoExecucao,
+            observacoes: prefill.observacoes || p.observacoes,
+          }));
+        }
         if (editingId) {
           try {
             const o = await buscarPorId(editingId);
@@ -134,7 +151,7 @@ export default function OrcamentoModal({ open, editingId, onClose, onSaved }) {
       ativo = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, editingId]);
+  }, [open, editingId, prefill]);
 
   const setField = (name, val) => setForm((p) => ({ ...p, [name]: val }));
 
@@ -240,14 +257,16 @@ export default function OrcamentoModal({ open, editingId, onClose, onSaved }) {
         condicoesPagamento: form.condicoesPagamento,
         observacoes: form.observacoes,
       };
+      if (!editingId && prefill?.validade) dados.validade = Number(prefill.validade) || 0;
+      let salvo;
       if (editingId) {
-        await atualizar(editingId, dados);
+        salvo = await atualizar(editingId, dados);
         addToast("Orçamento atualizado com sucesso", "success");
       } else {
-        await criar(dados);
+        salvo = await criar(dados);
         addToast("Orçamento criado com sucesso", "success");
       }
-      onSaved?.();
+      onSaved?.(salvo);
       onClose();
     } catch (err) {
       addToast(err.response?.data?.erro || "Erro na operação", "error");

@@ -1,14 +1,13 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { listarMovimentos, criarMovimento, removerMovimento, resumoTesouraria, exportarTesouraria, anexarFicheiros } from "@/services/tesouraria";
+import { listarMovimentos, criarMovimento, anularMovimento, resumoTesouraria, exportarTesouraria, anexarFicheiros } from "@/services/tesouraria";
 import { listarContas, criarConta } from "@/services/contasBancarias";
 import { resumo as resumoDividas } from "@/services/dividas";
 import { podeAtual } from "@/lib/permissoes";
 import AnexosModal from "@/components/vendas/AnexosModal";
 import Icon from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import Modal from "@/components/Modal";
 import NumeroInput from "@/components/ui/NumeroInput";
@@ -40,6 +39,7 @@ const estadoCfg = {
   confirmado: { label: "Confirmado", tom: "success" },
   pendente: { label: "Pendente", tom: "warning" },
   cancelado: { label: "Cancelado", tom: "neutral" },
+  anulado: { label: "Anulado", tom: "error" },
 };
 
 const tipoBadge = {
@@ -148,7 +148,8 @@ export default function TesourariaTab({ aba = "movimentos", setAba, abas = [], c
   const [anexosMovimento, setAnexosMovimento] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [criandoCaixa, setCriandoCaixa] = useState(false);
-  const [eliminarItem, setEliminarItem] = useState(null);
+  const [anularItem, setAnularItem] = useState(null);
+  const [motivoAnulacao, setMotivoAnulacao] = useState("");
   const [deletando, setDeletando] = useState(false);
   const [filtro, setFiltro] = useState({ campo: "geral", operador: "contem", termo: "" });
   const [filtroRapido, setFiltroRapido] = useState("todos");
@@ -402,16 +403,17 @@ export default function TesourariaTab({ aba = "movimentos", setAba, abas = [], c
     }
   };
 
-  const confirmarEliminacao = async () => {
-    if (!eliminarItem) return;
+  const confirmarAnulacao = async () => {
+    if (!anularItem) return;
     setDeletando(true);
     try {
-      await removerMovimento(eliminarItem.id);
-      addToast("Movimento removido com sucesso", "success");
-      setEliminarItem(null);
+      await anularMovimento(anularItem.id, motivoAnulacao.trim() || undefined);
+      addToast("Movimento anulado com sucesso", "success");
+      setAnularItem(null);
+      setMotivoAnulacao("");
       await Promise.all([carregarResumo(), carregarMovimentos(), carregarContas()]);
     } catch (err) {
-      addToast(err.response?.data?.erro || "Erro ao eliminar movimento", "error");
+      addToast(err.response?.data?.erro || "Erro ao anular movimento", "error");
     } finally {
       setDeletando(false);
     }
@@ -603,9 +605,12 @@ export default function TesourariaTab({ aba = "movimentos", setAba, abas = [], c
                       </LedgerTd>
                       <LedgerTd className="max-w-40"><span className="block truncate text-muted-foreground">{conta ? rotuloConta(conta) : "—"}</span></LedgerTd>
                       <LedgerTd>
-                        <StatusBadge tom="neutral" className={tipoBadge[m.tipo]}>
-                          <Icon name={tc.icon} className="text-[11px]" /> {tc.label}
-                        </StatusBadge>
+                        <div className="flex flex-wrap items-center gap-1">
+                          <StatusBadge tom="neutral" className={tipoBadge[m.tipo]}>
+                            <Icon name={tc.icon} className="text-[11px]" /> {tc.label}
+                          </StatusBadge>
+                          {m.estado === "anulado" && <StatusBadge tom="error">Anulado</StatusBadge>}
+                        </div>
                       </LedgerTd>
                       <LedgerTd className="tabular-nums whitespace-nowrap text-right">
                         <span className={`font-bold ${isEntrada ? "text-success" : isSaida ? "text-error" : "text-foreground"}`}>
@@ -617,7 +622,9 @@ export default function TesourariaTab({ aba = "movimentos", setAba, abas = [], c
                           ariaLabel="Ações do movimento"
                           itens={[
                             { icone: "attach_file", rotulo: m.anexos?.length > 0 ? `Anexos (${m.anexos.length})` : "Recibos / Anexos", onClick: () => setAnexosMovimento(m) },
-                            { icone: "delete", rotulo: "Remover", danger: true, onClick: () => setEliminarItem(m) },
+                            ...(m.estado !== "anulado"
+                              ? [{ icone: "block", rotulo: "Anular", danger: true, onClick: () => { setAnularItem(m); setMotivoAnulacao(""); } }]
+                              : []),
                           ]}
                         />
                       </LedgerTd>
@@ -770,14 +777,45 @@ export default function TesourariaTab({ aba = "movimentos", setAba, abas = [], c
         </form>
       </Modal>
 
-      <ConfirmDialog
-        open={Boolean(eliminarItem)}
-        onClose={() => setEliminarItem(null)}
-        onConfirm={confirmarEliminacao}
-        loading={deletando}
-        title="Eliminar movimento"
-        description={eliminarItem ? `Tem a certeza que deseja eliminar o movimento "${eliminarItem.descricao || eliminarItem.categoria || eliminarItem.id}"? Esta ação não pode ser desfeita.` : ""}
-      />
+      <Modal
+        open={Boolean(anularItem)}
+        onClose={() => { setAnularItem(null); setMotivoAnulacao(""); }}
+        title="Anular movimento"
+        icon="block"
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => { setAnularItem(null); setMotivoAnulacao(""); }}>Cancelar</Button>
+            <Button type="button" variant="destructive" loading={deletando} onClick={confirmarAnulacao}>Anular movimento</Button>
+          </>
+        }
+      >
+        {anularItem && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-error/20 bg-error/5 p-3">
+              <p className="text-sm font-semibold text-foreground">
+                {anularItem.descricao || anularItem.categoria || `Movimento #${anularItem.id}`}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {anularItem.tipo === "entrada" ? "Entrada" : anularItem.tipo === "saida" ? "Saída" : "Transferência"} de {formatKz(anularItem.valor)}
+                {anularItem.conta ? ` · ${anularItem.conta.banco_nome}` : ""}
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              O movimento não é apagado: fica marcado como anulado no histórico e o saldo da conta é reposto. Se estiver ligado a uma fatura, anule a fatura para estornar todos os pagamentos.
+            </p>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Motivo (opcional)</label>
+              <textarea
+                rows={3}
+                value={motivoAnulacao}
+                onChange={(e) => setMotivoAnulacao(e.target.value)}
+                className={inputCls}
+                placeholder="Ex: pagamento registado em duplicado"
+              />
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <AnexosModal
         movimento={anexosMovimento}

@@ -55,6 +55,13 @@ export async function removerFatura(id) {
   return data;
 }
 
+// Anula a fatura (mantém o registo) e estorna os movimentos de tesouraria
+// ligados a ela. O motivo é opcional.
+export async function anularFatura(id, dados = {}) {
+  const { data } = await api.post(`/faturacao/${id}/anular`, dados);
+  return data;
+}
+
 export async function exportarFaturas(params) {
   const { data } = await api.get("/faturacao/exportar", { params, responseType: "blob" });
   return data;
