@@ -21,16 +21,20 @@ export function decodificarToken(token) {
   }
 }
 
-export async function login(email, senha) {
-  const { data } = await api.post("/auth/login", { email, senha });
+function guardarSessao(data) {
   storage()?.setItem(CHAVE_TOKEN, data.token);
   storage()?.setItem(CHAVE_USUARIO, JSON.stringify(data.usuario));
   return data;
 }
 
+export async function login(email, senha) {
+  const { data } = await api.post("/auth/login", { email, senha });
+  return guardarSessao(data);
+}
+
 export async function registrar(dados) {
   const { data } = await api.post("/auth/registrar", dados);
-  return data;
+  return guardarSessao(data);
 }
 
 export async function carregarPerfil() {
@@ -38,7 +42,10 @@ export async function carregarPerfil() {
   return data;
 }
 
-export function logout() {
+export async function logout() {
+  try {
+    await api.post("/auth/logout");
+  } catch {}
   storage()?.removeItem(CHAVE_TOKEN);
   storage()?.removeItem(CHAVE_USUARIO);
   window.location.href = "/login";

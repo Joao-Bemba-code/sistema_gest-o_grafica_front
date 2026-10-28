@@ -45,18 +45,8 @@ export async function marcarPaga(id, dados) {
   return data;
 }
 
-export async function remover(id) {
-  const { data } = await api.delete(`/faturacao/${id}`);
-  return data;
-}
-
-export async function removerFatura(id) {
-  const { data } = await api.delete(`/faturacao/${id}`);
-  return data;
-}
-
 // Anula a fatura (mantém o registo) e estorna os movimentos de tesouraria
-// ligados a ela. O motivo é opcional.
+// ligados a ela. O motivo é obrigatório.
 export async function anularFatura(id, dados = {}) {
   const { data } = await api.post(`/faturacao/${id}/anular`, dados);
   return data;

@@ -20,8 +20,8 @@ export async function atualizar(id, dados) {
   return data;
 }
 
-export async function remover(id) {
-  const { data } = await api.delete(`/orcamentos/${id}`);
+export async function anular(id, motivo) {
+  const { data } = await api.post(`/orcamentos/${id}/anular`, { motivo });
   return data;
 }
 

@@ -14,15 +14,20 @@ const estadoColors = {
   pendente: "warning",
   cancelado: "secondary",
   rejeitado: "destructive",
+  anulado: "destructive",
 };
 
-const ESTADOS = ["pendente", "aprovado", "cancelado", "rejeitado"];
+const ESTADOS = ["pendente", "aprovado", "cancelado", "rejeitado", "anulado"];
+
+// A anulação exige motivo (ação Anular); não entra na lista de estados
+// que se podem escolher livremente.
+const ESTADOS_SELECIONAVEIS = ESTADOS.filter((s) => s !== "anulado");
 
 function formatKz(v) {
   return `Kz ${Number(v || 0).toLocaleString("pt-AO")}`;
 }
 
-export default function OrcamentoDetalhesModal({ orcamento, empresa, onClose, onEditar, onEliminar, onEstado }) {
+export default function OrcamentoDetalhesModal({ orcamento, empresa, onClose, onEditar, onAnular, onEstado }) {
   const { addToast } = useToast();
   const o = orcamento;
   const [pdfAberto, setPdfAberto] = useState(false);
@@ -47,7 +52,9 @@ export default function OrcamentoDetalhesModal({ orcamento, empresa, onClose, on
     <Modal open={Boolean(o)} onClose={onClose} title={`Detalhes — ${o.numero || o.id}`} icon="description" size="lg"
       footer={<>
         <Button variant="outline" onClick={() => onEditar(o)}><Icon name="edit" className="text-[16px]" /> Editar</Button>
-        <Button variant="outline" onClick={() => onEliminar(o)} className="text-error hover:text-error"><Icon name="delete" className="text-[16px]" /> Eliminar</Button>
+        {o.estado !== "anulado" && (
+          <Button variant="destructive" onClick={() => onAnular(o)}><Icon name="block" className="text-[16px]" /> Anular</Button>
+        )}
         <Button variant="outline" onClick={handleGerarPdf}><Icon name="picture_as_pdf" className="text-[16px]" /> PDF</Button>
         <Button variant="outline" onClick={handleWhatsApp}><Icon name="chat" className="text-[16px]" /> WhatsApp</Button>
         <Button onClick={onClose}>Fechar</Button>
@@ -228,7 +235,7 @@ export default function OrcamentoDetalhesModal({ orcamento, empresa, onClose, on
               onChange={(e) => onEstado(o, e.target.value)}
               className="w-full px-2 py-1.5 bg-background border border-input rounded-lg text-xs font-medium text-foreground outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer"
             >
-              {ESTADOS.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+              {ESTADOS_SELECIONAVEIS.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
             </select>
           </div>
         </div>

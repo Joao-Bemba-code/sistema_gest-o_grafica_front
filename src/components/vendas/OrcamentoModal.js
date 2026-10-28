@@ -64,7 +64,9 @@ export default function OrcamentoModal({ open, editingId, prefill, onClose, onSa
         setValorHoraServicos(Number(orgData?.valor_hora_servicos) || 0);
         if (!editingId && prefill) {
           // Orçamento criado a partir de uma proposta: herda cliente, prazo e o
-          // objecto/descrição da proposta nas observações.
+          // objecto da proposta. O objecto preenche o primeiro item E o primeiro
+          // serviço — o objecto costuma ser o serviço a executar; apague o que
+          // não aplicar antes de guardar.
           const listaClientes = Array.isArray(cliData) ? cliData : cliData?.data ?? [];
           const cli = listaClientes.find((c) => String(c.id) === String(prefill.cliente_id));
           setForm((p) => ({
@@ -77,6 +79,8 @@ export default function OrcamentoModal({ open, editingId, prefill, onClose, onSa
             email: cli?.email || p.email,
             prazoExecucao: prefill.prazoExecucao || p.prazoExecucao,
             observacoes: prefill.observacoes || p.observacoes,
+            itens: p.itens.map((it, i) => (i === 0 && prefill.objecto ? { ...it, descricao: prefill.objecto } : it)),
+            servicos: (p.servicos || []).map((sv, i) => (i === 0 && prefill.objecto ? { ...sv, descricao: prefill.objecto } : sv)),
           }));
         }
         if (editingId) {

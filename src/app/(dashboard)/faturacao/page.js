@@ -300,9 +300,14 @@ export default function FaturacaoPage() {
 
   const confirmarAnulacao = async () => {
     if (!anularItem) return;
+    const motivo = motivoAnulacao.trim();
+    if (!motivo) {
+      addToast("Indique o motivo da anulação", "error");
+      return;
+    }
     setDeletando(true);
     try {
-      const atual = await anularFatura(anularItem.id, { motivo: motivoAnulacao.trim() || undefined });
+      const atual = await anularFatura(anularItem.id, { motivo });
       setFaturas((prev) => prev.map((f) => (f.id === atual.id ? atual : f)));
       if (selectedFatura?.id === anularItem.id) setSelectedFatura(atual);
       addToast(
@@ -1003,7 +1008,7 @@ export default function FaturacaoPage() {
         footer={
           <>
             <Button type="button" variant="outline" onClick={() => { setAnularItem(null); setMotivoAnulacao(""); }}>Cancelar</Button>
-            <Button type="button" variant="destructive" loading={deletando} onClick={confirmarAnulacao}>Anular fatura</Button>
+            <Button type="button" variant="destructive" loading={deletando} disabled={!motivoAnulacao.trim()} onClick={confirmarAnulacao}>Anular fatura</Button>
           </>
         }
       >
@@ -1019,7 +1024,7 @@ export default function FaturacaoPage() {
               A fatura não é apagada: fica com o estado “Cancelada” no histórico. Os pagamentos confirmados na tesouraria são estornados e o saldo das contas é reposto.
             </p>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Motivo da anulação (opcional)</label>
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Motivo da anulação *</label>
               <textarea
                 rows={3}
                 value={motivoAnulacao}

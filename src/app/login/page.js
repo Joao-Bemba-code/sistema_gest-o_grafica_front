@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
 import { login } from "@/services/auth";
@@ -13,6 +14,18 @@ const DESTAQUES = [
   { icone: "inventory_2", titulo: "Stock em tempo real", descricao: "Reservas, consumos e reposição sempre actualizados." },
   { icone: "insights", titulo: "Indicadores e relatórios", descricao: "Decisões suportadas em dados do dia-a-dia." },
 ];
+
+// Símbolo da marca KAMGEST (mesmo SVG usado na consola de suporte).
+function Marca({ className }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M0 0H20V32H0V0Z" fill="#EE2A24" />
+      <path d="M20 0H40V32H20V0Z" fill="#0066FF" />
+      <path d="M0 16L20 0V32L0 16Z" fill="#FFB800" />
+      <path d="M20 0C25 10 35 15 40 16C35 20 25 22 20 32V0Z" fill="#0047AB" opacity="0.75" />
+    </svg>
+  );
+}
 
 // O backend responde com 429 quando a conta ou o IP esgotam as tentativas.
 // Distinguir os casos evita mostrar "credenciais inválidas" quando o problema
@@ -47,6 +60,9 @@ export default function LoginPage() {
   const [erro, setErro] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  const destinoDe = (usuario) =>
+    usuario?.perfil === "producao" ? "/producao" : usuario?.perfil === "gestao" ? "/vendas" : "/";
+
   const handleLogin = async (e) => {
     e.preventDefault();
     if (loading) return;
@@ -61,9 +77,7 @@ export default function LoginPage() {
     try {
       const data = await login(email.trim(), senha);
       setUsuario(data.usuario);
-      const destino =
-        data.usuario?.perfil === "producao" ? "/producao" : data.usuario?.perfil === "gestao" ? "/vendas" : "/";
-      router.replace(destino);
+      router.replace(destinoDe(data.usuario));
     } catch (err) {
       setErro(mensagemDeErro(err));
       setSenha("");
@@ -82,8 +96,8 @@ export default function LoginPage() {
       {/* Painel de marca */}
       <aside className="relative hidden lg:flex flex-col overflow-hidden bg-muted/40 border-r border-border p-10 xl:p-14">
         <div className="relative flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-            <Icon name="precision_manufacturing" className="text-xl ms-fill" />
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-card p-1.5 shadow-sm">
+            <Marca className="h-full w-full" />
           </div>
           <div className="min-w-0">
             <p className="text-[15px] font-semibold leading-none tracking-tight text-foreground">KAMGEST</p>
@@ -136,8 +150,8 @@ export default function LoginPage() {
 
         <div className="w-full max-w-sm">
           <div className="mb-8 flex flex-col items-center lg:hidden">
-            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Icon name="precision_manufacturing" className="text-2xl ms-fill" />
+            <div className="mb-3 flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl border border-border bg-card p-1.5 shadow-sm">
+              <Marca className="h-full w-full" />
             </div>
             <p className="text-xl font-bold tracking-tight text-foreground">KAMGEST</p>
             <p className="mt-1 text-xs text-muted-foreground">Sistema de Gestão para Indústria Gráfica</p>
@@ -231,6 +245,13 @@ export default function LoginPage() {
               )}
             </button>
           </form>
+
+          <p className="mt-6 text-center text-xs text-muted-foreground">
+            Ainda não tem conta?{" "}
+            <Link href="/registro" className="font-medium text-primary hover:underline">
+              Criar empresa
+            </Link>
+          </p>
 
           <p className="mt-8 text-center text-[11px] text-muted-foreground lg:hidden">
             © {new Date().getFullYear()} KAMGEST — Sistema de Gestão para Indústria Gráfica

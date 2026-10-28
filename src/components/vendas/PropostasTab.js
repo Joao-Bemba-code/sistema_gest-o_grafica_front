@@ -21,11 +21,11 @@ const FILTRO_VAZIO = { cliente: "", unidade: "", estado: "" };
 
 const CARTOES = [
   { chave: "rascunho", icone: "edit", tom: "bg-warning/10 text-warning" },
-  { chave: "enviada", icone: "send", tom: "bg-info/10 text-info" },
   { chave: "recebida", icone: "email", tom: "bg-muted text-muted-foreground" },
-  { chave: "avaliada", icone: "hourglass_top", tom: "bg-primary/10 text-primary" },
+  { chave: "enviada", icone: "send", tom: "bg-info/10 text-info" },
   { chave: "aprovada", icone: "verified", tom: "bg-success/10 text-success" },
   { chave: "rejeitada", icone: "block", tom: "bg-error/10 text-error" },
+  { chave: "expirada", icone: "event_busy", tom: "bg-muted text-muted-foreground" },
 ];
 
 function formatarData(valor) {
@@ -34,7 +34,7 @@ function formatarData(valor) {
   return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("pt-PT");
 }
 
-export default function PropostasTab({ propostas = [], onAbrir, onEditar, onEliminar }) {
+export default function PropostasTab({ propostas = [], onAbrir, onEditar, onAnular }) {
   const [rascunho, setRascunho] = useState(FILTRO_VAZIO);
   const [aplicado, setAplicado] = useState(FILTRO_VAZIO);
 
@@ -63,7 +63,7 @@ export default function PropostasTab({ propostas = [], onAbrir, onEditar, onElim
   );
 
   const contagem = useMemo(() => {
-    const base = { rascunho: 0, enviada: 0, recebida: 0, avaliada: 0, aprovada: 0, rejeitada: 0 };
+    const base = { rascunho: 0, enviada: 0, recebida: 0, avaliada: 0, aprovada: 0, rejeitada: 0, expirada: 0 };
     for (const p of filtradas) base[p.estado] = (base[p.estado] || 0) + 1;
     return base;
   }, [filtradas]);
@@ -82,11 +82,11 @@ export default function PropostasTab({ propostas = [], onAbrir, onEditar, onElim
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-3">
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {CARTOES.map((k) => (
           <div
             key={k.chave}
-            className="flex min-w-[150px] flex-1 items-center gap-3 rounded-xl border border-border bg-card p-3.5 shadow-sm"
+            className="flex items-center gap-3 rounded-xl border border-border bg-card p-3.5 shadow-sm"
           >
             <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${k.tom}`}>
               <Icon name={k.icone} className="text-lg" />
@@ -211,10 +211,10 @@ export default function PropostasTab({ propostas = [], onAbrir, onEditar, onElim
                       itens={[
                         { icone: "visibility", rotulo: "Ver detalhes", onClick: () => onAbrir?.(p) },
                         ...(p.estado === "rascunho"
-                          ? [
-                              { icone: "edit", rotulo: "Editar", onClick: () => onEditar?.(p) },
-                              { icone: "delete", rotulo: "Remover", danger: true, onClick: () => onEliminar?.(p) },
-                            ]
+                          ? [{ icone: "edit", rotulo: "Editar", onClick: () => onEditar?.(p) }]
+                          : []),
+                        ...(p.estado !== "anulada"
+                          ? [{ icone: "block", rotulo: "Anular", danger: true, onClick: () => onAnular?.(p) }]
                           : []),
                       ]}
                     />

@@ -9,6 +9,7 @@ import {
   LuLayoutDashboard,
   LuBuilding2,
   LuScrollText,
+  LuClipboardList,
   LuSettings,
   LuLogOut,
   LuChevronRight,
@@ -38,6 +39,7 @@ const GRUPOS = [
         sub: [{ nome: "Todas", para: "/suporte/organizacoes" }],
       },
       { nome: "Acessos", para: "/suporte/acessos", icone: LuScrollText },
+      { nome: "Auditoria", para: "/suporte/auditoria", icone: LuClipboardList },
     ],
   },
 ];

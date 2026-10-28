@@ -18,6 +18,7 @@ import {
   LedgerEmpty,
 } from "@/components/ui/Ledger";
 import { listarOrdens } from "@/services/producao";
+import gerarGuiaEntregaPdf from "@/lib/entregasPdf";
 
 const FATURA = {
   paga: { label: "Paga", tom: "success" },
@@ -78,13 +79,14 @@ function destinoDe(o) {
   return o.cliente?.endereco || o.cliente?.empresa || o.cliente?.nome || "";
 }
 
-export default function EntregasTab({ faturas = [], mesFiltro = null, onVerFatura }) {
+export default function EntregasTab({ faturas = [], mesFiltro = null, onVerFatura, empresa = {} }) {
   const router = useRouter();
   const { addToast } = useToast();
   const [ordens, setOrdens] = useState([]);
   const [loading, setLoading] = useState(true);
   const [rascunho, setRascunho] = useState(FILTRO_ENTREGA_VAZIO);
   const [aplicado, setAplicado] = useState(FILTRO_ENTREGA_VAZIO);
+  const [gerandoId, setGerandoId] = useState(null);
 
   useEffect(() => {
     let ativo = true;
@@ -193,6 +195,18 @@ export default function EntregasTab({ faturas = [], mesFiltro = null, onVerFatur
   const campoCls =
     "h-9 w-full rounded-lg border border-border bg-card px-2.5 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/25";
 
+  const baixarGuia = async (o) => {
+    if (gerandoId) return;
+    setGerandoId(o.id);
+    try {
+      await gerarGuiaEntregaPdf(o, empresa || {}, o._fatura || null);
+    } catch (err) {
+      addToast(err?.message || "Erro ao gerar a guia de entrega", "error");
+    } finally {
+      setGerandoId(null);
+    }
+  };
+
   const kpis = [
     { label: "Por preparar", valor: contagem.preparar, icone: "hourglass_top", tom: "bg-warning/10 text-warning" },
     { label: "Em trânsito", valor: contagem.transito, icone: "local_shipping", tom: "bg-info/10 text-info" },
@@ -297,6 +311,7 @@ export default function EntregasTab({ faturas = [], mesFiltro = null, onVerFatur
                   <LedgerTh>Destino</LedgerTh>
                   <LedgerTh>Data</LedgerTh>
                   <LedgerTh>Estado</LedgerTh>
+                  <LedgerTh>Ficha</LedgerTh>
                 </tr>
               </thead>
               <tbody>
@@ -333,6 +348,18 @@ export default function EntregasTab({ faturas = [], mesFiltro = null, onVerFatur
                       <LedgerTd className="whitespace-nowrap text-muted-foreground">{formatData(o.data_entrega)}</LedgerTd>
                       <LedgerTd>
                         <StatusBadge tom={estado.tom}>{estado.rotulo}</StatusBadge>
+                      </LedgerTd>
+                      <LedgerTd>
+                        <button
+                          type="button"
+                          onClick={() => baixarGuia(o)}
+                          disabled={gerandoId === o.id}
+                          aria-label={`Ficha de entrega ${o.numero || `OP #${o.id}`}`}
+                          title="Ficha de entrega (PDF)"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:opacity-50"
+                        >
+                          <Icon name="picture_as_pdf" className="text-sm" />
+                        </button>
                       </LedgerTd>
                     </LedgerTr>
                   );

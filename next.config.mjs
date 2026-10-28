@@ -12,6 +12,28 @@ const SEM_CACHE_API = {
 
 /** @type {import('next').NextConfig} */
 
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+const backendOrigin = new URL(apiUrl).origin;
+const desenvolvimento = process.env.NODE_ENV !== "production";
+
+// CSP compatível com o Next (scripts inline). Não é a política mais
+// restritiva possível, mas bloqueia scripts externos não previstos, iframes
+// de terceiros e uploads a executar como página.
+const csp = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${desenvolvimento ? " 'unsafe-eval'" : ""}`,
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data:",
+  `connect-src 'self' ${backendOrigin}`,
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "object-src 'none'",
+  "worker-src 'self' blob:",
+  "manifest-src 'self'",
+].join("; ");
+
 const nextConfig = {
   turbopack: {},
   images: {
@@ -24,7 +46,21 @@ const nextConfig = {
     ],
   },
   async headers() {
+    const cabecalhosSeguranca = [
+      { key: "Content-Security-Policy", value: csp },
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "X-Frame-Options", value: "DENY" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+    ];
+    if (!desenvolvimento) {
+      cabecalhosSeguranca.push({
+        key: "Strict-Transport-Security",
+        value: "max-age=31536000; includeSubDomains",
+      });
+    }
     return [
+      { source: "/:path*", headers: cabecalhosSeguranca },
       {
         source: "/sw.js",
         headers: [

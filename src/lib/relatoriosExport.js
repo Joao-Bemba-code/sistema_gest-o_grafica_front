@@ -1,5 +1,16 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import {
+  TEMA_TABELA_MARCA,
+  desenharCabecalhoMarca,
+  desenharMarcaDeAgua,
+  tituloSecaoMarca,
+  desenharKpisMarca,
+  finalizarComRodapeMarca,
+  LARGURA_UTIL_MARCA,
+  formatarData,
+  MARGEM_MARCA,
+} from "./pdfEstilo";
 
 function descarregar(blob, nome) {
   const url = URL.createObjectURL(blob);
@@ -41,38 +52,38 @@ export function exportarRelatorioExcel(titulo, cabecalhos = [], linhas = []) {
   descarregar(new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8" }), `${nomeFicheiro(titulo)}.xls`);
 }
 
-// Gera um PDF genérico a partir de uma tabela (título + resumo + tabela).
-export function exportarRelatorioPDF({ titulo, org = {}, cabecalhos = [], linhas = [], resumo = [] }) {
+// Gera um PDF no modelo de marca (cabeçalho com logo, indicadores, tabela e rodapé),
+// igual ao dos restantes relatórios do sistema.
+export async function exportarRelatorioPDF({ titulo, org = {}, cabecalhos = [], linhas = [], resumo = [] }) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  doc.setFontSize(14);
-  doc.setTextColor(30);
-  doc.text(org?.nome || "KAMGEST", 14, 16);
-  doc.setFontSize(11);
-  doc.text(String(titulo || "Relatório"), 14, 24);
-  doc.setFontSize(8);
-  doc.setTextColor(120);
-  doc.text(`Gerado em ${new Date().toLocaleString("pt-PT")}`, 14, 29);
+  const { yInicio, logo } = await desenharCabecalhoMarca(doc, {
+    titulo: titulo || "Relatório",
+    empresa: org,
+    direitos: [`Emissão: ${formatarData(new Date())}`],
+  });
+  desenharMarcaDeAgua(doc, logo);
 
-  let y = 35;
+  let y = yInicio + 3;
   if (resumo.length) {
-    doc.setTextColor(40);
-    doc.setFontSize(9);
-    resumo.forEach((r) => {
-      doc.text(String(r), 14, y);
-      y += 5;
+    const kpis = resumo.map((r) => {
+      const texto = String(r ?? "");
+      const i = texto.indexOf(":");
+      if (i > 0) return { label: texto.slice(0, i).trim(), value: texto.slice(i + 1).trim() };
+      return { label: "", value: texto };
     });
-    y += 2;
+    y = desenharKpisMarca(doc, y, kpis);
   }
+
+  y = tituloSecaoMarca(doc, "Dados do relatório", MARGEM_MARCA, y) + 4;
 
   autoTable(doc, {
     startY: y,
     head: [cabecalhos],
     body: linhas.length ? linhas : [["Sem dados para apresentar"]],
-    styles: { fontSize: 8, cellPadding: 2 },
-    headStyles: { fillColor: [0, 102, 204], textColor: 255, fontStyle: "bold" },
-    alternateRowStyles: { fillColor: [244, 247, 251] },
-    margin: { left: 14, right: 14 },
+    ...TEMA_TABELA_MARCA,
+    tableWidth: LARGURA_UTIL_MARCA,
   });
 
+  finalizarComRodapeMarca(doc);
   doc.save(`${nomeFicheiro(titulo)}.pdf`);
 }

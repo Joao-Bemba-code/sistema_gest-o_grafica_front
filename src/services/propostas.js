@@ -30,8 +30,8 @@ export async function vincularOrcamento(id, orcamentoId) {
   return data;
 }
 
-export async function remover(id) {
-  const { data } = await api.delete(`/propostas/${id}`);
+export async function anular(id, motivo) {
+  const { data } = await api.post(`/propostas/${id}/anular`, { motivo });
   return data;
 }
 
@@ -42,19 +42,23 @@ export const UNIDADES = [
 ];
 
 export const ESTADOS_PROPOSTA = [
-  { value: "rascunho", label: "Rascunho" },
-  { value: "enviada", label: "Enviada" },
-  { value: "recebida", label: "Recebida" },
-  { value: "avaliada", label: "Avaliada" },
-  { value: "aprovada", label: "Aprovada" },
-  { value: "rejeitada", label: "Rejeitada" },
+  { value: "rascunho", label: "EM PREPARAÇÃO" },
+  { value: "enviada", label: "ENVIADAS" },
+  { value: "recebida", label: "EM REVISÃO" },
+  { value: "avaliada", label: "AVALIADA" },
+  { value: "aprovada", label: "ACEITES" },
+  { value: "rejeitada", label: "RECUSADAS" },
+  { value: "expirada", label: "EXPIRADAS" },
+  { value: "anulada", label: "ANULADAS" },
 ];
 
 export const META_ESTADO = {
-  rascunho: { rotulo: "Rascunho", tom: "warning", icone: "edit" },
-  enviada: { rotulo: "Enviada", tom: "info", icone: "send" },
-  recebida: { rotulo: "Recebida", tom: "neutral", icone: "email" },
-  avaliada: { rotulo: "Avaliada", tom: "primary", icone: "hourglass_top" },
-  aprovada: { rotulo: "Aprovada", tom: "success", icone: "verified" },
-  rejeitada: { rotulo: "Rejeitada", tom: "error", icone: "block" },
+  rascunho: { rotulo: "EM PREPARAÇÃO", tom: "warning", icone: "edit" },
+  enviada: { rotulo: "ENVIADAS", tom: "info", icone: "send" },
+  recebida: { rotulo: "EM REVISÃO", tom: "neutral", icone: "email" },
+  avaliada: { rotulo: "AVALIADA", tom: "primary", icone: "hourglass_top" },
+  aprovada: { rotulo: "ACEITES", tom: "success", icone: "verified" },
+  rejeitada: { rotulo: "RECUSADAS", tom: "error", icone: "block" },
+  expirada: { rotulo: "EXPIRADAS", tom: "neutral", icone: "event_busy" },
+  anulada: { rotulo: "ANULADAS", tom: "error", icone: "block" },
 };

@@ -31,6 +31,7 @@ const TITULOS = {
   "/suporte": "Resumo",
   "/suporte/organizacoes": "Organizações",
   "/suporte/acessos": "Acessos",
+  "/suporte/auditoria": "Auditoria",
   "/suporte/configuracoes": "Configurações",
 };
 

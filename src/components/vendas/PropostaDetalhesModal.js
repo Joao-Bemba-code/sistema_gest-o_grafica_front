@@ -49,7 +49,7 @@ export default function PropostaDetalhesModal({
   empresa = {},
   onClose,
   onEditar,
-  onEliminar,
+  onAnular,
   onAtualizada,
   onCriarOrcamento,
   onVerOrcamento,
@@ -115,7 +115,7 @@ export default function PropostaDetalhesModal({
   const rejeicao = eventoPorEstado.rejeitada;
 
   const podeEditar = p.estado === "rascunho";
-  const podeEliminar = p.estado === "rascunho";
+  const podeAnular = p.estado !== "anulada";
 
   const acoes = [];
   if (p.estado === "rascunho") {
@@ -184,9 +184,9 @@ export default function PropostaDetalhesModal({
             <Button type="button" variant="outline" onClick={baixarPdf} loading={aGerarPdf}>
               <Icon name="picture_as_pdf" className="text-base" /> PDF
             </Button>
-            {podeEliminar && (
-              <Button type="button" variant="ghost" onClick={() => onEliminar?.(p)}>
-                <Icon name="delete" className="text-base" /> Eliminar
+            {podeAnular && (
+              <Button type="button" variant="destructive" onClick={() => onAnular?.(p)}>
+                <Icon name="block" className="text-base" /> Anular
               </Button>
             )}
           </div>
@@ -236,6 +236,16 @@ export default function PropostaDetalhesModal({
           <div className="rounded-xl border border-error/30 bg-error/10 p-3">
             <p className="text-[11px] font-semibold text-error">Motivo da rejeição</p>
             <p className="mt-1 whitespace-pre-wrap text-sm text-foreground">{p.motivo_rejeicao || "Não indicado."}</p>
+          </div>
+        )}
+
+        {p.estado === "anulada" && (
+          <div className="rounded-xl border border-error/30 bg-error/10 p-3">
+            <p className="text-[11px] font-semibold text-error">Motivo da anulação</p>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-foreground">{p.motivo_anulacao || "Não indicado."}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {[p.anulado_por ? `Anulada por ${p.anulado_por}` : "", formatarData(p.data_anulacao)].filter(Boolean).join(" · ")}
+            </p>
           </div>
         )}
 

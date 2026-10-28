@@ -30,6 +30,16 @@ export async function guardarSeguranca(dados) {
   return data;
 }
 
+export async function buscarAgt() {
+  const { data } = await api.get("/configuracoes/agt");
+  return data;
+}
+
+export async function guardarAgt(dados) {
+  const { data } = await api.put("/configuracoes/agt", dados);
+  return data;
+}
+
 export async function uploadLogo(file) {
   const form = new FormData();
   form.append("logo", file);

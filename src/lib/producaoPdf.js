@@ -80,7 +80,7 @@ export default async function gerarOrdemProducaoPdf(op, org = {}, matPorId = {})
   const x = MARGEM_MARCA;
   const w = pw - MARGEM_MARCA * 2;
 
-  const numero = op?.numero || (op?.id ? `OP-${op.id}` : "OP");
+  const numero = op?.numero || (op?.id ? `KOP-${op.id}` : "KOP");
   const impressoEm = new Date();
   const estado = ESTADO_LABEL[op?.estado || op?.status] || op?.estado || "—";
   const clienteDados = op?.clienteDados || (op?.cliente && typeof op.cliente === "object" ? op.cliente : null);

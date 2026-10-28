@@ -13,6 +13,7 @@ function ConfirmDialog({
   confirmLabel = "Eliminar",
   cancelLabel = "Cancelar",
   loading = false,
+  confirmDisabled = false,
   icon = "delete_forever",
   tone = "destructive",
   children,
@@ -34,6 +35,7 @@ function ConfirmDialog({
             variant={tone}
             onClick={onConfirm}
             loading={loading}
+            disabled={confirmDisabled}
           >
             {confirmLabel}
           </Button>

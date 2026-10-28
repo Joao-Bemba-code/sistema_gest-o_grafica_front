@@ -8,12 +8,15 @@ export const CHAVE_USUARIO = "sigraf_suporte_usuario";
 const apiSuporte = axios.create({
   baseURL: `${process.env.NEXT_PUBLIC_API_URL || "http://[::1]:8000/api"}/suporte`,
   timeout: 15000,
+  withCredentials: true,
   headers: {
     "Cache-Control": "no-cache",
   },
 });
 
 apiSuporte.interceptors.request.use((config) => {
+  // Reserva para ambientes locais onde o browser não envia o cookie
+  // (origens diferentes em http); em produção a sessão vai só no cookie HttpOnly.
   if (typeof window !== "undefined") {
     const token = window.sessionStorage.getItem(CHAVE_TOKEN);
     if (token) config.headers.Authorization = `Bearer ${token}`;

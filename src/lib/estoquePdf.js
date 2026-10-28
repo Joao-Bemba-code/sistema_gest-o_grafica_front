@@ -1,7 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { formatKz, familias, normalizarFamilia, tiposItem, normalizarTipoItem, entradasEspecificacao, especificacoesObjeto } from "./estoque";
-import { TEMA_TABELA, formatNumero, carregarLogo } from "./pdfEstilo";
+import { TEMA_TABELA, TEMA_TABELA_MARCA, formatNumero, formatarData, carregarLogo, desenharCabecalhoMarca, desenharMarcaDeAgua, tituloSecaoMarca, colunasProporcionaisMarca, desenharKpisMarca, finalizarComRodapeMarca, LARGURA_UTIL_MARCA, COR_MARCA_PRINCIPAL, COR_MARCA_SECUNDARIO, COR_MARCA_CINZA, COR_MARCA_FUNDO, MARGEM_MARCA } from "./pdfEstilo";
 
 // ─────────────────────────────────────────────────────────────
 // PALETA MONOCROMÁTICA (preto / branco / cinzas)
@@ -45,6 +45,7 @@ function colunasProporcionais(pesos, opcoes = {}) {
   return estilos;
 }
 
+// Largura útil de marca (margens de 14mm, igual à facturação)
 const MARGEM_TABELA = { left: MARGEM, right: MARGEM, top: 22, bottom: 18 };
 
 function dataHoraAgora() {
@@ -139,72 +140,7 @@ const TEMA_RELATORIO = {
 };
 
 // ============================================================
-// CABEÇALHO DE RELATÓRIO (sem faixa preta)
-// ============================================================
-async function desenharCabecalhoRelatorio(doc, org = {}, titulo) {
-  const pw = doc.internal.pageSize.getWidth();
-  const y = 10;
-  const box = 12;
-  const boxY = y - 1;
-  const logo = await carregarLogo(org);
-  const { data, hora } = dataHoraAgora();
-
-  if (logo && logo.data) {
-    const escala = Math.min(box / logo.w, box / logo.h);
-    const mmW = logo.w * escala;
-    const mmH = logo.h * escala;
-    doc.addImage(logo.data, logo.formato, MARGEM, boxY, mmW, mmH);
-  }
-
-  const textoX = logo && logo.data ? MARGEM + box + 6 : MARGEM;
-  doc.setTextColor(...PRETO);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  // Limita o nome à largura disponível antes da coluna Data/Hora (à direita)
-  const larguraNome = pw - MARGEM - textoX - 40;
-  const partesNome = doc.splitTextToSize(org.nome || "KAMGEST", larguraNome);
-  const nomeCortado = partesNome.length > 1 ? `${partesNome[0].slice(0, Math.max(1, partesNome[0].length - 1))}…` : partesNome[0];
-  doc.text(nomeCortado, textoX, y + 2);
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  doc.setTextColor(...CINZA_ESCURO);
-  doc.text(titulo, textoX, y + 8);
-
-  doc.setFontSize(7.5);
-  doc.setTextColor(...CINZA_MEDIO);
-  doc.text(`Data: ${data}`, pw - MARGEM, y + 2, { align: "right" });
-  doc.text(`Hora: ${hora}`, pw - MARGEM, y + 8, { align: "right" });
-
-  const linhaY = y + 13;
-  return { linhaY, pw, box };
-}
-
-// ============================================================
-// KPIs (apenas texto, sem caixa de fundo)
-// ============================================================
-function desenharKpis(doc, y, kpis) {
-  const totalW = LARGURA_UTIL;
-  const gap = 8;
-  const lista = Array.isArray(kpis) && kpis.length > 0 ? kpis : [{ label: "—", value: "—" }];
-  const n = lista.length;
-  const cardW = (totalW - gap * (n - 1)) / n;
-
-  lista.forEach((k, i) => {
-    const x = MARGEM + i * (cardW + gap);
-    doc.setFontSize(6.5);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(...CINZA_ESCURO);
-    doc.text(String(k.label || "").toUpperCase(), x, y + 2.5, { maxWidth: cardW });
-    doc.setFontSize(9.5);
-    doc.setTextColor(...PRETO);
-    doc.text(String(k.value), x, y + 8.5, { maxWidth: cardW });
-  });
-  return y + 14;
-}
-
-// ============================================================
-// SECÇÃO
+// SECÇÃO (documentos simples: requisição / ficha de material)
 // ============================================================
 function secaoPdf(doc, y, titulo) {
   doc.setFontSize(9);
@@ -365,7 +301,7 @@ export async function gerarPedidoPDF(pedido, org = {}) {
   const pw = doc.internal.pageSize.getWidth();
   const { linhaY } = await desenharCabecalho(doc, org, "Requisição");
 
-  const numero = pedido.numero || `PED-${pedido.id || ""}`;
+  const numero = pedido.numero || `KPED-${pedido.id || ""}`;
   const data = pedido.data_pedido ? new Date(pedido.data_pedido) : null;
   const dataStr = data && !isNaN(data.getTime()) ? data.toLocaleDateString("pt-PT") : "—";
   const itens = (pedido.itens || []).map((i) => ({
@@ -431,7 +367,12 @@ export async function gerarPedidoPDF(pedido, org = {}) {
 // ============================================================
 export async function gerarRelatorioStockPDF(materiais = [], categorias = [], org = {}) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const { linhaY: ly } = await desenharCabecalhoRelatorio(doc, org, "Relatório de Stock e Categorias");
+  const { yInicio, logo } = await desenharCabecalhoMarca(doc, {
+    titulo: "Relatório de Stock",
+    empresa: org,
+    direitos: [`Emissão: ${formatarData(new Date())}`],
+  });
+  desenharMarcaDeAgua(doc, logo);
 
   const catMap = {};
   materiais.forEach((m) => {
@@ -451,14 +392,14 @@ export async function gerarRelatorioStockPDF(materiais = [], categorias = [], or
     val: s.val + d.valorTotal,
   }), { itens: 0, qtd: 0, disp: 0, val: 0 });
 
-  let y = desenharKpis(doc, ly + 3, [
+  let y = desenharKpisMarca(doc, yInicio + 3, [
     { label: "Total de materiais", value: String(totais.itens) },
     { label: "Qtd. em stock", value: formatNumero(totais.qtd) },
     { label: "Disponível", value: formatNumero(totais.disp) },
     { label: "Valor de stock", value: formatKz(totais.val) },
   ]);
 
-  y = secaoPdf(doc, y + 2, "Resumo por Categoria");
+  y = tituloSecaoMarca(doc, "Resumo por Categoria", MARGEM_MARCA, y) + 4;
 
   autoTable(doc, {
     startY: y,
@@ -477,21 +418,22 @@ export async function gerarRelatorioStockPDF(materiais = [], categorias = [], or
       { content: formatNumero(totais.disp), styles: { fontStyle: "bold", halign: "right" } },
       { content: formatKz(totais.val), styles: { fontStyle: "bold", halign: "right" } },
     ]],
-    ...TEMA_RELATORIO,
+    ...TEMA_TABELA_MARCA,
+    tableWidth: LARGURA_UTIL_MARCA,
     footStyles: {
-      fillColor: CINZA_CLARO,
-      textColor: PRETO,
+      fillColor: COR_MARCA_FUNDO,
+      textColor: COR_MARCA_PRINCIPAL,
       fontStyle: "bold",
-      fontSize: 8,
+      fontSize: 7.8,
     },
-    columnStyles: colunasProporcionais(
+    columnStyles: colunasProporcionaisMarca(
       [3, 0.8, 1.3, 1.3, 1.6],
       { 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" } }
     ),
   });
 
-  y = doc.lastAutoTable.finalY + 10;
-  y = secaoPdf(doc, y, "Detalhe de Materiais");
+  y = doc.lastAutoTable.finalY + 9;
+  y = tituloSecaoMarca(doc, "Detalhe de Materiais", MARGEM_MARCA, y) + 4;
 
   const materiaisSorted = [...materiais].sort((a, b) => {
     const sa = a.status === "esgotado" ? 0 : a.status === "repor" ? 1 : 2;
@@ -512,10 +454,11 @@ export async function gerarRelatorioStockPDF(materiais = [], categorias = [], or
       m.custo_unit > 0 ? formatKz(m.custo_unit) : "—",
       m.status === "esgotado" ? "Esgotado" : m.status === "repor" ? "Repôr" : "Ok",
     ]),
-    ...TEMA_RELATORIO,
-    headStyles: { ...TEMA_RELATORIO.headStyles, fontSize: 7.5 },
-    bodyStyles: { ...TEMA_RELATORIO.bodyStyles, fontSize: 7.5 },
-    columnStyles: colunasProporcionais(
+    ...TEMA_TABELA_MARCA,
+    tableWidth: LARGURA_UTIL_MARCA,
+    styles: { ...TEMA_TABELA_MARCA.styles, fontSize: 7.5 },
+    headStyles: { ...TEMA_TABELA_MARCA.headStyles, fontSize: 7.5 },
+    columnStyles: colunasProporcionaisMarca(
       [2.8, 2, 1.4, 0.8, 0.8, 0.8, 1.4, 1],
       {
         2: { halign: "right" },
@@ -530,17 +473,17 @@ export async function gerarRelatorioStockPDF(materiais = [], categorias = [], or
       if (data.section === "body" && data.column.index === 7) {
         const v = String(data.cell.raw);
         if (v === "Esgotado") {
-          data.cell.styles.textColor = PRETO;
+          data.cell.styles.textColor = COR_MARCA_PRINCIPAL;
           data.cell.styles.fontStyle = "bold";
         } else if (v === "Repôr") {
-          data.cell.styles.textColor = CINZA_ESCURO;
+          data.cell.styles.textColor = COR_MARCA_SECUNDARIO;
           data.cell.styles.fontStyle = "bold";
         }
       }
     },
   });
 
-  finalizarComRodape(doc);
+  finalizarComRodapeMarca(doc);
   doc.save(`Relatorio_Stock_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
@@ -552,13 +495,18 @@ export async function gerarRelatorioCadastrosPDF(clientes = [], org = {}, filtro
   let titulo = "Relatório de Cadastros";
   if (filtro === "cliente") titulo = "Relatório de Clientes";
   else if (filtro === "fornecedor") titulo = "Relatório de Fornecedores";
-  const { linhaY: ly } = await desenharCabecalhoRelatorio(doc, org, titulo);
+  const { yInicio, logo } = await desenharCabecalhoMarca(doc, {
+    titulo,
+    empresa: org,
+    direitos: [`Emissão: ${formatarData(new Date())}`],
+  });
+  desenharMarcaDeAgua(doc, logo);
 
   const lista = filtro === "todos" ? clientes : clientes.filter((c) => c.tipo === filtro);
   const totalClientes = lista.filter((c) => c.tipo === "cliente").length;
   const totalFornecedores = lista.filter((c) => c.tipo === "fornecedor").length;
 
-  let y = desenharKpis(doc, ly + 3, [
+  let y = desenharKpisMarca(doc, yInicio + 3, [
     { label: "Total de cadastros", value: String(lista.length) },
     { label: "Clientes", value: String(totalClientes) },
     { label: "Fornecedores", value: String(totalFornecedores) },
@@ -579,7 +527,7 @@ export async function gerarRelatorioCadastrosPDF(clientes = [], org = {}, filtro
     c.email || "—",
   ]);
 
-  const colStyles = colunasProporcionais(
+  const colStyles = colunasProporcionaisMarca(
     [1, 2.6, 2, 1.2, 1.5, 2],
     {
       0: { fontStyle: "bold" },
@@ -589,12 +537,13 @@ export async function gerarRelatorioCadastrosPDF(clientes = [], org = {}, filtro
 
   const clientesLista = filtro === "fornecedor" ? [] : lista.filter((c) => c.tipo === "cliente");
   if (clientesLista.length > 0) {
-    y = secaoPdf(doc, y, `Clientes (${clientesLista.length})`);
+    y = tituloSecaoMarca(doc, `Clientes (${clientesLista.length})`, MARGEM_MARCA, y) + 4;
     autoTable(doc, {
       startY: y,
       head: [colunas],
       body: linhasCliente(clientesLista),
-      ...TEMA_RELATORIO,
+      ...TEMA_TABELA_MARCA,
+      tableWidth: LARGURA_UTIL_MARCA,
       columnStyles: colStyles,
     });
     y = doc.lastAutoTable.finalY + 8;
@@ -604,19 +553,20 @@ export async function gerarRelatorioCadastrosPDF(clientes = [], org = {}, filtro
   if (fornecedoresLista.length > 0) {
     if (y + 20 > doc.internal.pageSize.getHeight() - 20) {
       doc.addPage();
-      y = 22;
+      y = 20;
     }
-    y = secaoPdf(doc, y, `Fornecedores (${fornecedoresLista.length})`);
+    y = tituloSecaoMarca(doc, `Fornecedores (${fornecedoresLista.length})`, MARGEM_MARCA, y) + 4;
     autoTable(doc, {
       startY: y,
       head: [colunas],
       body: linhasCliente(fornecedoresLista),
-      ...TEMA_RELATORIO,
+      ...TEMA_TABELA_MARCA,
+      tableWidth: LARGURA_UTIL_MARCA,
       columnStyles: colStyles,
     });
   }
 
-  finalizarComRodape(doc);
+  finalizarComRodapeMarca(doc);
   const nomeFicheiro =
     filtro === "todos"
       ? "Relatorio_Cadastros"
@@ -633,7 +583,12 @@ export async function gerarRelatorioCadastrosPDF(clientes = [], org = {}, filtro
 // ============================================================
 export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [], org = {}, filtros = {}) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const { linhaY: ly } = await desenharCabecalhoRelatorio(doc, org, "Relatório de Categorias e Famílias");
+  const { yInicio, logo } = await desenharCabecalhoMarca(doc, {
+    titulo: "Relatório de Categorias",
+    empresa: org,
+    direitos: [`Emissão: ${formatarData(new Date())}`],
+  });
+  desenharMarcaDeAgua(doc, logo);
 
   // ── Filtros aplicados (Famílias / Grupos) ──
   const resolverGrupo = (c) => tiposItem[normalizarTipoItem(c.tipo)]?.label || String(c.tipo || "").trim() || "Sem grupo";
@@ -700,7 +655,7 @@ export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [
     return nomesFiltrados.has(String(m.categoria?.nome || m.categoria_nome || "").trim().toLowerCase());
   }).length;
 
-  let y = desenharKpis(doc, ly + 3, [
+  let y = desenharKpisMarca(doc, yInicio + 3, [
     { label: "Grupos", value: String(totalGrupos) },
     { label: "Famílias", value: String(totalFamilias) },
     { label: "Categorias", value: String(totalCategorias) },
@@ -710,9 +665,9 @@ export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [
 
   if (totalCategorias === 0) {
     doc.setFontSize(10);
-    doc.setTextColor(...CINZA_MEDIO);
-    doc.text(famsSel.length > 0 || grpsSel.length > 0 ? "Nenhuma categoria corresponde aos filtros aplicados." : "Nenhuma categoria registada.", MARGEM, y + 6);
-    finalizarComRodape(doc);
+    doc.setTextColor(...COR_MARCA_CINZA);
+    doc.text(famsSel.length > 0 || grpsSel.length > 0 ? "Nenhuma categoria corresponde aos filtros aplicados." : "Nenhuma categoria registada.", MARGEM_MARCA, y + 6);
+    finalizarComRodapeMarca(doc);
     doc.save(`Relatorio_Categorias_${new Date().toISOString().slice(0, 10)}.pdf`);
     return;
   }
@@ -725,14 +680,14 @@ export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [
   gruposOrdenados.forEach(([grupoLabel, g]) => {
     if (y + 30 > doc.internal.pageSize.getHeight() - 20) {
       doc.addPage();
-      y = 22;
+      y = 20;
     }
 
     // ── Título do GRUPO (apenas texto, sem caixa) ──
-    doc.setTextColor(...CINZA_ESCURO);
+    doc.setTextColor(...COR_MARCA_PRINCIPAL);
     doc.setFontSize(9.5);
     doc.setFont("helvetica", "bold");
-    doc.text(grupoLabel.toUpperCase(), MARGEM, y);
+    doc.text(grupoLabel.toUpperCase(), MARGEM_MARCA, y);
     y += 5;
 
     // ── Linhas: Família (sempre) | Subfamília | Itens ──
@@ -771,14 +726,15 @@ export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [
           styles: { fontStyle: "bold", halign: "right" },
         },
       ]],
-      ...TEMA_RELATORIO,
+      ...TEMA_TABELA_MARCA,
+      tableWidth: LARGURA_UTIL_MARCA,
       footStyles: {
-        fillColor: CINZA_CLARO,
-        textColor: PRETO,
+        fillColor: COR_MARCA_FUNDO,
+        textColor: COR_MARCA_PRINCIPAL,
         fontStyle: "bold",
-        fontSize: 8,
+        fontSize: 7.8,
       },
-      columnStyles: colunasProporcionais(
+      columnStyles: colunasProporcionaisMarca(
         [3, 3.6, 1.2],
         {
           2: { halign: "right" },
@@ -789,7 +745,7 @@ export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [
     y = doc.lastAutoTable.finalY + 8;
   });
 
-  finalizarComRodape(doc);
+  finalizarComRodapeMarca(doc);
   doc.save(`Relatorio_Categorias_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
@@ -799,7 +755,12 @@ export async function gerarRelatorioCategoriasPDF(categorias = [], materiais = [
 // ============================================================
 export async function gerarRelatorioFaturacoesPDF(faturas = [], org = {}, filtros = {}) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const { linhaY: ly } = await desenharCabecalhoRelatorio(doc, org, "Relatório de Faturação");
+  const { yInicio, logo } = await desenharCabecalhoMarca(doc, {
+    titulo: "Relatório de Faturação",
+    empresa: org,
+    direitos: [`Emissão: ${formatarData(new Date())}`],
+  });
+  desenharMarcaDeAgua(doc, logo);
 
   const estados = Array.isArray(filtros?.estados) ? filtros.estados : [];
   const tipos = Array.isArray(filtros?.tipos) ? filtros.tipos : [];
@@ -823,7 +784,7 @@ export async function gerarRelatorioFaturacoesPDF(faturas = [], org = {}, filtro
   if (estados.length > 0) filtroTxt.push(`Estados: ${estados.map(estadoLabel).join(", ")}`);
   if (tipos.length > 0) filtroTxt.push(`Tipos: ${tipos.map(tipoLabel).join(", ")}`);
 
-  let y = desenharKpis(doc, ly + 3, [
+  let y = desenharKpisMarca(doc, yInicio + 3, [
     { label: "Documentos", value: String(lista.length) },
     { label: "Total faturado", value: formatKz(totalGeral) },
     { label: "Recebido", value: formatKz(recebido) },
@@ -833,12 +794,12 @@ export async function gerarRelatorioFaturacoesPDF(faturas = [], org = {}, filtro
   if (filtroTxt.length > 0) {
     doc.setFontSize(8);
     doc.setFont("helvetica", "italic");
-    doc.setTextColor(...CINZA_ESCURO);
-    doc.text(`Filtros aplicados: ${filtroTxt.join("  ·  ")}`, MARGEM, y);
+    doc.setTextColor(...COR_MARCA_CINZA);
+    doc.text(`Filtros aplicados: ${filtroTxt.join("  ·  ")}`, MARGEM_MARCA, y);
     y += 5;
   }
 
-  y = secaoPdf(doc, y, "Faturação");
+  y = tituloSecaoMarca(doc, "Faturação", MARGEM_MARCA, y) + 4;
 
   autoTable(doc, {
     startY: y,
@@ -864,29 +825,30 @@ export async function gerarRelatorioFaturacoesPDF(faturas = [], org = {}, filtro
       { content: formatKz(recebido), styles: { fontStyle: "bold", halign: "right" } },
       { content: formatKz(aReceber), styles: { fontStyle: "bold", halign: "right" } },
     ]],
-    ...TEMA_RELATORIO,
-    headStyles: { ...TEMA_RELATORIO.headStyles, fontSize: 7.5 },
-    bodyStyles: { ...TEMA_RELATORIO.bodyStyles, fontSize: 7.5 },
+    ...TEMA_TABELA_MARCA,
+    tableWidth: LARGURA_UTIL_MARCA,
+    styles: { ...TEMA_TABELA_MARCA.styles, fontSize: 7.5 },
+    headStyles: { ...TEMA_TABELA_MARCA.headStyles, fontSize: 7.5 },
     footStyles: {
-      fillColor: CINZA_CLARO,
-      textColor: PRETO,
+      fillColor: COR_MARCA_FUNDO,
+      textColor: COR_MARCA_PRINCIPAL,
       fontStyle: "bold",
-      fontSize: 8,
+      fontSize: 7.8,
     },
-    columnStyles: colunasProporcionais(
+    columnStyles: colunasProporcionaisMarca(
       [1, 1.4, 1.6, 2.4, 1.4, 1.3, 1.3, 1.3],
       { 5: { halign: "right" }, 6: { halign: "right" }, 7: { halign: "right" } }
     ),
     didParseCell(data) {
       if (data.section === "body" && data.column.index === 4) {
         const v = String(data.cell.raw);
-        if (v === "Paga") data.cell.styles.textColor = CINZA_ESCURO;
-        else if (v === "Cancelada") data.cell.styles.textColor = CINZA_MEDIO;
+        if (v === "Paga") data.cell.styles.textColor = COR_MARCA_PRINCIPAL;
+        else if (v === "Cancelada") data.cell.styles.textColor = COR_MARCA_CINZA;
       }
     },
   });
 
-  finalizarComRodape(doc);
+  finalizarComRodapeMarca(doc);
   doc.save(`Relatorio_Faturacao_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
@@ -896,7 +858,12 @@ export async function gerarRelatorioFaturacoesPDF(faturas = [], org = {}, filtro
 // ============================================================
 export async function gerarRelatorioProducaoPDF(ordens = [], org = {}, filtros = {}) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const { linhaY: ly } = await desenharCabecalhoRelatorio(doc, org, "Relatório de Produção");
+  const { yInicio, logo } = await desenharCabecalhoMarca(doc, {
+    titulo: "Relatório de Produção",
+    empresa: org,
+    direitos: [`Emissão: ${formatarData(new Date())}`],
+  });
+  desenharMarcaDeAgua(doc, logo);
 
   const estados = Array.isArray(filtros?.estados) ? filtros.estados : [];
   const lista = ordens.filter((o) => estados.length === 0 || estados.includes(o.estado || o.status));
@@ -915,7 +882,7 @@ export async function gerarRelatorioProducaoPDF(ordens = [], org = {}, filtros =
 
   const filtroTxt = estados.length > 0 ? `Estados: ${estados.map(estadoLabel).join(", ")}` : "";
 
-  let y = desenharKpis(doc, ly + 3, [
+  let y = desenharKpisMarca(doc, yInicio + 3, [
     { label: "Total de ordens", value: String(lista.length) },
     { label: "Entregues", value: String(entregues) },
     { label: "Em produção", value: String(emProducao) },
@@ -925,12 +892,12 @@ export async function gerarRelatorioProducaoPDF(ordens = [], org = {}, filtros =
   if (filtroTxt) {
     doc.setFontSize(8);
     doc.setFont("helvetica", "italic");
-    doc.setTextColor(...CINZA_ESCURO);
-    doc.text(`Filtros aplicados: ${filtroTxt}`, MARGEM, y);
+    doc.setTextColor(...COR_MARCA_CINZA);
+    doc.text(`Filtros aplicados: ${filtroTxt}`, MARGEM_MARCA, y);
     y += 5;
   }
 
-  y = secaoPdf(doc, y, "Ordens de Produção");
+  y = tituloSecaoMarca(doc, "Ordens de Produção", MARGEM_MARCA, y) + 4;
 
   autoTable(doc, {
     startY: y,
@@ -948,29 +915,30 @@ export async function gerarRelatorioProducaoPDF(ordens = [], org = {}, filtros =
       { content: "TOTAL", colSpan: 6, styles: { fontStyle: "bold" } },
       { content: `${lista.length}`, styles: { fontStyle: "bold", halign: "right" } },
     ]],
-    ...TEMA_RELATORIO,
-    headStyles: { ...TEMA_RELATORIO.headStyles, fontSize: 7.5 },
-    bodyStyles: { ...TEMA_RELATORIO.bodyStyles, fontSize: 7.5 },
+    ...TEMA_TABELA_MARCA,
+    tableWidth: LARGURA_UTIL_MARCA,
+    styles: { ...TEMA_TABELA_MARCA.styles, fontSize: 7.5 },
+    headStyles: { ...TEMA_TABELA_MARCA.headStyles, fontSize: 7.5 },
     footStyles: {
-      fillColor: CINZA_CLARO,
-      textColor: PRETO,
+      fillColor: COR_MARCA_FUNDO,
+      textColor: COR_MARCA_PRINCIPAL,
       fontStyle: "bold",
-      fontSize: 8,
+      fontSize: 7.8,
     },
-    columnStyles: colunasProporcionais(
+    columnStyles: colunasProporcionaisMarca(
       [1, 2.6, 0.8, 1.4, 1.4, 1.6, 1.2],
       { 5: { halign: "center" }, 6: { halign: "right" } }
     ),
     didParseCell(data) {
       if (data.section === "body" && data.column.index === 5) {
         const v = String(data.cell.raw);
-        if (v === "Entregue") data.cell.styles.textColor = CINZA_ESCURO;
-        else if (v === "Finalizado") data.cell.styles.textColor = CINZA_ESCURO;
-        else if (v === "Em produção") data.cell.styles.textColor = CINZA_MEDIO;
+        if (v === "Entregue") data.cell.styles.textColor = COR_MARCA_PRINCIPAL;
+        else if (v === "Finalizado") data.cell.styles.textColor = COR_MARCA_PRINCIPAL;
+        else if (v === "Em produção") data.cell.styles.textColor = COR_MARCA_SECUNDARIO;
       }
     },
   });
 
-  finalizarComRodape(doc);
+  finalizarComRodapeMarca(doc);
   doc.save(`Relatorio_Producao_${new Date().toISOString().slice(0, 10)}.pdf`);
 }

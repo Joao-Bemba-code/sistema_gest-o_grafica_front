@@ -94,10 +94,10 @@ export default async function gerarPropostaPdf(proposta, empresa = {}) {
   doc.setFontSize(9);
   for (const [rotulo, valor] of dados) {
     doc.setTextColor(...COR_MARCA_SECUNDARIO);
-    doc.text(rotulo, MARGEM_MARCA, y);
+    doc.text(rotulo, MARGEM_MARCA + 9, y);
     doc.setTextColor(...COR_MARCA_TEXTO);
     doc.setFont("helvetica", "bold");
-    doc.text(doc.splitTextToSize(String(valor), largura - 60)[0] || "—", MARGEM_MARCA + 52, y);
+    doc.text(doc.splitTextToSize(String(valor), largura - 69)[0] || "—", MARGEM_MARCA + 61, y);
     doc.setFont("helvetica", "normal");
     y += 6;
   }

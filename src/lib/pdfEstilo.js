@@ -184,7 +184,7 @@ export async function carregarLogo(org) {
 // ─────────────────────────────────────────────────────────────
 // CABEÇALHO DE MARCA (claro/preto: logotipo + título)
 // ─────────────────────────────────────────────────────────────
-export async function desenharCabecalhoMarca(doc, { titulo = "", empresa = {}, direitos = [] }) {
+export async function desenharCabecalhoMarca(doc, { titulo = "", empresa = {}, direitos = [], avatar = null }) {
   const pw = doc.internal.pageSize.getWidth();
 
   let logo = null;
@@ -220,7 +220,8 @@ export async function desenharCabecalhoMarca(doc, { titulo = "", empresa = {}, d
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16.5);
   const larguraTitulo = doc.getTextWidth(String(titulo || "").toUpperCase());
-  const larguraColunaEsquerda = Math.max(40, pw - MARGEM_MARCA - larguraTitulo - textoX - 12);
+  const reservaAvatar = avatar && avatar.data ? 16 : 0;
+  const larguraColunaEsquerda = Math.max(40, pw - MARGEM_MARCA - larguraTitulo - textoX - 12 - reservaAvatar);
 
   doc.setTextColor(...COR_MARCA_PRINCIPAL);
   doc.setFont("helvetica", "bold");
@@ -250,6 +251,31 @@ export async function desenharCabecalhoMarca(doc, { titulo = "", empresa = {}, d
   doc.setFontSize(16.5);
   doc.setTextColor(...COR_MARCA_PRINCIPAL);
   doc.text(titulo.toUpperCase(), pw - MARGEM_MARCA, 18, { align: "right" });
+
+  // Avatar (ex.: logo do cliente) à esquerda do título, circular e sem borda:
+  // a imagem é recortada pelo círculo, cobrindo-o por inteiro.
+  if (avatar && avatar.data) {
+    const aBox = 12;
+    const cx = pw - MARGEM_MARCA - larguraTitulo - aBox / 2 - 4;
+    const cy = 12 + aBox / 2;
+    const raio = aBox / 2;
+    try {
+      const w = Number(avatar.w) || aBox;
+      const h = Number(avatar.h) || aBox;
+      const escala = Math.max(aBox / w, aBox / h); // preenche todo o círculo (cover)
+      const lw = w * escala;
+      const lh = h * escala;
+      doc.saveGraphicsState();
+      doc.circle(cx, cy, raio, "D");
+      doc.clip();
+      doc.discardPath();
+      doc.addImage(avatar.data, avatar.formato || "JPEG", cx - lw / 2, cy - lh / 2, lw, lh);
+      doc.restoreGraphicsState();
+    } catch {
+      // imagem inválida: não desenha o avatar
+    }
+  }
+
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.6);
   doc.setTextColor(...COR_MARCA_TEXTO);
@@ -389,4 +415,79 @@ export function assinaturaMarca(doc, y, rotulos = ["Assinatura do Responsável",
   const direita = meio + 15 + (pw - MARGEM_MARCA - (meio + 15)) / 2;
   doc.text(rotulos[0] || "", esquerda, y + 4.5, { align: "center" });
   doc.text(rotulos[1] || "", direita, y + 4.5, { align: "center" });
+}
+
+// ─────────────────────────────────────────────────────────────
+// HELPERS DE MARCA PARTILHADOS (relatórios e acompanhamento)
+// ─────────────────────────────────────────────────────────────
+const LARGURA_A4 = 210;
+export const LARGURA_UTIL_MARCA = LARGURA_A4 - MARGEM_MARCA * 2;
+
+// Distribui larguras proporcionalmente garantindo soma exacta = largura útil
+export function colunasProporcionaisMarca(pesos, opcoes = {}) {
+  if (!Array.isArray(pesos) || pesos.length === 0) return {};
+  const totalPeso = pesos.reduce((s, p) => s + Math.max(0, Number(p) || 0), 0) || 1;
+  const estilos = {};
+  let acumulado = 0;
+  pesos.forEach((peso, i) => {
+    let largura;
+    if (i === pesos.length - 1) {
+      largura = +(LARGURA_UTIL_MARCA - acumulado).toFixed(2);
+    } else {
+      largura = +((LARGURA_UTIL_MARCA * peso) / totalPeso).toFixed(2);
+      acumulado += largura;
+    }
+    const extra = opcoes[i] || {};
+    estilos[i] = { cellWidth: largura, ...extra };
+  });
+  return estilos;
+}
+
+// Cartões de indicadores (KPI) no estilo de marca
+export function desenharKpisMarca(doc, y, kpis) {
+  const totalW = LARGURA_UTIL_MARCA;
+  const gap = 6;
+  const lista = Array.isArray(kpis) && kpis.length > 0 ? kpis : [{ label: "—", value: "—" }];
+  const n = lista.length;
+  const cardW = (totalW - gap * (n - 1)) / n;
+  const cardH = 15.5;
+
+  lista.forEach((k, i) => {
+    const x = MARGEM_MARCA + i * (cardW + gap);
+    doc.setFillColor(...COR_MARCA_CARTAO);
+    doc.roundedRect(x, y, cardW, cardH, 2.5, 2.5, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6.4);
+    doc.setTextColor(...COR_MARCA_SECUNDARIO);
+    doc.text(String(k.label || "").toUpperCase(), x + 5, y + 5, { maxWidth: cardW - 10 });
+    doc.setFontSize(10.5);
+    doc.setTextColor(...COR_MARCA_PRINCIPAL);
+    doc.text(String(k.value), x + 5, y + 11.5, { maxWidth: cardW - 10 });
+  });
+  return y + cardH + 5;
+}
+
+// Rodapé de marca desenhado em todas as páginas
+export function finalizarComRodapeMarca(doc) {
+  const pw = doc.internal.pageSize.getWidth();
+  const ph = doc.internal.pageSize.getHeight();
+  const total = doc.internal.getNumberOfPages();
+  const data = formatarData(new Date());
+  for (let p = 1; p <= total; p++) {
+    doc.setPage(p);
+    if (p > 1) {
+      doc.setFillColor(...COR_MARCA_FUNDO);
+      doc.rect(0, 0, pw, 12, "F");
+      doc.setTextColor(...COR_MARCA_PRINCIPAL);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.5);
+      doc.text(doc.splitTextToSize(String(doc.marcaNome || ""), 150)[0], MARGEM_MARCA, 9);
+    }
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.8);
+    doc.setTextColor(...COR_MARCA_CINZA);
+    doc.text(`Página ${p}`, pw - MARGEM_MARCA, ph - 8, { align: "right" });
+    doc.setFontSize(7);
+    doc.text(`Documento gerado por KAMGEST em ${data}`, pw / 2, ph - 9, { align: "center" });
+  }
 }

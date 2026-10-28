@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
-import { login, isAutenticadoSuporte } from "@/services/suporte";
+import { login, verificarSessaoSuporte } from "@/services/suporte";
 import { useTheme } from "@/contexts/ThemeContext";
-import { LuShield } from "react-icons/lu";
+import { LuShield, LuShieldCheck } from "react-icons/lu";
 
 function mensagemDeErro(err) {
   const status = err?.response?.status;
@@ -14,9 +14,7 @@ function mensagemDeErro(err) {
   if (status === 401 || status === 400) return doBackend || "Email ou senha incorretos.";
   if (!err?.response) return "Não foi possível falar com o servidor. Verifique a ligação.";
   return doBackend || "Não foi possível iniciar sessão.";
-}
-
-const campoCls =
+}const campoCls =
   "flex h-11 w-full rounded-lg border border-input bg-background py-2 pr-3.5 pl-10 text-sm text-foreground " +
   "placeholder:text-muted-foreground/60 transition-all duration-200 ease-in-out " +
   "focus-visible:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 " +
@@ -27,12 +25,14 @@ export default function SuporteLoginPage() {
   const { dark, toggleTheme } = useTheme();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+  const [codigo, setCodigo] = useState("");
+  const [precisaTotp, setPrecisaTotp] = useState(false);
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [erro, setErro] = useState(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (isAutenticadoSuporte()) router.replace("/suporte");
+    verificarSessaoSuporte().then((ok) => { if (ok) router.replace("/suporte"); });
   }, [router]);
 
   const handleLogin = async (e) => {
@@ -44,14 +44,20 @@ export default function SuporteLoginPage() {
       setErro("Preencha o email e a senha para continuar.");
       return;
     }
+    if (precisaTotp && !codigo.trim()) {
+      setErro("Introduza o código de 6 dígitos da app de autenticação.");
+      return;
+    }
 
     setLoading(true);
     try {
-      await login(email.trim(), senha);
+      await login(email.trim(), senha, codigo.trim());
       router.replace("/suporte");
     } catch (err) {
       setErro(mensagemDeErro(err));
+      setPrecisaTotp(!!err?.response?.data?.precisa_totp);
       setSenha("");
+      setCodigo("");
     } finally {
       setLoading(false);
     }
@@ -137,6 +143,30 @@ export default function SuporteLoginPage() {
                 </button>
               </div>
             </div>
+
+            {precisaTotp && (
+              <div className="flex flex-col gap-2">
+                <label htmlFor="suporte-codigo" className="text-xs font-medium text-muted-foreground">
+                  Código de verificação (app de autenticação)
+                </label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    <LuShieldCheck className="size-5" />
+                  </span>
+                  <input
+                    id="suporte-codigo"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={codigo}
+                    onChange={(e) => { setCodigo(e.target.value.replace(/\D/g, "").slice(0, 6)); setErro(null); }}
+                    className={`${campoCls} text-center text-base tracking-[0.4em]`}
+                    placeholder="000000"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+            )}
 
             {erro && (
               <div role="alert" className="flex items-start gap-2 rounded-xl border border-error/30 bg-error/10 px-4 py-3 animate-msg-in">

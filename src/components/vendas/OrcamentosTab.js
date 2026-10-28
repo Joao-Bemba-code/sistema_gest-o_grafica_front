@@ -23,6 +23,7 @@ const META_ESTADO = {
   expirado: { rotulo: "Expirado", tom: "bg-warning/10 text-warning" },
   cancelado: { rotulo: "Cancelado", tom: "bg-muted text-muted-foreground" },
   rejeitado: { rotulo: "Rejeitado", tom: "bg-error/10 text-error" },
+  anulado: { rotulo: "Anulado", tom: "bg-error/10 text-error" },
 };
 
 const OPCOES_ESTADO = [
@@ -31,6 +32,7 @@ const OPCOES_ESTADO = [
   { value: "expirado", label: "Expirado" },
   { value: "cancelado", label: "Cancelado" },
   { value: "rejeitado", label: "Rejeitado" },
+  { value: "anulado", label: "Anulado" },
 ];
 
 function formatKz(v) {
@@ -65,6 +67,7 @@ function estadoOrcamento(o) {
   if (o.estado === "aprovado") return "aprovado";
   if (o.estado === "cancelado") return "cancelado";
   if (o.estado === "rejeitado") return "rejeitado";
+  if (o.estado === "anulado") return "anulado";
   return expirado(o) ? "expirado" : "calculo";
 }
 
@@ -83,7 +86,7 @@ function margemDe(o) {
   return itens.reduce((s, i) => s + (Number(i.margem) || 0), 0) / itens.length;
 }
 
-export default function OrcamentosTab({ orcamentos = [], onAbrir, onEditar, onEliminar }) {
+export default function OrcamentosTab({ orcamentos = [], onAbrir, onEditar, onAnular }) {
   const [rascunho, setRascunho] = useState(FILTRO_VAZIO);
   const [aplicado, setAplicado] = useState(FILTRO_VAZIO);
 
@@ -273,7 +276,9 @@ export default function OrcamentosTab({ orcamentos = [], onAbrir, onEditar, onEl
                       itens={[
                         { icone: "visibility", rotulo: "Ver detalhes", onClick: () => onAbrir?.(o) },
                         { icone: "edit", rotulo: "Editar", onClick: () => onEditar?.(o) },
-                        { icone: "delete", rotulo: "Remover", danger: true, onClick: () => onEliminar?.(o) },
+                        ...(o.estado !== "anulado"
+                          ? [{ icone: "block", rotulo: "Anular", danger: true, onClick: () => onAnular?.(o) }]
+                          : []),
                       ]}
                     />
                   </LedgerTd>

@@ -14,7 +14,7 @@ import { useToast } from "@/components/Toast";
 import { ListSkeleton } from "@/components/Skeleton";
 import FilterBar, { useFilter } from "@/components/ui/FilterBar";
 import { entradasEspecificacao } from "@/lib/estoque";
-import { listar, remover, mudarEstado } from "@/services/orcamentos";
+import { listar, anular, mudarEstado } from "@/services/orcamentos";
 import { buscarOrganizacao } from "@/services/configuracoes";
 import OrcamentoPdfModal from "@/components/orcamentos/OrcamentoPdfModal";
 
@@ -23,9 +23,14 @@ const estadoColors = {
   pendente: "warning",
   cancelado: "secondary",
   rejeitado: "destructive",
+  anulado: "destructive",
 };
 
-const ESTADOS = ["pendente", "aprovado", "cancelado", "rejeitado"];
+const ESTADOS = ["pendente", "aprovado", "cancelado", "rejeitado", "anulado"];
+
+// A anulação exige motivo (ação Anular); não entra na lista de estados
+// que se podem escolher livremente.
+const ESTADOS_SELECIONAVEIS = ESTADOS.filter((s) => s !== "anulado");
 
 function formatKz(v) { return `Kz ${Number(v).toLocaleString("pt-AO")}`; }
 
@@ -52,6 +57,7 @@ const estadoCor = {
   pendente: "#f59e0b",
   cancelado: "#94a3b8",
   rejeitado: "#ef4444",
+  anulado: "#6b7280",
 };
 
 function parseDataOrc(o) {
@@ -91,8 +97,9 @@ export default function OrcamentosPage() {
   const [erro, setErro] = useState(null);
   const [filter, setFilter] = useState("todos");
   const [selected, setSelected] = useState(null);
-  const [eliminarItem, setEliminarItem] = useState(null);
-  const [deletando, setDeletando] = useState(false);
+  const [anularItem, setAnularItem] = useState(null);
+  const [motivoAnulacao, setMotivoAnulacao] = useState("");
+  const [anulando, setAnulando] = useState(false);
   const { addToast } = useToast();
 
   const filterConfig = useMemo(() => [
@@ -171,18 +178,29 @@ export default function OrcamentosPage() {
     setPdfOrcamento(o);
   };
 
-  const confirmarEliminacao = async () => {
-    if (!eliminarItem) return;
-    setDeletando(true);
+  const abrirAnulacao = (o) => {
+    setAnularItem(o);
+    setMotivoAnulacao("");
+  };
+
+  const confirmarAnulacao = async () => {
+    if (!anularItem) return;
+    const motivo = motivoAnulacao.trim();
+    if (!motivo) {
+      addToast("Indique o motivo da anulação", "error");
+      return;
+    }
+    setAnulando(true);
     try {
-      await remover(eliminarItem.id);
-      setOrcamentos((prev) => prev.filter((o) => o.id !== eliminarItem.id));
-      addToast("Orçamento removido com sucesso", "success");
-      setEliminarItem(null);
+      const atual = await anular(anularItem.id, motivo);
+      setOrcamentos((prev) => prev.map((o) => (o.id === atual.id ? normalizarOrcamento({ ...o, ...atual }) : o)));
+      addToast("Orçamento anulado com sucesso", "success");
+      setAnularItem(null);
+      setMotivoAnulacao("");
     } catch (err) {
       addToast(err.response?.data?.erro || "Erro na operação", "error");
     } finally {
-      setDeletando(false);
+      setAnulando(false);
     }
   };
 
@@ -341,10 +359,12 @@ export default function OrcamentosPage() {
                         title="Mudar estado"
                         className="px-2 py-1.5 bg-background border border-input rounded-lg text-[11px] font-medium text-foreground outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer"
                       >
-                        {ESTADOS.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+                        {ESTADOS_SELECIONAVEIS.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
                       </select>
                       <Button variant="ghost" size="icon" onClick={() => irParaEdicao(o)} title="Editar"><Icon name="edit" className="text-[16px]" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => setEliminarItem(o)} title="Remover" className="text-error hover:text-error"><Icon name="delete" className="text-[16px]" /></Button>
+                      {o.estado !== "anulado" && (
+                        <Button variant="ghost" size="icon" onClick={() => abrirAnulacao(o)} title="Anular" className="text-error hover:text-error"><Icon name="block" className="text-[16px]" /></Button>
+                      )}
                       <Button variant="ghost" size="icon" onClick={() => handleGerarPdf(o)} title="Gerar PDF"><Icon name="picture_as_pdf" className="text-[16px]" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => handleWhatsApp(o)} title="Enviar WhatsApp"><Icon name="chat" className="text-[16px]" /></Button>
                     </div>
@@ -376,11 +396,13 @@ export default function OrcamentosPage() {
                       title="Mudar estado"
                       className="px-2 py-1.5 bg-background border border-input rounded-lg text-[11px] font-medium text-foreground outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer"
                     >
-                      {ESTADOS.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+                      {ESTADOS_SELECIONAVEIS.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
                     </select>
                     <Button variant="ghost" size="sm" onClick={() => irParaEdicao(o)}><Icon name="edit" className="text-sm" /> Editar</Button>
                     <Button variant="ghost" size="sm" onClick={() => handleGerarPdf(o)}><Icon name="picture_as_pdf" className="text-sm" /></Button>
-                    <Button variant="ghost" size="sm" onClick={() => setEliminarItem(o)} className="text-error"><Icon name="delete" className="text-sm" /></Button>
+                    {o.estado !== "anulado" && (
+                      <Button variant="ghost" size="sm" onClick={() => abrirAnulacao(o)} className="text-error"><Icon name="block" className="text-sm" /></Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -565,7 +587,7 @@ export default function OrcamentosPage() {
                     onChange={(e) => handleMudarEstado(o, e.target.value)}
                     className="w-full px-2 py-1.5 bg-background border border-input rounded-lg text-xs font-medium text-foreground outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer"
                   >
-                    {ESTADOS.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+                    {ESTADOS_SELECIONAVEIS.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
                   </select>
                 </div>
               </div>
@@ -590,17 +612,33 @@ export default function OrcamentosPage() {
       />
 
       <ConfirmDialog
-        open={Boolean(eliminarItem)}
-        onClose={() => setEliminarItem(null)}
-        onConfirm={confirmarEliminacao}
-        loading={deletando}
-        title="Remover orçamento"
+        open={Boolean(anularItem)}
+        onClose={() => { setAnularItem(null); setMotivoAnulacao(""); }}
+        onConfirm={confirmarAnulacao}
+        loading={anulando}
+        confirmDisabled={!motivoAnulacao.trim()}
+        title="Anular orçamento"
+        icon="block"
+        confirmLabel="Anular orçamento"
         description={
-          eliminarItem
-            ? `Tem a certeza que deseja remover o orçamento #${eliminarItem.numero || eliminarItem.id}? Esta ação não pode ser desfeita.`
+          anularItem
+            ? `Anular o orçamento #${anularItem.numero || anularItem.id}? O registo não é apagado: fica no sistema, marcado como anulado.`
             : ""
         }
-      />
+      >
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Motivo da anulação *
+          </span>
+          <textarea
+            value={motivoAnulacao}
+            onChange={(e) => setMotivoAnulacao(e.target.value)}
+            rows={3}
+            placeholder="Indique o motivo da anulação"
+            className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/25"
+          />
+        </label>
+      </ConfirmDialog>
 
       <FloatButton href="/orcamentos/novo" label="Novo Orçamento" icon="request_quote" />
     </div>

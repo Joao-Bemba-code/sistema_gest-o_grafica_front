@@ -8,7 +8,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import { ListSkeleton } from "@/components/Skeleton";
 import FloatButton from "@/components/ui/FloatButton";
-import { listar as listarOrcamentos, remover as removerOrcamento, mudarEstado } from "@/services/orcamentos";
+import { listar as listarOrcamentos, anular as anularOrcamento, mudarEstado } from "@/services/orcamentos";
 import { listarFaturas, buscarFatura } from "@/services/faturacao";
 import { buscarOrganizacao } from "@/services/configuracoes";
 import OrcamentoModal from "@/components/vendas/OrcamentoModal";
@@ -27,7 +27,7 @@ import AcompanhamentoTab from "@/components/vendas/AcompanhamentoTab";
 import {
   listar as listarPropostas,
   buscarPorId as buscarProposta,
-  remover as removerProposta,
+  anular as anularProposta,
   vincularOrcamento,
 } from "@/services/propostas";
 
@@ -60,8 +60,9 @@ function ConteudoComercial() {
   const [faturas, setFaturas] = useState([]);
   const [empresa, setEmpresa] = useState({ nome: "", nif: "", endereco: "", telefone: "", email: "" });
   const [loading, setLoading] = useState(true);
-  const [eliminarItem, setEliminarItem] = useState(null);
-  const [deletando, setDeletando] = useState(false);
+  const [anularItem, setAnularItem] = useState(null);
+  const [motivoAnulacao, setMotivoAnulacao] = useState("");
+  const [anulando, setAnulando] = useState(false);
   const [orcForm, setOrcForm] = useState({ open: false, id: null });
   const [orcPrefill, setOrcPrefill] = useState(null);
   const [propForm, setPropForm] = useState({ open: false, proposta: null });
@@ -185,6 +186,7 @@ function ConteudoComercial() {
     setOrcPrefill({
       proposta_id: p.id,
       cliente_id: p.cliente_id,
+      objecto: p.objecto || "",
       prazoExecucao: p.prazo_execucao || "",
       validade: p.validade,
       observacoes,
@@ -252,24 +254,37 @@ function ConteudoComercial() {
     ? capitalizar(mesFiltro.toLocaleDateString("pt-PT", { month: "long", year: "numeric" }))
     : mesLabel;
 
-  const confirmarEliminacao = async () => {
-    if (!eliminarItem) return;
-    setDeletando(true);
+  const abrirAnulacao = (item) => {
+    setAnularItem(item);
+    setMotivoAnulacao("");
+  };
+
+  const confirmarAnulacao = async () => {
+    if (!anularItem) return;
+    const motivo = motivoAnulacao.trim();
+    if (!motivo) {
+      addToast("Indique o motivo da anulação", "error");
+      return;
+    }
+    setAnulando(true);
     try {
-      if (eliminarItem._tipo === "proposta") {
-        await removerProposta(eliminarItem.id);
-        setPropostas((prev) => prev.filter((p) => p.id !== eliminarItem.id));
-        addToast("Proposta eliminada com sucesso", "success");
+      if (anularItem._tipo === "proposta") {
+        const atual = await anularProposta(anularItem.id, motivo);
+        setPropostas((prev) => prev.map((p) => (p.id === atual.id ? atual : p)));
+        setPropDetalhe((prev) => (prev && prev.id === atual.id ? atual : prev));
+        addToast("Proposta anulada com sucesso", "success");
       } else {
-        await removerOrcamento(eliminarItem.id);
-        setOrcamentos((prev) => prev.filter((o) => o.id !== eliminarItem.id));
-        addToast("Orçamento removido com sucesso", "success");
+        const atual = await anularOrcamento(anularItem.id, motivo);
+        setOrcamentos((prev) => prev.map((o) => (o.id === atual.id ? atual : o)));
+        setOrcDetalhe((prev) => (prev && prev.id === atual.id ? atual : prev));
+        addToast("Orçamento anulado com sucesso", "success");
       }
-      setEliminarItem(null);
+      setAnularItem(null);
+      setMotivoAnulacao("");
     } catch (err) {
-      addToast(err.response?.data?.erro || "Erro ao eliminar", "error");
+      addToast(err.response?.data?.erro || "Erro ao anular", "error");
     } finally {
-      setDeletando(false);
+      setAnulando(false);
     }
   };
 
@@ -340,7 +355,7 @@ function ConteudoComercial() {
           orcamentos={orcamentosVisiveis}
           onAbrir={abrirOrcDetalhe}
           onEditar={abrirEdicaoOrc}
-          onEliminar={(o) => setEliminarItem({ ...o, _tipo: "orcamento" })}
+          onAnular={(o) => abrirAnulacao({ ...o, _tipo: "orcamento" })}
         />
       )}
 
@@ -349,7 +364,7 @@ function ConteudoComercial() {
           propostas={propostasVisiveis}
           onAbrir={abrirProposta}
           onEditar={abrirEdicaoProposta}
-          onEliminar={(p) => setEliminarItem({ ...p, _tipo: "proposta" })}
+          onAnular={(p) => abrirAnulacao({ ...p, _tipo: "proposta" })}
         />
       )}
 
@@ -369,6 +384,7 @@ function ConteudoComercial() {
           faturas={faturas}
           mesFiltro={mesFiltro}
           onVerFatura={abrirFaturaDetalhe}
+          empresa={empresa}
         />
       )}
 
@@ -406,9 +422,9 @@ function ConteudoComercial() {
         empresa={empresa}
         onClose={() => setPropDetalhe(null)}
         onEditar={abrirEdicaoProposta}
-        onEliminar={(p) => {
+        onAnular={(p) => {
           setPropDetalhe(null);
-          setEliminarItem({ ...p, _tipo: "proposta" });
+          abrirAnulacao({ ...p, _tipo: "proposta" });
         }}
         onAtualizada={atualizarDetalheProposta}
         onCriarOrcamento={criarOrcamentoDeProposta}
@@ -423,14 +439,13 @@ function ConteudoComercial() {
         empresa={empresa}
         onClose={() => setOrcDetalhe(null)}
         onEditar={abrirEdicaoOrc}
-        onEliminar={(o) => { setOrcDetalhe(null); setEliminarItem({ ...o, _tipo: "orcamento" }); }}
+        onAnular={(o) => { setOrcDetalhe(null); abrirAnulacao({ ...o, _tipo: "orcamento" }); }}
         onEstado={mudarEstadoOrc}
       />
 
       <FaturaDetalhesModal
         fatura={fatDetalhe}
         empresa={empresa}
-        podeRemover={false}
         onClose={() => setFatDetalhe(null)}
         onChanged={(atual) => {
           setFatDetalhe(atual);
@@ -445,19 +460,35 @@ function ConteudoComercial() {
       />
 
       <ConfirmDialog
-        open={Boolean(eliminarItem)}
-        onClose={() => setEliminarItem(null)}
-        onConfirm={confirmarEliminacao}
-        loading={deletando}
-        title={eliminarItem?._tipo === "proposta" ? "Remover proposta" : "Remover orçamento"}
+        open={Boolean(anularItem)}
+        onClose={() => { setAnularItem(null); setMotivoAnulacao(""); }}
+        onConfirm={confirmarAnulacao}
+        loading={anulando}
+        confirmDisabled={!motivoAnulacao.trim()}
+        title={anularItem?._tipo === "proposta" ? "Anular proposta" : "Anular orçamento"}
+        icon="block"
+        confirmLabel={anularItem?._tipo === "proposta" ? "Anular proposta" : "Anular orçamento"}
         description={
-          eliminarItem
-            ? eliminarItem._tipo === "proposta"
-              ? `Tem a certeza que deseja remover a proposta "${eliminarItem.numero}"? Esta ação não pode ser desfeita.`
-              : `Tem a certeza que deseja remover o orçamento "${eliminarItem.numero}"? Esta ação não pode ser desfeita.`
+          anularItem
+            ? anularItem._tipo === "proposta"
+              ? `Anular a proposta "${anularItem.numero}"? O registo não é apagado: fica no sistema, marcado como anulado.`
+              : `Anular o orçamento "${anularItem.numero}"? O registo não é apagado: fica no sistema, marcado como anulado.`
             : ""
         }
-      />
+      >
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Motivo da anulação *
+          </span>
+          <textarea
+            value={motivoAnulacao}
+            onChange={(e) => setMotivoAnulacao(e.target.value)}
+            rows={3}
+            placeholder="Indique o motivo da anulação"
+            className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/25"
+          />
+        </label>
+      </ConfirmDialog>
 
 
       {tab === "orcamentos" && (

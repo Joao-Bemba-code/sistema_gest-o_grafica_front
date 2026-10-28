@@ -9,13 +9,13 @@ import { FormField } from "@/components/ui/FormField";
 import { StatusBadge } from "@/components/ui/Ledger";
 import { CardSkeleton } from "@/components/Skeleton";
 import Icon from "@/components/Icon";
-import { getImageUrl } from "@/lib/utils";
 import {
   buscarOrganizacao, guardarOrganizacao,
   buscarSistema, guardarSistema,
   buscarSeguranca, guardarSeguranca,
   uploadLogo, buscarUtilizadorAtual,
   alterarEmail, alterarSenha,
+  buscarAgt, guardarAgt,
 } from "@/services/configuracoes";
 
 
@@ -32,10 +32,13 @@ const SIS_PADRAO = {
 
 const SEG_PADRAO = { tfa_ativo: true, forcar_senha: true, bloqueio_bruta: true, sessao_inativa: false };
 
+const AGT_PADRAO = { ativo: false, ambiente: "homologacao", username: "", senha: "", nif: "", establishment: "SEDE", eac_code: "", iva: 14, taxpayer_key: "" };
+
 const SECCOES = [
   { id: "organizacao", label: "Organização", titulo: "Organização", sub: "Dados da organização e identidade", desc: "Dados da empresa e identidade", icon: "business" },
   { id: "sistema", label: "Sistema", titulo: "Sistema", sub: "Parâmetros gerais do sistema", desc: "Idioma, moeda e aparência", icon: "settings" },
   { id: "seguranca", label: "Segurança", titulo: "Segurança", sub: "Acesso e privacidade", desc: "Acesso e privacidade", icon: "shield" },
+  { id: "agt", label: "Faturação AGT", titulo: "Faturação AGT", sub: "Credenciais da AGT desta empresa", desc: "Comunicação com a AGT", icon: "receipt_long" },
   { id: "conta", label: "Conta", titulo: "Conta de Utilizador", sub: "Email, senha e dados pessoais", desc: "Email, senha e perfil", icon: "person" },
 ];
 
@@ -111,6 +114,8 @@ export default function ConfiguracoesPage() {
   const [org, setOrg] = useState({ nome: "", sigla: "", endereco: "", telefone: "", email: "", nif: "", website: "", logo_url: "", template_contrato: CONTRATO_TEMPLATE });
   const [sis, setSis] = useState(SIS_PADRAO);
   const [seg, setSeg] = useState(SEG_PADRAO);
+  const [agt, setAgt] = useState(AGT_PADRAO);
+  const [agtInfo, setAgtInfo] = useState({ definida: false, pronto: false, segredos: { senhaDefinida: false, taxpayerKeyDefinida: false }, software: {}, baseUrl: "" });
   const [userAtual, setUserAtual] = useState({});
   const [mostrarAlterarEmail, setMostrarAlterarEmail] = useState(false);
   const [mostrarAlterarSenha, setMostrarAlterarSenha] = useState(false);
@@ -123,11 +128,25 @@ export default function ConfiguracoesPage() {
       buscarSistema().catch(() => null),
       buscarSeguranca().catch(() => null),
       buscarUtilizadorAtual().catch(() => null),
-    ]).then(([o, s, sg, u]) => {
+      buscarAgt().catch(() => null),
+    ]).then(([o, s, sg, u, a]) => {
       if (o) setOrg((prev) => ({ ...prev, ...o, template_contrato: o.template_contrato || CONTRATO_TEMPLATE }));
       if (s) setSis(s);
       if (sg) setSeg(sg);
       if (u) setUserAtual(u);
+      if (a) {
+        setAgtInfo(a);
+        setAgt((prev) => ({
+          ...prev,
+          ativo: !!a.ativo,
+          ambiente: a.ambiente || "homologacao",
+          username: a.username || "",
+          nif: a.nif || "",
+          establishment: a.establishment || "SEDE",
+          eac_code: a.eacCode || "",
+          iva: a.iva ?? 14,
+        }));
+      }
     }).finally(() => setCarregando(false));
   }, []);
 
@@ -138,10 +157,23 @@ export default function ConfiguracoesPage() {
     catch { notificar(errorMsg || "Erro ao guardar", "error"); }
   };
 
+  const handleGuardarAgt = () => {
+    const dados = { ...agt };
+    // Campos vazios não são enviados: mantêm os segredos atuais na BD.
+    if (!dados.senha) delete dados.senha;
+    if (!dados.taxpayer_key) delete dados.taxpayer_key;
+    return handleGuardar(async () => {
+      const resp = await guardarAgt(dados);
+      setAgtInfo((p) => ({ ...p, definida: true, pronto: resp.pronto }));
+      setAgt((p) => ({ ...p, senha: "", taxpayer_key: "" }));
+    }, "Configuração AGT guardada");
+  };
+
   const guardarAtual = () => {
     if (aba === "organizacao") return handleGuardar(() => guardarOrganizacao(org), "Dados da organização guardados");
     if (aba === "sistema") return handleGuardar(() => guardarSistema(sis), "Parâmetros do sistema guardados");
     if (aba === "seguranca") return handleGuardar(() => guardarSeguranca(seg), "Configurações de segurança guardadas");
+    if (aba === "agt") return handleGuardarAgt();
     notificar("Não há alterações a guardar nesta secção", "info");
   };
 
@@ -207,6 +239,11 @@ export default function ConfiguracoesPage() {
     organizacao: { valor: org.nome || "—", badge: org.nif ? `NIF ${org.nif}` : "Sem NIF", tom: org.nome ? "info" : "neutral" },
     sistema: { valor: sis.moeda || "—", badge: [sis.idioma, sis.formato_data].filter(Boolean).join(" · "), tom: "neutral" },
     seguranca: { valor: `${proteccoesActivas}/4`, badge: proteccoesActivas >= 3 ? "Protecções activas" : "Rever protecções", tom: proteccoesActivas >= 3 ? "success" : "warning" },
+    agt: {
+      valor: agtInfo.pronto ? "Pronta" : agtInfo.definida ? "Incompleta" : "Por configurar",
+      badge: agtInfo.pronto ? "Pronta para emitir" : agtInfo.definida ? "Faltam dados" : "Sem configuração",
+      tom: agtInfo.pronto ? "success" : agtInfo.definida ? "warning" : "neutral",
+    },
     conta: { valor: userAtual.nome || "—", badge: userAtual.funcao || "—", tom: "info" },
   }[aba];
 
@@ -224,6 +261,9 @@ export default function ConfiguracoesPage() {
     seguranca: [
       { label: "Guardar Segurança", icon: "save", estilo: "primary", onClick: () => handleGuardar(() => guardarSeguranca(seg), "Configurações de segurança guardadas") },
       { label: "Repor Predefinições", icon: "restart_alt", estilo: "neutro", onClick: () => { setSeg(SEG_PADRAO); notificar("Segurança reposta para as predefinições"); } },
+    ],
+    agt: [
+      { label: "Guardar Configuração", icon: "save", estilo: "primary", onClick: handleGuardarAgt },
     ],
     conta: [
       { label: "Alterar Email", icon: "email", estilo: "neutro", onClick: () => { setAba("conta"); setMostrarAlterarEmail(true); } },
@@ -361,17 +401,20 @@ export default function ConfiguracoesPage() {
                   <div className="flex min-w-0 items-center gap-4">
                     <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-primary/30 bg-primary/5">
                       {org.logo_url ? (
-                        <Image src={getImageUrl(org.logo_url)} alt="Logo" className="h-full w-full object-contain" width={64} height={64} />
+                        // Caminho relativo de propósito: o next.config reencaminha
+                        // /uploads/* para o backend, evitando o bloqueio de domínios
+                        // externos (remotePatterns/CSP) na pré-visualização.
+                        <Image src={org.logo_url} alt="Logo" className="h-full w-full object-contain" width={64} height={64} />
                       ) : (
                         <Icon name="image" className="text-2xl text-primary/60" />
                       )}
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-foreground">Logo da Organização</p>
-                      <p className="text-xs text-muted-foreground">PNG, JPG ou SVG • Máx 2MB</p>
+                      <p className="text-xs text-muted-foreground">PNG, JPG, WEBP ou GIF • Máx 5MB</p>
                     </div>
                   </div>
-                  <input id="logo-upload" type="file" accept="image/png,image/jpg,image/jpeg,image/svg+xml" className="hidden" onChange={handleUploadLogo} />
+                  <input id="logo-upload" type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={handleUploadLogo} />
                 </div>
               </>
             )}
@@ -429,6 +472,87 @@ export default function ConfiguracoesPage() {
                 <SecurityItem icon="shield" label="Bloqueio de Força Bruta" desc="Bloquear após 5 tentativas falhadas" ativo={seg.bloqueio_bruta} onClick={() => setSeg((p) => ({ ...p, bloqueio_bruta: !p.bloqueio_bruta }))} />
                 <SecurityItem icon="schedule" label="Sessão Inativa" desc="Encerrar sessão após 30 min de inatividade" ativo={seg.sessao_inativa} onClick={() => setSeg((p) => ({ ...p, sessao_inativa: !p.sessao_inativa }))} />
               </div>
+            )}
+
+            {aba === "agt" && (
+              <>
+                <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-muted/40 p-4">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <Icon name="verified" />
+                    </div>
+                    <div className="min-w-0 space-y-0.5">
+                      <p className="text-sm font-normal text-foreground">
+                        Software certificado: {agtInfo.software?.productId ? `Kamgest (${agtInfo.software.productId})` : "Kamgest"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {agtInfo.software?.productVersion ? `Versão ${agtInfo.software.productVersion}` : "Sem versão"}
+                        {" · "}
+                        {agtInfo.software?.softwareValidationNumber
+                          ? `Validação ${agtInfo.software.softwareValidationNumber}`
+                          : "Sem número de validação no servidor"}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">{agtInfo.baseUrl || ""}</p>
+                    </div>
+                  </div>
+                  <StatusBadge tom={agtInfo.pronto ? "success" : agtInfo.definida ? "warning" : "neutral"}>
+                    {agtInfo.pronto ? "Pronta" : agtInfo.definida ? "Incompleta" : "Por configurar"}
+                  </StatusBadge>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <FormField label="Comunicação com a AGT">
+                    <Select value={agt.ativo ? "sim" : "nao"} onChange={(e) => setAgt((p) => ({ ...p, ativo: e.target.value === "sim" }))}>
+                      <option value="sim">Sim — emitir na AGT</option>
+                      <option value="nao">Não — desativada</option>
+                    </Select>
+                  </FormField>
+                  <FormField label="Ambiente">
+                    <Select value={agt.ambiente} onChange={(e) => setAgt((p) => ({ ...p, ambiente: e.target.value }))}>
+                      <option value="homologacao">Homologação (testes)</option>
+                      <option value="producao">Produção (real)</option>
+                    </Select>
+                  </FormField>
+                  <FormField label="Utilizador da AGT (username)">
+                    <Input value={agt.username} onChange={(e) => setAgt((p) => ({ ...p, username: e.target.value }))} />
+                  </FormField>
+                  <FormField
+                    label="Senha da AGT"
+                    hint={agtInfo.segredos?.senhaDefinida ? "Já definida — deixe vazio para manter" : "Ainda não definida"}
+                  >
+                    <Input type="password" value={agt.senha} onChange={(e) => setAgt((p) => ({ ...p, senha: e.target.value }))} placeholder="••••••••" />
+                  </FormField>
+                  <FormField label="NIF do contribuinte">
+                    <Input value={agt.nif} onChange={(e) => setAgt((p) => ({ ...p, nif: e.target.value }))} />
+                  </FormField>
+                  <FormField label="Estabelecimento">
+                    <Input value={agt.establishment} onChange={(e) => setAgt((p) => ({ ...p, establishment: e.target.value }))} />
+                  </FormField>
+                  <FormField label="Código EAC">
+                    <Input value={agt.eac_code} onChange={(e) => setAgt((p) => ({ ...p, eac_code: e.target.value }))} />
+                  </FormField>
+                  <FormField label="IVA predefinido (%)">
+                    <Input type="number" value={agt.iva} onChange={(e) => setAgt((p) => ({ ...p, iva: Number(e.target.value) }))} />
+                  </FormField>
+                </div>
+
+                <FormField
+                  label="Chave privada do contribuinte"
+                  hint={agtInfo.segredos?.taxpayerKeyDefinida ? "Já definida — deixe vazio para manter" : "Ainda não definida"}
+                >
+                  <textarea
+                    value={agt.taxpayer_key}
+                    onChange={(e) => setAgt((p) => ({ ...p, taxpayer_key: e.target.value }))}
+                    placeholder="Cole aqui o conteúdo da chave privada (-----BEGIN PRIVATE KEY----- ...)"
+                    className="h-32 w-full resize-y rounded-xl border border-input bg-background p-4 font-mono text-xs leading-relaxed text-foreground transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </FormField>
+
+                <div className="space-y-1 rounded-xl border border-border bg-muted/40 p-4 text-xs text-muted-foreground">
+                  <p>A senha e a chave privada ficam encriptadas na base de dados e nunca são devolvidas ao navegador.</p>
+                  <p>A certificação do software (Kamgest) é única para todas as empresas; cada empresa indica aqui as suas próprias credenciais de contribuinte da AGT.</p>
+                </div>
+              </>
             )}
 
             {aba === "conta" && (
