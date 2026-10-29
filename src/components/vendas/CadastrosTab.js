@@ -468,6 +468,20 @@ export default function CadastrosTab({ apenas, mesFiltro = null, faturas } = {})
     }
   };
 
+  const atualizarNoDetalhe = async (dados) => {
+    if (!detalhes?.id) return null;
+    try {
+      const atualizado = await atualizar(detalhes.id, dados);
+      setDetalhes(atualizado);
+      setClientes((prev) => prev.map((c) => (c.id === atualizado.id ? { ...c, ...atualizado } : c)));
+      addToast("Cliente actualizado com sucesso", "success");
+      return atualizado;
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao actualizar o cliente", "error");
+      throw err;
+    }
+  };
+
   const confirmarAnulacao = async () => {
     if (!docAnular) return;
     setAnulando(true);
@@ -933,7 +947,7 @@ export default function CadastrosTab({ apenas, mesFiltro = null, faturas } = {})
       <Modal
         open={Boolean(detalhes)}
         onClose={fecharDetalhes}
-        title={`Detalhes do ${detalhes?.tipo === "fornecedor" ? "fornecedor" : "cliente"}`}
+        title={detalhes?.tipo === "fornecedor" ? "Detalhes do fornecedor" : "Atualização do cliente"}
         icon={detalhes?.tipo === "fornecedor" ? "local_shipping" : "person"}
         size={detalhes && detalhes.tipo !== "fornecedor" ? "2xl" : "md"}
         footer={detalhes && (
@@ -977,6 +991,7 @@ export default function CadastrosTab({ apenas, mesFiltro = null, faturas } = {})
       >
         {detalhes && (detalhes.tipo !== "fornecedor" ? (
           <ClienteDetalhes
+            key={detalhes.id}
             cliente={detalhes}
             historico={historico}
             documentos={documentos}
@@ -987,6 +1002,8 @@ export default function CadastrosTab({ apenas, mesFiltro = null, faturas } = {})
             onAnexar={anexarNoDetalhe}
             onAbrirDocumento={abrirDocumentoGuardado}
             onAnularDocumento={setDocAnular}
+            onAtualizar={atualizarNoDetalhe}
+            responsaveis={opcoesFiltro.responsaveis}
           />
         ) : (
           <>

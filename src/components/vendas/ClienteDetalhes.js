@@ -1,17 +1,36 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Icon from "@/components/Icon";
 import { StatusBadge } from "@/components/ui/Ledger";
 import { Button } from "@/components/ui/Button";
+import SugestaoSelect from "@/components/ui/SugestaoSelect";
 import { inputCls } from "@/lib/estoque";
 import { cn } from "@/lib/utils";
+import {
+  CATEGORIAS,
+  SETORES,
+  PROVINCIAS,
+  MUNICIPIOS_POR_PROVINCIA,
+  MUNICIPIOS_TODOS,
+} from "@/lib/clienteReferencias";
 
 const TABS = [
   { key: "identidade", label: "Identidade", icon: "person" },
   { key: "contactos", label: "Contactos & Endereço", icon: "phone" },
   { key: "documentos", label: "Observações & Documentos", icon: "attach_file" },
   { key: "historico", label: "Histórico", icon: "history" },
+];
+
+const TIPOS_CLIENTE = [
+  "Pessoa singular", "Empresa privada", "Instituição pública", "ONG",
+  "Associação/Fundação", "Organismo internacional", "Outro",
+];
+
+const UNIDADES_NEGOCIO = [
+  "UN-01 Artes Gráficas",
+  "UN-02 Formação Profissional",
+  "UN-03 Soluções Digitais",
 ];
 
 const UNIDADES_SECUNDARIAS = [
@@ -95,20 +114,35 @@ function iconeDocumento(doc) {
   return mime.includes("pdf") ? "picture_as_pdf" : "image";
 }
 
-function Campo({ label, valor, full, mono, children }) {
+function formInicial(c) {
+  return {
+    tipo_cliente: c.tipo_cliente || "",
+    nome: c.nome || "",
+    nif: c.nif || "",
+    segmento: c.segmento || "",
+    unidade_negocio: c.unidade_negocio || "",
+    categoria: c.categoria || "",
+    setor_atividade: c.setor_atividade || "",
+    responsavel_comercial: c.responsavel_comercial || "",
+    ativo: c.ativo !== false,
+    telefone: c.telefone || "",
+    whatsapp: c.whatsapp || "",
+    email: c.email || "",
+    pais: c.pais || "",
+    provincia: c.provincia || "",
+    municipio: c.municipio || "",
+    bairro: c.bairro || "",
+    rua: c.rua || "",
+    numero_porta: c.numero_porta || "",
+    observacoes: c.observacoes || "",
+  };
+}
+
+function Campo({ label, full, children }) {
   return (
     <div className={`flex flex-col gap-1.5 ${full ? "sm:col-span-2" : ""}`}>
       <span className="cyber-label">{label}</span>
-      {children ?? (
-        <div className={cn(
-          "min-h-9 w-full rounded-lg border border-border bg-muted/40 px-2.5 py-2 text-sm",
-          mono ? "font-mono text-xs text-muted-foreground" : "text-foreground"
-        )}>
-          {String(valor || "").trim()
-            ? valor
-            : <span className="text-xs italic text-muted-foreground">—</span>}
-        </div>
-      )}
+      {children}
     </div>
   );
 }
@@ -166,11 +200,45 @@ export default function ClienteDetalhes({
   onAnexar,
   onAbrirDocumento,
   onAnularDocumento,
+  onAtualizar,
+  responsaveis = [],
 }) {
   const [tab, setTab] = useState("identidade");
+  const [form, setForm] = useState(() => formInicial(cliente));
+  const [salvando, setSalvando] = useState(false);
   const ativo = cliente.ativo !== false;
   const unidades = Array.isArray(cliente.unidades_secundarias) ? cliente.unidades_secundarias : [];
   const id = (sufixo) => `detalhes-cliente-${sufixo}`;
+
+  const setCampo = (campo, valor) => setForm((f) => ({ ...f, [campo]: valor }));
+
+  const sugestoes = useMemo(() => {
+    const municipios = form.provincia
+      ? MUNICIPIOS_POR_PROVINCIA[form.provincia] || []
+      : MUNICIPIOS_TODOS;
+    return {
+      tipos: TIPOS_CLIENTE,
+      unidades: UNIDADES_NEGOCIO,
+      categorias: CATEGORIAS,
+      setores: SETORES,
+      provincias: PROVINCIAS,
+      municipios,
+      responsaveis: responsaveis.filter((v) => String(v || "").trim()),
+    };
+  }, [form.provincia, responsaveis]);
+
+  const guardar = async () => {
+    if (!onAtualizar) return;
+    setSalvando(true);
+    try {
+      const atualizado = await onAtualizar(form);
+      if (atualizado) setForm(formInicial(atualizado));
+    } catch {
+      // o erro já é mostrado pelo ecrã que abre os detalhes
+    } finally {
+      setSalvando(false);
+    }
+  };
 
   const historicoOrd = {
     orcamentos: ordenarPorData(historico.orcamentos || [], "data"),
@@ -205,21 +273,90 @@ export default function ClienteDetalhes({
       <div role="tabpanel" id={`${id("painel")}-${tab}`} aria-labelledby={id(`tab-${tab}`)} className="animate-fade-up">
         {tab === "identidade" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Campo label="Código do Cliente" valor={cliente.codigo || "—"} mono />
-            <Campo label="Tipo de Cliente" valor={cliente.tipo_cliente} />
-            <Campo label="Nome / Razão Social" valor={cliente.nome} />
-            <Campo label="NIF" valor={cliente.nif} mono />
-            <Campo label="Nome Comercial" valor={cliente.nome_comercial} />
-            <Campo label="Segmento" valor={cliente.segmento} />
-            <Campo label="Unidade de Negócio Principal" valor={cliente.unidade_negocio} />
-            <Campo label="Categoria" valor={cliente.categoria} />
-            <Campo label="Setor de Actividade" valor={cliente.setor_atividade} />
-            <Campo label="Responsável Comercial" valor={cliente.responsavel_comercial} />
+            <Campo label="Código do Cliente">
+              <input
+                value={cliente.codigo || "—"}
+                readOnly
+                disabled
+                className={`${inputCls} bg-muted/60 cursor-not-allowed`}
+              />
+            </Campo>
+            <Campo label="Tipo de Cliente">
+              <SugestaoSelect
+                id={id("tipo-cliente")}
+                value={form.tipo_cliente}
+                opcoes={sugestoes.tipos}
+                onChange={(valor) => setCampo("tipo_cliente", valor)}
+                placeholder="Selecionar ou escrever..."
+                icon="person"
+              />
+            </Campo>
+            <Campo label="Nome / Razão Social">
+              <input value={form.nome} onChange={(e) => setCampo("nome", e.target.value)} className={inputCls} />
+            </Campo>
+            <Campo label="NIF">
+              <input value={form.nif} onChange={(e) => setCampo("nif", e.target.value)} className={inputCls} />
+            </Campo>
+            <Campo label="Segmento">
+              <input value={form.segmento} onChange={(e) => setCampo("segmento", e.target.value)} className={inputCls} placeholder="Ex.: Grande conta, PME..." />
+            </Campo>
+            <Campo label="Unidade de Negócio Principal">
+              <SugestaoSelect
+                id={id("unidade-negocio")}
+                value={form.unidade_negocio}
+                opcoes={sugestoes.unidades}
+                onChange={(valor) => setCampo("unidade_negocio", valor)}
+                placeholder="Selecionar ou escrever..."
+                icon="factory"
+              />
+            </Campo>
+            <Campo label="Categoria">
+              <SugestaoSelect
+                id={id("categoria")}
+                value={form.categoria}
+                opcoes={sugestoes.categorias}
+                onChange={(valor) => setCampo("categoria", valor)}
+                placeholder="Selecionar ou escrever..."
+                icon="label"
+              />
+            </Campo>
+            <Campo label="Setor de Actividade">
+              <SugestaoSelect
+                id={id("setor-atividade")}
+                value={form.setor_atividade}
+                opcoes={sugestoes.setores}
+                onChange={(valor) => setCampo("setor_atividade", valor)}
+                placeholder="Selecionar ou escrever..."
+                icon="factory"
+              />
+            </Campo>
+            <Campo label="Responsável Comercial">
+              <SugestaoSelect
+                id={id("responsavel")}
+                value={form.responsavel_comercial}
+                opcoes={sugestoes.responsaveis}
+                onChange={(valor) => setCampo("responsavel_comercial", valor)}
+                placeholder="Selecionar ou escrever..."
+                icon="badge"
+              />
+            </Campo>
             <Campo label="Estado">
-              <div className="min-h-9 w-full rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 flex items-center">
-                <StatusBadge tom={ativo ? "success" : "neutral"}>
-                  {ativo ? "Activo" : "Inactivo"}
-                </StatusBadge>
+              <div className="flex gap-4 pt-1.5">
+                {[
+                  { valor: true, rotulo: "Activo" },
+                  { valor: false, rotulo: "Inactivo" },
+                ].map((o) => (
+                  <label key={o.rotulo} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name={`${id("estado")}-${cliente.id || "x"}`}
+                      checked={o.valor ? form.ativo !== false : form.ativo === false}
+                      onChange={() => setCampo("ativo", o.valor)}
+                      className="w-4 h-4 accent-primary"
+                    />
+                    <span className={o.valor ? "text-foreground font-medium" : "text-muted-foreground"}>{o.rotulo}</span>
+                  </label>
+                ))}
               </div>
             </Campo>
             <div className="sm:col-span-2 flex flex-col gap-2">
@@ -248,26 +385,60 @@ export default function ClienteDetalhes({
 
         {tab === "contactos" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Campo label="Telefone" valor={cliente.telefone} />
-            <Campo label="WhatsApp" valor={cliente.whatsapp} />
-            <Campo label="E-mail" valor={cliente.email} full />
-            <Campo label="País" valor={cliente.pais} />
-            <Campo label="Província" valor={cliente.provincia} />
-            <Campo label="Município" valor={cliente.municipio} />
-            <Campo label="Bairro" valor={cliente.bairro} />
-            <Campo label="Rua / Avenida" valor={cliente.rua} />
-            <Campo label="N.º / Porta" valor={cliente.numero_porta} />
+            <Campo label="Telefone">
+              <input value={form.telefone} onChange={(e) => setCampo("telefone", e.target.value)} className={inputCls} placeholder="Ex.: +244 923 456 789" />
+            </Campo>
+            <Campo label="WhatsApp">
+              <input value={form.whatsapp} onChange={(e) => setCampo("whatsapp", e.target.value)} className={inputCls} placeholder="Ex.: +244 923 456 789" />
+            </Campo>
+            <Campo label="E-mail" full>
+              <input type="email" value={form.email} onChange={(e) => setCampo("email", e.target.value)} className={inputCls} placeholder="Ex.: contato@empresa.ao" />
+            </Campo>
+            <Campo label="País">
+              <input value={form.pais} onChange={(e) => setCampo("pais", e.target.value)} className={inputCls} />
+            </Campo>
+            <Campo label="Província">
+              <SugestaoSelect
+                id={id("provincia")}
+                value={form.provincia}
+                opcoes={sugestoes.provincias}
+                onChange={(valor) => setCampo("provincia", valor)}
+                placeholder="Selecionar ou escrever..."
+                icon="pin_drop"
+              />
+            </Campo>
+            <Campo label="Município">
+              <SugestaoSelect
+                id={id("municipio")}
+                value={form.municipio}
+                opcoes={sugestoes.municipios}
+                onChange={(valor) => setCampo("municipio", valor)}
+                placeholder="Selecionar ou escrever..."
+                icon="pin_drop"
+              />
+            </Campo>
+            <Campo label="Bairro">
+              <input value={form.bairro} onChange={(e) => setCampo("bairro", e.target.value)} className={inputCls} />
+            </Campo>
+            <Campo label="Rua / Avenida">
+              <input value={form.rua} onChange={(e) => setCampo("rua", e.target.value)} className={inputCls} />
+            </Campo>
+            <Campo label="N.º / Porta">
+              <input value={form.numero_porta} onChange={(e) => setCampo("numero_porta", e.target.value)} className={inputCls} />
+            </Campo>
           </div>
         )}
 
         {tab === "documentos" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Campo label="Observações" full>
-              <div className="min-h-[96px] w-full rounded-lg border border-border bg-muted/40 px-2.5 py-2.5 text-sm text-foreground whitespace-pre-wrap">
-                {String(cliente.observacoes || "").trim()
-                  ? cliente.observacoes
-                  : <span className="text-xs italic text-muted-foreground">Sem observações.</span>}
-              </div>
+              <textarea
+                rows={4}
+                value={form.observacoes}
+                onChange={(e) => setCampo("observacoes", e.target.value)}
+                className={`${inputCls} resize-y`}
+                placeholder="Notas internas sobre o cliente..."
+              />
             </Campo>
 
             <div className="sm:col-span-2 flex flex-col gap-2">
@@ -438,6 +609,26 @@ export default function ClienteDetalhes({
           </div>
         )}
       </div>
+
+      {tab !== "historico" && (
+        <div className="flex justify-end gap-2 border-t border-border pt-4">
+          <Button type="button" loading={salvando} onClick={guardar}>
+            <Icon name="save" className="text-base" /> Guardar alterações
+          </Button>
+        </div>
+      )}
+
+      <p className="text-xs text-muted-foreground">
+        {ativo ? (
+          <span className="inline-flex items-center gap-1.5">
+            <StatusBadge tom="success">Activo</StatusBadge> Cliente activo no sistema
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5">
+            <StatusBadge tom="neutral">Inactivo</StatusBadge> Cadastro inactivo
+          </span>
+        )}
+      </p>
     </div>
   );
 }
