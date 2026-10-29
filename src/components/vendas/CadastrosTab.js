@@ -35,8 +35,18 @@ import {
   abrirDocumento,
 } from "@/services/clientes";
 import { listarFaturas } from "@/services/faturacao";
+import { listar as listarOrcamentos } from "@/services/orcamentos";
+import { listar as listarPropostas } from "@/services/propostas";
+import { listarOrdens } from "@/services/producao";
 import { buscarOrganizacao } from "@/services/configuracoes";
 import gerarFichaClientePdf from "@/lib/fichaClientePdf";
+import {
+  CATEGORIAS,
+  SETORES,
+  PROVINCIAS,
+  MUNICIPIOS_POR_PROVINCIA,
+  MUNICIPIOS_TODOS,
+} from "@/lib/clienteReferencias";
 import ClienteForm from "./ClienteForm";
 import ClienteDetalhes from "./ClienteDetalhes";
 
@@ -49,12 +59,17 @@ const initialForm = {
   tipo_cliente: "", nome_comercial: "", segmento: "", unidade_negocio: "",
   unidades_secundarias: [], pais: "Angola", provincia: "", municipio: "", bairro: "",
   rua: "", numero_porta: "", categoria: "", setor_atividade: "", fonte_origem: "",
-  referencia_interna: "", observacoes: "", ativo: true,
+  referencia_interna: "", responsavel_comercial: "", observacoes: "", ativo: true,
 };
 
-const FILTRO_VAZIO = { termo: "", segmento: "", estado: "" };
+const FILTRO_VAZIO = {
+  termo: "", tipo: "", estado: "",
+  periodoDe: "", periodoAte: "",
+  unidade: "", situacao: "", categoria: "", setor: "", provincia: "", municipio: "",
+  responsavel: "",
+};
 
-const SEGMENTOS = [
+const TIPOS = [
   { value: "cliente", label: "Cliente" },
   { value: "fornecedor", label: "Fornecedor" },
 ];
@@ -94,6 +109,9 @@ export default function CadastrosTab({ apenas, mesFiltro = null, faturas } = {})
   const [form, setForm] = useState(formVazio);
   const [clientes, setClientes] = useState([]);
   const [faturasLocal, setFaturasLocal] = useState([]);
+  const [orcamentosLocal, setOrcamentosLocal] = useState([]);
+  const [propostasLocal, setPropostasLocal] = useState([]);
+  const [ordensLocal, setOrdensLocal] = useState([]);
   const [rascunho, setRascunho] = useState(FILTRO_VAZIO);
   const [aplicado, setAplicado] = useState(FILTRO_VAZIO);
   const [carregando, setCarregando] = useState(true);
@@ -149,6 +167,24 @@ export default function CadastrosTab({ apenas, mesFiltro = null, faturas } = {})
     return () => { ativo = false; };
   }, [ehCliente, faturas]);
 
+  // Atividade do cliente para o separador Histórico: orçamentos, propostas
+  // e ordens de produção (entregas). Filtradas por cliente nos detalhes.
+  useEffect(() => {
+    if (!ehCliente) return undefined;
+    let ativo = true;
+    Promise.all([
+      listarOrcamentos().catch(() => []),
+      listarPropostas().catch(() => []),
+      listarOrdens().catch(() => []),
+    ]).then(([orc, prop, ord]) => {
+      if (!ativo) return;
+      setOrcamentosLocal(Array.isArray(orc) ? orc : orc?.data ?? []);
+      setPropostasLocal(Array.isArray(prop) ? prop : prop?.data ?? []);
+      setOrdensLocal(Array.isArray(ord) ? ord : ord?.data ?? []);
+    });
+    return () => { ativo = false; };
+  }, [ehCliente]);
+
   const base = useMemo(
     () => (apenas ? clientes.filter((c) => (c.tipo === "fornecedor" ? "fornecedor" : "cliente") === apenas) : clientes),
     [clientes, apenas]
@@ -158,6 +194,19 @@ export default function CadastrosTab({ apenas, mesFiltro = null, faturas } = {})
   const totalFornecedores = clientes.filter((c) => c.tipo === "fornecedor").length;
 
   const faturasDisponiveis = Array.isArray(faturas) ? faturas : faturasLocal;
+
+  // Atividade do cliente aberto nos detalhes (separador Histórico).
+  const historico = useMemo(() => {
+    const cid = detalhes?.id;
+    if (!cid) return { orcamentos: [], propostas: [], faturas: [], entregas: [] };
+    const idDoDoc = (doc) => Number(doc?.cliente_id ?? doc?.cliente?.id);
+    return {
+      orcamentos: orcamentosLocal.filter((o) => idDoDoc(o) === Number(cid)),
+      propostas: propostasLocal.filter((p) => idDoDoc(p) === Number(cid)),
+      faturas: faturasDisponiveis.filter((f) => idDoDoc(f) === Number(cid)),
+      entregas: ordensLocal.filter((o) => idDoDoc(o) === Number(cid)),
+    };
+  }, [detalhes, orcamentosLocal, propostasLocal, faturasDisponiveis, ordensLocal]);
 
   const periodo = useMemo(() => {
     const ref = mesFiltro instanceof Date ? mesFiltro : new Date();
@@ -173,6 +222,32 @@ export default function CadastrosTab({ apenas, mesFiltro = null, faturas } = {})
     () => base.filter((c) => String(c.dataCadastro || c.data_cadastro || "").startsWith(periodo.chave)).length,
     [base, periodo.chave]
   );
+
+  // Opções dos filtros da vista de clientes: listas oficiais (categorias,
+  // sectores, províncias e municípios) fundidas com os valores já usados.
+  const opcoesFiltro = useMemo(() => {
+    const fundir = (lista, campo) => {
+      const mapa = new Map();
+      const adicionar = (valor) => {
+        const texto = String(valor || "").trim();
+        if (texto) mapa.set(texto.toLowerCase(), texto);
+      };
+      lista.forEach(adicionar);
+      for (const c of base) adicionar(c[campo]);
+      return [...mapa.values()].sort((a, b) => a.localeCompare(b, "pt"));
+    };
+    const municipiosDaProvincia = rascunho.provincia
+      ? MUNICIPIOS_POR_PROVINCIA[rascunho.provincia] || []
+      : MUNICIPIOS_TODOS;
+    return {
+      unidades: fundir([], "unidade_negocio"),
+      categorias: fundir(CATEGORIAS, "categoria"),
+      setores: fundir(SETORES, "setor_atividade"),
+      provincias: fundir(PROVINCIAS, "provincia"),
+      municipios: fundir(municipiosDaProvincia, "municipio"),
+      responsaveis: fundir([], "responsavel_comercial"),
+    };
+  }, [base, rascunho.provincia]);
 
   // Saldo em aberto por cliente: faturas não pagas/anuladas e recibos não contam.
   const dividaPorCliente = useMemo(() => {
@@ -194,22 +269,52 @@ export default function CadastrosTab({ apenas, mesFiltro = null, faturas } = {})
   );
 
   const resultado = useMemo(() => {
-    const termo = aplicado.termo.trim().toLowerCase();
     let res = [...base];
+    if (ehCliente) {
+      const { periodoDe, periodoAte } = aplicado;
+      if (periodoDe || periodoAte) {
+        res = res.filter((c) => {
+          const data = String(c.dataCadastro || c.data_cadastro || "").slice(0, 10);
+          if (!data) return false;
+          if (periodoDe && data < periodoDe) return false;
+          if (periodoAte && data > periodoAte) return false;
+          return true;
+        });
+      }
+      const igual = (c, campo, valor) =>
+        String(c[campo] || "").trim().toLowerCase() === String(valor).trim().toLowerCase();
+      if (aplicado.unidade) res = res.filter((c) => igual(c, "unidade_negocio", aplicado.unidade));
+      if (aplicado.responsavel) res = res.filter((c) => igual(c, "responsavel_comercial", aplicado.responsavel));
+      if (aplicado.categoria) res = res.filter((c) => igual(c, "categoria", aplicado.categoria));
+      if (aplicado.setor) res = res.filter((c) => igual(c, "setor_atividade", aplicado.setor));
+      if (aplicado.provincia) res = res.filter((c) => igual(c, "provincia", aplicado.provincia));
+      if (aplicado.municipio) res = res.filter((c) => igual(c, "municipio", aplicado.municipio));
+      if (aplicado.situacao === "ativo") res = res.filter((c) => c.ativo !== false && !c.anulado);
+      if (aplicado.situacao === "inativo") res = res.filter((c) => c.ativo === false && !c.anulado);
+      if (aplicado.situacao === "anulado") res = res.filter((c) => Boolean(c.anulado));
+      return res;
+    }
+    const termo = aplicado.termo.trim().toLowerCase();
     if (termo) {
       res = res.filter((c) =>
         `${c.nome || ""} ${c.nif || ""} ${c.codigo || ""}`.toLowerCase().includes(termo)
       );
     }
-    if (aplicado.segmento) {
-      res = res.filter((c) => (c.tipo === "fornecedor" ? "fornecedor" : "cliente") === aplicado.segmento);
+    if (aplicado.tipo) {
+      res = res.filter((c) => (c.tipo === "fornecedor" ? "fornecedor" : "cliente") === aplicado.tipo);
     }
     if (aplicado.estado === "ativo") res = res.filter((c) => c.ativo !== false);
     if (aplicado.estado === "inativo") res = res.filter((c) => c.ativo === false);
     return res;
-  }, [base, aplicado]);
+  }, [base, aplicado, ehCliente]);
 
-  const temFiltro = Boolean(aplicado.termo || aplicado.segmento || aplicado.estado);
+  const temFiltro = ehCliente
+    ? Boolean(
+        aplicado.periodoDe || aplicado.periodoAte || aplicado.unidade || aplicado.situacao ||
+        aplicado.categoria || aplicado.setor || aplicado.provincia || aplicado.municipio ||
+        aplicado.responsavel
+      )
+    : Boolean(aplicado.termo || aplicado.tipo || aplicado.estado);
   const aplicar = () => setAplicado({ ...rascunho });
   const limpar = () => {
     setRascunho(FILTRO_VAZIO);
@@ -268,16 +373,9 @@ export default function CadastrosTab({ apenas, mesFiltro = null, faturas } = {})
     e.preventDefault();
     const rotulo = form.tipo === "fornecedor" ? "Fornecedor" : "Cliente";
     try {
-      // O endereço completo continua a alimentar os PDFs e as entregas.
-      const payload = form.tipo === "fornecedor"
-        ? form
-        : {
-            ...form,
-            endereco: [form.rua, form.numero_porta, form.bairro, form.municipio, form.provincia]
-              .map((v) => String(v || "").trim())
-              .filter(Boolean)
-              .join(", "),
-          };
+      // A morada é escrita directamente no formulário; os campos antigos
+      // (rua, bairro, porta) ficam guardados mas já não são editáveis.
+      const payload = form;
       const salvo = editando ? await atualizar(editando, payload) : await criar(payload);
       addToast(`${rotulo} ${editando ? "atualizado" : "cadastrado"} com sucesso`, "success");
       if (ficheirosForm.length && salvo?.id) {
@@ -400,6 +498,7 @@ export default function CadastrosTab({ apenas, mesFiltro = null, faturas } = {})
       bairro: item.bairro || "", rua: item.rua || "", numero_porta: item.numero_porta || "",
       categoria: item.categoria || "", setor_atividade: item.setor_atividade || "",
       fonte_origem: item.fonte_origem || "", referencia_interna: item.referencia_interna || "",
+      responsavel_comercial: item.responsavel_comercial || "",
       observacoes: item.observacoes || "", ativo: item.ativo !== false,
     });
     setFicheirosForm([]);
@@ -438,50 +537,175 @@ export default function CadastrosTab({ apenas, mesFiltro = null, faturas } = {})
       )}
 
       <Ledger rotulo={`${titulo} ledger`}>
-        <LedgerHeader titulo={titulo} subtitulo={subtitulo} />
+        {!ehCliente && <LedgerHeader titulo={titulo} subtitulo={subtitulo} />}
 
         <div className="border-b border-border bg-muted/30 px-4 py-3">
           <p className="mb-2 text-xs font-semibold text-muted-foreground">Filtros</p>
           <div className="flex flex-wrap items-end gap-2.5">
-            <label className="flex min-w-44 flex-1 flex-col gap-1 sm:max-w-64 sm:flex-none">
-              <span className="text-[11px] font-medium text-muted-foreground">Nome / NIF</span>
-              <input
-                value={rascunho.termo}
-                onChange={(e) => setRascunho((f) => ({ ...f, termo: e.target.value }))}
-                onKeyDown={(e) => { if (e.key === "Enter") aplicar(); }}
-                placeholder="Pesquisar nome ou NIF"
-                aria-label="Nome ou NIF"
-                className={campoCls}
-              />
-            </label>
+            {ehCliente ? (
+              <>
+                <label className="flex min-w-40 flex-1 flex-col gap-1 sm:flex-none">
+                  <span className="text-[11px] font-medium text-muted-foreground">Unidade de Negócio</span>
+                  <select
+                    value={rascunho.unidade}
+                    onChange={(e) => setRascunho((f) => ({ ...f, unidade: e.target.value }))}
+                    className={campoCls}
+                  >
+                    <option value="">Todas</option>
+                    {opcoesFiltro.unidades.map((v) => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
+                  </select>
+                </label>
 
-            <label className="flex min-w-36 flex-1 flex-col gap-1 sm:flex-none">
-              <span className="text-[11px] font-medium text-muted-foreground">Segmento</span>
-              <select
-                value={rascunho.segmento}
-                onChange={(e) => setRascunho((f) => ({ ...f, segmento: e.target.value }))}
-                className={campoCls}
-              >
-                <option value="">Todos</option>
-                {SEGMENTOS.map((s) => (
-                  <option key={s.value} value={s.value}>{s.label}</option>
-                ))}
-              </select>
-            </label>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[11px] font-medium text-muted-foreground">Período de Referência</span>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="date"
+                      value={rascunho.periodoDe}
+                      onChange={(e) => setRascunho((f) => ({ ...f, periodoDe: e.target.value }))}
+                      aria-label="Período de"
+                      className={campoCls}
+                    />
+                    <span className="text-xs text-muted-foreground">até</span>
+                    <input
+                      type="date"
+                      value={rascunho.periodoAte}
+                      onChange={(e) => setRascunho((f) => ({ ...f, periodoAte: e.target.value }))}
+                      aria-label="Período até"
+                      className={campoCls}
+                    />
+                  </div>
+                </div>
 
-            <label className="flex min-w-32 flex-1 flex-col gap-1 sm:flex-none">
-              <span className="text-[11px] font-medium text-muted-foreground">Estado</span>
-              <select
-                value={rascunho.estado}
-                onChange={(e) => setRascunho((f) => ({ ...f, estado: e.target.value }))}
-                className={campoCls}
-              >
-                <option value="">Todos</option>
-                {ESTADOS.map((s) => (
-                  <option key={s.value} value={s.value}>{s.label}</option>
-                ))}
-              </select>
-            </label>
+                <label className="flex min-w-36 flex-1 flex-col gap-1 sm:flex-none">
+                  <span className="text-[11px] font-medium text-muted-foreground">Situação Cadastral</span>
+                  <select
+                    value={rascunho.situacao}
+                    onChange={(e) => setRascunho((f) => ({ ...f, situacao: e.target.value }))}
+                    className={campoCls}
+                  >
+                    <option value="">Todas</option>
+                    <option value="ativo">Activo</option>
+                    <option value="inativo">Inactivo</option>
+                    <option value="anulado">Anulado</option>
+                  </select>
+                </label>
+
+                <div className="flex flex-col gap-1">
+                  <span className="text-[11px] font-medium text-muted-foreground">Categoria / Sector</span>
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={rascunho.categoria}
+                      onChange={(e) => setRascunho((f) => ({ ...f, categoria: e.target.value }))}
+                      aria-label="Categoria"
+                      className={campoCls}
+                    >
+                      <option value="">Todas</option>
+                      {opcoesFiltro.categorias.map((v) => (
+                        <option key={v} value={v}>{v}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={rascunho.setor}
+                      onChange={(e) => setRascunho((f) => ({ ...f, setor: e.target.value }))}
+                      aria-label="Sector"
+                      className={campoCls}
+                    >
+                      <option value="">Todos</option>
+                      {opcoesFiltro.setores.map((v) => (
+                        <option key={v} value={v}>{v}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <span className="text-[11px] font-medium text-muted-foreground">Província / Município</span>
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={rascunho.provincia}
+                      onChange={(e) => setRascunho((f) => ({ ...f, provincia: e.target.value, municipio: "" }))}
+                      aria-label="Província"
+                      className={campoCls}
+                    >
+                      <option value="">Todas</option>
+                      {opcoesFiltro.provincias.map((v) => (
+                        <option key={v} value={v}>{v}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={rascunho.municipio}
+                      onChange={(e) => setRascunho((f) => ({ ...f, municipio: e.target.value }))}
+                      aria-label="Município"
+                      className={campoCls}
+                    >
+                      <option value="">Todos</option>
+                      {opcoesFiltro.municipios.map((v) => (
+                        <option key={v} value={v}>{v}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <label className="flex min-w-36 flex-1 flex-col gap-1 sm:flex-none">
+                  <span className="text-[11px] font-medium text-muted-foreground">Responsável Comercial</span>
+                  <select
+                    value={rascunho.responsavel}
+                    onChange={(e) => setRascunho((f) => ({ ...f, responsavel: e.target.value }))}
+                    className={campoCls}
+                  >
+                    <option value="">Todos</option>
+                    {opcoesFiltro.responsaveis.map((v) => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            ) : (
+              <>
+                <label className="flex min-w-44 flex-1 flex-col gap-1 sm:max-w-64 sm:flex-none">
+                  <span className="text-[11px] font-medium text-muted-foreground">Nome / NIF</span>
+                  <input
+                    value={rascunho.termo}
+                    onChange={(e) => setRascunho((f) => ({ ...f, termo: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === "Enter") aplicar(); }}
+                    placeholder="Pesquisar nome ou NIF"
+                    aria-label="Nome ou NIF"
+                    className={campoCls}
+                  />
+                </label>
+
+                <label className="flex min-w-36 flex-1 flex-col gap-1 sm:flex-none">
+                  <span className="text-[11px] font-medium text-muted-foreground">Segmento</span>
+                  <select
+                    value={rascunho.tipo}
+                    onChange={(e) => setRascunho((f) => ({ ...f, tipo: e.target.value }))}
+                    className={campoCls}
+                  >
+                    <option value="">Todos</option>
+                    {TIPOS.map((s) => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="flex min-w-32 flex-1 flex-col gap-1 sm:flex-none">
+                  <span className="text-[11px] font-medium text-muted-foreground">Estado</span>
+                  <select
+                    value={rascunho.estado}
+                    onChange={(e) => setRascunho((f) => ({ ...f, estado: e.target.value }))}
+                    className={campoCls}
+                  >
+                    <option value="">Todos</option>
+                    {ESTADOS.map((s) => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            )}
 
             <button
               type="button"
@@ -509,10 +733,21 @@ export default function CadastrosTab({ apenas, mesFiltro = null, faturas } = {})
               <thead>
                 <tr className="border-b border-border">
                   <LedgerTh>Código</LedgerTh>
-                  <LedgerTh>{apenas === "fornecedor" ? "Fornecedor" : "Cliente"}</LedgerTh>
-                  <LedgerTh>NIF</LedgerTh>
-                  <LedgerTh>Contacto</LedgerTh>
-                  <LedgerTh>Estado</LedgerTh>
+                  <LedgerTh>{apenas === "fornecedor" ? "Fornecedor" : "Cliente / Designação"}</LedgerTh>
+                  {ehCliente ? (
+                    <>
+                      <LedgerTh>Tipo</LedgerTh>
+                      <LedgerTh>Província</LedgerTh>
+                      <LedgerTh>Estado</LedgerTh>
+                      <LedgerTh>Unidade</LedgerTh>
+                    </>
+                  ) : (
+                    <>
+                      <LedgerTh>NIF</LedgerTh>
+                      <LedgerTh>Contacto</LedgerTh>
+                      <LedgerTh>Estado</LedgerTh>
+                    </>
+                  )}
                   <LedgerTh className="w-10" />
                 </tr>
               </thead>
@@ -528,15 +763,36 @@ export default function CadastrosTab({ apenas, mesFiltro = null, faturas } = {})
                         <span className="block min-w-0 truncate text-sm">{item.nome || "—"}</span>
                       </span>
                     </LedgerTd>
-                    <LedgerTd className="whitespace-nowrap font-mono text-xs text-muted-foreground">{item.nif || "—"}</LedgerTd>
-                    <LedgerTd className="max-w-44 whitespace-nowrap">
-                      <span className="block truncate">{item.telefone || item.whatsapp || item.email || "—"}</span>
-                    </LedgerTd>
-                    <LedgerTd>
-                      <StatusBadge tom={item.anulado ? "error" : item.ativo === false ? "neutral" : "success"}>
-                        {item.anulado ? "Anulado" : item.ativo === false ? "Inativo" : "Ativo"}
-                      </StatusBadge>
-                    </LedgerTd>
+                    {ehCliente ? (
+                      <>
+                        <LedgerTd className="max-w-36 whitespace-nowrap">
+                          <span className="block truncate text-xs">{item.tipo_cliente || "—"}</span>
+                        </LedgerTd>
+                        <LedgerTd className="max-w-36 whitespace-nowrap">
+                          <span className="block truncate text-xs">{item.provincia || "—"}</span>
+                        </LedgerTd>
+                        <LedgerTd>
+                          <StatusBadge tom={item.anulado ? "error" : item.ativo === false ? "neutral" : "success"}>
+                            {item.anulado ? "Anulado" : item.ativo === false ? "Inativo" : "Ativo"}
+                          </StatusBadge>
+                        </LedgerTd>
+                        <LedgerTd className="max-w-44 whitespace-nowrap">
+                          <span className="block truncate text-xs">{item.unidade_negocio || "—"}</span>
+                        </LedgerTd>
+                      </>
+                    ) : (
+                      <>
+                        <LedgerTd className="whitespace-nowrap font-mono text-xs text-muted-foreground">{item.nif || "—"}</LedgerTd>
+                        <LedgerTd className="max-w-44 whitespace-nowrap">
+                          <span className="block truncate">{item.telefone || item.whatsapp || item.email || "—"}</span>
+                        </LedgerTd>
+                        <LedgerTd>
+                          <StatusBadge tom={item.anulado ? "error" : item.ativo === false ? "neutral" : "success"}>
+                            {item.anulado ? "Anulado" : item.ativo === false ? "Inativo" : "Ativo"}
+                          </StatusBadge>
+                        </LedgerTd>
+                      </>
+                    )}
                     <LedgerTd>
                       <RowMenu
                         ariaLabel="Ações do cadastro"
@@ -567,9 +823,9 @@ export default function CadastrosTab({ apenas, mesFiltro = null, faturas } = {})
               formId="form-cliente"
               form={form}
               onChange={(campo, valor) => setForm((f) => ({ ...f, [campo]: valor }))}
+              existentes={clientes}
               ficheiros={ficheirosForm}
               onFicheiros={setFicheirosForm}
-              existentes={clientes}
             />
           ) : (
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -722,6 +978,7 @@ export default function CadastrosTab({ apenas, mesFiltro = null, faturas } = {})
         {detalhes && (detalhes.tipo !== "fornecedor" ? (
           <ClienteDetalhes
             cliente={detalhes}
+            historico={historico}
             documentos={documentos}
             carregandoDocs={carregandoDocs}
             ficheirosNovos={ficheirosDetalhe}

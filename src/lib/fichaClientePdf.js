@@ -23,15 +23,20 @@ const LARG_ROTULO = 31;
 const ALT_LINHA = 6.8;
 
 function estadoDoCliente(cliente) {
+  if (cliente.anulado) return "Anulado";
   return cliente.ativo === false ? "Inactivo" : "Activo";
 }
 
 function moradaDoCliente(cliente) {
+  if (cliente.endereco) return cliente.endereco;
   const partes = [
     cliente.rua,
     cliente.numero_porta ? `N.º ${cliente.numero_porta}` : null,
+    cliente.bairro,
+    cliente.municipio,
+    cliente.provincia,
   ].filter(Boolean);
-  return partes.length ? partes.join(", ") : cliente.endereco || "—";
+  return partes.length ? partes.join(", ") : "—";
 }
 
 // Campos em duas colunas para a ficha caber numa única página A4 vertical.
@@ -93,31 +98,24 @@ export default async function gerarFichaClientePdf(cliente, empresa = {}, docume
   desenharMarcaDeAgua(doc, logo);
 
   let y = 50;
-  const unidadesSec = Array.isArray(cliente.unidades_secundarias) && cliente.unidades_secundarias.length
-    ? cliente.unidades_secundarias.join(" · ")
-    : "—";
 
-  // 01 a 03 — campos em duas colunas para caber numa única página
-  y = secaoCampos(doc, "01 · Identidade do Cliente & Unidade de Negócio", [
-    [["Código do Cliente", codigo], ["Estado do Cliente", estadoDoCliente(cliente)]],
-    [["Tipo de Cliente", cliente.tipo_cliente || "—"], ["NIF", cliente.nif || "—"]],
-    [["Nome / Razão Social", cliente.nome || "—"], ["Nome Comercial", cliente.nome_comercial || "—"]],
-    [["Unidade Principal", cliente.unidade_negocio || "—"], ["Unidade Secundária", unidadesSec]],
+  // As secções espelham o formulário de registo do cliente (COM-CLI-01).
+  y = secaoCampos(doc, "01 · Identificação do Cliente", [
+    [["Código do Cliente", codigo], ["Tipo de Cliente", cliente.tipo_cliente || "—"]],
+    [["Nome / Designação Social", cliente.nome || "—"], ["NIF", cliente.nif || "—"]],
   ], y);
 
-  y = secaoCampos(doc, "02 · Contactos Principais & Endereço", [
-    [["Telefone", cliente.telefone || "—"], ["WhatsApp", cliente.whatsapp || "—"]],
-    [["E-mail", cliente.email || "—"], ["País", cliente.pais || "—"]],
+  y = secaoCampos(doc, "02 · Contactos e Localização", [
+    [["Telefone Principal", cliente.telefone || "—"], ["Correio Electrónico", cliente.email || "—"]],
     [["Província", cliente.provincia || "—"], ["Município", cliente.municipio || "—"]],
-    [["Bairro", cliente.bairro || "—"], ["Morada", moradaDoCliente(cliente)]],
   ], y);
+  y += linhaCampo(doc, "Morada", moradaDoCliente(cliente), MARGEM, y, pw - MARGEM * 2) + 3;
 
-  y = secaoCampos(doc, "03 · Pessoas de Contacto & Classificação Comercial", [
-    [["Pessoa de Contacto", cliente.pessoa_contacto || "—"], ["Função / Cargo", cliente.pessoa_funcao || "—"]],
-    [["Telefone Directo", cliente.pessoa_telefone || "—"], ["E-mail da Pessoa", cliente.pessoa_email || "—"]],
-    [["Categoria do Cliente", cliente.categoria || "—"], ["Sector de Actividade", cliente.setor_atividade || "—"]],
-    [["Fonte de Origem", cliente.fonte_origem || "—"], ["Referência Interna", cliente.referencia_interna || "—"]],
+  y = secaoCampos(doc, "03 · Classificação e Controlo", [
+    [["Sector de Actividade", cliente.setor_atividade || "—"], ["Categoria", cliente.categoria || "—"]],
+    [["Unidade de Negócio", cliente.unidade_negocio || "—"], ["Estado do Cadastro", estadoDoCliente(cliente)]],
   ], y);
+  y += linhaCampo(doc, "Responsável Comercial", cliente.responsavel_comercial || "—", MARGEM, y, pw - MARGEM * 2) + 3;
 
   // 04 — Observações & documentos
   y += 2;

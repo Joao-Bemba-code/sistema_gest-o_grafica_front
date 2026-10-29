@@ -225,11 +225,12 @@ export default function EncomendasTab({ encomendas = [], onAbrir }) {
         <LedgerTable>
           <thead>
             <tr className="border-b border-border">
-              <LedgerTh>Pedido</LedgerTh>
+              <LedgerTh>Código</LedgerTh>
               <LedgerTh>Cliente</LedgerTh>
-              <LedgerTh>Prazo</LedgerTh>
-              <LedgerTh>Valor</LedgerTh>
+              <LedgerTh>Emissão</LedgerTh>
               <LedgerTh>Estado</LedgerTh>
+              <LedgerTh>Valor</LedgerTh>
+              <LedgerTh>Responsável</LedgerTh>
               <LedgerTh className="w-10" />
             </tr>
           </thead>
@@ -252,12 +253,15 @@ export default function EncomendasTab({ encomendas = [], onAbrir }) {
                       <span className="block truncate text-xs text-muted-foreground">{o.cliente.nome}</span>
                     )}
                   </LedgerTd>
-                  <LedgerTd className="text-muted-foreground">
-                    {prazoDe(o) ? formatData(prazoDe(o)) : (o.prazoExecucao || "—")}
+                  <LedgerTd className="whitespace-nowrap text-muted-foreground">
+                    {formatData(o.data || o.createdAt)}
                   </LedgerTd>
-                  <LedgerTd className="font-bold tabular-nums text-foreground">{formatKz(o.total)}</LedgerTd>
                   <LedgerTd>
                     <StatusBadge tom={meta.tom}>{meta.rotulo}</StatusBadge>
+                  </LedgerTd>
+                  <LedgerTd className="font-bold tabular-nums text-foreground">{formatKz(o.total)}</LedgerTd>
+                  <LedgerTd className="max-w-40">
+                    <span className="block truncate text-xs">{o.responsavel || "—"}</span>
                   </LedgerTd>
                   <LedgerTd>
                     <RowMenu

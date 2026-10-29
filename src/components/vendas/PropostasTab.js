@@ -17,7 +17,7 @@ import Paginacao, { usePaginacao } from "@/components/ui/Paginacao";
 import RowMenu from "@/components/ui/RowMenu";
 import { UNIDADES, ESTADOS_PROPOSTA, META_ESTADO } from "@/services/propostas";
 
-const FILTRO_VAZIO = { cliente: "", unidade: "", estado: "" };
+const FILTRO_VAZIO = { periodoDe: "", periodoAte: "", unidade: "", estado: "", responsavel: "" };
 
 const CARTOES = [
   { chave: "rascunho", icone: "edit", tom: "bg-warning/10 text-warning" },
@@ -34,29 +34,40 @@ function formatarData(valor) {
   return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("pt-PT");
 }
 
+function formatKz(v) {
+  return `Kz ${Number(v || 0).toLocaleString("pt-AO")}`;
+}
+
 export default function PropostasTab({ propostas = [], onAbrir, onEditar, onAnular }) {
   const [rascunho, setRascunho] = useState(FILTRO_VAZIO);
   const [aplicado, setAplicado] = useState(FILTRO_VAZIO);
 
-  const clientes = useMemo(() => {
+  const responsaveis = useMemo(() => {
     const mapa = new Map();
     for (const p of propostas) {
-      const id = String(p.cliente_id ?? p.cliente?.id ?? "");
-      const nome = p.cliente?.empresa || p.cliente?.nome || "";
-      if (id && nome && !mapa.has(id)) mapa.set(id, nome);
+      const v = String(p.responsavel_comercial || "").trim();
+      if (v) mapa.set(v.toLowerCase(), v);
     }
-    return Array.from(mapa, ([value, label]) => ({ value, label })).sort((a, b) =>
-      a.label.localeCompare(b.label, "pt")
-    );
+    return [...mapa.values()].sort((a, b) => a.localeCompare(b, "pt"));
   }, [propostas]);
 
   const filtradas = useMemo(
     () =>
       propostas.filter((p) => {
-        const clienteId = String(p.cliente_id ?? p.cliente?.id ?? "");
-        if (aplicado.cliente && clienteId !== aplicado.cliente) return false;
+        if (aplicado.periodoDe || aplicado.periodoAte) {
+          const data = String(p.data_emissao || p.criada_em || "").slice(0, 10);
+          if (!data) return false;
+          if (aplicado.periodoDe && data < aplicado.periodoDe) return false;
+          if (aplicado.periodoAte && data > aplicado.periodoAte) return false;
+        }
         if (aplicado.unidade && p.unidade !== aplicado.unidade) return false;
         if (aplicado.estado && p.estado !== aplicado.estado) return false;
+        if (
+          aplicado.responsavel &&
+          String(p.responsavel_comercial || "").trim().toLowerCase() !== aplicado.responsavel.toLowerCase()
+        ) {
+          return false;
+        }
         return true;
       }),
     [propostas, aplicado]
@@ -69,7 +80,9 @@ export default function PropostasTab({ propostas = [], onAbrir, onEditar, onAnul
   }, [filtradas]);
 
   const pag = usePaginacao({ items: filtradas });
-  const temFiltro = Boolean(aplicado.cliente || aplicado.unidade || aplicado.estado);
+  const temFiltro = Boolean(
+    aplicado.periodoDe || aplicado.periodoAte || aplicado.unidade || aplicado.estado || aplicado.responsavel
+  );
 
   const aplicar = () => setAplicado({ ...rascunho });
   const limpar = () => {
@@ -110,22 +123,29 @@ export default function PropostasTab({ propostas = [], onAbrir, onEditar, onAnul
         <div className="border-b border-border bg-muted/30 px-4 py-3">
           <p className="mb-2 text-xs font-semibold text-muted-foreground">Filtros</p>
           <div className="flex flex-wrap items-end gap-2.5">
-            <label className="flex min-w-40 flex-1 flex-col gap-1 sm:flex-none">
-              <span className="text-[11px] font-medium text-muted-foreground">Cliente</span>
-              <select
-                value={rascunho.cliente}
-                onChange={(e) => setRascunho((f) => ({ ...f, cliente: e.target.value }))}
-                className={campoCls}
-              >
-                <option value="">Todos</option>
-                {clientes.map((c) => (
-                  <option key={c.value} value={c.value}>{c.label}</option>
-                ))}
-              </select>
-            </label>
+            <div className="flex flex-col gap-1">
+              <span className="text-[11px] font-medium text-muted-foreground">Período Inicial / Final</span>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="date"
+                  value={rascunho.periodoDe}
+                  onChange={(e) => setRascunho((f) => ({ ...f, periodoDe: e.target.value }))}
+                  aria-label="Período inicial"
+                  className={campoCls}
+                />
+                <span className="text-xs text-muted-foreground">até</span>
+                <input
+                  type="date"
+                  value={rascunho.periodoAte}
+                  onChange={(e) => setRascunho((f) => ({ ...f, periodoAte: e.target.value }))}
+                  aria-label="Período final"
+                  className={campoCls}
+                />
+              </div>
+            </div>
 
             <label className="flex min-w-44 flex-1 flex-col gap-1 sm:flex-none">
-              <span className="text-[11px] font-medium text-muted-foreground">Unidade de negócio</span>
+              <span className="text-[11px] font-medium text-muted-foreground">Unidade de Negócio</span>
               <select
                 value={rascunho.unidade}
                 onChange={(e) => setRascunho((f) => ({ ...f, unidade: e.target.value }))}
@@ -139,7 +159,7 @@ export default function PropostasTab({ propostas = [], onAbrir, onEditar, onAnul
             </label>
 
             <label className="flex min-w-36 flex-1 flex-col gap-1 sm:flex-none">
-              <span className="text-[11px] font-medium text-muted-foreground">Estado</span>
+              <span className="text-[11px] font-medium text-muted-foreground">Estado da Proposta</span>
               <select
                 value={rascunho.estado}
                 onChange={(e) => setRascunho((f) => ({ ...f, estado: e.target.value }))}
@@ -148,6 +168,20 @@ export default function PropostasTab({ propostas = [], onAbrir, onEditar, onAnul
                 <option value="">Todos</option>
                 {ESTADOS_PROPOSTA.map((e) => (
                   <option key={e.value} value={e.value}>{e.label}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex min-w-40 flex-1 flex-col gap-1 sm:flex-none">
+              <span className="text-[11px] font-medium text-muted-foreground">Responsável Comercial</span>
+              <select
+                value={rascunho.responsavel}
+                onChange={(e) => setRascunho((f) => ({ ...f, responsavel: e.target.value }))}
+                className={campoCls}
+              >
+                <option value="">Todos</option>
+                {responsaveis.map((v) => (
+                  <option key={v} value={v}>{v}</option>
                 ))}
               </select>
             </label>
@@ -174,12 +208,12 @@ export default function PropostasTab({ propostas = [], onAbrir, onEditar, onAnul
         <LedgerTable>
           <thead>
             <tr className="border-b border-border">
-              <LedgerTh>Referência</LedgerTh>
+              <LedgerTh>Código</LedgerTh>
               <LedgerTh>Cliente</LedgerTh>
-              <LedgerTh>Unidade</LedgerTh>
-              <LedgerTh>Objecto</LedgerTh>
-              <LedgerTh>Validade</LedgerTh>
+              <LedgerTh>Emissão</LedgerTh>
               <LedgerTh>Estado</LedgerTh>
+              <LedgerTh>Valor (Kz)</LedgerTh>
+              <LedgerTh>Responsável</LedgerTh>
               <LedgerTh className="w-10" />
             </tr>
           </thead>
@@ -197,13 +231,17 @@ export default function PropostasTab({ propostas = [], onAbrir, onEditar, onAnul
                       <span className="block truncate text-xs text-muted-foreground">{p.cliente.nome}</span>
                     )}
                   </LedgerTd>
-                  <LedgerTd className="text-muted-foreground">{p.unidade_rotulo || p.unidade}</LedgerTd>
-                  <LedgerTd className="max-w-64">
-                    <span className="block truncate text-sm">{p.objecto || "—"}</span>
+                  <LedgerTd className="whitespace-nowrap text-muted-foreground">
+                    {formatarData(p.data_emissao || p.criada_em)}
                   </LedgerTd>
-                  <LedgerTd className="text-muted-foreground">{formatarData(p.validade_data)}</LedgerTd>
                   <LedgerTd>
                     <StatusBadge tom={estado.tom}>{estado.rotulo}</StatusBadge>
+                  </LedgerTd>
+                  <LedgerTd className="whitespace-nowrap font-bold tabular-nums text-foreground">
+                    {Number(p.valor) > 0 ? formatKz(p.valor) : "—"}
+                  </LedgerTd>
+                  <LedgerTd className="max-w-40">
+                    <span className="block truncate text-xs">{p.responsavel_comercial || p.responsavel || "—"}</span>
                   </LedgerTd>
                   <LedgerTd>
                     <RowMenu

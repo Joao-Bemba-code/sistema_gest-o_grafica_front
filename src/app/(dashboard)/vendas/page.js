@@ -302,7 +302,9 @@ function ConteudoComercial() {
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-extrabold tracking-tight text-foreground">Gestão Comercial</h2>
+          <h2 className="text-2xl font-extrabold tracking-tight text-foreground">
+            {tab === "propostas" ? "Proposta Comercial" : "Gestão de Clientes"}
+          </h2>
           <p className="mt-0.5 text-xs font-medium text-muted-foreground">Clientes, propostas, orçamentos, encomendas, facturação, entregas e acompanhamento.</p>
         </div>
         <div className="flex items-center gap-2.5">

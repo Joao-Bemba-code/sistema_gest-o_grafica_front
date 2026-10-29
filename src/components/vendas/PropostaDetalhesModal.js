@@ -27,6 +27,10 @@ function formatarData(valor) {
   return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("pt-PT");
 }
 
+function formatKz(v) {
+  return `Kz ${Number(v || 0).toLocaleString("pt-AO")}`;
+}
+
 function formatarDataHora(valor) {
   if (!valor) return "";
   const d = new Date(valor);
@@ -209,13 +213,16 @@ export default function PropostaDetalhesModal({
         </div>
 
         <div className="grid grid-cols-1 gap-4 rounded-xl border border-border bg-card p-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Campo rotulo="Cliente" valor={p.cliente?.empresa || p.cliente?.nome} />
+          <Campo rotulo="Cliente / Entidade" valor={p.cliente?.empresa || p.cliente?.nome} />
           <Campo rotulo="Contacto" valor={[p.cliente?.telefone, p.cliente?.email].filter(Boolean).join(" · ")} />
-          <Campo rotulo="Prazo de execução" valor={p.prazo_execucao} />
-          <Campo
-            rotulo="Validade"
-            valor={p.validade ? `${p.validade} dias${p.validade_data ? ` · até ${formatarData(p.validade_data)}` : ""}` : "—"}
-          />
+          <Campo rotulo="Data de Emissão" valor={formatarData(p.data_emissao || p.criada_em)} />
+          <Campo rotulo="Validade da Proposta" valor={formatarData(p.validade_data)} />
+          <Campo rotulo="Unidade de Negócio" valor={p.unidade_rotulo || p.unidade} />
+          <Campo rotulo="Responsável Comercial" valor={p.responsavel_comercial} />
+          <Campo rotulo="Valor Proposto (KZ)" valor={Number(p.valor) ? formatKz(p.valor) : "—"} />
+          <Campo rotulo="Condições de Pagamento" valor={p.condicoes_pagamento} />
+          <Campo rotulo="Prazo de Execução" valor={p.prazo_execucao} />
+          <Campo rotulo="Prazo de Entrega" valor={p.prazo_entrega} />
         </div>
 
         <div>

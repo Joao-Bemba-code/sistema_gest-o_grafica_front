@@ -10,8 +10,8 @@ import { cn } from "@/lib/utils";
 const TABS = [
   { key: "identidade", label: "Identidade", icon: "person" },
   { key: "contactos", label: "Contactos & Endereço", icon: "phone" },
-  { key: "pessoas", label: "Pessoas & Classificação", icon: "groups" },
   { key: "documentos", label: "Observações & Documentos", icon: "attach_file" },
+  { key: "historico", label: "Histórico", icon: "history" },
 ];
 
 const UNIDADES_SECUNDARIAS = [
@@ -19,6 +19,62 @@ const UNIDADES_SECUNDARIAS = [
   "UN-02 Formação Profissional",
   "UN-03 Soluções Digitais",
 ];
+
+const ESTADO_ORCAMENTO = {
+  calculo: { rotulo: "Em cálculo", tom: "primary" },
+  aprovado: { rotulo: "Aprovado", tom: "success" },
+  expirado: { rotulo: "Expirado", tom: "warning" },
+  cancelado: { rotulo: "Cancelado", tom: "neutral" },
+  rejeitado: { rotulo: "Rejeitado", tom: "error" },
+  anulado: { rotulo: "Anulado", tom: "error" },
+};
+
+const ESTADO_PROPOSTA = {
+  rascunho: { rotulo: "Rascunho", tom: "warning" },
+  recebida: { rotulo: "Recebida", tom: "neutral" },
+  enviada: { rotulo: "Enviada", tom: "info" },
+  aprovada: { rotulo: "Aprovada", tom: "success" },
+  rejeitada: { rotulo: "Rejeitada", tom: "error" },
+  expirada: { rotulo: "Expirada", tom: "neutral" },
+};
+
+const ESTADO_FATURA = {
+  emitida: { rotulo: "Emitida", tom: "info" },
+  paga: { rotulo: "Paga", tom: "success" },
+  parcial: { rotulo: "Parcial", tom: "warning" },
+  vencida: { rotulo: "Vencida", tom: "error" },
+  cancelada: { rotulo: "Anulada", tom: "neutral" },
+};
+
+const TIPOS_DOCUMENTO = {
+  fatura: "Factura",
+  recibo: "Recibo",
+  proforma: "Pró-forma",
+  nota_credito: "Nota de crédito",
+};
+
+const ESTADO_ENTREGA = {
+  preparar: { rotulo: "Por preparar", tom: "warning" },
+  transito: { rotulo: "Em trânsito", tom: "info" },
+  entregue: { rotulo: "Entregue", tom: "success" },
+};
+
+function estadoEntregaCliente(o) {
+  if (o.estado === "entregue" || o.entrega_ok) return "entregue";
+  if (o.estado === "finalizado") return "transito";
+  return "preparar";
+}
+
+function formatKz(v) {
+  return `Kz ${Number(v || 0).toLocaleString("pt-AO")}`;
+}
+
+function ordenarPorData(lista, campo) {
+  const valor = typeof campo === "function" ? campo : (x) => x[campo];
+  return [...lista].sort((a, b) =>
+    String(valor(b) || "").slice(0, 10).localeCompare(String(valor(a) || "").slice(0, 10))
+  );
+}
 
 function formatBytes(n) {
   const v = Number(n || 0);
@@ -65,8 +121,43 @@ function SubTitulo({ children }) {
   );
 }
 
+function GrupoHistorico({ titulo, icone, itens, children }) {
+  return (
+    <div className="sm:col-span-2 flex flex-col gap-2">
+      <SubTitulo>
+        <Icon name={icone} className="text-base" /> {titulo} ({itens.length})
+      </SubTitulo>
+      {itens.length === 0 ? (
+        <p className="text-xs italic text-muted-foreground">Sem {titulo.toLowerCase()}.</p>
+      ) : (
+        <div className="max-h-72 space-y-2 overflow-y-auto pr-0.5">{children}</div>
+      )}
+    </div>
+  );
+}
+
+function LinhaHistorico({ icone, numero, meta, data, badge, extra }) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-lg border border-border/60 p-2.5">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+        <Icon name={icone} className="text-[16px] text-primary" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-xs font-semibold text-foreground">{numero}</p>
+        {meta && <p className="truncate text-[10px] text-muted-foreground">{meta}</p>}
+      </div>
+      {extra && (
+        <span className="shrink-0 text-xs font-bold text-foreground tabular-nums">{extra}</span>
+      )}
+      <span className="shrink-0 whitespace-nowrap text-[10px] text-muted-foreground">{data}</span>
+      <StatusBadge tom={badge.tom}>{badge.rotulo}</StatusBadge>
+    </div>
+  );
+}
+
 export default function ClienteDetalhes({
   cliente,
+  historico = {},
   documentos = [],
   carregandoDocs = false,
   ficheirosNovos = [],
@@ -80,6 +171,16 @@ export default function ClienteDetalhes({
   const ativo = cliente.ativo !== false;
   const unidades = Array.isArray(cliente.unidades_secundarias) ? cliente.unidades_secundarias : [];
   const id = (sufixo) => `detalhes-cliente-${sufixo}`;
+
+  const historicoOrd = {
+    orcamentos: ordenarPorData(historico.orcamentos || [], "data"),
+    propostas: ordenarPorData(historico.propostas || [], "criada_em"),
+    faturas: ordenarPorData(historico.faturas || [], (f) => f.data_emissao || f.data || f.createdAt),
+    entregas: ordenarPorData(historico.entregas || [], (o) => o.data_entrega || o.createdAt),
+  };
+  const temAtividade = ["orcamentos", "propostas", "faturas", "entregas"].some(
+    (k) => historicoOrd[k].length > 0
+  );
 
   return (
     <div className="space-y-5">
@@ -111,6 +212,16 @@ export default function ClienteDetalhes({
             <Campo label="Nome Comercial" valor={cliente.nome_comercial} />
             <Campo label="Segmento" valor={cliente.segmento} />
             <Campo label="Unidade de Negócio Principal" valor={cliente.unidade_negocio} />
+            <Campo label="Categoria" valor={cliente.categoria} />
+            <Campo label="Setor de Actividade" valor={cliente.setor_atividade} />
+            <Campo label="Responsável Comercial" valor={cliente.responsavel_comercial} />
+            <Campo label="Estado">
+              <div className="min-h-9 w-full rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 flex items-center">
+                <StatusBadge tom={ativo ? "success" : "neutral"}>
+                  {ativo ? "Activo" : "Inactivo"}
+                </StatusBadge>
+              </div>
+            </Campo>
             <div className="sm:col-span-2 flex flex-col gap-2">
               <span className="cyber-label">Unidades de Negócio Secundárias</span>
               <div className="flex flex-wrap gap-2">
@@ -146,33 +257,6 @@ export default function ClienteDetalhes({
             <Campo label="Bairro" valor={cliente.bairro} />
             <Campo label="Rua / Avenida" valor={cliente.rua} />
             <Campo label="N.º / Porta" valor={cliente.numero_porta} />
-          </div>
-        )}
-
-        {tab === "pessoas" && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <SubTitulo>
-              <Icon name="person" className="text-base" /> Pessoa de Contacto
-            </SubTitulo>
-            <Campo label="Nome" valor={cliente.pessoa_contacto} />
-            <Campo label="Função / Cargo" valor={cliente.pessoa_funcao} />
-            <Campo label="Telefone Direto" valor={cliente.pessoa_telefone} />
-            <Campo label="E-mail" valor={cliente.pessoa_email} />
-
-            <SubTitulo>
-              <Icon name="label" className="text-base" /> Classificação Comercial
-            </SubTitulo>
-            <Campo label="Categoria" valor={cliente.categoria} />
-            <Campo label="Setor de Actividade" valor={cliente.setor_atividade} />
-            <Campo label="Fonte de Origem" valor={cliente.fonte_origem} />
-            <Campo label="Estado">
-              <div className="min-h-9 w-full rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 flex items-center">
-                <StatusBadge tom={ativo ? "success" : "neutral"}>
-                  {ativo ? "Activo" : "Inactivo"}
-                </StatusBadge>
-              </div>
-            </Campo>
-            <Campo label="Referência Interna" valor={cliente.referencia_interna} />
           </div>
         )}
 
@@ -269,6 +353,88 @@ export default function ClienteDetalhes({
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {tab === "historico" && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {!temAtividade ? (
+              <p className="sm:col-span-2 text-xs italic text-muted-foreground">
+                Ainda não há atividade registada para este cliente.
+              </p>
+            ) : (
+              <>
+                <GrupoHistorico titulo="Orçamentos" icone="request_quote" itens={historicoOrd.orcamentos}>
+                  {historicoOrd.orcamentos.map((o) => {
+                    const estado = o.anulado
+                      ? ESTADO_ORCAMENTO.anulado
+                      : ESTADO_ORCAMENTO[o.estado] || { rotulo: o.estado || "—", tom: "neutral" };
+                    return (
+                      <LinhaHistorico
+                        key={`orc-${o.id}`}
+                        icone="request_quote"
+                        numero={o.numero || `#${o.id}`}
+                        meta={o.ordem_producao ? `OP ${o.ordem_producao.numero || ""}`.trim() : ""}
+                        data={formatData(o.data)}
+                        badge={estado}
+                        extra={Number(o.total) > 0 ? formatKz(o.total) : ""}
+                      />
+                    );
+                  })}
+                </GrupoHistorico>
+
+                <GrupoHistorico titulo="Propostas" icone="description" itens={historicoOrd.propostas}>
+                  {historicoOrd.propostas.map((p) => {
+                    const estado = p.anulado
+                      ? { rotulo: "Anulada", tom: "error" }
+                      : ESTADO_PROPOSTA[p.estado] || { rotulo: p.estado || "—", tom: "neutral" };
+                    return (
+                      <LinhaHistorico
+                        key={`prop-${p.id}`}
+                        icone="description"
+                        numero={p.numero || `#${p.id}`}
+                        meta={p.objecto}
+                        data={formatData(p.criada_em)}
+                        badge={estado}
+                      />
+                    );
+                  })}
+                </GrupoHistorico>
+
+                <GrupoHistorico titulo="Facturas" icone="receipt_long" itens={historicoOrd.faturas}>
+                  {historicoOrd.faturas.map((f) => {
+                    const estado = ESTADO_FATURA[f.estado] || { rotulo: f.estado || "—", tom: "neutral" };
+                    return (
+                      <LinhaHistorico
+                        key={`fat-${f.id}`}
+                        icone="receipt_long"
+                        numero={f.numero || `#${f.id}`}
+                        meta={TIPOS_DOCUMENTO[f.tipo] || f.tipo || ""}
+                        data={formatData(f.data_emissao || f.data)}
+                        badge={estado}
+                        extra={Number(f.total ?? f.valor) > 0 ? formatKz(f.total ?? f.valor) : ""}
+                      />
+                    );
+                  })}
+                </GrupoHistorico>
+
+                <GrupoHistorico titulo="Entregas" icone="local_shipping" itens={historicoOrd.entregas}>
+                  {historicoOrd.entregas.map((o) => {
+                    const estado = ESTADO_ENTREGA[estadoEntregaCliente(o)];
+                    return (
+                      <LinhaHistorico
+                        key={`ent-${o.id}`}
+                        icone="local_shipping"
+                        numero={o.numero || `OP #${o.id}`}
+                        meta={o.orcamento?.numero || ""}
+                        data={formatData(o.data_entrega || o.createdAt)}
+                        badge={estado}
+                      />
+                    );
+                  })}
+                </GrupoHistorico>
+              </>
+            )}
           </div>
         )}
       </div>

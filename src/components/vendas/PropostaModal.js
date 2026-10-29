@@ -1,20 +1,31 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Icon from "@/components/Icon";
 import Modal from "@/components/Modal";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/Toast";
+import SugestaoSelect from "@/components/ui/SugestaoSelect";
 import { listar as listarClientes } from "@/services/clientes";
 import { criar, atualizar, UNIDADES } from "@/services/propostas";
+
+function hojeISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 const VAZIO = {
   unidade: "UN-01",
   cliente_id: "",
   objecto: "",
   descricao: "",
+  data_emissao: hojeISO(),
+  validade_data: "",
+  valor: "",
+  condicoes_pagamento: "",
   prazo_execucao: "",
-  validade: "30",
+  prazo_entrega: "",
+  responsavel_comercial: "",
 };
 
 function formInicial(proposta) {
@@ -24,8 +35,13 @@ function formInicial(proposta) {
     cliente_id: proposta.cliente_id ? String(proposta.cliente_id) : "",
     objecto: proposta.objecto || "",
     descricao: proposta.descricao || "",
+    data_emissao: String(proposta.data_emissao || proposta.criada_em || "").slice(0, 10),
+    validade_data: String(proposta.validade_data || "").slice(0, 10),
+    valor: proposta.valor ? String(proposta.valor) : "",
+    condicoes_pagamento: proposta.condicoes_pagamento || "",
     prazo_execucao: proposta.prazo_execucao || "",
-    validade: String(proposta.validade ?? 30),
+    prazo_entrega: proposta.prazo_entrega || "",
+    responsavel_comercial: proposta.responsavel_comercial || "",
   };
 }
 
@@ -33,6 +49,17 @@ const campoCls =
   "h-10 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/25";
 
 const rotuloCls = "text-xs font-semibold text-muted-foreground";
+
+function Secao({ titulo, icone, children }) {
+  return (
+    <section className="space-y-3 rounded-xl border border-border bg-muted/20 p-4">
+      <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+        <Icon name={icone} className="text-sm" /> {titulo}
+      </p>
+      {children}
+    </section>
+  );
+}
 
 export default function PropostaModal({ open, proposta, onClose, onSaved }) {
   const { addToast } = useToast();
@@ -61,6 +88,15 @@ export default function PropostaModal({ open, proposta, onClose, onSaved }) {
     return () => { ativo = false; };
   }, [open, addToast]);
 
+  const responsaveis = useMemo(() => {
+    const mapa = new Map();
+    for (const c of clientes) {
+      const v = String(c.responsavel_comercial || "").trim();
+      if (v) mapa.set(v.toLowerCase(), v);
+    }
+    return [...mapa.values()].sort((a, b) => a.localeCompare(b, "pt"));
+  }, [clientes]);
+
   const setField = (nome, valor) => setForm((p) => ({ ...p, [nome]: valor }));
 
   const guardar = async (e) => {
@@ -74,8 +110,13 @@ export default function PropostaModal({ open, proposta, onClose, onSaved }) {
         cliente_id: form.cliente_id,
         objecto: form.objecto.trim(),
         descricao: form.descricao.trim(),
+        data_emissao: form.data_emissao,
+        validade_data: form.validade_data,
+        valor: Number(form.valor) || 0,
+        condicoes_pagamento: form.condicoes_pagamento.trim(),
         prazo_execucao: form.prazo_execucao.trim(),
-        validade: Number(form.validade) || 0,
+        prazo_entrega: form.prazo_entrega.trim(),
+        responsavel_comercial: form.responsavel_comercial.trim(),
       };
       const salva = editando ? await atualizar(proposta.id, dados) : await criar(dados);
       addToast(editando ? "Proposta atualizada" : "Proposta criada", "success");
@@ -92,9 +133,9 @@ export default function PropostaModal({ open, proposta, onClose, onSaved }) {
     <Modal
       open={Boolean(open)}
       onClose={onClose}
-      title={editando ? `Editar proposta ${proposta?.numero || ""}` : "Nova proposta"}
+      title={editando ? `Editar proposta ${proposta?.numero || ""}` : "Proposta Comercial"}
       icon="description"
-      size="lg"
+      size="2xl"
       footer={
         <>
           <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
@@ -112,86 +153,156 @@ export default function PropostaModal({ open, proposta, onClose, onSaved }) {
         </div>
       ) : (
         <form id="form-proposta" onSubmit={guardar} className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Secao titulo="Proposta Comercial" icone="description">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <label className="flex flex-col gap-1.5">
+                <span className={rotuloCls}>Número da Proposta</span>
+                <input
+                  value={editando ? proposta?.numero || "" : "Gerado automaticamente"}
+                  readOnly
+                  disabled
+                  className={`${campoCls} bg-muted/60 cursor-not-allowed`}
+                />
+              </label>
+
+              <label className="flex flex-col gap-1.5">
+                <span className={rotuloCls}>Cliente / Entidade</span>
+                <select
+                  value={form.cliente_id}
+                  onChange={(e) => setField("cliente_id", e.target.value)}
+                  className={campoCls}
+                  required
+                >
+                  <option value="">Escolher cliente…</option>
+                  {clientes.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.empresa ? `${c.empresa} · ${c.nome}` : c.nome}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1.5">
+                <span className={rotuloCls}>Data de Emissão</span>
+                <input
+                  type="date"
+                  value={form.data_emissao}
+                  onChange={(e) => setField("data_emissao", e.target.value)}
+                  className={campoCls}
+                />
+              </label>
+
+              <label className="flex flex-col gap-1.5">
+                <span className={rotuloCls}>Validade da Proposta</span>
+                <input
+                  type="date"
+                  value={form.validade_data}
+                  onChange={(e) => setField("validade_data", e.target.value)}
+                  className={campoCls}
+                />
+              </label>
+
+              <label className="flex flex-col gap-1.5">
+                <span className={rotuloCls}>Unidade de Negócio</span>
+                <select
+                  value={form.unidade}
+                  onChange={(e) => setField("unidade", e.target.value)}
+                  className={campoCls}
+                  required
+                >
+                  {UNIDADES.map((u) => (
+                    <option key={u.value} value={u.value}>{u.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1.5">
+                <span className={rotuloCls}>Responsável Comercial <span className="text-destructive">*</span></span>
+                <SugestaoSelect
+                  id="proposta-responsavel"
+                  value={form.responsavel_comercial}
+                  opcoes={responsaveis}
+                  onChange={(valor) => setField("responsavel_comercial", valor)}
+                  placeholder="Selecionar ou escrever..."
+                  icon="badge"
+                  required
+                />
+              </label>
+            </div>
+          </Secao>
+
+          <Secao titulo="Objecto e Especificações" icone="segment">
             <label className="flex flex-col gap-1.5">
-              <span className={rotuloCls}>Unidade de negócio</span>
-              <select
-                value={form.unidade}
-                onChange={(e) => setField("unidade", e.target.value)}
-                className={campoCls}
-                required
-              >
-                {UNIDADES.map((u) => (
-                  <option key={u.value} value={u.value}>{u.label}</option>
-                ))}
-              </select>
-            </label>
-
-            <label className="flex flex-col gap-1.5">
-              <span className={rotuloCls}>Cliente</span>
-              <select
-                value={form.cliente_id}
-                onChange={(e) => setField("cliente_id", e.target.value)}
-                className={campoCls}
-                required
-              >
-                <option value="">Escolher cliente…</option>
-                {clientes.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.empresa ? `${c.empresa} · ${c.nome}` : c.nome}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <label className="flex flex-col gap-1.5">
-            <span className={rotuloCls}>Objecto da proposta</span>
-            <input
-              value={form.objecto}
-              onChange={(e) => setField("objecto", e.target.value)}
-              className={campoCls}
-              placeholder="Ex.: Impressão de 5.000 flyers A5"
-              maxLength={200}
-              required
-            />
-          </label>
-
-          <label className="flex flex-col gap-1.5">
-            <span className={rotuloCls}>Descrição</span>
-            <textarea
-              value={form.descricao}
-              onChange={(e) => setField("descricao", e.target.value)}
-              className={`${campoCls} h-auto min-h-28 resize-y py-2.5`}
-              placeholder="O que se propõe ao cliente, materiais, quantidades, condições…"
-            />
-          </label>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <label className="flex flex-col gap-1.5">
-              <span className={rotuloCls}>Prazo de execução</span>
+              <span className={rotuloCls}>Objecto da proposta / solução apresentada</span>
               <input
-                value={form.prazo_execucao}
-                onChange={(e) => setField("prazo_execucao", e.target.value)}
+                value={form.objecto}
+                onChange={(e) => setField("objecto", e.target.value)}
                 className={campoCls}
-                placeholder="Ex.: 10 dias úteis"
-                maxLength={100}
+                placeholder="Ex.: Impressão de 5.000 flyers A5"
+                maxLength={200}
+                required
               />
             </label>
-
             <label className="flex flex-col gap-1.5">
-              <span className={rotuloCls}>Validade (dias)</span>
-              <input
-                type="number"
-                min="0"
-                max="3650"
-                value={form.validade}
-                onChange={(e) => setField("validade", e.target.value)}
-                className={campoCls}
-                placeholder="30"
+              <span className={rotuloCls}>Especificações</span>
+              <textarea
+                value={form.descricao}
+                onChange={(e) => setField("descricao", e.target.value)}
+                className={`${campoCls} h-auto min-h-24 resize-y py-2.5`}
+                placeholder="O que se propõe ao cliente, materiais, quantidades, condições…"
               />
             </label>
-          </div>
+          </Secao>
+
+          <Secao titulo="Condições Comerciais e Financeiras" icone="payments">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <label className="flex flex-col gap-1.5">
+                <span className={rotuloCls}>Valor Proposto (KZ)</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.valor}
+                  onChange={(e) => setField("valor", e.target.value)}
+                  className={campoCls}
+                  placeholder="0,00"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1.5">
+                <span className={rotuloCls}>Condições de Pagamento</span>
+                <input
+                  value={form.condicoes_pagamento}
+                  onChange={(e) => setField("condicoes_pagamento", e.target.value)}
+                  className={campoCls}
+                  placeholder="Ex.: 50% de adiantamento e 50% na entrega"
+                  maxLength={200}
+                />
+              </label>
+
+              <label className="flex flex-col gap-1.5">
+                <span className={rotuloCls}>Prazo de Execução</span>
+                <input
+                  value={form.prazo_execucao}
+                  onChange={(e) => setField("prazo_execucao", e.target.value)}
+                  className={campoCls}
+                  placeholder="Ex.: 10 dias úteis"
+                  maxLength={100}
+                />
+              </label>
+
+              <label className="flex flex-col gap-1.5">
+                <span className={rotuloCls}>Prazo de Entrega</span>
+                <input
+                  value={form.prazo_entrega}
+                  onChange={(e) => setField("prazo_entrega", e.target.value)}
+                  className={campoCls}
+                  placeholder="Ex.: até 15 de Dezembro"
+                  maxLength={100}
+                />
+              </label>
+            </div>
+          </Secao>
         </form>
       )}
     </Modal>
