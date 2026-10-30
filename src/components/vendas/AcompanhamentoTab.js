@@ -8,7 +8,6 @@ import { useToast } from "@/components/Toast";
 import Paginacao, { usePaginacao } from "@/components/ui/Paginacao";
 import {
   Ledger,
-  LedgerHeader,
   LedgerTable,
   LedgerTh,
   LedgerTr,
@@ -223,8 +222,7 @@ export default function AcompanhamentoTab({ orcamentos = [], faturas = [], onAbr
   const { addToast } = useToast();
   const [ordens, setOrdens] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [rascunho, setRascunho] = useState(FILTRO_VAZIO);
-  const [aplicado, setAplicado] = useState(FILTRO_VAZIO);
+  const [filtro, setFiltro] = useState(FILTRO_VAZIO);
 
   useEffect(() => {
     let ativo = true;
@@ -303,15 +301,15 @@ export default function AcompanhamentoTab({ orcamentos = [], faturas = [], onAbr
   );
 
   const filtrados = useMemo(() => {
-    const limite = aplicado.periodo ? somarDias(hojeISO(), -Number(aplicado.periodo)) : null;
+    const limite = filtro.periodo ? somarDias(hojeISO(), -Number(filtro.periodo)) : null;
     return base.filter((l) => {
-      if (aplicado.cliente && l.chave !== aplicado.cliente) return false;
-      if (aplicado.responsavel === SEM_RESPONSAVEL && l.responsavel) return false;
-      if (aplicado.responsavel && aplicado.responsavel !== SEM_RESPONSAVEL && l.responsavel !== aplicado.responsavel) return false;
+      if (filtro.cliente && l.chave !== filtro.cliente) return false;
+      if (filtro.responsavel === SEM_RESPONSAVEL && l.responsavel) return false;
+      if (filtro.responsavel && filtro.responsavel !== SEM_RESPONSAVEL && l.responsavel !== filtro.responsavel) return false;
       if (limite && (!l.atividadeData || l.atividadeData < limite)) return false;
       return true;
     });
-  }, [base, aplicado]);
+  }, [base, filtro]);
 
   const resumo = useMemo(
     () => ({
@@ -324,12 +322,8 @@ export default function AcompanhamentoTab({ orcamentos = [], faturas = [], onAbr
 
   const pag = usePaginacao({ items: filtrados, tamanhoInicial: 10 });
 
-  const temFiltro = Boolean(aplicado.responsavel || aplicado.cliente || aplicado.periodo);
-  const aplicar = () => setAplicado({ ...rascunho });
-  const limpar = () => {
-    setRascunho(FILTRO_VAZIO);
-    setAplicado(FILTRO_VAZIO);
-  };
+  const temFiltro = Boolean(filtro.responsavel || filtro.cliente || filtro.periodo);
+  const limpar = () => setFiltro(FILTRO_VAZIO);
 
   const abrir = (l) => {
     if (!l.doc) return;
@@ -364,19 +358,14 @@ export default function AcompanhamentoTab({ orcamentos = [], faturas = [], onAbr
       </section>
 
       <Ledger rotulo="Acompanhamento">
-        <LedgerHeader
-          titulo="Acompanhamento"
-          subtitulo={`${filtrados.length} clientes em acompanhamento · ${resumo.acoes} acções pendentes · ${resumo.atrasos} atrasos`}
-        />
-
         <div className="border-b border-border bg-muted/30 px-4 py-3">
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Filtros</p>
+          <p className="mb-2 text-xs font-semibold text-muted-foreground">Filtros</p>
           <div className="flex flex-wrap items-end gap-2.5">
             <label className="flex min-w-40 flex-1 flex-col gap-1 sm:flex-none">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Responsável</span>
+              <span className="text-[11px] font-medium text-muted-foreground">Responsável</span>
               <select
-                value={rascunho.responsavel}
-                onChange={(e) => setRascunho((f) => ({ ...f, responsavel: e.target.value }))}
+                value={filtro.responsavel}
+                onChange={(e) => setFiltro((f) => ({ ...f, responsavel: e.target.value }))}
                 className={campoCls}
               >
                 <option value="">Todos</option>
@@ -387,10 +376,10 @@ export default function AcompanhamentoTab({ orcamentos = [], faturas = [], onAbr
             </label>
 
             <label className="flex min-w-40 flex-1 flex-col gap-1 sm:flex-none">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Cliente</span>
+              <span className="text-[11px] font-medium text-muted-foreground">Cliente</span>
               <select
-                value={rascunho.cliente}
-                onChange={(e) => setRascunho((f) => ({ ...f, cliente: e.target.value }))}
+                value={filtro.cliente}
+                onChange={(e) => setFiltro((f) => ({ ...f, cliente: e.target.value }))}
                 className={campoCls}
               >
                 <option value="">Todos</option>
@@ -401,10 +390,10 @@ export default function AcompanhamentoTab({ orcamentos = [], faturas = [], onAbr
             </label>
 
             <label className="flex min-w-40 flex-1 flex-col gap-1 sm:flex-none">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Período</span>
+              <span className="text-[11px] font-medium text-muted-foreground">Período</span>
               <select
-                value={rascunho.periodo}
-                onChange={(e) => setRascunho((f) => ({ ...f, periodo: e.target.value }))}
+                value={filtro.periodo}
+                onChange={(e) => setFiltro((f) => ({ ...f, periodo: e.target.value }))}
                 className={campoCls}
               >
                 {PERIODOS.map((p) => (
@@ -413,13 +402,6 @@ export default function AcompanhamentoTab({ orcamentos = [], faturas = [], onAbr
               </select>
             </label>
 
-            <button
-              type="button"
-              onClick={aplicar}
-              className="inline-flex h-9 items-center rounded-lg bg-primary px-4 text-xs font-bold uppercase tracking-wider text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 active:scale-[0.98]"
-            >
-              Aplicar
-            </button>
             {temFiltro && (
               <button
                 type="button"

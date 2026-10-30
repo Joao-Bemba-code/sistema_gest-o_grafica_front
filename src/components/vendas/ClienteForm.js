@@ -81,7 +81,6 @@ export default function ClienteForm({
       municipios: fundir(municipiosDaProvincia, "municipio"),
       categorias: fundir(CATEGORIAS, "categoria"),
       setores: fundir(SETORES, "setor_atividade"),
-      responsaveis: fundir([], "responsavel_comercial"),
     };
   }, [existentes, form.provincia]);
 
@@ -105,7 +104,8 @@ export default function ClienteForm({
         ))}
       </div>
 
-      <div role="tabpanel" id={`${formId}-painel-${tab}`} aria-labelledby={id(`tab-${tab}`)} className="animate-fade-up">
+      {/* Altura fixa para o modal não mudar de tamanho ao trocar de secção. */}
+      <div role="tabpanel" id={`${formId}-painel-${tab}`} aria-labelledby={id(`tab-${tab}`)} className="animate-fade-up h-[400px] overflow-y-auto pr-1 custom-scrollbar">
         {tab === "identificacao" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Campo label="Código do Cliente">
@@ -226,17 +226,6 @@ export default function ClienteForm({
                 ))}
               </div>
             </div>
-            <Campo label="Responsável Comercial" obrigatorio>
-              <SugestaoSelect
-                id={id("responsavel")}
-                value={form.responsavel_comercial || ""}
-                opcoes={sugestoesTodas.responsaveis}
-                onChange={(valor) => onChange("responsavel_comercial", valor)}
-                placeholder="Selecionar ou escrever..."
-                icon="badge"
-                required
-              />
-            </Campo>
           </div>
         )}
 

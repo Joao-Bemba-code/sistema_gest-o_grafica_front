@@ -11,8 +11,11 @@ import OrcamentoForm, {
   blankMaterial,
   blankServico,
   custoUnitItem,
+  encontrarProdutoArquivo,
+  materiaisDaComposicao,
   recalcularItem,
   recalcularServico,
+  totalQuantidadeItem,
 } from "@/components/orcamentos/OrcamentoForm";
 import { buscarPorId, criar, atualizar } from "@/services/orcamentos";
 import { listar as listarClientes } from "@/services/clientes";
@@ -22,6 +25,16 @@ import { buscarOrganizacao } from "@/services/configuracoes";
 
 function formatKz(v) {
   return `Kz ${Number(v || 0).toLocaleString("pt-AO")}`;
+}
+
+// "5.000 unidades" → "5000"; "2,5" → "2.5"; "" quando não há número.
+function quantidadeNumerica(v) {
+  const t = String(v || "").trim();
+  if (!t) return "";
+  const n = t.replace(/\s+/g, "").replace(",", ".");
+  if (/^\d{1,3}(\.\d{3})+$/.test(n)) return String(parseInt(n.replace(/\./g, ""), 10));
+  const num = Number(n);
+  return Number.isNaN(num) ? "" : String(num);
 }
 
 function PreviewLinha({ label, valor, acento }) {
@@ -63,25 +76,84 @@ export default function OrcamentoModal({ open, editingId, prefill, onClose, onSa
         setServicosCatalogo(Array.isArray(srvData) ? srvData : srvData?.data ?? []);
         setValorHoraServicos(Number(orgData?.valor_hora_servicos) || 0);
         if (!editingId && prefill) {
-          // Orçamento criado a partir de uma proposta: herda cliente, prazo e o
-          // objecto da proposta. O objecto preenche o primeiro item E o primeiro
-          // serviço — o objecto costuma ser o serviço a executar; apague o que
-          // não aplicar antes de guardar.
+          // Orçamento criado a partir de uma proposta: herda cliente, prazo e
+          // os produtos + quantidades. Cada produto é procurado no cadastro
+          // (stock); se existir, o item fica com a descrição, a quantidade e a
+          // composição — a mesma lógica de escrever o nome do produto no campo
+          // de descrição. Se o nome bater com um serviço do catálogo, o
+          // primeiro serviço é preenchido. O objecto fica só nas observações.
           const listaClientes = Array.isArray(cliData) ? cliData : cliData?.data ?? [];
+          const listaMateriais = Array.isArray(matData) ? matData : matData?.data ?? [];
+          const listaServicos = Array.isArray(srvData) ? srvData : srvData?.data ?? [];
           const cli = listaClientes.find((c) => String(c.id) === String(prefill.cliente_id));
-          setForm((p) => ({
-            ...p,
-            cliente_id: prefill.cliente_id ? String(prefill.cliente_id) : p.cliente_id,
-            cliente: cli?.nome || p.cliente,
-            empresa: cli?.empresa || p.empresa,
-            nif: cli?.nif || p.nif,
-            telefone: cli?.telefone || p.telefone,
-            email: cli?.email || p.email,
-            prazoExecucao: prefill.prazoExecucao || p.prazoExecucao,
-            observacoes: prefill.observacoes || p.observacoes,
-            itens: p.itens.map((it, i) => (i === 0 && prefill.objecto ? { ...it, descricao: prefill.objecto } : it)),
-            servicos: (p.servicos || []).map((sv, i) => (i === 0 && prefill.objecto ? { ...sv, descricao: prefill.objecto } : sv)),
-          }));
+          const produtosProposta = Array.isArray(prefill.produtos)
+            ? prefill.produtos.filter((pr) => pr && String(pr.nome || "").trim())
+            : [];
+          setForm((p) => {
+            let itens = [...p.itens];
+            const servicos = [...(p.servicos || [])];
+            if (produtosProposta.length) {
+              itens = produtosProposta.map((pr, i) => {
+                const nome = String(pr.nome || "").trim();
+                const qtd = quantidadeNumerica(pr.quantidade);
+                const mat = encontrarProdutoArquivo(listaMateriais, nome);
+                const base = i === 0 ? { ...p.itens[0] } : { ...blankItem, materiais: [{ ...blankMaterial }] };
+                const item = { ...base, descricao: nome, quantidade: qtd || base.quantidade };
+                if (mat) {
+                  item.descricao = mat.nome || mat.nome_tecnico || nome;
+                  item.materiais = materiaisDaComposicao(mat, Number(qtd) || 1, listaMateriais);
+                  item.produtoAplicado = mat.id;
+                  item.valorUnitario = Number(mat.preco_venda) || Number(mat.custo_unit) || 0;
+                }
+                item.total = totalQuantidadeItem(item);
+                return item;
+              });
+            } else {
+              const produtoTexto = String(prefill.produto || "").trim();
+              const qtdTexto = quantidadeNumerica(prefill.quantidade);
+              const produto = produtoTexto ? encontrarProdutoArquivo(listaMateriais, produtoTexto) : null;
+              const servico = !produto && produtoTexto
+                ? listaServicos.find((s) => String(s.nome || "").trim().toLowerCase() === produtoTexto.toLowerCase()) || null
+                : null;
+              if (produto) {
+                const comp = materiaisDaComposicao(produto, Number(qtdTexto) || 1, listaMateriais);
+                itens[0] = {
+                  ...itens[0],
+                  descricao: produto.nome || produto.nome_tecnico || produtoTexto,
+                  quantidade: qtdTexto || itens[0].quantidade,
+                  materiais: comp,
+                  produtoAplicado: produto.id,
+                  valorUnitario: Number(produto.preco_venda) || Number(produto.custo_unit) || 0,
+                };
+                itens[0].total = totalQuantidadeItem(itens[0]);
+              } else if (servico) {
+                servicos[0] = {
+                  ...servicos[0],
+                  servico_id: servico.id,
+                  descricao: servico.nome,
+                  valorHora: Number(orgData?.valor_hora_servicos) || 0,
+                };
+                const calc = recalcularServico(servicos[0]);
+                servicos[0].duracaoHoras = calc.duracaoHoras;
+                servicos[0].total = calc.total;
+              } else if (produtoTexto) {
+                itens[0] = { ...itens[0], descricao: produtoTexto, quantidade: qtdTexto || itens[0].quantidade };
+              }
+            }
+            return {
+              ...p,
+              cliente_id: prefill.cliente_id ? String(prefill.cliente_id) : p.cliente_id,
+              cliente: cli?.nome || p.cliente,
+              empresa: cli?.empresa || p.empresa,
+              nif: cli?.nif || p.nif,
+              telefone: cli?.telefone || p.telefone,
+              email: cli?.email || p.email,
+              prazoExecucao: prefill.prazoExecucao || p.prazoExecucao,
+              observacoes: prefill.observacoes || p.observacoes,
+              itens,
+              servicos,
+            };
+          });
         }
         if (editingId) {
           try {

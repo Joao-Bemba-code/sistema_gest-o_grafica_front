@@ -29,10 +29,17 @@ const faturaEstados = {
   cancelada: { label: "Cancelada", variant: "outline" },
 };
 
+const TABS = [
+  { key: "documento", label: "01 Documento", icon: "description" },
+  { key: "itens", label: "02 Itens", icon: "list" },
+  { key: "pagamento", label: "03 Pagamento", icon: "payments" },
+];
+
 function formatKz(v) { return `Kz ${Number(v || 0).toLocaleString("pt-AO")}`; }
 
 export default function FaturaDetalhesModal({ fatura, empresa, onClose, onChanged }) {
   const { addToast } = useToast();
+  const [tab, setTab] = useState("documento");
   const [pagamentoExtra, setPagamentoExtra] = useState("");
   const [registrando, setRegistrando] = useState(false);
   const [contas, setContas] = useState([]);
@@ -93,13 +100,15 @@ export default function FaturaDetalhesModal({ fatura, empresa, onClose, onChange
     }
   };
 
+  const id = (sufixo) => `form-fatura-ficha-${sufixo}`;
+
   return (
-    <Modal open={Boolean(f)} onClose={onClose} title={`Fatura ${f.numero}`} icon="receipt_long" size="lg"
+    <Modal open={Boolean(f)} onClose={onClose} title={`Fatura ${f.numero}`} icon="receipt_long" size="xl"
       footer={<>
         {!["paga", "cancelada"].includes(f.estado) && f.tipo !== "recibo" && (
           <div className="w-full flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1 flex-1 min-w-[180px] max-w-[240px]">
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Valor a pagar agora</label>
+              <label className="text-[11px] font-medium text-muted-foreground">Valor a pagar agora</label>
               <div className="flex items-center rounded-xl border border-input bg-background overflow-hidden focus-within:ring-2 focus-within:ring-primary/30">
                 <span className="pl-3 pr-1 text-sm font-semibold text-muted-foreground">Kz</span>
                 <NumeroInput
@@ -111,7 +120,7 @@ export default function FaturaDetalhesModal({ fatura, empresa, onClose, onChange
               </div>
             </div>
             <div className="flex flex-col gap-1 flex-1 min-w-[160px] max-w-[220px]">
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Conta bancária</label>
+              <label className="text-[11px] font-medium text-muted-foreground">Conta bancária</label>
               <select
                 value={contaPagamento}
                 onChange={(e) => setContaPagamento(e.target.value)}
@@ -137,103 +146,137 @@ export default function FaturaDetalhesModal({ fatura, empresa, onClose, onChange
         </div>
       </>}>
       <div className="space-y-5">
-        <div className="rounded-xl border bg-muted/30 p-4">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Cliente</p>
-              <p className="text-sm font-semibold text-foreground truncate">{f.cliente?.nome || "—"}</p>
-              {f.cliente?.nif && <p className="text-xs text-muted-foreground">NIF: {f.cliente.nif}</p>}
+        <div role="tablist" aria-label="Secções da fatura" className="flex gap-2 flex-wrap bg-muted/60 border border-border p-1.5 rounded-full">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.key}
+              aria-controls={`${id("painel")}-${t.key}`}
+              id={id(`tab-${t.key}`)}
+              onClick={() => setTab(t.key)}
+              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-full text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${tab === t.key ? "nav-pill text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <Icon name={t.icon} className="text-lg" />
+              <span className="hidden md:inline">{t.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Altura fixa: o modal nunca muda de tamanho ao trocar de secção */}
+        <div role="tabpanel" id={`${id("painel")}-${tab}`} aria-labelledby={id(`tab-${tab}`)} className="animate-fade-up h-[400px] overflow-y-auto pr-1 custom-scrollbar">
+          {tab === "documento" && (
+            <div className="space-y-4">
+              <div className="rounded-xl border bg-muted/30 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium text-muted-foreground">Cliente</p>
+                    <p className="text-sm font-semibold text-foreground truncate">{f.cliente?.nome || "—"}</p>
+                    {f.cliente?.nif && <p className="text-xs text-muted-foreground">NIF: {f.cliente.nif}</p>}
+                  </div>
+                  <div className="flex flex-col items-end gap-1.5">
+                    <Badge variant={faturaEstados[f.estado]?.variant || "outline"} className="text-[10px]">
+                      {faturaEstados[f.estado]?.label || f.estado}
+                    </Badge>
+                    {f.orcamento && (
+                      <span className="text-[10px] text-muted-foreground">
+                        Origem: <span className="font-semibold text-foreground">{f.orcamento.numero || f.orcamento.id}</span>
+                        {f.orcamento.total_com_iva != null && (
+                          <span> (Total orçamento: {formatKz(f.orcamento.total_com_iva)})</span>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+                  <div>
+                    <p className="text-[11px] font-medium text-muted-foreground">Emissão</p>
+                    <p className="text-sm font-medium text-foreground">{f.data_emissao ? new Date(f.data_emissao).toLocaleDateString("pt-BR") : "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-medium text-muted-foreground">Vencimento</p>
+                    <p className="text-sm font-medium text-foreground">{f.data_vencimento ? new Date(f.data_vencimento).toLocaleDateString("pt-BR") : "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-medium text-muted-foreground">Método</p>
+                    <p className="text-sm font-medium text-foreground">{metodos[f.metodo_pagamento]?.label || f.metodo_pagamento || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-medium text-muted-foreground">OP</p>
+                    <p className="text-sm font-medium text-foreground">{f.ordem_producao?.id || "—"}</p>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="flex flex-col items-end gap-1.5">
-              <Badge variant={faturaEstados[f.estado]?.variant || "outline"} className="text-[10px]">
-                {faturaEstados[f.estado]?.label || f.estado}
-              </Badge>
-              {f.orcamento && (
-                <span className="text-[10px] text-muted-foreground">
-                  Origem: <span className="font-semibold text-foreground">{f.orcamento.numero || f.orcamento.id}</span>
-                  {f.orcamento.total_com_iva != null && (
-                    <span> (Total orçamento: {formatKz(f.orcamento.total_com_iva)})</span>
-                  )}
-                </span>
+          )}
+
+          {tab === "itens" && (
+            <div>
+              {f.itens?.length > 0 ? (
+                <div className="overflow-x-auto rounded-xl border">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="text-left px-3 py-2 font-bold text-muted-foreground">Descrição</th>
+                        <th className="text-center px-3 py-2 font-bold text-muted-foreground">Qtd</th>
+                        <th className="text-right px-3 py-2 font-bold text-muted-foreground">Valor Unit.</th>
+                        <th className="text-right px-3 py-2 font-bold text-muted-foreground">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {f.itens.map((it, i) => (
+                        <tr key={i} className="border-b border-border/20">
+                          <td className="px-3 py-2 text-foreground">{it.descricao}</td>
+                          <td className="px-3 py-2 text-center text-muted-foreground">{it.quantidade}</td>
+                          <td className="px-3 py-2 text-right text-muted-foreground">{formatKz(it.preco_unit)}</td>
+                          <td className="px-3 py-2 text-right font-bold text-foreground">{formatKz(it.total)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="px-3 py-2.5 rounded-xl border border-dashed border-input text-[11px] text-muted-foreground bg-muted/30">
+                  Sem itens registados.
+                </p>
               )}
             </div>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
-            <div>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Emissão</p>
-              <p className="text-sm font-medium text-foreground">{f.data_emissao ? new Date(f.data_emissao).toLocaleDateString("pt-BR") : "—"}</p>
+          )}
+
+          {tab === "pagamento" && (
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-xl border p-4 space-y-1.5 text-xs">
+                  <p className="text-[11px] font-medium text-muted-foreground mb-2">Resumo</p>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Subtotal:</span><span className="font-medium text-foreground">{formatKz(f.subtotal)}</span></div>
+                  {Number(f.iva) > 0 && (
+                    <div className="flex justify-between"><span className="text-muted-foreground">IVA ({Number(f.iva)}%):</span><span className="font-medium text-foreground">{formatKz(f.valor_iva)}</span></div>
+                  )}
+                  <div className="flex justify-between border-t pt-1.5 font-bold text-sm"><span>Total:</span><span className="text-primary">{formatKz(f.total || f.valor)}</span></div>
+                </div>
+
+                <div className="rounded-xl border bg-emerald-50/50 p-4 space-y-1.5 text-xs">
+                  <p className="text-[11px] font-medium text-emerald-700 mb-2">Pagamento</p>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Valor pago:</span><span className="font-semibold text-emerald-700">{formatKz(f.valor_pago)}</span></div>
+                  {Number(f.total || f.valor) > Number(f.valor_pago || 0) && (
+                    <div className="flex justify-between"><span className="text-muted-foreground">Em dívida a liquidar:</span><span className="font-semibold text-amber-600">{formatKz(Number(f.total || f.valor) - Number(f.valor_pago || 0))}</span></div>
+                  )}
+                  {Number(f.total || f.valor) <= Number(f.valor_pago || 0) && (
+                    <p className="pt-1 text-[11px] text-emerald-700">Fatura integralmente paga.</p>
+                  )}
+                </div>
+              </div>
+
+              {f.observacoes && (
+                <div className="bg-muted/50 rounded-xl p-3">
+                  <p className="text-[11px] font-medium text-muted-foreground mb-1">Observações</p>
+                  <p className="text-foreground text-sm">{f.observacoes}</p>
+                </div>
+              )}
             </div>
-            <div>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Vencimento</p>
-              <p className="text-sm font-medium text-foreground">{f.data_vencimento ? new Date(f.data_vencimento).toLocaleDateString("pt-BR") : "—"}</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Método</p>
-              <p className="text-sm font-medium text-foreground">{metodos[f.metodo_pagamento]?.label || f.metodo_pagamento || "—"}</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">OP</p>
-              <p className="text-sm font-medium text-foreground">{f.ordem_producao?.id || "—"}</p>
-            </div>
-          </div>
+          )}
         </div>
-
-        {f.itens?.length > 0 && (
-          <div>
-            <h3 className="text-[10px] font-bold text-muted-foreground uppercase mb-2 tracking-wider">Itens</h3>
-            <div className="overflow-x-auto rounded-xl border">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    <th className="text-left px-3 py-2 font-bold text-muted-foreground uppercase">Descrição</th>
-                    <th className="text-center px-3 py-2 font-bold text-muted-foreground uppercase">Qtd</th>
-                    <th className="text-right px-3 py-2 font-bold text-muted-foreground uppercase">Valor Unit.</th>
-                    <th className="text-right px-3 py-2 font-bold text-muted-foreground uppercase">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {f.itens.map((it, i) => (
-                    <tr key={i} className="border-b border-border/20">
-                      <td className="px-3 py-2 text-foreground">{it.descricao}</td>
-                      <td className="px-3 py-2 text-center text-muted-foreground">{it.quantidade}</td>
-                      <td className="px-3 py-2 text-right text-muted-foreground">{formatKz(it.preco_unit)}</td>
-                      <td className="px-3 py-2 text-right font-bold text-foreground">{formatKz(it.total)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-xl border p-4 space-y-1.5 text-xs">
-            <p className="text-[10px] font-bold text-muted-foreground uppercase mb-2 tracking-wider">Resumo</p>
-            <div className="flex justify-between"><span className="text-muted-foreground">Subtotal:</span><span className="font-medium text-foreground">{formatKz(f.subtotal)}</span></div>
-            {Number(f.iva) > 0 && (
-              <div className="flex justify-between"><span className="text-muted-foreground">IVA ({Number(f.iva)}%):</span><span className="font-medium text-foreground">{formatKz(f.valor_iva)}</span></div>
-            )}
-            <div className="flex justify-between border-t pt-1.5 font-bold text-sm"><span>Total:</span><span className="text-primary">{formatKz(f.total || f.valor)}</span></div>
-          </div>
-
-          <div className="rounded-xl border bg-emerald-50/50 p-4 space-y-1.5 text-xs">
-            <p className="text-[10px] font-bold text-emerald-700 uppercase mb-2 tracking-wider">Pagamento</p>
-            <div className="flex justify-between"><span className="text-muted-foreground">Valor pago:</span><span className="font-semibold text-emerald-700">{formatKz(f.valor_pago)}</span></div>
-            {Number(f.total || f.valor) > Number(f.valor_pago || 0) && (
-              <div className="flex justify-between"><span className="text-muted-foreground">Em dívida a liquidar:</span><span className="font-semibold text-amber-600">{formatKz(Number(f.total || f.valor) - Number(f.valor_pago || 0))}</span></div>
-            )}
-            {Number(f.total || f.valor) <= Number(f.valor_pago || 0) && (
-              <p className="pt-1 text-[11px] text-emerald-700">Fatura integralmente paga.</p>
-            )}
-          </div>
-        </div>
-
-        {f.observacoes && (
-          <div className="bg-muted/50 rounded-xl p-3">
-            <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1 tracking-wider">Observações</p>
-            <p className="text-foreground text-sm">{f.observacoes}</p>
-          </div>
-        )}
       </div>
     </Modal>
   );

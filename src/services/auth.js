@@ -1,28 +1,23 @@
 import api from "./api";
 
-const CHAVE_TOKEN = "sigraf_token";
+// A sessão real vive num cookie HttpOnly: o browser nunca guarda nem envia o
+// JWT em JavaScript. Mantemos apenas o perfil público do utilizador para
+// renderização; é sempre revalidado junto do servidor em cada arranque.
 const CHAVE_USUARIO = "sigraf_usuario";
+const CHAVE_TOKEN_LEGADO = "sigraf_token";
 
 function storage() {
   if (typeof window === "undefined") return null;
   return window.sessionStorage;
 }
 
-export function decodificarToken(token) {
-  if (!token) return null;
-  try {
-    const parte = token.split(".")[1];
-    if (!parte) return null;
-    const base64 = parte.replace(/-/g, "+").replace(/_/g, "/");
-    const pad = base64.length % 4 === 0 ? "" : "=".repeat(4 - (base64.length % 4));
-    return JSON.parse(atob(base64 + pad));
-  } catch {
-    return null;
-  }
+function limparTokenLegado() {
+  // Versões antigas guardavam o JWT aqui (acessível a XSS). Remove sempre.
+  storage()?.removeItem(CHAVE_TOKEN_LEGADO);
 }
 
 function guardarSessao(data) {
-  storage()?.setItem(CHAVE_TOKEN, data.token);
+  limparTokenLegado();
   storage()?.setItem(CHAVE_USUARIO, JSON.stringify(data.usuario));
   return data;
 }
@@ -46,20 +41,22 @@ export async function logout() {
   try {
     await api.post("/auth/logout");
   } catch {}
-  storage()?.removeItem(CHAVE_TOKEN);
+  limparTokenLegado();
   storage()?.removeItem(CHAVE_USUARIO);
   window.location.href = "/login";
 }
 
-export function getToken() {
-  return storage()?.getItem(CHAVE_TOKEN) ?? null;
-}
-
 export function getUsuario() {
   const raw = storage()?.getItem(CHAVE_USUARIO);
-  return raw ? JSON.parse(raw) : null;
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 }
 
 export function isAutenticado() {
-  return !!getToken();
+  // Só há indício local de sessão; a validação definitiva é carregarPerfil().
+  return !!getUsuario();
 }

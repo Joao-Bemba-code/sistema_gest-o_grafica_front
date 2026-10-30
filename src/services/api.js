@@ -9,22 +9,14 @@ const api = axios.create({
   },
 });
 
-api.interceptors.request.use((config) => {
-  // Reserva para ambientes locais onde o browser não envia o cookie
-  // (origens diferentes em http); em produção a sessão vai só no cookie HttpOnly.
-  if (typeof window !== "undefined") {
-    const token = window.sessionStorage.getItem("sigraf_token");
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
 api.interceptors.response.use(
   (res) => {
     return res;
   },
   (err) => {
     if (err.response?.status === 401 && typeof window !== "undefined") {
+      // Limpa também chaves antigas de versões que guardavam o JWT em
+      // sessionStorage (expostas a XSS). A sessão real é o cookie HttpOnly.
       window.sessionStorage.removeItem("sigraf_token");
       window.sessionStorage.removeItem("sigraf_usuario");
       if (window.location.pathname !== "/login") {

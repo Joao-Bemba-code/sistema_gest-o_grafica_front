@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import Icon from "@/components/Icon";
 import {
   Ledger,
-  LedgerHeader,
   LedgerTable,
   LedgerTh,
   LedgerTr,
@@ -87,8 +86,7 @@ function margemDe(o) {
 }
 
 export default function OrcamentosTab({ orcamentos = [], onAbrir, onEditar, onAnular }) {
-  const [rascunho, setRascunho] = useState(FILTRO_VAZIO);
-  const [aplicado, setAplicado] = useState(FILTRO_VAZIO);
+  const [filtro, setFiltro] = useState(FILTRO_VAZIO);
 
   const clientes = useMemo(() => {
     const mapa = new Map();
@@ -115,12 +113,12 @@ export default function OrcamentosTab({ orcamentos = [], onAbrir, onEditar, onAn
     () =>
       orcamentos.filter((o) => {
         const clienteId = String(o.cliente_id ?? o.cliente?.id ?? "");
-        if (aplicado.cliente && clienteId !== aplicado.cliente) return false;
-        if (aplicado.artigo && artigoDe(o) !== aplicado.artigo) return false;
-        if (aplicado.estado && estadoOrcamento(o) !== aplicado.estado) return false;
+        if (filtro.cliente && clienteId !== filtro.cliente) return false;
+        if (filtro.artigo && artigoDe(o) !== filtro.artigo) return false;
+        if (filtro.estado && estadoOrcamento(o) !== filtro.estado) return false;
         return true;
       }),
-    [orcamentos, aplicado]
+    [orcamentos, filtro]
   );
 
   const contagem = useMemo(() => {
@@ -132,15 +130,10 @@ export default function OrcamentosTab({ orcamentos = [], onAbrir, onEditar, onAn
     return base;
   }, [filtrados]);
 
-  const total = filtrados.reduce((s, o) => s + (Number(o.total) || 0), 0);
   const pag = usePaginacao({ items: filtrados });
-  const temFiltro = Boolean(aplicado.cliente || aplicado.artigo || aplicado.estado);
+  const temFiltro = Boolean(filtro.cliente || filtro.artigo || filtro.estado);
 
-  const aplicar = () => setAplicado({ ...rascunho });
-  const limpar = () => {
-    setRascunho(FILTRO_VAZIO);
-    setAplicado(FILTRO_VAZIO);
-  };
+  const limpar = () => setFiltro(FILTRO_VAZIO);
 
   const campoCls =
     "h-9 w-full rounded-lg border border-border bg-card px-2.5 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/25";
@@ -166,19 +159,14 @@ export default function OrcamentosTab({ orcamentos = [], onAbrir, onEditar, onAn
       </div>
 
       <Ledger rotulo="Orçamentos ledger">
-        <LedgerHeader
-          titulo="Orçamentos"
-          subtitulo={`${filtrados.length} orçamentos · ${formatKz(total)}`}
-        />
-
         <div className="border-b border-border bg-muted/30 px-4 py-3">
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Filtros</p>
+          <p className="mb-2 text-xs font-semibold text-muted-foreground">Filtros</p>
           <div className="flex flex-wrap items-end gap-2.5">
             <label className="flex min-w-40 flex-1 flex-col gap-1 sm:flex-none">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Cliente</span>
+              <span className="text-[11px] font-medium text-muted-foreground">Cliente</span>
               <select
-                value={rascunho.cliente}
-                onChange={(e) => setRascunho((f) => ({ ...f, cliente: e.target.value }))}
+                value={filtro.cliente}
+                onChange={(e) => setFiltro((f) => ({ ...f, cliente: e.target.value }))}
                 className={campoCls}
               >
                 <option value="">Todos</option>
@@ -189,10 +177,10 @@ export default function OrcamentosTab({ orcamentos = [], onAbrir, onEditar, onAn
             </label>
 
             <label className="flex min-w-40 flex-1 flex-col gap-1 sm:flex-none">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Artigo</span>
+              <span className="text-[11px] font-medium text-muted-foreground">Artigo</span>
               <select
-                value={rascunho.artigo}
-                onChange={(e) => setRascunho((f) => ({ ...f, artigo: e.target.value }))}
+                value={filtro.artigo}
+                onChange={(e) => setFiltro((f) => ({ ...f, artigo: e.target.value }))}
                 className={campoCls}
               >
                 <option value="">Todos</option>
@@ -203,10 +191,10 @@ export default function OrcamentosTab({ orcamentos = [], onAbrir, onEditar, onAn
             </label>
 
             <label className="flex min-w-36 flex-1 flex-col gap-1 sm:flex-none">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Estado</span>
+              <span className="text-[11px] font-medium text-muted-foreground">Estado</span>
               <select
-                value={rascunho.estado}
-                onChange={(e) => setRascunho((f) => ({ ...f, estado: e.target.value }))}
+                value={filtro.estado}
+                onChange={(e) => setFiltro((f) => ({ ...f, estado: e.target.value }))}
                 className={campoCls}
               >
                 <option value="">Todos</option>
@@ -216,13 +204,6 @@ export default function OrcamentosTab({ orcamentos = [], onAbrir, onEditar, onAn
               </select>
             </label>
 
-            <button
-              type="button"
-              onClick={aplicar}
-              className="inline-flex h-9 items-center rounded-lg bg-primary px-4 text-xs font-bold uppercase tracking-wider text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 active:scale-[0.98]"
-            >
-              Aplicar
-            </button>
             {temFiltro && (
               <button
                 type="button"

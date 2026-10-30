@@ -1,4 +1,6 @@
-import apiSuporte, { CHAVE_TOKEN, CHAVE_USUARIO } from "./apiSuporte";
+import apiSuporte, { CHAVE_USUARIO } from "./apiSuporte";
+
+const CHAVE_TOKEN_LEGADO = "sigraf_suporte_token";
 
 function storage() {
   if (typeof window === "undefined") return null;
@@ -7,7 +9,8 @@ function storage() {
 
 export async function login(email, senha, codigo) {
   const { data } = await apiSuporte.post("/login", { email, senha, ...(codigo ? { codigo } : {}) });
-  storage()?.setItem(CHAVE_TOKEN, data.token);
+  // O JWT não é guardado no browser; a sessão é o cookie HttpOnly.
+  storage()?.removeItem(CHAVE_TOKEN_LEGADO);
   storage()?.setItem(CHAVE_USUARIO, JSON.stringify(data.usuario));
   return data;
 }
@@ -16,7 +19,7 @@ export async function logout() {
   try {
     await apiSuporte.post("/logout");
   } catch {}
-  storage()?.removeItem(CHAVE_TOKEN);
+  storage()?.removeItem(CHAVE_TOKEN_LEGADO);
   storage()?.removeItem(CHAVE_USUARIO);
   window.location.href = "/suporte/login";
 }
@@ -47,8 +50,8 @@ export async function totpConfirmar(codigo) {
   return data;
 }
 
-export async function totpDesactivar(senha) {
-  const { data } = await apiSuporte.post("/totp/desactivar", { senha });
+export async function totpDesactivar(senha, codigo) {
+  const { data } = await apiSuporte.post("/totp/desactivar", { senha, codigo });
   return data;
 }
 
@@ -58,7 +61,8 @@ export function getSuporte() {
 }
 
 export function isAutenticadoSuporte() {
-  return !!storage()?.getItem(CHAVE_TOKEN);
+  // Indício local; a validação definitiva é verificarSessaoSuporte().
+  return !!getSuporte();
 }
 
 export async function obterResumo() {

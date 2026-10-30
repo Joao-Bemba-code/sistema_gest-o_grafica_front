@@ -417,6 +417,17 @@ export function ehProduto(categoria) {
   return tipo === "artigo" || tipo === "produto_acabado";
 }
 
+// Artigo/produto vendável do stock: categoria "artigo"/"produto acabado" ou
+// material com composição — o que pode ser oferecido como produto final.
+export function ehArtigoOuProduto(m) {
+  if (!m) return false;
+  if (temComposicao(m)) return true;
+  if (m.categoria && typeof m.categoria === "object") return ehProduto(m.categoria);
+  const esp = especificacoesObjeto(m?.especificacoes);
+  const grupo = esp.grupo || esp.categoria;
+  return grupo ? ehProduto({ tipo: tipoChaveDe(grupo) }) : false;
+}
+
 export function temComposicao(material) {
   return Array.isArray(material?.composicao) && material.composicao.length > 0;
 }

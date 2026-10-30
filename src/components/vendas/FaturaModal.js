@@ -30,7 +30,27 @@ const blankFaturaForm = {
   metodo: "transferencia", conta_bancaria_id: "", itens: [{ ...blankItem }], observacoes: "", valor_pago: "",
 };
 
+const TABS = [
+  { key: "documento", label: "01 Documento", icon: "description" },
+  { key: "itens", label: "02 Itens", icon: "list" },
+  { key: "pagamento", label: "03 Pagamento", icon: "payments" },
+];
+
+const campoCls =
+  "h-10 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/25";
+
 function formatKz(v) { return `Kz ${Number(v || 0).toLocaleString("pt-AO")}`; }
+
+function Campo({ label, children, obrigatorio, full }) {
+  return (
+    <label className={`flex flex-col gap-1.5 ${full ? "sm:col-span-2" : ""}`}>
+      <span className="text-[11px] font-medium text-muted-foreground">
+        {label} {obrigatorio && <span className="text-destructive" aria-hidden="true">*</span>}
+      </span>
+      {children}
+    </label>
+  );
+}
 
 export default function FaturaModal({ open, onClose, onSaved }) {
   const { addToast } = useToast();
@@ -40,6 +60,7 @@ export default function FaturaModal({ open, onClose, onSaved }) {
   const [faturas, setFaturas] = useState([]);
   const [contas, setContas] = useState([]);
   const [carregando, setCarregando] = useState(true);
+  const [tab, setTab] = useState("documento");
   const [faturaForm, setFaturaForm] = useState(blankFaturaForm);
 
   useEffect(() => {
@@ -156,8 +177,10 @@ export default function FaturaModal({ open, onClose, onSaved }) {
   const titulo = faturaForm.tipo === "recibo" ? "Novo Recibo" : faturaForm.tipo === "factura_recibo" ? "Nova Factura Recibo" : "Nova Fatura";
   const botaoRegisto = faturaForm.tipo === "recibo" ? "Registar Recibo" : faturaForm.tipo === "factura_recibo" ? "Registar Factura Recibo" : "Registar Fatura";
 
+  const id = (sufixo) => `form-fatura-${sufixo}`;
+
   return (
-    <Modal open={open} onClose={onClose} title={titulo} icon="receipt_long" size="xl"
+    <Modal open={open} onClose={onClose} title={titulo} icon="receipt_long" size="2xl"
       footer={<>
         <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
         <Button type="submit" form="form-fatura" disabled={carregando}>{carregando ? "A carregar..." : botaoRegisto}</Button>
@@ -168,153 +191,173 @@ export default function FaturaModal({ open, onClose, onSaved }) {
         </div>
       ) : (
         <form id="form-fatura" onSubmit={handleSubmitFatura} className="space-y-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1.5 sm:col-span-2">
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Tipo de Documento *</label>
-              <select required value={faturaForm.tipo} onChange={(e) => setFaturaForm({ ...faturaForm, tipo: e.target.value, valor_pago: e.target.value === "factura_recibo" ? "" : faturaForm.valor_pago })} className={inputCls}>
-                <option value="fatura">Fatura (a receber)</option>
-                <option value="recibo">Recibo (pagamento)</option>
-                <option value="factura_recibo">Factura Recibo (já paga)</option>
-              </select>
-              {faturaForm.tipo === "factura_recibo" && (
-                <p className="text-[10px] text-amber-600">A Factura Recibo fica automaticamente marcada como paga pelo valor total.</p>
-              )}
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Cliente *</label>
-              <select required value={faturaForm.cliente_id} onChange={(e) => setFaturaForm({ ...faturaForm, cliente_id: e.target.value, orcamentos_ids: [], itens: [{ ...blankItem }] })} className={inputCls}>
-                <option value="">Seleccionar...</option>
-                {clientes.map((c) => <option key={c.id} value={c.id}>{c.nome || c.razao_social}</option>)}
-              </select>
-            </div>
-            {faturaForm.cliente_id && (
-              <div className="flex flex-col gap-1.5 sm:col-span-2">
-                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Orçamentos do Cliente</label>
-                {orcamentosDisponiveis.length === 0 ? (
-                  <p className="px-3 py-2.5 rounded-xl border border-dashed border-input text-[11px] text-muted-foreground bg-muted/30">
-                    Sem orçamentos disponíveis (aprovados/pendentes e ainda não facturados).
-                  </p>
-                ) : (
-                  <div className="space-y-1.5 max-h-48 overflow-y-auto rounded-xl border bg-muted/30 p-2">
-                    {orcamentosDisponiveis.map((o) => {
-                      const marcado = faturaForm.orcamentos_ids.includes(String(o.id));
-                      return (
-                        <label key={o.id} className={`flex items-center gap-2.5 rounded-lg border px-2.5 py-2 cursor-pointer transition-colors ${marcado ? "border-primary/60 bg-primary/5" : "bg-background border-input hover:border-primary/40"}`}>
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 shrink-0 accent-primary cursor-pointer"
-                            checked={marcado}
-                            onChange={() => toggleOrcamento(o)}
-                          />
-                          <span className="flex-1 min-w-0">
-                            <span className="block text-xs font-semibold text-foreground truncate">{o.numero || o.id} · {formatKz(o.total || o.subtotal + o.valorIva)}</span>
-                            <span className="block text-[10px] text-muted-foreground truncate">{(o.itens || []).map((it) => it.descricao).filter(Boolean).join(", ") || "Sem descrição"}</span>
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
-                {faturaForm.orcamentos_ids.length > 0 && (
-                  <p className="text-[10px] font-medium text-primary">{faturaForm.orcamentos_ids.length} orçamento(s) selecionado(s) — os itens foram somados abaixo.</p>
-                )}
-              </div>
-            )}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Ordem de Produção</label>
-              <select value={faturaForm.op} onChange={(e) => setFaturaForm({ ...faturaForm, op: e.target.value })} className={inputCls}>
-                <option value="">Seleccionar OP...</option>
-                {ordens.map((o) => <option key={o.id} value={o.id}>{o.id} — {o.cliente?.nome || o.cliente}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Data de Emissão *</label>
-              <input required type="date" value={faturaForm.data_emissao} onChange={(e) => setFaturaForm({ ...faturaForm, data_emissao: e.target.value })} className={inputCls} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Data de Vencimento</label>
-              <input type="date" value={faturaForm.data_vencimento} onChange={(e) => setFaturaForm({ ...faturaForm, data_vencimento: e.target.value })} className={inputCls} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">IVA (%)</label>
-              <NumeroInput value={faturaForm.iva} onChange={(e) => setFaturaForm({ ...faturaForm, iva: e.target.value })} className={inputCls} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Método de Pagamento</label>
-              <select value={faturaForm.metodo} onChange={(e) => setFaturaForm({ ...faturaForm, metodo: e.target.value })} className={inputCls}>
-                {Object.entries(metodos).map(([key, m]) => <option key={key} value={key}>{m.label}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Conta Bancária Destino</label>
-              <select value={faturaForm.conta_bancaria_id || ""} onChange={(e) => setFaturaForm({ ...faturaForm, conta_bancaria_id: e.target.value })} className={inputCls}>
-                <option value="">Seleccionar conta...</option>
-                {contas.map((c) => <option key={c.id} value={c.id}>{c.banco_nome}{c.numero_conta ? ` - ${c.numero_conta}` : ""}</option>)}
-              </select>
-            </div>
-            {faturaForm.tipo !== "factura_recibo" && (
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Valor Pago Agora</label>
-                <NumeroInput value={faturaForm.valor_pago} onChange={(e) => setFaturaForm({ ...faturaForm, valor_pago: e.target.value })} className={inputCls} placeholder="0,00" />
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2"><Icon name="list" className="text-sm text-primary" /> Itens da Fatura</h3>
-              <Button type="button" variant="ghost" size="sm" onClick={addFaturaItem}><Icon name="add_circle" className="text-sm" /> Adicionar Item</Button>
-            </div>
-            {faturaForm.itens.map((it, idx) => (
-              <div key={idx} className="grid grid-cols-12 gap-2 items-end bg-muted/50 rounded-xl p-3">
-                <div className="col-span-12 sm:col-span-5 flex flex-col gap-1.5">
-                  {idx === 0 && <label className="text-[9px] font-semibold text-muted-foreground uppercase">Descrição *</label>}
-                  <input required value={it.descricao} onChange={(e) => setFaturaItem(idx, "descricao", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="Descrição do serviço" />
-                </div>
-                <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
-                  {idx === 0 && <label className="text-[9px] font-semibold text-muted-foreground uppercase">Qtd *</label>}
-                  <NumeroInput required value={it.quantidade} onChange={(e) => setFaturaItem(idx, "quantidade", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="0" />
-                </div>
-                <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
-                  {idx === 0 && <label className="text-[9px] font-semibold text-muted-foreground uppercase">Valor Unit. *</label>}
-                  <NumeroInput required value={it.preco_unit} onChange={(e) => setFaturaItem(idx, "preco_unit", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="0" />
-                </div>
-                <div className="col-span-3 sm:col-span-2 flex flex-col gap-1.5">
-                  {idx === 0 && <label className="text-[9px] font-semibold text-muted-foreground uppercase">Total</label>}
-                  <div className="px-2.5 py-2 bg-muted border border-input rounded-lg text-xs font-bold text-foreground">{formatKz((Number(it.quantidade) || 0) * (Number(it.preco_unit) || 0))}</div>
-                </div>
-                <div className="col-span-1 flex justify-center">
-                  {faturaForm.itens.length > 1 && (
-                    <Button type="button" variant="ghost" size="icon" onClick={() => removeFaturaItem(idx)} title="Remover" className="text-error">
-                      <Icon name="close" className="text-sm" />
-                    </Button>
-                  )}
-                </div>
-              </div>
+          <div role="tablist" aria-label="Secções da fatura" className="flex gap-2 flex-wrap bg-muted/60 border border-border p-1.5 rounded-full">
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                role="tab"
+                aria-selected={tab === t.key}
+                aria-controls={`${id("painel")}-${t.key}`}
+                id={id(`tab-${t.key}`)}
+                onClick={() => setTab(t.key)}
+                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-full text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${tab === t.key ? "nav-pill text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <Icon name={t.icon} className="text-lg" />
+                <span className="hidden md:inline">{t.label}</span>
+              </button>
             ))}
           </div>
 
-          <div className="bg-muted/50 rounded-xl p-4 flex items-center justify-between">
-            <div className="text-xs text-muted-foreground">
-              <p>Subtotal: <strong className="text-foreground">{formatKz(faturaSubtotal)}</strong></p>
-              {faturaIva > 0 && <p>IVA ({Number(faturaForm.iva) || 0}%): <strong className="text-foreground">{formatKz(faturaIva)}</strong></p>}
-              {faturaForm.tipo !== "factura_recibo" && Number(faturaForm.valor_pago) > 0 && (
-                <p>Valor pago: <strong className="text-success">{formatKz(faturaForm.valor_pago)}</strong></p>
-              )}
-              {faturaForm.tipo !== "factura_recibo" && faturaDivida > 0 && (
-                <p>Em dívida a liquidar: <strong className="text-warning">{formatKz(faturaDivida)}</strong></p>
-              )}
-            </div>
-            <div className="text-right">
-              <p className="text-[10px] text-muted-foreground uppercase font-bold">Total</p>
-              <p className="text-lg font-bold text-primary">{formatKz(faturaTotal)}</p>
-            </div>
+          {/* Altura fixa: o modal nunca muda de tamanho ao trocar de secção */}
+          <div role="tabpanel" id={`${id("painel")}-${tab}`} aria-labelledby={id(`tab-${tab}`)} className="animate-fade-up h-[400px] overflow-y-auto pr-1 custom-scrollbar">
+            {tab === "documento" && (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Campo label="Tipo de Documento" obrigatorio full>
+                  <select required value={faturaForm.tipo} onChange={(e) => setFaturaForm({ ...faturaForm, tipo: e.target.value, valor_pago: e.target.value === "factura_recibo" ? "" : faturaForm.valor_pago })} className={campoCls}>
+                    <option value="fatura">Fatura (a receber)</option>
+                    <option value="recibo">Recibo (pagamento)</option>
+                    <option value="factura_recibo">Factura Recibo (já paga)</option>
+                  </select>
+                  {faturaForm.tipo === "factura_recibo" && (
+                    <p className="text-[10px] text-amber-600">A Factura Recibo fica automaticamente marcada como paga pelo valor total.</p>
+                  )}
+                </Campo>
+                <Campo label="Cliente" obrigatorio>
+                  <select required value={faturaForm.cliente_id} onChange={(e) => setFaturaForm({ ...faturaForm, cliente_id: e.target.value, orcamentos_ids: [], itens: [{ ...blankItem }] })} className={campoCls}>
+                    <option value="">Selecionar...</option>
+                    {clientes.map((c) => <option key={c.id} value={c.id}>{c.nome || c.razao_social}</option>)}
+                  </select>
+                </Campo>
+                <Campo label="Ordem de Produção">
+                  <select value={faturaForm.op} onChange={(e) => setFaturaForm({ ...faturaForm, op: e.target.value })} className={campoCls}>
+                    <option value="">Selecionar OP...</option>
+                    {ordens.map((o) => <option key={o.id} value={o.id}>{o.id} — {o.cliente?.nome || o.cliente}</option>)}
+                  </select>
+                </Campo>
+                {faturaForm.cliente_id && (
+                  <div className="sm:col-span-2 flex flex-col gap-1.5">
+                    <span className="text-[11px] font-medium text-muted-foreground">Orçamentos do Cliente</span>
+                    {orcamentosDisponiveis.length === 0 ? (
+                      <p className="px-3 py-2.5 rounded-xl border border-dashed border-input text-[11px] text-muted-foreground bg-muted/30">
+                        Sem orçamentos disponíveis (aprovados/pendentes e ainda não facturados).
+                      </p>
+                    ) : (
+                      <div className="space-y-1.5 max-h-48 overflow-y-auto rounded-xl border bg-muted/30 p-2">
+                        {orcamentosDisponiveis.map((o) => {
+                          const marcado = faturaForm.orcamentos_ids.includes(String(o.id));
+                          return (
+                            <label key={o.id} className={`flex items-center gap-2.5 rounded-lg border px-2.5 py-2 cursor-pointer transition-colors ${marcado ? "border-primary/60 bg-primary/5" : "bg-background border-input hover:border-primary/40"}`}>
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 shrink-0 accent-primary cursor-pointer"
+                                checked={marcado}
+                                onChange={() => toggleOrcamento(o)}
+                              />
+                              <span className="flex-1 min-w-0">
+                                <span className="block text-xs font-semibold text-foreground truncate">{o.numero || o.id} · {formatKz(o.total || o.subtotal + o.valorIva)}</span>
+                                <span className="block text-[10px] text-muted-foreground truncate">{(o.itens || []).map((it) => it.descricao).filter(Boolean).join(", ") || "Sem descrição"}</span>
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {faturaForm.orcamentos_ids.length > 0 && (
+                      <p className="text-[10px] font-medium text-primary">{faturaForm.orcamentos_ids.length} orçamento(s) selecionado(s) — os itens foram somados abaixo.</p>
+                    )}
+                  </div>
+                )}
+                <Campo label="Data de Emissão" obrigatorio>
+                  <input required type="date" value={faturaForm.data_emissao} onChange={(e) => setFaturaForm({ ...faturaForm, data_emissao: e.target.value })} className={campoCls} />
+                </Campo>
+                <Campo label="Data de Vencimento">
+                  <input type="date" value={faturaForm.data_vencimento} onChange={(e) => setFaturaForm({ ...faturaForm, data_vencimento: e.target.value })} className={campoCls} />
+                </Campo>
+              </div>
+            )}
+
+            {tab === "itens" && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-2"><Icon name="list" className="text-sm text-primary" /> Itens da Fatura</span>
+                  <Button type="button" variant="ghost" size="sm" onClick={addFaturaItem}><Icon name="add_circle" className="text-sm" /> Adicionar Item</Button>
+                </div>
+                {faturaForm.itens.map((it, idx) => (
+                  <div key={idx} className="grid grid-cols-12 gap-2 items-end bg-muted/50 rounded-xl p-3">
+                    <div className="col-span-12 sm:col-span-5 flex flex-col gap-1.5">
+                      {idx === 0 && <span className="text-[11px] font-medium text-muted-foreground">Descrição *</span>}
+                      <input required value={it.descricao} onChange={(e) => setFaturaItem(idx, "descricao", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="Descrição do serviço" />
+                    </div>
+                    <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
+                      {idx === 0 && <span className="text-[11px] font-medium text-muted-foreground">Qtd *</span>}
+                      <NumeroInput required value={it.quantidade} onChange={(e) => setFaturaItem(idx, "quantidade", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="0" />
+                    </div>
+                    <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">
+                      {idx === 0 && <span className="text-[11px] font-medium text-muted-foreground">Valor Unit. *</span>}
+                      <NumeroInput required value={it.preco_unit} onChange={(e) => setFaturaItem(idx, "preco_unit", e.target.value)} className="px-2.5 py-2 bg-background border border-input rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/30" placeholder="0" />
+                    </div>
+                    <div className="col-span-3 sm:col-span-2 flex flex-col gap-1.5">
+                      {idx === 0 && <span className="text-[11px] font-medium text-muted-foreground">Total</span>}
+                      <div className="px-2.5 py-2 bg-muted border border-input rounded-lg text-xs font-bold text-foreground">{formatKz((Number(it.quantidade) || 0) * (Number(it.preco_unit) || 0))}</div>
+                    </div>
+                    <div className="col-span-1 flex justify-center">
+                      {faturaForm.itens.length > 1 && (
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeFaturaItem(idx)} title="Remover" className="text-error">
+                          <Icon name="close" className="text-sm" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {tab === "pagamento" && (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Campo label="IVA (%)">
+                  <NumeroInput value={faturaForm.iva} onChange={(e) => setFaturaForm({ ...faturaForm, iva: e.target.value })} className={campoCls} />
+                </Campo>
+                <Campo label="Método de Pagamento">
+                  <select value={faturaForm.metodo} onChange={(e) => setFaturaForm({ ...faturaForm, metodo: e.target.value })} className={campoCls}>
+                    {Object.entries(metodos).map(([key, m]) => <option key={key} value={key}>{m.label}</option>)}
+                  </select>
+                </Campo>
+                <Campo label="Conta Bancária Destino">
+                  <select value={faturaForm.conta_bancaria_id || ""} onChange={(e) => setFaturaForm({ ...faturaForm, conta_bancaria_id: e.target.value })} className={campoCls}>
+                    <option value="">Selecionar conta...</option>
+                    {contas.map((c) => <option key={c.id} value={c.id}>{c.banco_nome}{c.numero_conta ? ` - ${c.numero_conta}` : ""}</option>)}
+                  </select>
+                </Campo>
+                {faturaForm.tipo !== "factura_recibo" && (
+                  <Campo label="Valor Pago Agora">
+                    <NumeroInput value={faturaForm.valor_pago} onChange={(e) => setFaturaForm({ ...faturaForm, valor_pago: e.target.value })} className={campoCls} placeholder="0,00" />
+                  </Campo>
+                )}
+                <Campo label="Observações" full>
+                  <textarea value={faturaForm.observacoes} onChange={(e) => setFaturaForm({ ...faturaForm, observacoes: e.target.value })} rows={2} className={`${campoCls} h-auto resize-none py-2.5`} placeholder="Notas adicionais..." />
+                </Campo>
+                <div className="sm:col-span-2 bg-muted/50 rounded-xl p-4 flex items-center justify-between">
+                  <div className="text-xs text-muted-foreground">
+                    <p>Subtotal: <strong className="text-foreground">{formatKz(faturaSubtotal)}</strong></p>
+                    {faturaIva > 0 && <p>IVA ({Number(faturaForm.iva) || 0}%): <strong className="text-foreground">{formatKz(faturaIva)}</strong></p>}
+                    {faturaForm.tipo !== "factura_recibo" && Number(faturaForm.valor_pago) > 0 && (
+                      <p>Valor pago: <strong className="text-success">{formatKz(faturaForm.valor_pago)}</strong></p>
+                    )}
+                    {faturaForm.tipo !== "factura_recibo" && faturaDivida > 0 && (
+                      <p>Em dívida a liquidar: <strong className="text-warning">{formatKz(faturaDivida)}</strong></p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] text-muted-foreground font-bold">Total</p>
+                    <p className="text-lg font-bold text-primary">{formatKz(faturaTotal)}</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Observações</label>
-            <textarea value={faturaForm.observacoes} onChange={(e) => setFaturaForm({ ...faturaForm, observacoes: e.target.value })} rows={2} className={`${inputCls} resize-none`} placeholder="Notas adicionais..." />
-          </div>
+          <p className="text-[11px] text-destructive">* Campos de preenchimento obrigatório</p>
         </form>
       )}
     </Modal>

@@ -10,6 +10,7 @@ import { listar as listarMateriais } from "@/services/materiais";
 import { listar as listarPedidos } from "@/services/pedidos";
 import { listar as listarMaquinas } from "@/services/maquinas";
 import { listarMovimentos } from "@/services/tesouraria";
+import { listar as listarPropostas } from "@/services/propostas";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -148,6 +149,77 @@ const tooltipStyle = {
   color: "var(--foreground)",
 };
 
+/* ─── Pizza (donut) reutilizável ─── */
+
+function Donut({ segmentos, centroValor, centroLabel }) {
+  const CIRC = 2 * Math.PI * 38;
+  const total = Math.max(1, segmentos.reduce((s, x) => s + x.value, 0));
+  const partes = segmentos
+    .filter((s) => s.value > 0)
+    .reduce((acc, s) => {
+      const len = (s.value / total) * CIRC;
+      const offset = -(acc.soma / total) * CIRC;
+      acc.soma += s.value;
+      acc.lista.push({ ...s, len, offset });
+      return acc;
+    }, { soma: 0, lista: [] }).lista;
+  return (
+    <div className="my-auto flex items-center justify-between">
+      <div className="relative flex h-28 w-28 flex-shrink-0 items-center justify-center">
+        <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
+          <circle cx="50" cy="50" fill="none" r="38" stroke="var(--muted)" strokeWidth="13" />
+          {partes.map((s) => (
+            <circle
+              key={s.label}
+              cx="50"
+              cy="50"
+              fill="none"
+              r="38"
+              stroke={s.color}
+              strokeWidth="13"
+              strokeDasharray={`${s.len} ${CIRC}`}
+              strokeDashoffset={s.offset}
+            />
+          ))}
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+          <span className="max-w-20 truncate text-base font-bold leading-none text-foreground">{centroValor}</span>
+          <span className="mt-0.5 text-[9px] font-bold leading-none tracking-tight text-muted-foreground">{centroLabel}</span>
+        </div>
+      </div>
+      <div className="space-y-2 pl-3 text-[10px]">
+        {partes.map((s) => (
+          <div key={s.label} className="flex items-center justify-between space-x-2">
+            <div className="flex items-center space-x-1.5">
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
+              <span className="text-muted-foreground">{s.label}</span>
+            </div>
+            <span className="font-bold text-foreground">
+              {formatNum(s.value)} ({Math.round((s.value / total) * 100)}%)
+            </span>
+          </div>
+        ))}
+        {partes.length === 0 && (
+          <p className="py-4 text-xs text-muted-foreground">Sem propostas de momento.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Cores e rótulos das propostas por estado ─── */
+
+const ESTADO_PIZZA = [
+  { estado: "rascunho", rotulo: "Em preparação", cor: "#f59e0b" },
+  { estado: "enviada", rotulo: "Enviadas", cor: "#0ea5e9" },
+  { estado: "recebida", rotulo: "Em revisão", cor: "#64748b" },
+  { estado: "avaliada", rotulo: "Avaliadas", cor: "#8b5cf6" },
+  { estado: "aprovada", rotulo: "Aceites", cor: "#10b981" },
+  { estado: "rejeitada", rotulo: "Recusadas", cor: "#ef4444" },
+  { estado: "expirada", rotulo: "Expiradas", cor: "#94a3b8" },
+  { estado: "anulada", rotulo: "Anuladas", cor: "#475569" },
+];
+
 /* ═══════════════ Página ═══════════════ */
 
 export default function DashboardPage() {
@@ -158,6 +230,7 @@ export default function DashboardPage() {
   const [pedidos, setPedidos] = useState([]);
   const [maquinas, setMaquinas] = useState([]);
   const [movimentos, setMovimentos] = useState([]);
+  const [propostas, setPropostas] = useState([]);
   const [periodo, setPeriodo] = useState("mes");
   const [mesRef, setMesRef] = useState(null);
   const [nMeses, setNMeses] = useState(6);
@@ -168,13 +241,14 @@ export default function DashboardPage() {
 
   const carregar = useCallback(async () => {
     try {
-      const [f, o, m, p, ma, mv] = await Promise.all([
+      const [f, o, m, p, ma, mv, pr] = await Promise.all([
         listarFaturas().catch(() => []),
         listarOrdens().catch(() => []),
         listarMateriais().catch(() => []),
         listarPedidos().catch(() => []),
         listarMaquinas().catch(() => []),
         listarMovimentos().catch(() => []),
+        listarPropostas().catch(() => []),
       ]);
       setFaturas(f);
       setOrdens(o);
@@ -182,6 +256,7 @@ export default function DashboardPage() {
       setPedidos(Array.isArray(p) ? p : p?.data || []);
       setMaquinas(Array.isArray(ma) ? ma : []);
       setMovimentos(Array.isArray(mv) ? mv : mv?.data || []);
+      setPropostas(Array.isArray(pr) ? pr : pr?.data || []);
     } finally {
       setCarregando(false);
     }
@@ -311,6 +386,25 @@ export default function DashboardPage() {
   const maquinasManutencao = maquinas.filter(
     (m) => m.estado === "manutencao" || m.estado === "avariada"
   );
+
+  /* ─── Pizzas: propostas por estado (quantidade e valor, todo o período) ─── */
+  const pizzaPropostas = ESTADO_PIZZA.map((e) => {
+    const doEstado = propostas.filter((x) => x.estado === e.estado);
+    return {
+      ...e,
+      qtd: doEstado.length,
+      valor: doEstado.reduce((s, x) => s + (Number(x.valor) || 0), 0),
+    };
+  });
+  const segmentosQtd = pizzaPropostas.map((e) => ({ label: e.rotulo, value: e.qtd, color: e.cor }));
+  const segmentosValor = pizzaPropostas.map((e) => ({ label: e.rotulo, value: e.valor, color: e.cor }));
+  const totalValorPropostas = segmentosValor.reduce((s, x) => s + x.value, 0);
+
+  function compactKz(v) {
+    if (v >= 1e6) return `${(v / 1e6).toFixed(1).replace(".", ",")}M`;
+    if (v >= 1e3) return `${Math.round(v / 1e3)}k`;
+    return formatNum(v);
+  }
 
   /* ─── Donut: estado das ordens ─── */
   const CIRC = 2 * Math.PI * 38;
@@ -674,6 +768,28 @@ export default function DashboardPage() {
                   )}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ══════════ Pizzas das propostas ══════════ */}
+        <div className="min-w-0 lg:col-span-9">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="flex flex-col justify-between rounded-xl border border-border bg-card p-4 shadow-sm">
+              <h3 className="mb-2 text-xs font-bold text-foreground">Propostas por estado (quantidade)</h3>
+              <Donut
+                segmentos={segmentosQtd}
+                centroValor={formatNum(propostas.length)}
+                centroLabel="propostas"
+              />
+            </div>
+            <div className="flex flex-col justify-between rounded-xl border border-border bg-card p-4 shadow-sm">
+              <h3 className="mb-2 text-xs font-bold text-foreground">Propostas por estado (valor)</h3>
+              <Donut
+                segmentos={segmentosValor}
+                centroValor={compactKz(totalValorPropostas)}
+                centroLabel="Kz"
+              />
             </div>
           </div>
         </div>

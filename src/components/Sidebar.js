@@ -104,9 +104,8 @@ function NavegacaoComercial({ item, onVoltar, onNavegar, colapsado = false }) {
           <LuArrowLeft className="h-4 w-4" />
         </button>
         {!colapsado && (
-          <span className="min-w-0 truncate text-[12px] font-semibold text-muted-foreground">
-            M02 <span className="text-muted-foreground/50">/</span>{" "}
-            <span className="text-foreground">Comercial</span>
+          <span className="min-w-0 truncate text-[12px] font-semibold text-foreground">
+            Comercial
           </span>
         )}
       </div>

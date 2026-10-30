@@ -1,9 +1,10 @@
 import axios from "axios";
 
 // Instância axios exclusiva do painel de suporte técnico.
-// Usa chaves de sessão próprias: nunca partilha token com o SIGRAF.
-export const CHAVE_TOKEN = "sigraf_suporte_token";
+// A sessão real vive no cookie HttpOnly `sigraf_suporte_token`; o browser não
+// guarda o JWT. Só o perfil público fica em sessionStorage.
 export const CHAVE_USUARIO = "sigraf_suporte_usuario";
+const CHAVE_TOKEN_LEGADO = "sigraf_suporte_token";
 
 const apiSuporte = axios.create({
   baseURL: `${process.env.NEXT_PUBLIC_API_URL || "http://[::1]:8000/api"}/suporte`,
@@ -14,21 +15,12 @@ const apiSuporte = axios.create({
   },
 });
 
-apiSuporte.interceptors.request.use((config) => {
-  // Reserva para ambientes locais onde o browser não envia o cookie
-  // (origens diferentes em http); em produção a sessão vai só no cookie HttpOnly.
-  if (typeof window !== "undefined") {
-    const token = window.sessionStorage.getItem(CHAVE_TOKEN);
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
 apiSuporte.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401 && typeof window !== "undefined") {
-      window.sessionStorage.removeItem(CHAVE_TOKEN);
+      // Limpa também a chave antiga que guardava o JWT em sessionStorage.
+      window.sessionStorage.removeItem(CHAVE_TOKEN_LEGADO);
       window.sessionStorage.removeItem(CHAVE_USUARIO);
       const emLogin = window.location.pathname.startsWith("/suporte/login");
       if (!emLogin) {

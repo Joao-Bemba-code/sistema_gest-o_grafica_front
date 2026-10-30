@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import Icon from "@/components/Icon";
 import {
   Ledger,
-  LedgerHeader,
   LedgerTable,
   LedgerTh,
   LedgerTr,
@@ -84,8 +83,7 @@ function dentroDoPrazo(o, filtro) {
 }
 
 export default function EncomendasTab({ encomendas = [], onAbrir }) {
-  const [rascunho, setRascunho] = useState(FILTRO_VAZIO);
-  const [aplicado, setAplicado] = useState(FILTRO_VAZIO);
+  const [filtro, setFiltro] = useState(FILTRO_VAZIO);
 
   const clientes = useMemo(() => {
     const mapa = new Map();
@@ -103,12 +101,12 @@ export default function EncomendasTab({ encomendas = [], onAbrir }) {
     () =>
       encomendas.filter((o) => {
         const clienteId = String(o.cliente_id ?? o.cliente?.id ?? "");
-        if (aplicado.cliente && clienteId !== aplicado.cliente) return false;
-        if (aplicado.prazo && !dentroDoPrazo(o, aplicado.prazo)) return false;
-        if (aplicado.estado && estadoEncomenda(o) !== aplicado.estado) return false;
+        if (filtro.cliente && clienteId !== filtro.cliente) return false;
+        if (filtro.prazo && !dentroDoPrazo(o, filtro.prazo)) return false;
+        if (filtro.estado && estadoEncomenda(o) !== filtro.estado) return false;
         return true;
       }),
-    [encomendas, aplicado]
+    [encomendas, filtro]
   );
 
   const contagem = useMemo(() => {
@@ -117,15 +115,10 @@ export default function EncomendasTab({ encomendas = [], onAbrir }) {
     return base;
   }, [filtradas]);
 
-  const total = filtradas.reduce((s, o) => s + (Number(o.total) || 0), 0);
   const pag = usePaginacao({ items: filtradas });
-  const temFiltro = Boolean(aplicado.cliente || aplicado.prazo || aplicado.estado);
+  const temFiltro = Boolean(filtro.cliente || filtro.prazo || filtro.estado);
 
-  const aplicar = () => setAplicado({ ...rascunho });
-  const limpar = () => {
-    setRascunho(FILTRO_VAZIO);
-    setAplicado(FILTRO_VAZIO);
-  };
+  const limpar = () => setFiltro(FILTRO_VAZIO);
 
   const campoCls =
     "h-9 w-full rounded-lg border border-border bg-card px-2.5 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/25";
@@ -153,19 +146,14 @@ export default function EncomendasTab({ encomendas = [], onAbrir }) {
       </div>
 
       <Ledger rotulo="Encomendas ledger">
-        <LedgerHeader
-          titulo="Encomendas"
-          subtitulo={`${filtradas.length} encomendas · ${formatKz(total)}`}
-        />
-
         <div className="border-b border-border bg-muted/30 px-4 py-3">
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Filtros</p>
+          <p className="mb-2 text-xs font-semibold text-muted-foreground">Filtros</p>
           <div className="flex flex-wrap items-end gap-2.5">
             <label className="flex min-w-40 flex-1 flex-col gap-1 sm:flex-none">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Cliente</span>
+              <span className="text-[11px] font-medium text-muted-foreground">Cliente</span>
               <select
-                value={rascunho.cliente}
-                onChange={(e) => setRascunho((f) => ({ ...f, cliente: e.target.value }))}
+                value={filtro.cliente}
+                onChange={(e) => setFiltro((f) => ({ ...f, cliente: e.target.value }))}
                 className={campoCls}
               >
                 <option value="">Todos</option>
@@ -176,10 +164,10 @@ export default function EncomendasTab({ encomendas = [], onAbrir }) {
             </label>
 
             <label className="flex min-w-36 flex-1 flex-col gap-1 sm:flex-none">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Prazo</span>
+              <span className="text-[11px] font-medium text-muted-foreground">Prazo</span>
               <select
-                value={rascunho.prazo}
-                onChange={(e) => setRascunho((f) => ({ ...f, prazo: e.target.value }))}
+                value={filtro.prazo}
+                onChange={(e) => setFiltro((f) => ({ ...f, prazo: e.target.value }))}
                 className={campoCls}
               >
                 <option value="">Todos</option>
@@ -190,10 +178,10 @@ export default function EncomendasTab({ encomendas = [], onAbrir }) {
             </label>
 
             <label className="flex min-w-36 flex-1 flex-col gap-1 sm:flex-none">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Estado</span>
+              <span className="text-[11px] font-medium text-muted-foreground">Estado</span>
               <select
-                value={rascunho.estado}
-                onChange={(e) => setRascunho((f) => ({ ...f, estado: e.target.value }))}
+                value={filtro.estado}
+                onChange={(e) => setFiltro((f) => ({ ...f, estado: e.target.value }))}
                 className={campoCls}
               >
                 <option value="">Todos</option>
@@ -203,13 +191,6 @@ export default function EncomendasTab({ encomendas = [], onAbrir }) {
               </select>
             </label>
 
-            <button
-              type="button"
-              onClick={aplicar}
-              className="inline-flex h-9 items-center rounded-lg bg-primary px-4 text-xs font-bold uppercase tracking-wider text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 active:scale-[0.98]"
-            >
-              Aplicar
-            </button>
             {temFiltro && (
               <button
                 type="button"

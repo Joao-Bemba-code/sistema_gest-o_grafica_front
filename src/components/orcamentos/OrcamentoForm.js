@@ -74,6 +74,34 @@ export function totalQuantidadeItem(it) {
   return qtd > 0 ? Number((qtd * preco).toFixed(2)) : preco;
 }
 
+// Linhas de material de um produto composto: quantidade por unidade do
+// produto × quantidade do item; preços e stock vêm do cadastro.
+export function materiaisDaComposicao(produto, qtdItem, materiais = []) {
+  const comp = Array.isArray(produto?.composicao) ? produto.composicao : [];
+  const qtd = Number(qtdItem) || 1;
+  return comp
+    .filter((c) => c.material_id)
+    .map((c) => {
+      const mat = materiais.find((m) => String(m.id) === String(c.material_id));
+      const qtdPorUnidade = Number(c.quantidade) || 1;
+      return {
+        ...blankMaterial,
+        material_id: String(c.material_id),
+        descricao: mat?.nome || mat?.nome_tecnico || "",
+        unidade: mat?.unidade || "un",
+        tipo_estoque: mat?.tipo_estoque || "",
+        formato: mat?.formato || "",
+        especificacoes: mat?.especificacoes || {},
+        categoria: mat?.categoria || null,
+        preco_venda: Number(mat?.preco_venda) || 0,
+        preco_folha: Number(mat?.preco_venda) || 0,
+        quantidade: Number((qtdPorUnidade * qtd).toFixed(4)),
+        usar_parcial: false,
+        mover_estoque: mat?.mover_estoque !== false,
+      };
+    });
+}
+
 export function recalcularServico(sv) {
   const mob = Number(sv.mob) || 1;
   const prazo = Number(sv.prazoExecucao) || 0;
@@ -109,6 +137,30 @@ function categoriaEfetiva(m) {
 
 function ehArtigoProduto(m) {
   return ehProduto(categoriaEfetiva(m));
+}
+
+// Mesma regra do campo de descrição do item: encontra no cadastro o
+// artigo/produto cujo nome (ou nome técnico) bate com o texto dado.
+export function encontrarProdutoArquivo(materiais, nome) {
+  const alvo = String(nome || "").trim().toLowerCase();
+  if (!alvo) return null;
+  return (
+    (materiais || [])
+      .filter((m) => ehArtigoProduto(m) || temComposicao(m))
+      .find((m) => String(m.nome || m.nome_tecnico || "").trim().toLowerCase() === alvo) || null
+  );
+}
+
+// Qualquer material do cadastro (inclui matéria-prima): usado para herdar o
+// preço de venda quando a descrição bate com um artigo do stock.
+export function encontrarMaterialPorNome(materiais, nome) {
+  const alvo = String(nome || "").trim().toLowerCase();
+  if (!alvo) return null;
+  return (
+    (materiais || []).find(
+      (m) => String(m.nome || m.nome_tecnico || "").trim().toLowerCase() === alvo
+    ) || null
+  );
 }
 
 function ehFolhaMaterial(m) {
@@ -190,14 +242,6 @@ export default function OrcamentoForm({ formId = "form-orcamento", form, setFiel
   const id = (sufixo) => `${formId}-${sufixo}`;
   const produtosComposicao = materiais.filter((m) => temComposicao(m));
   const materiaisEstoque = materiais.filter((m) => m.mover_estoque !== false);
-  // Todos os artigos/produtos registados, controlem stock ou não: o campo de
-  // descrição tem de listar os produtos do cadastro, não apenas os que já
-  // estão marcados como "não movimenta estoque".
-  const produtosArquivo = materiais
-    .filter((m) => ehArtigoProduto(m) || temComposicao(m))
-    .sort((a, b) =>
-      String(a.nome || a.nome_tecnico || "").localeCompare(String(b.nome || b.nome_tecnico || ""), "pt")
-    );
 
   useEffect(() => {
     const vh = Number(valorHoraServicos) || 0;
@@ -208,31 +252,6 @@ export default function OrcamentoForm({ formId = "form-orcamento", form, setFiel
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [valorHoraServicos]);
-
-  const materiaisDaComposicao = (produto, qtdItem) => {
-    const comp = Array.isArray(produto.composicao) ? produto.composicao : [];
-    return comp
-      .filter((c) => c.material_id)
-      .map((c) => {
-        const mat = materiais.find((m) => String(m.id) === String(c.material_id));
-        const qtdPorUnidade = Number(c.quantidade) || 1;
-        return {
-          ...blankMaterial,
-          material_id: String(c.material_id),
-          descricao: mat?.nome || mat?.nome_tecnico || "",
-          unidade: mat?.unidade || "un",
-          tipo_estoque: mat?.tipo_estoque || "",
-          formato: mat?.formato || "",
-          especificacoes: mat?.especificacoes || {},
-          categoria: mat?.categoria || null,
-          preco_venda: Number(mat?.preco_venda) || 0,
-          preco_folha: Number(mat?.preco_venda) || 0,
-          quantidade: Number((qtdPorUnidade * qtdItem).toFixed(4)),
-          usar_parcial: false,
-          mover_estoque: mat?.mover_estoque !== false,
-        };
-      });
-  };
 
   const addItem = () => setForm((p) => ({ ...p, itens: [...p.itens, { ...blankItem, materiais: [{ ...blankMaterial }] }] }));
   const removeItem = (idx) => setForm((p) => ({ ...p, itens: p.itens.filter((_, i) => i !== idx) }));
@@ -249,7 +268,7 @@ export default function OrcamentoForm({ formId = "form-orcamento", form, setFiel
           const produto = materiais.find((m) => String(m.id) === String(itens[idx].produtoAplicado));
           if (produto) {
             const qtd = Number(val) || 0;
-            itens[idx].materiais = materiaisDaComposicao(produto, qtd > 0 ? qtd : 1);
+            itens[idx].materiais = materiaisDaComposicao(produto, qtd > 0 ? qtd : 1, materiais);
             if (!(Number(itens[idx].valorUnitario) > 0)) {
               itens[idx].valorUnitario = Number(produto.preco_venda) || Number(produto.custo_unit) || 0;
             }
@@ -274,7 +293,7 @@ export default function OrcamentoForm({ formId = "form-orcamento", form, setFiel
       const itens = [...p.itens];
       const it = { ...itens[idx] };
       const qtdItem = Number(it.quantidade) || 1;
-      const novasMat = materiaisDaComposicao(produto, qtdItem);
+      const novasMat = materiaisDaComposicao(produto, qtdItem, materiais);
       if (novasMat.length === 0) return p;
       it.materiais = novasMat;
       it.descricao = produto.nome || produto.nome_tecnico || it.descricao;
@@ -292,22 +311,30 @@ export default function OrcamentoForm({ formId = "form-orcamento", form, setFiel
     setForm((p) => {
       const itens = [...p.itens];
       itens[idx] = { ...itens[idx], descricao: nome };
-      const match = produtosArquivo.find((pr) => (pr.nome || pr.nome_tecnico) === nome);
-      if (!match) {
-        itens[idx].produtoAplicado = null;
+      const match = encontrarProdutoArquivo(materiais, nome);
+      if (match) {
+        if (itens[idx].produtoAplicado !== match.id) {
+          const it = { ...itens[idx] };
+          const qtdItem = Number(it.quantidade) || 1;
+          const comp = Array.isArray(match.composicao) ? match.composicao : [];
+          it.materiais = comp.length > 0 ? materiaisDaComposicao(match, qtdItem, materiais) : [];
+          if (!(Number(it.valorUnitario) > 0)) {
+            it.valorUnitario = Number(match.preco_venda) || Number(match.custo_unit) || 0;
+          }
+          it.produtoAplicado = match.id;
+          it.total = totalQuantidadeItem(it);
+          itens[idx] = it;
+        }
         return { ...p, itens };
       }
-      if (itens[idx].produtoAplicado === match.id) return { ...p, itens };
-      const it = { ...itens[idx] };
-      const qtdItem = Number(it.quantidade) || 1;
-      const comp = Array.isArray(match.composicao) ? match.composicao : [];
-      it.materiais = comp.length > 0 ? materiaisDaComposicao(match, qtdItem) : [];
-      if (!(Number(it.valorUnitario) > 0)) {
-        it.valorUnitario = Number(match.preco_venda) || Number(match.custo_unit) || 0;
+      // Não é produto acabado: se o nome bater com um material do stock
+      // (ex.: papel), herda só o preço de venda por unidade.
+      itens[idx].produtoAplicado = null;
+      const mat = encontrarMaterialPorNome(materiais, nome);
+      if (mat && !(Number(itens[idx].valorUnitario) > 0)) {
+        itens[idx].valorUnitario = Number(mat.preco_venda) || Number(mat.custo_unit) || 0;
+        itens[idx].total = totalQuantidadeItem(itens[idx]);
       }
-      it.produtoAplicado = match.id;
-      it.total = totalQuantidadeItem(it);
-      itens[idx] = it;
       return { ...p, itens };
     });
   };
@@ -489,14 +516,16 @@ return (
                       value={it.descricao}
                       onChange={(e) => atualizarDescricaoItem(idx, e.target.value)}
                       className={inputCls}
-                      placeholder={produtosArquivo.length > 0 ? "Escrever ou escolher produto pronto (Ex: Cartão de visita)..." : "Ex: Caderno A5, Cartão de visita"}
+                      placeholder={materiais.length > 0 ? "Escrever ou escolher artigo do stock (Ex: Cartão de visita, Papel A4)..." : "Ex: Caderno A5, Cartão de visita"}
                     />
                     <datalist id={`${formId}-produtos-arquivo`}>
-                      {produtosArquivo.map((p) => (
-                        <option key={p.id} value={p.nome || p.nome_tecnico}>
-                          {Number(p.preco_venda) > 0 ? ` · Kz ${Number(p.preco_venda).toLocaleString("pt-AO")}` : ""}
-                        </option>
-                      ))}
+                      {[...materiais]
+                        .sort((a, b) => String(a.nome || a.nome_tecnico || "").localeCompare(String(b.nome || b.nome_tecnico || ""), "pt"))
+                        .map((m) => (
+                          <option key={m.id} value={m.nome || m.nome_tecnico}>
+                            {Number(m.preco_venda) > 0 ? ` · Kz ${Number(m.preco_venda).toLocaleString("pt-AO")}` : ""}
+                          </option>
+                        ))}
                     </datalist>
                   </div>
                   <div className="col-span-4 sm:col-span-2 flex flex-col gap-1.5">

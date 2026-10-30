@@ -8,7 +8,6 @@ import { useToast } from "@/components/Toast";
 import Paginacao, { usePaginacao } from "@/components/ui/Paginacao";
 import {
   Ledger,
-  LedgerHeader,
   LedgerTable,
   LedgerTh,
   LedgerTr,
@@ -84,8 +83,7 @@ export default function EntregasTab({ faturas = [], mesFiltro = null, onVerFatur
   const { addToast } = useToast();
   const [ordens, setOrdens] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [rascunho, setRascunho] = useState(FILTRO_ENTREGA_VAZIO);
-  const [aplicado, setAplicado] = useState(FILTRO_ENTREGA_VAZIO);
+  const [filtro, setFiltro] = useState(FILTRO_ENTREGA_VAZIO);
   const [gerandoId, setGerandoId] = useState(null);
 
   useEffect(() => {
@@ -169,12 +167,12 @@ export default function EntregasTab({ faturas = [], mesFiltro = null, onVerFatur
   const entregasFiltradas = useMemo(
     () =>
       base.filter((o) => {
-        if (aplicado.encomenda && String(o.id) !== aplicado.encomenda) return false;
-        if (aplicado.destino && destinoDe(o) !== aplicado.destino) return false;
-        if (aplicado.estado && estadoEntrega(o) !== aplicado.estado) return false;
+        if (filtro.encomenda && String(o.id) !== filtro.encomenda) return false;
+        if (filtro.destino && destinoDe(o) !== filtro.destino) return false;
+        if (filtro.estado && estadoEntrega(o) !== filtro.estado) return false;
         return true;
       }),
-    [base, aplicado]
+    [base, filtro]
   );
 
   const contagem = useMemo(() => {
@@ -185,12 +183,8 @@ export default function EntregasTab({ faturas = [], mesFiltro = null, onVerFatur
 
   const pag = usePaginacao({ items: entregasFiltradas, tamanhoInicial: 10 });
 
-  const temFiltro = Boolean(aplicado.encomenda || aplicado.destino || aplicado.estado);
-  const aplicar = () => setAplicado({ ...rascunho });
-  const limpar = () => {
-    setRascunho(FILTRO_ENTREGA_VAZIO);
-    setAplicado(FILTRO_ENTREGA_VAZIO);
-  };
+  const temFiltro = Boolean(filtro.encomenda || filtro.destino || filtro.estado);
+  const limpar = () => setFiltro(FILTRO_ENTREGA_VAZIO);
 
   const campoCls =
     "h-9 w-full rounded-lg border border-border bg-card px-2.5 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/25";
@@ -230,19 +224,14 @@ export default function EntregasTab({ faturas = [], mesFiltro = null, onVerFatur
       </section>
 
       <Ledger rotulo="Entregas">
-        <LedgerHeader
-          titulo="Entregas"
-          subtitulo={`${entregasFiltradas.length} entregas · ${contagem.transito} em trânsito · ${contagem.entregue} entregues`}
-        />
-
         <div className="border-b border-border bg-muted/30 px-4 py-3">
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Filtros</p>
+          <p className="mb-2 text-xs font-semibold text-muted-foreground">Filtros</p>
           <div className="flex flex-wrap items-end gap-2.5">
             <label className="flex min-w-40 flex-1 flex-col gap-1 sm:flex-none">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Encomenda</span>
+              <span className="text-[11px] font-medium text-muted-foreground">Encomenda</span>
               <select
-                value={rascunho.encomenda}
-                onChange={(e) => setRascunho((f) => ({ ...f, encomenda: e.target.value }))}
+                value={filtro.encomenda}
+                onChange={(e) => setFiltro((f) => ({ ...f, encomenda: e.target.value }))}
                 className={campoCls}
               >
                 <option value="">Todas</option>
@@ -253,10 +242,10 @@ export default function EntregasTab({ faturas = [], mesFiltro = null, onVerFatur
             </label>
 
             <label className="flex min-w-40 flex-1 flex-col gap-1 sm:flex-none">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Destino</span>
+              <span className="text-[11px] font-medium text-muted-foreground">Destino</span>
               <select
-                value={rascunho.destino}
-                onChange={(e) => setRascunho((f) => ({ ...f, destino: e.target.value }))}
+                value={filtro.destino}
+                onChange={(e) => setFiltro((f) => ({ ...f, destino: e.target.value }))}
                 className={campoCls}
               >
                 <option value="">Todos</option>
@@ -267,10 +256,10 @@ export default function EntregasTab({ faturas = [], mesFiltro = null, onVerFatur
             </label>
 
             <label className="flex min-w-36 flex-1 flex-col gap-1 sm:flex-none">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Estado</span>
+              <span className="text-[11px] font-medium text-muted-foreground">Estado</span>
               <select
-                value={rascunho.estado}
-                onChange={(e) => setRascunho((f) => ({ ...f, estado: e.target.value }))}
+                value={filtro.estado}
+                onChange={(e) => setFiltro((f) => ({ ...f, estado: e.target.value }))}
                 className={campoCls}
               >
                 <option value="">Todos</option>
@@ -280,13 +269,6 @@ export default function EntregasTab({ faturas = [], mesFiltro = null, onVerFatur
               </select>
             </label>
 
-            <button
-              type="button"
-              onClick={aplicar}
-              className="inline-flex h-9 items-center rounded-lg bg-primary px-4 text-xs font-bold uppercase tracking-wider text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 active:scale-[0.98]"
-            >
-              Aplicar
-            </button>
             {temFiltro && (
               <button
                 type="button"

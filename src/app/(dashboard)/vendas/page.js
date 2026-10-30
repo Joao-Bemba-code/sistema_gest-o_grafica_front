@@ -19,6 +19,7 @@ import CadastrosTab from "@/components/vendas/CadastrosTab";
 import PropostasTab from "@/components/vendas/PropostasTab";
 import PropostaModal from "@/components/vendas/PropostaModal";
 import PropostaDetalhesModal from "@/components/vendas/PropostaDetalhesModal";
+import PropostaHistoricoModal from "@/components/vendas/PropostaHistoricoModal";
 import OrcamentosTab from "@/components/vendas/OrcamentosTab";
 import EncomendasTab from "@/components/vendas/EncomendasTab";
 import FaturacaoTab from "@/components/vendas/FaturacaoTab";
@@ -27,6 +28,7 @@ import AcompanhamentoTab from "@/components/vendas/AcompanhamentoTab";
 import {
   listar as listarPropostas,
   buscarPorId as buscarProposta,
+  criar as criarProposta,
   anular as anularProposta,
   vincularOrcamento,
 } from "@/services/propostas";
@@ -41,6 +43,17 @@ const TABS = [
   { value: "acompanhamento", label: "Acompanhamento", icone: "history" },
 ];
 
+// Título do cabeçalho por aba: mostra apenas o nome da aba activa.
+const TITULO_ABA = {
+  clientes: "Painel de clientes",
+  propostas: "Propostas",
+  orcamentos: "Orçamentos",
+  pedidos: "Encomendas",
+  vendas: "Facturação",
+  entregas: "Entregas",
+  acompanhamento: "Acompanhamento",
+};
+
 export default function AreaComercialPage() {
   return (
     <Suspense fallback={<ListSkeleton lines={8} />}>
@@ -54,7 +67,7 @@ function ConteudoComercial() {
   // A aba vem sempre do URL (?tab=…) para o menu lateral e a barra de abas
   // navegarem em sintonia, sem perder o separador ao recarregar a página.
   const tabUrl = searchParams.get("tab");
-  const tab = TABS.some((t) => t.value === tabUrl) ? tabUrl : "orcamentos";
+  const tab = TABS.some((t) => t.value === tabUrl) ? tabUrl : "clientes";
   const [orcamentos, setOrcamentos] = useState([]);
   const [propostas, setPropostas] = useState([]);
   const [faturas, setFaturas] = useState([]);
@@ -67,6 +80,7 @@ function ConteudoComercial() {
   const [orcPrefill, setOrcPrefill] = useState(null);
   const [propForm, setPropForm] = useState({ open: false, proposta: null });
   const [propDetalhe, setPropDetalhe] = useState(null);
+  const [propHistorico, setPropHistorico] = useState(null);
   const [orcDetalhe, setOrcDetalhe] = useState(null);
   const [fatDetalhe, setFatDetalhe] = useState(null);
   const [fatFormOpen, setFatFormOpen] = useState(false);
@@ -173,6 +187,52 @@ function ConteudoComercial() {
 
   const fecharPropostaForm = () => setPropForm({ open: false, proposta: null });
 
+  const abrirHistoricoProposta = async (p) => {
+    setPropHistorico({ proposta: p, eventos: p.eventos || [], carregando: true });
+    try {
+      const fresca = await buscarProposta(p.id);
+      setPropHistorico({ proposta: fresca, eventos: fresca?.eventos || [], carregando: false });
+    } catch {
+      setPropHistorico((prev) => (prev ? { ...prev, carregando: false } : prev));
+    }
+  };
+
+  const duplicarProposta = async (p) => {
+    try {
+      const nova = await criarProposta({
+        cliente_id: p.cliente_id,
+        unidade: p.unidade,
+        versao: "1.0",
+        objecto: p.objecto ? `${p.objecto} (cópia)` : "",
+        tipo: p.tipo,
+        origem: p.origem,
+        familia: p.familia,
+        produto: p.produto,
+        produtos: p.produtos,
+        formato: p.formato,
+        quantidade: p.quantidade,
+        suporte: p.suporte,
+        cores: p.cores,
+        acabamento: p.acabamento,
+        descricao: p.descricao,
+        valor: p.valor,
+        condicoes_pagamento: p.condicoes_pagamento,
+        prazo_execucao: p.prazo_execucao,
+        prazo_entrega: p.prazo_entrega,
+        local_entrega: p.local_entrega,
+        condicoes_entrega: p.condicoes_entrega,
+        observacoes: p.observacoes,
+        modelo_documental: p.modelo_documental,
+        responsavel_comercial: p.responsavel_comercial,
+        validade: p.validade,
+      });
+      await atualizarPropostas();
+      addToast(`Proposta ${nova.numero} criada a partir de ${p.numero}`, "success");
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao duplicar a proposta", "error");
+    }
+  };
+
   const atualizarDetalheProposta = (atual) => {
     setPropDetalhe(atual);
     setPropostas((prev) => prev.map((x) => (x.id === atual.id ? atual : x)));
@@ -182,11 +242,18 @@ function ConteudoComercial() {
     const observacoes = [`Proposta ${p.numero} — ${p.objecto}`, p.descricao]
       .filter(Boolean)
       .join("\n");
+    const produtos = Array.isArray(p.produtos) && p.produtos.length
+      ? p.produtos.filter((pr) => pr && String(pr.nome || "").trim())
+      : p.produto
+        ? [{ nome: p.produto, quantidade: p.quantidade || "" }]
+        : [];
     setPropDetalhe(null);
     setOrcPrefill({
       proposta_id: p.id,
       cliente_id: p.cliente_id,
-      objecto: p.objecto || "",
+      produto: p.produto || "",
+      quantidade: p.quantidade || "",
+      produtos,
       prazoExecucao: p.prazo_execucao || "",
       validade: p.validade,
       observacoes,
@@ -292,20 +359,11 @@ function ConteudoComercial() {
 
   return (
     <div className="space-y-4">
-      {/* Faixa do módulo — identificação comercial (brandGreen) */}
-      <div className="flex items-center justify-between rounded-xl bg-[#0a6b3f] px-5 py-2.5 text-white shadow-sm">
-        <span className="text-lg font-black tracking-wide drop-shadow-sm">2. COMERCIAL</span>
-        <span className="hidden text-[11px] font-semibold uppercase tracking-wider text-emerald-100 sm:block">
-          Sistema de Gestão Integrada • KAMGEST
-        </span>
-      </div>
-
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-extrabold tracking-tight text-foreground">
-            {tab === "propostas" ? "Proposta Comercial" : "Gestão de Clientes"}
+          <h2 className="text-xl font-semibold text-foreground">
+            {TITULO_ABA[tab]}
           </h2>
-          <p className="mt-0.5 text-xs font-medium text-muted-foreground">Clientes, propostas, orçamentos, encomendas, facturação, entregas e acompanhamento.</p>
         </div>
         <div className="flex items-center gap-2.5">
           <div className="relative self-start sm:self-auto" ref={menuMesRef}>
@@ -366,6 +424,8 @@ function ConteudoComercial() {
           propostas={propostasVisiveis}
           onAbrir={abrirProposta}
           onEditar={abrirEdicaoProposta}
+          onDuplicar={duplicarProposta}
+          onHistoricos={abrirHistoricoProposta}
           onAnular={(p) => abrirAnulacao({ ...p, _tipo: "proposta" })}
         />
       )}
@@ -409,8 +469,10 @@ function ConteudoComercial() {
 
       {propForm.open && (
         <PropostaModal
+          key={propForm.proposta?.id || "nova"}
           open
           proposta={propForm.proposta}
+          existentes={propostas}
           onClose={fecharPropostaForm}
           onSaved={(salva) => {
             atualizarPropostas();
@@ -423,7 +485,6 @@ function ConteudoComercial() {
         proposta={propDetalhe}
         empresa={empresa}
         onClose={() => setPropDetalhe(null)}
-        onEditar={abrirEdicaoProposta}
         onAnular={(p) => {
           setPropDetalhe(null);
           abrirAnulacao({ ...p, _tipo: "proposta" });
@@ -434,6 +495,13 @@ function ConteudoComercial() {
           setPropDetalhe(null);
           setOrcDetalhe(o);
         }}
+      />
+
+      <PropostaHistoricoModal
+        proposta={propHistorico?.proposta}
+        eventos={propHistorico?.eventos || []}
+        carregando={propHistorico?.carregando || false}
+        onClose={() => setPropHistorico(null)}
       />
 
       <OrcamentoDetalhesModal

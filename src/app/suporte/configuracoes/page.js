@@ -26,6 +26,7 @@ export default function SuporteConfiguracoesPage() {
   const [totpSetup, setTotpSetup] = useState(null);
   const [totpCodigo, setTotpCodigo] = useState("");
   const [totpSenha, setTotpSenha] = useState("");
+  const [totpCodigoDesactivar, setTotpCodigoDesactivar] = useState("");
   const [totpMsg, setTotpMsg] = useState(null);
   const [copiado, setCopiado] = useState(false);
   const [aCarregarTotp, setACarregarTotp] = useState(false);
@@ -60,8 +61,8 @@ export default function SuporteConfiguracoesPage() {
   const desactivarTotp = async () => {
     setACarregarTotp(true); setTotpMsg(null);
     try {
-      await totpDesactivar(totpSenha);
-      setTotpActivo(false); setTotpSenha("");
+      await totpDesactivar(totpSenha, totpCodigoDesactivar.trim());
+      setTotpActivo(false); setTotpSenha(""); setTotpCodigoDesactivar("");
       setTotpMsg({ tipo: "ok", texto: "Verificação em dois passos desactivada." });
     } catch (e) {
       setTotpMsg({ tipo: "erro", texto: e?.response?.data?.erro || "Não foi possível desactivar." });
@@ -257,7 +258,16 @@ export default function SuporteConfiguracoesPage() {
                     onChange={(e) => setTotpSenha(e.target.value)}
                     className="h-9 w-56 rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-3 focus:ring-ring/50"
                   />
-                  <BotaoVariante onClick={desactivarTotp} disabled={aCarregarTotp || !totpSenha}>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    placeholder="Código 2FA"
+                    value={totpCodigoDesactivar}
+                    onChange={(e) => setTotpCodigoDesactivar(e.target.value)}
+                    className="h-9 w-36 rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-3 focus:ring-ring/50"
+                  />
+                  <BotaoVariante onClick={desactivarTotp} disabled={aCarregarTotp || !totpSenha || !totpCodigoDesactivar}>
                     <LuKeyRound className="size-4" />
                     Desactivar
                   </BotaoVariante>

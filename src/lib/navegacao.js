@@ -34,7 +34,7 @@ export const ITENS_NAVEGACAO = [
     para: "/vendas",
     perm: ["comercial", "ver"],
     subitens: SUBITENS_COMERCIAL,
-    tabPadrao: "orcamentos",
+    tabPadrao: "clientes",
   },
   { icone: LuCog, nome: "Produção", para: "/producao", perm: ["producao", "ver"] },
   { icone: LuBox, nome: "Stocks", para: "/estoque", perm: ["estoque", "ver"] },

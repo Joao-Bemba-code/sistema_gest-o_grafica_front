@@ -30,6 +30,12 @@ export async function listarDocumentos(clienteId) {
   return data;
 }
 
+// Histórico de auditoria do cliente: quem criou, alterou, anulou, etc.
+export async function historico(clienteId) {
+  const { data } = await api.get(`/clientes/${clienteId}/historico`);
+  return data;
+}
+
 export async function anexarDocumentos(clienteId, ficheiros) {
   const form = new FormData();
   ficheiros.forEach((f) => form.append("anexos", f));

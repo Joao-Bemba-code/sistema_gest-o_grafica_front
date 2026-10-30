@@ -48,6 +48,26 @@ function escreverParagrafo(doc, texto, x, y, largura, ph, opcoes = {}) {
   return y;
 }
 
+// Tabela rótulo/valor usada nas secções de dados.
+function tabelaRotuloValor(doc, linhas, x, y, largura, ph) {
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  for (const [rotulo, valor] of linhas) {
+    if (y > ph - 45) {
+      doc.addPage();
+      y = 24;
+    }
+    doc.setTextColor(...COR_MARCA_SECUNDARIO);
+    doc.text(rotulo, x + 9, y);
+    doc.setTextColor(...COR_MARCA_TEXTO);
+    doc.setFont("helvetica", "bold");
+    doc.text(doc.splitTextToSize(String(valor || "—"), largura - 69)[0] || "—", x + 61, y);
+    doc.setFont("helvetica", "normal");
+    y += 6;
+  }
+  return y + 3;
+}
+
 export default async function gerarPropostaPdf(proposta, empresa = {}) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
@@ -86,22 +106,14 @@ export default async function gerarPropostaPdf(proposta, empresa = {}) {
   y += 6;
   const dados = [
     ["Unidade de negócio", ROTULO_UNIDADE[proposta.unidade] || proposta.unidade || "—"],
-    ["Prazo de execução", proposta.prazo_execucao || "—"],
+    ["Versão", proposta.versao || "—"],
+    ["Tipo", proposta.tipo || "—"],
+    ["Origem", proposta.origem || "—"],
+    ["Valor proposto", Number(proposta.valor) ? `Kz ${Number(proposta.valor).toLocaleString("pt-AO")}` : "—"],
     ["Validade", validade],
-    ["Responsável", proposta.responsavel || "—"],
+    ["Responsável", proposta.responsavel_comercial || proposta.responsavel || "—"],
   ];
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  for (const [rotulo, valor] of dados) {
-    doc.setTextColor(...COR_MARCA_SECUNDARIO);
-    doc.text(rotulo, MARGEM_MARCA + 9, y);
-    doc.setTextColor(...COR_MARCA_TEXTO);
-    doc.setFont("helvetica", "bold");
-    doc.text(doc.splitTextToSize(String(valor), largura - 69)[0] || "—", MARGEM_MARCA + 61, y);
-    doc.setFont("helvetica", "normal");
-    y += 6;
-  }
-  y += 3;
+  y = tabelaRotuloValor(doc, dados, MARGEM_MARCA, y, largura, ph);
 
   // Objecto
   tituloSecaoMarca(doc, "Objecto", MARGEM_MARCA, y);
@@ -126,6 +138,47 @@ export default async function gerarPropostaPdf(proposta, empresa = {}) {
     });
   }
   y += 6;
+
+  // Especificação
+  const produtosProposta = Array.isArray(proposta.produtos) && proposta.produtos.length
+    ? proposta.produtos.filter((pr) => pr && pr.nome)
+    : proposta.produto
+      ? [{ nome: proposta.produto, quantidade: proposta.quantidade || "" }]
+      : [];
+  const especificacao = [
+    ["Família", proposta.familia],
+    ["Formato", proposta.formato],
+    ["Cores", proposta.cores],
+    ["Acabamento", proposta.acabamento],
+    ...produtosProposta.map((pr) => ["Produto", pr.quantidade ? `${pr.nome} — ${pr.quantidade}` : pr.nome]),
+  ].filter(([, valor]) => valor);
+  if (especificacao.length) {
+    tituloSecaoMarca(doc, "Especificação", MARGEM_MARCA, y);
+    y += 6;
+    y = tabelaRotuloValor(doc, especificacao, MARGEM_MARCA, y, largura, ph);
+  }
+
+  // Condições de entrega e pagamento
+  const condicoesEntrega = [
+    ["Prazo de execução", proposta.prazo_execucao],
+    ["Prazo de entrega", proposta.prazo_entrega],
+    ["Local de entrega", proposta.local_entrega],
+    ["Condições de entrega", proposta.condicoes_entrega],
+    ["Condições de pagamento", proposta.condicoes_pagamento],
+  ].filter(([, valor]) => valor);
+  if (condicoesEntrega.length) {
+    tituloSecaoMarca(doc, "Condições de entrega e pagamento", MARGEM_MARCA, y);
+    y += 6;
+    y = tabelaRotuloValor(doc, condicoesEntrega, MARGEM_MARCA, y, largura, ph);
+  }
+
+  // Observações
+  if (proposta.observacoes) {
+    tituloSecaoMarca(doc, "Observações", MARGEM_MARCA, y);
+    y += 5;
+    y = escreverParagrafo(doc, proposta.observacoes, MARGEM_MARCA, y, largura, ph);
+    y += 4;
+  }
 
   // Condições
   doc.setFillColor(...COR_MARCA_FUNDO);

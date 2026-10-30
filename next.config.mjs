@@ -17,21 +17,26 @@ const backendOrigin = new URL(apiUrl).origin;
 const desenvolvimento = process.env.NODE_ENV !== "production";
 
 // CSP compatível com o Next (scripts inline). Não é a política mais
-// restritiva possível, mas bloqueia scripts externos não previstos, iframes
-// de terceiros e uploads a executar como página.
+// restritiva possível (sem nonce exigiria um proxy e renderização dinâmica),
+// mas bloqueia scripts externos não previstos, iframes de terceiros, handlers
+// inline e uploads a executar como página. O `unsafe-inline` de scripts fica
+// documentado como risco residual.
 const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${desenvolvimento ? " 'unsafe-eval'" : ""}`,
+  "script-src-attr 'none'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https:",
+  `img-src 'self' data: blob: ${backendOrigin} https://lh3.googleusercontent.com`,
   "font-src 'self' data:",
   `connect-src 'self' ${backendOrigin}`,
+  "frame-src 'none'",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
   "object-src 'none'",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
+  ...(desenvolvimento ? [] : ["upgrade-insecure-requests"]),
 ].join("; ");
 
 const nextConfig = {

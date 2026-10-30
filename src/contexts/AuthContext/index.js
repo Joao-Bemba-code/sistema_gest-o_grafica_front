@@ -1,11 +1,10 @@
 "use client";
 import { createContext, useContext, useState, useEffect } from "react";
-import { getUsuario, isAutenticado, getToken, decodificarToken, carregarPerfil, logout as sair } from "@/services/auth";
+import { getUsuario, isAutenticado, carregarPerfil, logout as sair } from "@/services/auth";
 
 const AuthContext = createContext();
 
 const CHAVE_USUARIO = "sigraf_usuario";
-const CHAVE_TOKEN = "sigraf_token";
 
 export function AuthProvider({ children }) {
   const [usuario, setUsuario] = useState(null);
@@ -17,18 +16,10 @@ export function AuthProvider({ children }) {
         setCarregando(false);
         return;
       }
-      const armazenado = getUsuario();
-      const payload = decodificarToken(getToken());
-      const orgToken = payload?.organizacao_id;
-      const orgUsuario = armazenado?.organizacao_id;
-      if (orgToken == null || orgUsuario == null || String(orgToken) !== String(orgUsuario)) {
-        sair();
-        setCarregando(false);
-        return;
-      }
-      // Revalida o perfil/permissões com o servidor para não usar dados antigos
-      // (permitindo que alterações de perfil/permissões tenham efeito sem relogin).
-      setUsuario(armazenado);
+      // O perfil guardado serve apenas para arranque imediato; a fonte de
+      // verdade é o servidor (cookie HttpOnly). Nunca confiamos no JWT do
+      // cliente para decidir organização ou permissões.
+      setUsuario(getUsuario());
       try {
         const perfil = await carregarPerfil();
         if (perfil) {
@@ -60,4 +51,3 @@ export function AuthProvider({ children }) {
 }
 
 export const useAuth = () => useContext(AuthContext);
-
