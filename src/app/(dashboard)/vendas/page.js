@@ -23,8 +23,6 @@ import PropostaHistoricoModal from "@/components/vendas/PropostaHistoricoModal";
 import OrcamentosTab from "@/components/vendas/OrcamentosTab";
 import EncomendasTab from "@/components/vendas/EncomendasTab";
 import FaturacaoTab from "@/components/vendas/FaturacaoTab";
-import EntregasTab from "@/components/vendas/EntregasTab";
-import AcompanhamentoTab from "@/components/vendas/AcompanhamentoTab";
 import {
   listar as listarPropostas,
   buscarPorId as buscarProposta,
@@ -39,8 +37,6 @@ const TABS = [
   { value: "orcamentos", label: "Orçamentos", icone: "request_quote" },
   { value: "pedidos", label: "Encomendas", icone: "pending_actions" },
   { value: "vendas", label: "Facturação", icone: "receipt_long" },
-  { value: "entregas", label: "Entregas", icone: "local_shipping" },
-  { value: "acompanhamento", label: "Acompanhamento", icone: "history" },
 ];
 
 // Título do cabeçalho por aba: mostra apenas o nome da aba activa.
@@ -50,8 +46,6 @@ const TITULO_ABA = {
   orcamentos: "Orçamentos",
   pedidos: "Encomendas",
   vendas: "Facturação",
-  entregas: "Entregas",
-  acompanhamento: "Acompanhamento",
 };
 
 export default function AreaComercialPage() {
@@ -299,8 +293,6 @@ function ConteudoComercial() {
     }
   };
 
-  const pedidosAprovados = orcamentosVisiveis.filter((o) => o.estado === "aprovado");
-
   const mesLabel = (() => {
     const m = new Date().toLocaleDateString("pt-PT", { month: "long", year: "numeric" });
     return m.charAt(0).toUpperCase() + m.slice(1);
@@ -407,7 +399,14 @@ function ConteudoComercial() {
       </div>
 
       {tab === "pedidos" && (
-        <EncomendasTab encomendas={pedidosAprovados} onAbrir={abrirOrcDetalhe} />
+        <EncomendasTab
+          orcamentos={orcamentos}
+          faturas={faturas}
+          empresa={empresa}
+          onAbrirOrcamento={abrirOrcDetalhe}
+          onVerFatura={abrirFaturaDetalhe}
+          onAtualizar={atualizarOrcamentos}
+        />
       )}
 
       {tab === "orcamentos" && (
@@ -440,24 +439,6 @@ function ConteudoComercial() {
       )}
 
       {tab === "clientes" && <CadastrosTab apenas="cliente" faturas={faturas} mesFiltro={mesFiltro} />}
-
-      {tab === "entregas" && (
-        <EntregasTab
-          faturas={faturas}
-          mesFiltro={mesFiltro}
-          onVerFatura={abrirFaturaDetalhe}
-          empresa={empresa}
-        />
-      )}
-
-      {tab === "acompanhamento" && (
-        <AcompanhamentoTab
-          orcamentos={orcamentos}
-          faturas={faturas}
-          onAbrirOrcamento={abrirOrcDetalhe}
-          onAbrirFatura={abrirFaturaDetalhe}
-        />
-      )}
 
       <OrcamentoModal
         open={orcForm.open}

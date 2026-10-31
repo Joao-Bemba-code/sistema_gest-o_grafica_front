@@ -21,8 +21,6 @@ export const SUBITENS_COMERCIAL = [
   { nome: "Orçamentos", tab: "orcamentos", icone: "request_quote" },
   { nome: "Encomendas", tab: "pedidos", icone: "pending_actions" },
   { nome: "Facturação", tab: "vendas", icone: "receipt_long" },
-  { nome: "Entregas", tab: "entregas", icone: "local_shipping" },
-  { nome: "Acompanhamento", tab: "acompanhamento", icone: "history" },
 ];
 
 // Itens do menu lateral (com permissão associada)
