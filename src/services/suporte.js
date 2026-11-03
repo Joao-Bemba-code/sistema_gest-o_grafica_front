@@ -1,4 +1,4 @@
-import apiSuporte, { CHAVE_USUARIO } from "./apiSuporte";
+import apiSuporte, { CHAVE_USUARIO, CHAVE_TOKEN_RESERVA } from "./apiSuporte";
 
 const CHAVE_TOKEN_LEGADO = "sigraf_suporte_token";
 
@@ -9,9 +9,11 @@ function storage() {
 
 export async function login(email, senha, codigo) {
   const { data } = await apiSuporte.post("/login", { email, senha, ...(codigo ? { codigo } : {}) });
-  // O JWT não é guardado no browser; a sessão é o cookie HttpOnly.
+  // O JWT fica apenas como reserva para browsers que bloqueiam o cookie
+  // cross-site; a sessão principal continua a ser o cookie HttpOnly.
   storage()?.removeItem(CHAVE_TOKEN_LEGADO);
   storage()?.setItem(CHAVE_USUARIO, JSON.stringify(data.usuario));
+  if (data.token) storage()?.setItem(CHAVE_TOKEN_RESERVA, data.token);
   return data;
 }
 
@@ -21,6 +23,7 @@ export async function logout() {
   } catch {}
   storage()?.removeItem(CHAVE_TOKEN_LEGADO);
   storage()?.removeItem(CHAVE_USUARIO);
+  storage()?.removeItem(CHAVE_TOKEN_RESERVA);
   window.location.href = "/suporte/login";
 }
 
