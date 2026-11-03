@@ -14,7 +14,8 @@ import {
   atualizar,
   anexarDocumentos,
   UNIDADES,
-  TIPOS_PROPOSTA,
+  TIPO_PROPOSTA_OPCOES,
+  classificarTipoProposta,
   ORIGENS_PROPOSTA,
   FAMILIAS_PRODUTO,
   FORMATOS_SUGERIDOS,
@@ -192,7 +193,6 @@ export default function PropostaModal({ open, proposta, existentes = [], onClose
       if (fam) familiasStock.set(fam.toLowerCase(), fam);
     }
     return {
-      tipos: fundir(TIPOS_PROPOSTA, "tipo"),
       origens: fundir(ORIGENS_PROPOSTA, "origem"),
       familias: fundir([...FAMILIAS_PRODUTO, ...familiasStock.values()], "familia"),
       produtos: fundir([...nomesArtigos.values()], "produto"),
@@ -275,6 +275,18 @@ export default function PropostaModal({ open, proposta, existentes = [], onClose
   };
 
   const id = (sufixo) => `form-proposta-${sufixo}`;
+
+  // O tipo escolhido decide o conteúdo da aba "02 Especificação":
+  // Técnica → só produto; Financeira → só valores; Ambas → os dois grupos.
+  // Valores livres de propostas antigas (grupoTipo === "") mostram tudo.
+  const grupoTipo = classificarTipoProposta(form.tipo);
+  const mostrarTecnico = grupoTipo !== "financeira";
+  const mostrarFinanceiro = grupoTipo !== "tecnica";
+  const notaTipo = {
+    tecnica: "Na especificação aparecem só família, formato, produtos, cores e acabamento.",
+    financeira: "Na especificação aparecem só o valor, a validade, o pagamento e os prazos.",
+    ambas: "Na especificação aparece a parte técnica e os valores.",
+  }[grupoTipo] || "Escolhe o tipo para definir o que aparece na aba Especificação.";
 
   const sugestao = (chave, campo, icon, placeholder) => (
     <SugestaoSelect
@@ -375,9 +387,37 @@ export default function PropostaModal({ open, proposta, existentes = [], onClose
                     required
                   />
                 </Campo>
-                <Campo label="Tipo de Proposta">
-                  {sugestao("tipos", "tipo", "request_quote", "Selecionar ou escrever...")}
-                </Campo>
+                <div className="sm:col-span-2 flex flex-col gap-1.5">
+                  <span className="text-[11px] font-medium text-muted-foreground">Tipo de Proposta</span>
+                  <div className="grid grid-cols-3 gap-2">
+                    {TIPO_PROPOSTA_OPCOES.map((t) => {
+                      const activo = form.tipo === t.value;
+                      return (
+                        <button
+                          key={t.value}
+                          type="button"
+                          aria-pressed={activo}
+                          onClick={() => setField("tipo", activo ? "" : t.value)}
+                          className={`flex flex-col items-center justify-center gap-1 rounded-lg border px-2 py-2.5 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 ${
+                            activo
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-border bg-card text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          <Icon name={t.icone} className="text-lg" />
+                          {t.value}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">{notaTipo}</p>
+                  {form.tipo && !grupoTipo && (
+                    <p className="text-[11px] text-warning">
+                      Esta proposta tem o tipo “{form.tipo}” guardado como texto livre. Ao escolher um dos
+                      três tipos esse valor é substituído; se não escolher nada continua a mostrar tudo.
+                    </p>
+                  )}
+                </div>
                 <Campo label="Responsável Comercial">
                   {sugestao("responsaveis", "responsavel_comercial", "badge", "Selecionar ou escrever...")}
                 </Campo>
@@ -409,56 +449,120 @@ export default function PropostaModal({ open, proposta, existentes = [], onClose
 
             {tab === "especificacao" && (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Campo label="Família de Produto">
-                  {sugestao("familias", "familia", "category", "Selecionar ou escrever...")}
-                </Campo>
-                <Campo label="Formato">
-                  {sugestao("formatos", "formato", "straighten", "Selecionar ou escrever...")}
-                </Campo>
-                <div className="sm:col-span-2 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-medium text-muted-foreground">Produtos (artigos do stock)</span>
-                    <Button type="button" variant="ghost" size="sm" onClick={addProduto}>
-                      <Icon name="add_circle" className="text-sm" /> Adicionar produto
-                    </Button>
-                  </div>
-                  {form.produtos.map((pr, i) => (
-                    <div key={i} className="grid grid-cols-12 gap-2 items-center">
-                      <div className="col-span-12 sm:col-span-8">
-                        <SugestaoSelect
-                          id={`proposta-produto-${i}`}
-                          value={pr.nome}
-                          opcoes={sugestoes.produtos}
-                          onChange={(valor) => setProduto(i, "nome", valor)}
-                          placeholder="Ex.: Cartões de visita, Livros"
-                          icon="inventory_2"
-                        />
+                {mostrarTecnico && (
+                  <>
+                    {grupoTipo === "ambas" && (
+                      <p className="sm:col-span-2 text-[11px] font-semibold text-muted-foreground">Parte técnica</p>
+                    )}
+                    <Campo label="Família de Produto">
+                      {sugestao("familias", "familia", "category", "Selecionar ou escrever...")}
+                    </Campo>
+                    <Campo label="Formato">
+                      {sugestao("formatos", "formato", "straighten", "Selecionar ou escrever...")}
+                    </Campo>
+                    <div className="sm:col-span-2 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-medium text-muted-foreground">Produtos (artigos do stock)</span>
+                        <Button type="button" variant="ghost" size="sm" onClick={addProduto}>
+                          <Icon name="add_circle" className="text-sm" /> Adicionar produto
+                        </Button>
                       </div>
-                      <div className="col-span-9 sm:col-span-3">
-                        <input
-                          value={pr.quantidade}
-                          onChange={(e) => setProduto(i, "quantidade", e.target.value)}
-                          className={campoCls}
-                          placeholder="Quantidade (ex.: 5.000)"
-                          maxLength={100}
-                        />
-                      </div>
-                      <div className="col-span-3 sm:col-span-1 flex justify-center">
-                        {form.produtos.length > 1 && (
-                          <Button type="button" variant="ghost" size="icon" onClick={() => removeProduto(i)} title="Remover produto" className="text-error">
-                            <Icon name="close" className="text-sm" />
-                          </Button>
-                        )}
-                      </div>
+                      {form.produtos.map((pr, i) => (
+                        <div key={i} className="grid grid-cols-12 gap-2 items-center">
+                          <div className="col-span-12 sm:col-span-8">
+                            <SugestaoSelect
+                              id={`proposta-produto-${i}`}
+                              value={pr.nome}
+                              opcoes={sugestoes.produtos}
+                              onChange={(valor) => setProduto(i, "nome", valor)}
+                              placeholder="Ex.: Cartões de visita, Livros"
+                              icon="inventory_2"
+                            />
+                          </div>
+                          <div className="col-span-9 sm:col-span-3">
+                            <input
+                              value={pr.quantidade}
+                              onChange={(e) => setProduto(i, "quantidade", e.target.value)}
+                              className={campoCls}
+                              placeholder="Quantidade (ex.: 5.000)"
+                              maxLength={100}
+                            />
+                          </div>
+                          <div className="col-span-3 sm:col-span-1 flex justify-center">
+                            {form.produtos.length > 1 && (
+                              <Button type="button" variant="ghost" size="icon" onClick={() => removeProduto(i)} title="Remover produto" className="text-error">
+                                <Icon name="close" className="text-sm" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-                <Campo label="Cores">
-                  {sugestao("cores", "cores", "palette", "Selecionar ou escrever...")}
-                </Campo>
-                <Campo label="Acabamento">
-                  {sugestao("acabamentos", "acabamento", "workspace_premium", "Selecionar ou escrever...")}
-                </Campo>
+                    <Campo label="Cores">
+                      {sugestao("cores", "cores", "palette", "Selecionar ou escrever...")}
+                    </Campo>
+                    <Campo label="Acabamento">
+                      {sugestao("acabamentos", "acabamento", "workspace_premium", "Selecionar ou escrever...")}
+                    </Campo>
+                  </>
+                )}
+
+                {mostrarFinanceiro && (
+                  <>
+                    {grupoTipo === "ambas" && (
+                      <p className="sm:col-span-2 text-[11px] font-semibold text-muted-foreground">Valores</p>
+                    )}
+                    <Campo label="Valor Proposto (KZ)">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={form.valor}
+                        onChange={(e) => setField("valor", e.target.value)}
+                        className={campoCls}
+                        placeholder="0,00"
+                      />
+                    </Campo>
+                    <Campo label="Validade da Proposta">
+                      <input
+                        type="date"
+                        value={form.validade_data}
+                        onChange={(e) => setField("validade_data", e.target.value)}
+                        className={campoCls}
+                      />
+                    </Campo>
+                    <Campo label="Condições de Pagamento" full>
+                      <input
+                        value={form.condicoes_pagamento}
+                        onChange={(e) => setField("condicoes_pagamento", e.target.value)}
+                        className={campoCls}
+                        placeholder="Ex.: 50% de adiantamento e 50% na entrega"
+                        maxLength={200}
+                      />
+                    </Campo>
+                    <Campo label="Prazo de Execução">
+                      <input
+                        value={form.prazo_execucao}
+                        onChange={(e) => setField("prazo_execucao", e.target.value)}
+                        className={campoCls}
+                        placeholder="Ex.: 10 dias úteis"
+                        maxLength={100}
+                      />
+                    </Campo>
+                    <Campo label="Prazo de Entrega">
+                      <input
+                        value={form.prazo_entrega}
+                        onChange={(e) => setField("prazo_entrega", e.target.value)}
+                        className={campoCls}
+                        placeholder="Ex.: até 15 de Dezembro"
+                        maxLength={100}
+                      />
+                    </Campo>
+                    <p className="sm:col-span-2 text-[11px] text-muted-foreground">
+                      Estes campos são os mesmos da aba Condições; preencher aqui ou ali dá o mesmo resultado.
+                    </p>
+                  </>
+                )}
               </div>
             )}
 

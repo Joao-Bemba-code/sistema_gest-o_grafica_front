@@ -97,15 +97,52 @@ export const META_ESTADO = {
   anulada: { rotulo: "ANULADAS", tom: "error", icone: "block" },
 };
 
-// Listas fixas de sugestão para os campos abertos da proposta.
-export const TIPOS_PROPOSTA = [
-  "Proposta comercial",
-  "Proposta técnica",
-  "Cotação",
-  "Renovação de contrato",
-  "Proposta institucional",
-];
+// O tipo é escolhido entre estas três opções fixas e decide o que a aba
+// "02 Especificação" mostra (ver classificarTipoProposta).
+export const TIPOS_PROPOSTA = ["Técnica", "Financeira", "Ambas"];
 
+const ICONE_TIPO_PROPOSTA = {
+  Técnica: "precision_manufacturing",
+  Financeira: "account_balance_wallet",
+  Ambas: "layers",
+};
+
+export const TIPO_PROPOSTA_OPCOES = TIPOS_PROPOSTA.map((value) => ({
+  value,
+  icone: ICONE_TIPO_PROPOSTA[value],
+}));
+
+export const META_TIPO_PROPOSTA = {
+  tecnica: { rotulo: "Técnica", tom: "info" },
+  financeira: { rotulo: "Financeira", tom: "success" },
+  ambas: { rotulo: "Ambas", tom: "primary" },
+};
+
+// Texto do tipo → grupo: "tecnica", "financeira" ou "ambas".
+// Devolve "" quando não há correspondência (propostas antigas com tipo livre,
+// ou ainda sem tipo): nesse caso os ecrãs mostram tudo, para não esconder dados.
+export function classificarTipoProposta(tipo) {
+  const texto = String(tipo || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  const tecnica = texto.includes("tecnica");
+  const financeira = texto.includes("financeira");
+  if (texto === "ambas" || (tecnica && financeira)) return "ambas";
+  if (tecnica) return "tecnica";
+  if (financeira) return "financeira";
+  return "";
+}
+
+// Rótulo apresentável: normaliza os tipos actuais e mantém o texto das propostas antigas.
+export function rotuloTipoProposta(tipo) {
+  const grupo = classificarTipoProposta(tipo);
+  if (grupo) return META_TIPO_PROPOSTA[grupo].rotulo;
+  return String(tipo || "").trim();
+}
+
+// Listas fixas de sugestão para os restantes campos abertos da proposta.
 export const ORIGENS_PROPOSTA = [
   "Contacto directo",
   "Indicação de cliente",

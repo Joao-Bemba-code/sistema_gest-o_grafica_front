@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/Ledger";
 import Paginacao, { usePaginacao } from "@/components/ui/Paginacao";
 import RowMenu from "@/components/ui/RowMenu";
-import { ESTADOS_PROPOSTA, META_ESTADO } from "@/services/propostas";
+import { ESTADOS_PROPOSTA, META_ESTADO, TIPO_PROPOSTA_OPCOES, META_TIPO_PROPOSTA, classificarTipoProposta } from "@/services/propostas";
 
 const FILTRO_VAZIO = {
   pesquisa: "",
@@ -44,6 +44,17 @@ function formatKz(v) {
   return `Kz ${Number(v || 0).toLocaleString("pt-AO")}`;
 }
 
+// Filtro por tipo: "Ambas" também conta como técnica e como financeira.
+// Tipos livres de propostas antigas só aparecem no filtro escrito por extenso.
+function correspondeTipo(tipoProposta, filtroTipo) {
+  if (!filtroTipo) return true;
+  const grupo = classificarTipoProposta(tipoProposta);
+  if (filtroTipo === "Ambas") return grupo === "ambas";
+  if (filtroTipo === "Técnica") return grupo === "tecnica" || grupo === "ambas";
+  if (filtroTipo === "Financeira") return grupo === "financeira" || grupo === "ambas";
+  return String(tipoProposta || "").trim() === filtroTipo;
+}
+
 export default function PropostasTab({
   propostas = [],
   onAbrir,
@@ -63,15 +74,6 @@ export default function PropostasTab({
     return [...mapa.values()].sort((a, b) => a.localeCompare(b, "pt"));
   }, [propostas]);
 
-  const tipos = useMemo(() => {
-    const mapa = new Map();
-    for (const p of propostas) {
-      const v = String(p.tipo || "").trim();
-      if (v) mapa.set(v.toLowerCase(), v);
-    }
-    return [...mapa.values()].sort((a, b) => a.localeCompare(b, "pt"));
-  }, [propostas]);
-
   const filtradas = useMemo(() => {
     const termo = filtro.pesquisa.trim().toLowerCase();
     return propostas.filter((p) => {
@@ -81,7 +83,7 @@ export default function PropostasTab({
         if (filtro.periodoDe && data < filtro.periodoDe) return false;
         if (filtro.periodoAte && data > filtro.periodoAte) return false;
       }
-      if (filtro.tipo && String(p.tipo || "").trim() !== filtro.tipo) return false;
+      if (!correspondeTipo(p.tipo, filtro.tipo)) return false;
       if (filtro.estado && p.estado !== filtro.estado) return false;
       if (
         filtro.responsavel &&
@@ -173,8 +175,8 @@ export default function PropostasTab({
                 className={campoCls}
               >
                 <option value="">Todos</option>
-                {tipos.map((v) => (
-                  <option key={v} value={v}>{v}</option>
+                {TIPO_PROPOSTA_OPCOES.map((t) => (
+                  <option key={t.value} value={t.value}>{t.value}</option>
                 ))}
               </select>
             </label>
@@ -241,10 +243,16 @@ export default function PropostasTab({
           <tbody>
             {pag.visiveis.map((p) => {
               const estado = META_ESTADO[p.estado] || META_ESTADO.rascunho;
+              const metaTipo = META_TIPO_PROPOSTA[classificarTipoProposta(p.tipo)];
               return (
                 <LedgerTr key={p.id} onClick={() => onAbrir?.(p)}>
                   <LedgerTd className="max-w-40">
                     <IdCell id={p.numero} aoAbrir={() => onAbrir?.(p)} />
+                    {p.tipo ? (
+                      <StatusBadge tom={metaTipo ? metaTipo.tom : "neutral"} className="mt-1">
+                        {metaTipo ? metaTipo.rotulo : p.tipo}
+                      </StatusBadge>
+                    ) : null}
                   </LedgerTd>
                   <LedgerTd className="max-w-56">
                     <span className="block truncate text-sm">{p.cliente?.empresa || p.cliente?.nome || "—"}</span>

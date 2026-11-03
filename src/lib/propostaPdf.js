@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import { classificarTipoProposta, rotuloTipoProposta } from "@/services/propostas";
 import {
   COR_MARCA_PRINCIPAL,
   COR_MARCA_SECUNDARIO,
@@ -79,6 +80,12 @@ export default async function gerarPropostaPdf(proposta, empresa = {}) {
     : "—";
   const criadaEm = formatarData(proposta.criada_em || proposta.data_envio);
 
+  // O tipo decide o que entra no PDF: Técnica não leva valores, Financeira não
+  // leva especificação técnica. Tipos livres de propostas antigas levam tudo.
+  const grupoTipo = classificarTipoProposta(proposta.tipo);
+  const mostrarTecnico = grupoTipo !== "financeira";
+  const mostrarFinanceiro = grupoTipo !== "tecnica";
+
   const { yInicio, logo } = await desenharCabecalhoMarca(doc, {
     titulo: "Proposta",
     empresa,
@@ -107,10 +114,14 @@ export default async function gerarPropostaPdf(proposta, empresa = {}) {
   const dados = [
     ["Unidade de negócio", ROTULO_UNIDADE[proposta.unidade] || proposta.unidade || "—"],
     ["Versão", proposta.versao || "—"],
-    ["Tipo", proposta.tipo || "—"],
+    ["Tipo", rotuloTipoProposta(proposta.tipo) || "—"],
     ["Origem", proposta.origem || "—"],
-    ["Valor proposto", Number(proposta.valor) ? `Kz ${Number(proposta.valor).toLocaleString("pt-AO")}` : "—"],
-    ["Validade", validade],
+    ...(mostrarFinanceiro
+      ? [
+          ["Valor proposto", Number(proposta.valor) ? `Kz ${Number(proposta.valor).toLocaleString("pt-AO")}` : "—"],
+          ["Validade", validade],
+        ]
+      : []),
     ["Responsável", proposta.responsavel_comercial || proposta.responsavel || "—"],
   ];
   y = tabelaRotuloValor(doc, dados, MARGEM_MARCA, y, largura, ph);
@@ -152,7 +163,7 @@ export default async function gerarPropostaPdf(proposta, empresa = {}) {
     ["Acabamento", proposta.acabamento],
     ...produtosProposta.map((pr) => ["Produto", pr.quantidade ? `${pr.nome} — ${pr.quantidade}` : pr.nome]),
   ].filter(([, valor]) => valor);
-  if (especificacao.length) {
+  if (mostrarTecnico && especificacao.length) {
     tituloSecaoMarca(doc, "Especificação", MARGEM_MARCA, y);
     y += 6;
     y = tabelaRotuloValor(doc, especificacao, MARGEM_MARCA, y, largura, ph);
@@ -164,7 +175,7 @@ export default async function gerarPropostaPdf(proposta, empresa = {}) {
     ["Prazo de entrega", proposta.prazo_entrega],
     ["Local de entrega", proposta.local_entrega],
     ["Condições de entrega", proposta.condicoes_entrega],
-    ["Condições de pagamento", proposta.condicoes_pagamento],
+    ...(mostrarFinanceiro ? [["Condições de pagamento", proposta.condicoes_pagamento]] : []),
   ].filter(([, valor]) => valor);
   if (condicoesEntrega.length) {
     tituloSecaoMarca(doc, "Condições de entrega e pagamento", MARGEM_MARCA, y);

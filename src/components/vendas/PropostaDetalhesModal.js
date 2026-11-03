@@ -14,6 +14,9 @@ import {
   abrirDocumento,
   anularDocumento,
   META_ESTADO,
+  META_TIPO_PROPOSTA,
+  classificarTipoProposta,
+  rotuloTipoProposta,
 } from "@/services/propostas";
 import { buscarPorId as buscarOrcamento } from "@/services/orcamentos";
 import gerarPropostaPdf from "@/lib/propostaPdf";
@@ -109,6 +112,13 @@ export default function PropostaDetalhesModal({
 
   const p = proposta;
   const meta = META_ESTADO[p?.estado] || META_ESTADO.rascunho;
+
+  // O tipo decide o que se vê na aba "02 Especificação": Técnica → parte técnica,
+  // Financeira → valores, Ambas → os dois. Tipos livres antigos mostram tudo.
+  const grupoTipo = classificarTipoProposta(p?.tipo);
+  const mostrarTecnico = grupoTipo !== "financeira";
+  const mostrarFinanceiro = grupoTipo !== "tecnica";
+  const metaTipo = META_TIPO_PROPOSTA[grupoTipo];
 
   useEffect(() => {
     if (tab !== "documentos" || !p?.id) return;
@@ -396,7 +406,11 @@ export default function PropostaDetalhesModal({
                 label="Estado"
                 badge={<StatusBadge tom={meta.tom}>{meta.rotulo}</StatusBadge>}
               />
-              <Info label="Tipo de Proposta" value={p.tipo} />
+              <Info
+                label="Tipo de Proposta"
+                value={rotuloTipoProposta(p.tipo)}
+                badge={metaTipo ? <StatusBadge tom={metaTipo.tom}>{metaTipo.rotulo}</StatusBadge> : undefined}
+              />
               <Info label="Cliente / Entidade" value={p.cliente?.empresa || p.cliente?.nome} />
               <Info label="Contacto" value={[p.cliente?.telefone, p.cliente?.email].filter(Boolean).join(" · ")} />
               <Info label="Objecto" value={p.objecto} full />
@@ -411,27 +425,50 @@ export default function PropostaDetalhesModal({
 
           {tab === "especificacao" && (
             <div className="grid grid-cols-1 gap-2.5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <Info label="Família de Produto" value={p.familia} />
-                <Info label="Formato" value={p.formato} />
-                <Info label="Cores" value={p.cores} />
-                <Info label="Acabamento" value={p.acabamento} full />
-              </div>
-              <div className="rounded-lg bg-muted/40 px-3 py-2.5">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Produtos</span>
-                {produtosDaProposta(p).length ? (
-                  <ul className="mt-1.5 space-y-1">
-                    {produtosDaProposta(p).map((pr, i) => (
-                      <li key={i} className="flex items-center justify-between gap-3 text-sm">
-                        <span className="text-foreground">{pr.nome}</span>
-                        {pr.quantidade ? <span className="font-mono text-muted-foreground">{pr.quantidade}</span> : null}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="mt-1 text-sm text-muted-foreground">Sem produtos indicados.</p>
-                )}
-              </div>
+              {mostrarTecnico && (
+                <>
+                  {grupoTipo === "ambas" && (
+                    <p className="text-[11px] font-semibold text-muted-foreground">Parte técnica</p>
+                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <Info label="Família de Produto" value={p.familia} />
+                    <Info label="Formato" value={p.formato} />
+                    <Info label="Cores" value={p.cores} />
+                    <Info label="Acabamento" value={p.acabamento} full />
+                  </div>
+                  <div className="rounded-lg bg-muted/40 px-3 py-2.5">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Produtos</span>
+                    {produtosDaProposta(p).length ? (
+                      <ul className="mt-1.5 space-y-1">
+                        {produtosDaProposta(p).map((pr, i) => (
+                          <li key={i} className="flex items-center justify-between gap-3 text-sm">
+                            <span className="text-foreground">{pr.nome}</span>
+                            {pr.quantidade ? <span className="font-mono text-muted-foreground">{pr.quantidade}</span> : null}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-1 text-sm text-muted-foreground">Sem produtos indicados.</p>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {mostrarFinanceiro && (
+                <>
+                  {grupoTipo === "ambas" && (
+                    <p className="text-[11px] font-semibold text-muted-foreground">Valores</p>
+                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <Info label="Valor Proposto (KZ)" value={Number(p.valor) ? formatKz(p.valor) : ""} />
+                    <Info label="Validade da Proposta" value={formatarData(p.validade_data)} />
+                    <Info label="Prazo de Execução" value={p.prazo_execucao} />
+                    <Info label="Prazo de Entrega" value={p.prazo_entrega} />
+                    <Info label="Condições de Pagamento" value={p.condicoes_pagamento} full />
+                  </div>
+                </>
+              )}
+
               <div className="rounded-lg bg-muted/40 px-3 py-2.5">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Descrição</span>
                 <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-foreground">{p.descricao || "Sem descrição."}</p>
