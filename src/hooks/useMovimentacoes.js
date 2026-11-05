@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo } from "react";
 import { extrato } from "@/services/materiais";
+import { listar as listarRequisicoes } from "@/services/requisicoesMaterial";
 import { gerarRequisicaoPDF } from "@/lib/estoquePdf";
 import { useToast } from "@/components/Toast";
 
@@ -34,16 +35,30 @@ export default function useMovimentacoes({ org }) {
 
   const fechar = useCallback(() => setOpen(false), []);
 
+  // A ficha de saída imprime quem preparou, quem entregou e quem recebeu. Essa
+  // informação vive na requisição (o movimento só guarda a referência), por isso
+  // vamos buscá-la pelo id quando o movimento vem de uma requisição de material.
+  const requisicaoDoMovimento = useCallback(async (mov) => {
+    if (mov?.referencia_tipo !== "requisicao_material" || !mov?.referencia_id) return null;
+    try {
+      const todas = await listarRequisicoes();
+      return (Array.isArray(todas) ? todas : []).find((r) => Number(r.id) === Number(mov.referencia_id)) || null;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const gerarPDF = useCallback(async (mov) => {
     setPdfId(mov.id);
     try {
-      await gerarRequisicaoPDF(mov, org || {});
+      const requisicao = await requisicaoDoMovimento(mov);
+      await gerarRequisicaoPDF(mov, org || {}, requisicao);
     } catch {
       addToast("Erro ao gerar PDF", "error");
     } finally {
       setPdfId(null);
     }
-  }, [org, addToast]);
+  }, [org, addToast, requisicaoDoMovimento]);
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();

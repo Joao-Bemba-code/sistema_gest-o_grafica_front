@@ -176,7 +176,7 @@ function finalizarComRodape(doc) {
 // ============================================================
 // REQUISIÇÃO DE MATERIAL
 // ============================================================
-export async function gerarRequisicaoPDF(mov, org = {}) {
+export async function gerarRequisicaoPDF(mov, org = {}, requisicao = null) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
   const { linhaY } = await desenharCabecalho(doc, org, "Requisição de Material");
@@ -214,14 +214,38 @@ export async function gerarRequisicaoPDF(mov, org = {}) {
     ),
   });
 
-  const yObs = doc.lastAutoTable.finalY + 8;
+  // Preparação e entrega: os três nomes e a data/hora ficam na requisição, não
+  // no movimento, por isso só aparecem quando a requisição foi encontrada.
+  let yFim = doc.lastAutoTable.finalY + 8;
+  if (requisicao) {
+    const quando = requisicao.entregue_em ? new Date(requisicao.entregue_em) : null;
+    const dataHora =
+      quando && !isNaN(quando.getTime())
+        ? `${quando.toLocaleDateString("pt-PT")} às ${quando.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}`
+        : "—";
+    yFim = secaoPdf(doc, yFim, "Preparação e entrega");
+    autoTable(doc, {
+      startY: yFim,
+      head: [["Preparou", "Entregou", "Recebeu", "Data e hora da saída"]],
+      body: [[requisicao.preparado_por || "—", requisicao.entregue_por || "—", requisicao.recebido_por || "—", dataHora]],
+      ...TEMA_RELATORIO,
+      columnStyles: colunasProporcionais([1.4, 1.4, 1.4, 1.8]),
+    });
+    yFim = doc.lastAutoTable.finalY + 8;
+  }
+
+  const yObs = yFim;
   doc.setFontSize(9);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...PRETO);
   doc.text("Observações:", MARGEM, yObs);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...CINZA_ESCURO);
-  const obsText = (mov.observacoes || "").trim() || "—";
+  // Quando a requisição já deu a linha de preparação, não repetimos a mesma
+  // informação escrita no movimento.
+  const obsBruta = (mov.observacoes || "").trim();
+  const obsText =
+    (requisicao && obsBruta.startsWith("Preparado por")) || !obsBruta ? "—" : obsBruta;
   const obsLines = doc.splitTextToSize(obsText, LARGURA_UTIL);
   doc.text(obsLines, MARGEM, yObs + 5);
 
