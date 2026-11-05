@@ -23,6 +23,7 @@ import {
   LedgerEmpty,
 } from "@/components/ui/Ledger";
 import { listar, criar, atualizar, listarPerfis, listarAcessos } from "@/services/usuarios";
+import ServicosExecutadosSection from "@/components/rh/ServicosExecutadosSection";
 import { getUsuario } from "@/services/auth";
 import { perfilLabel, MODULOS, ACOES, permissoesDoUsuario, podeAtual } from "@/lib/permissoes";
 
@@ -36,9 +37,9 @@ const CAMPOS = [
   { value: "perfil", label: "Perfil", obter: (u) => perfilLabel(u.perfil) || "" },
 ];
 
-const tabClsBase = "-mb-px inline-flex items-center gap-1.5 whitespace-nowrap border-b-2 pb-2.5 pt-2 text-sm font-medium transition-colors";
-const tabClsAtiva = "border-blue-600 font-bold text-blue-600";
-const tabClsInativa = "border-transparent text-muted-foreground hover:text-foreground";
+const tabClsBase = "inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors";
+const tabClsAtiva = "bg-primary font-semibold text-primary-foreground shadow-sm";
+const tabClsInativa = "text-muted-foreground hover:bg-muted hover:text-foreground";
 
 const perfilTom = (p) =>
   p === "admin" ? "error" : p === "gestao" ? "warning" : p === "leitura" ? "neutral" : "info";
@@ -313,25 +314,17 @@ export default function UtilizadoresPage() {
 
   return (
     <div className="space-y-4">
-      {/* Faixa do módulo - identificação Recursos Humanos (carmim) */}
-      <div className="flex items-center justify-between rounded-xl bg-[#9f1239] px-5 py-2.5 text-white shadow-sm">
-        <span className="text-lg font-extrabold uppercase tracking-wide">9. Recursos Humanos</span>
-        <span className="hidden text-[11px] font-semibold uppercase tracking-wider text-rose-100 sm:block">
-          Sistema Integrado de Gestão Empresarial
-        </span>
-      </div>
-
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Gestão de Pessoas</h1>
-          <p className="mt-0.5 text-xs font-medium text-muted-foreground">Colaboradores, perfis e permissões.</p>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">Gestão de Pessoas</h1>
+          <p className="mt-1 text-xs font-medium text-muted-foreground">Colaboradores, perfis e permissões.</p>
         </div>
         {admin && (
           <div className="flex shrink-0 flex-wrap items-center gap-2.5">
             {podeAtual("relatorios", "ver") && (
               <Link
                 href="/relatorios"
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#be123c] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#9f1239]"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/60"
               >
                 <Icon name="description" className="text-base" /> Relatórios
               </Link>
@@ -339,7 +332,7 @@ export default function UtilizadoresPage() {
             <button
               type="button"
               onClick={abrirNovo}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#be123c] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#9f1239]"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
             >
               <Icon name="add" className="text-base" /> Novo Utilizador
             </button>
@@ -369,7 +362,7 @@ export default function UtilizadoresPage() {
               titulo="Equipa"
               subtitulo={`${filtrados.length} de ${usuarios.length} utilizadores · ${perfisDisponiveis.length} perfis`}
             />
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-border px-4">
+            <div className="flex flex-wrap items-center gap-1 px-4 pt-3">
               {tabs.map((t) => (
                 <button
                   key={t.id}
@@ -383,7 +376,7 @@ export default function UtilizadoresPage() {
                 </button>
               ))}
             </div>
-            <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2.5">
+            <div className="flex flex-wrap items-center gap-1.5 px-4 py-1.5">
               <select
                 value={estadoFiltro}
                 onChange={(e) => setEstadoFiltro(e.target.value)}
@@ -478,6 +471,8 @@ export default function UtilizadoresPage() {
               </>
             )}
           </Ledger>
+
+          <ServicosExecutadosSection />
 
           <Modal
             open={modal.aberto}
