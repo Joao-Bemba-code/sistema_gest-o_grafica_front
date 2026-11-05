@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import Icon from "@/components/Icon";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import AprovarRequisicaoModal from "@/components/estoque/AprovarRequisicaoModal";
 import { inputCls } from "@/lib/estoque";
 
 const estados = {
@@ -25,12 +26,21 @@ const FILTROS = [
 
 const ORDEM_ESTADOS = { pendente: 0, aprovada: 1, rejeitada: 2, cancelada: 3, consumida: 4 };
 
+// "04/11/2026 às 14:30" — a data e a hora da entrega do material.
+const dataHora = (v) => {
+  if (!v) return "";
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.toLocaleDateString("pt-AO", { day: "2-digit", month: "2-digit", year: "numeric" })} às ${d.toLocaleTimeString("pt-AO", { hour: "2-digit", minute: "2-digit" })}`;
+};
+
 export default function RequisicoesMaterialModal({
   open,
   onClose,
   requisicoes,
   carregando,
   materiaisPorId,
+  nomeUsuario = "",
   podeAprovar = false,
   onAprovar,
   onRejeitar,
@@ -39,6 +49,10 @@ export default function RequisicoesMaterialModal({
   const [filtro, setFiltro] = useState("pendentes");
   const [rejeitar, setRejeitar] = useState(null);
   const [motivo, setMotivo] = useState("");
+  const [aAprovar, setAAprovar] = useState(null);
+  // Sessão serve de `key`: cada abertura monta o formulário de aprovação do
+  // zero, com hoje/agora e o nome de quem aprova já preenchidos.
+  const [sessaoAprovacao, setSessaoAprovacao] = useState(0);
   const [processando, setProcessando] = useState(null);
 
   const termo = busca.trim().toLowerCase();
@@ -50,6 +64,7 @@ export default function RequisicoesMaterialModal({
       if (!termo) return true;
       return (
         String(r.numero || "").toLowerCase().includes(termo) ||
+        String(r.ordem_producao_numero || "").toLowerCase().includes(termo) ||
         String(r.cliente_nome || "").toLowerCase().includes(termo) ||
         String(r.solicitado_por || "").toLowerCase().includes(termo)
       );
@@ -72,12 +87,38 @@ export default function RequisicoesMaterialModal({
 
   const pendentes = contagens.pendentes;
 
+  // Nomes já usados nas requisições: servem de sugestão quando o Estoque
+  // registra quem preparou, quem entregou e quem recebeu, sem impedir
+  // escrever outro.
+  const nomesSugeridos = useMemo(() => {
+    const mapa = new Map();
+    const adicionar = (valor) => {
+      const texto = String(valor || "").trim();
+      if (texto) mapa.set(texto.toLowerCase(), texto);
+    };
+    requisicoes.forEach((r) => {
+      adicionar(r.solicitado_por);
+      adicionar(r.aprovado_por);
+      adicionar(r.preparado_por);
+      adicionar(r.entregue_por);
+      adicionar(r.recebido_por);
+    });
+    return [...mapa.values()].sort((a, b) => a.localeCompare(b, "pt"));
+  }, [requisicoes]);
+
   // O `try/finally` é obrigatório: sem ele, um erro inesperado do pai deixa o
   // botão em "a processar" para sempre e o utilizador não sabe o que aconteceu.
-  const aprovar = async (r) => {
+  const aprovar = (r) => {
+    setSessaoAprovacao((s) => s + 1);
+    setAAprovar(r);
+  };
+
+  const confirmarAprovacao = async (r, dados) => {
+    if (!r) return;
     setProcessando(r.id);
     try {
-      await onAprovar(r);
+      const ok = await onAprovar(r, dados);
+      if (ok) setAAprovar(null);
     } finally {
       setProcessando(null);
     }
@@ -145,7 +186,7 @@ export default function RequisicoesMaterialModal({
                 type="search"
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
-                placeholder="Nº, cliente ou solicitante..."
+                placeholder="Nº, OP, cliente ou solicitante..."
                 className={`${inputCls} pl-9 h-9 text-xs`}
                 aria-label="Pesquisar requisições"
               />
@@ -180,6 +221,11 @@ export default function RequisicoesMaterialModal({
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-mono text-sm font-bold text-primary">{r.numero}</span>
                           <Badge variant={meta.variant}>{meta.label}</Badge>
+                          {r.ordem_producao_numero && (
+                            <span className="pill pill-muted text-[9px]">
+                              <Icon name="precision_manufacturing" className="text-[11px]" /> OP {r.ordem_producao_numero}
+                            </span>
+                          )}
                           {!r.cliente_id && (
                             <span className="pill pill-muted text-[9px]">
                               <Icon name="factory" className="text-[11px]" /> Consumo interno
@@ -268,7 +314,17 @@ export default function RequisicoesMaterialModal({
                       <p className="text-[11px] text-error font-semibold">Motivo: {r.motivo_rejeicao}</p>
                     )}
                     {r.aprovado_por && r.estado !== "pendente" && (
-                      <p className="text-[11px] text-muted-foreground">Processada por {r.aprovado_por}</p>
+                      <div className="text-[11px] text-muted-foreground space-y-0.5">
+                        <p>Processada por {r.aprovado_por}</p>
+                        {(r.preparado_por || r.entregue_por || r.recebido_por || r.entregue_em) && (
+                          <p>
+                            Preparado por <span className="text-foreground font-medium">{r.preparado_por || "—"}</span>
+                            {" · "}entregue por <span className="text-foreground font-medium">{r.entregue_por || "—"}</span>
+                            {" · "}recebido por <span className="text-foreground font-medium">{r.recebido_por || "—"}</span>
+                            {r.entregue_em ? ` · ${dataHora(r.entregue_em)}` : ""}
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
                 );
@@ -296,6 +352,16 @@ export default function RequisicoesMaterialModal({
           placeholder="Motivo da rejeição"
         />
       </ConfirmDialog>
+
+      <AprovarRequisicaoModal
+        key={`aprovar-${sessaoAprovacao}`}
+        open={Boolean(aAprovar)}
+        requisicao={aAprovar}
+        nomeUsuario={nomeUsuario}
+        sugestoes={nomesSugeridos}
+        onClose={() => setAAprovar(null)}
+        onConfirm={confirmarAprovacao}
+      />
     </>
   );
 }

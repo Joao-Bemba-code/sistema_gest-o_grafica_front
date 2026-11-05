@@ -58,9 +58,9 @@ const TIPO_META = {
 
 /* Paleta do módulo stocks (referência KAMGEST) */
 const STATUS_META = {
-  ok: { label: "Normal", badge: "border-transparent bg-emerald-100 text-emerald-700" },
-  repor: { label: "Atenção", badge: "border-transparent bg-amber-100 text-amber-700" },
-  esgotado: { label: "Crítico", badge: "border-transparent bg-red-100 text-red-600" },
+  ok: { label: "Normal", badge: "border-transparent bg-success/15 text-success" },
+  repor: { label: "Atenção", badge: "border-transparent bg-warning/15 text-warning" },
+  esgotado: { label: "Crítico", badge: "border-transparent bg-error/15 text-error" },
 };
 
 // Agrupa o tipo de uma categoria/material num identificador canónico:
@@ -91,13 +91,13 @@ const CAMPOS = [
   { value: "familia", label: "Família", obter: (i) => familiaDe(i) },
 ];
 
-const pillBase = "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-sm font-medium whitespace-nowrap transition-colors";
-const pillAtiva = "border-blue-600/40 bg-blue-50 text-blue-600";
-const pillInativa = "border-border bg-card text-muted-foreground hover:bg-muted/60 hover:text-foreground [&_svg]:text-blue-600 [&_.material-symbols-outlined]:text-blue-600";
+const pillBase = "inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium whitespace-nowrap transition-colors";
+const pillAtiva = "bg-primary/10 font-semibold text-primary";
+const pillInativa = "text-muted-foreground hover:bg-muted hover:text-foreground";
 
-const tabBase = "-mb-px inline-flex items-center gap-1.5 whitespace-nowrap border-b-2 pb-2.5 pt-2 text-sm font-medium transition-colors";
-const tabAtiva = "border-blue-600 font-bold text-blue-600";
-const tabInativa = "border-transparent text-muted-foreground hover:text-foreground";
+const tabBase = "inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors";
+const tabAtiva = "bg-primary font-semibold text-primary-foreground shadow-sm";
+const tabInativa = "text-muted-foreground hover:bg-muted hover:text-foreground";
 
 export default function EstoquePage() {
   const router = useRouter();
@@ -340,11 +340,15 @@ export default function EstoquePage() {
   }, [addToast]);
 
   const confirmarAprovacaoRequisicao = useCallback(
-    async (requisicao) => {
+    async (requisicao, dados) => {
       try {
-        await aprovarRequisicao(requisicao.id);
+        await aprovarRequisicao(requisicao.id, dados);
         await Promise.all([recarregarRequisicoes(), carregar()]);
-        addToast(`Requisição ${requisicao.numero} aprovada — material com saída do stock registada`, "success");
+        addToast(
+          `Requisição ${requisicao.numero} aprovada — saída registada: preparou ${dados?.preparado_por || "?"}, entregou ${dados?.entregue_por || "?"}, recebeu ${dados?.recebido_por || "?"}`,
+          "success"
+        );
+        return true;
       } catch (err) {
         const proibido = err.response?.status === 403;
         addToast(
@@ -353,6 +357,7 @@ export default function EstoquePage() {
             : err.response?.data?.erro || "Erro ao aprovar a requisição",
           "error"
         );
+        return false;
       }
     },
     [recarregarRequisicoes, carregar, addToast]
@@ -418,18 +423,10 @@ export default function EstoquePage() {
 
   return (
     <div className="space-y-4">
-      {/* Faixa do módulo - identificação stocks (indigo) */}
-      <div className="flex items-center justify-between rounded-xl bg-[#3B4CA8] px-5 py-2.5 text-white shadow-sm">
-        <span className="text-lg font-black tracking-wide drop-shadow-sm">4. STOCKS</span>
-        <span className="hidden text-[11px] font-semibold uppercase tracking-wider text-indigo-100 sm:block">
-          Sistema de Gestão Integrada · KAMGEST
-        </span>
-      </div>
-
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Gestão de Stocks</h1>
-          <p className="mt-0.5 text-xs font-medium text-muted-foreground">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">Gestão de Stocks</h1>
+          <p className="mt-1 text-xs font-medium text-muted-foreground">
             Materiais, consumíveis e produtos acabados · {materiais.length} {materiais.length === 1 ? "artigo" : "artigos"}
           </p>
         </div>
@@ -442,14 +439,14 @@ export default function EstoquePage() {
           <button
             type="button"
             onClick={movs.abrir}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
           >
             <Icon name="sync_alt" className="text-base" /> Movimentações
           </button>
           <button
             type="button"
             onClick={() => router.push("/estoque/novo")}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
           >
             <Icon name="add" className="text-base" /> Novo Artigo
           </button>
@@ -490,7 +487,7 @@ export default function EstoquePage() {
           onToggleFiltros={() => setFiltrosAbertos((v) => !v)}
           filtrosAbertos={filtrosAbertos}
         />
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-border px-4">
+        <div className="flex flex-wrap items-center gap-1 px-4 pt-3">
           <button
             type="button"
             onClick={() => aoMudarTipo("todos")}
@@ -512,7 +509,7 @@ export default function EstoquePage() {
             </button>
           ))}
         </div>
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2">
+        <div className="flex flex-wrap items-center gap-1.5 px-4 py-1.5">
           <select
             value={categoriaFiltro}
             onChange={(e) => setCategoriaFiltro(e.target.value)}
@@ -539,7 +536,7 @@ export default function EstoquePage() {
           />
         )}
         {subFiltros.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2">
+          <div className="flex flex-wrap items-center gap-1.5 px-4 py-1.5">
             <button
               type="button"
               onClick={() => setSubFiltro("todas")}
@@ -691,6 +688,7 @@ export default function EstoquePage() {
         requisicoes={requisicoes}
         carregando={reqCarregando}
         materiaisPorId={materiaisPorId}
+        nomeUsuario={nomeUsuario}
         podeAprovar={podeAtual("estoque", "editar")}
         onAprovar={confirmarAprovacaoRequisicao}
         onRejeitar={confirmarRejeicaoRequisicao}

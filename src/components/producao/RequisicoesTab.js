@@ -39,6 +39,7 @@ const CONSUMO_INTERNO = "Consumo interno / produção";
 
 const CAMPOS = [
   { value: "numero", label: "Número", obter: (r) => r.numero || "" },
+  { value: "op", label: "Ordem de produção", obter: (r) => r.ordem_producao_numero || "" },
   { value: "cliente", label: "Cliente", obter: (r) => r.cliente_nome || "" },
   { value: "solicitante", label: "Solicitante", obter: (r) => r.solicitado_por || "" },
   { value: "material", label: "Material", obter: (r) => (r.itens || []).map((i) => i.nome || "").join(" ") },
@@ -51,10 +52,18 @@ function fmtData(v) {
   return d.toLocaleDateString("pt-AO", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+// Data e hora juntas: é assim que se regista a entrega do material.
+function fmtDataHora(v) {
+  if (!v) return "—";
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return "—";
+  return `${d.toLocaleDateString("pt-AO", { day: "2-digit", month: "2-digit", year: "numeric" })} · ${d.toLocaleTimeString("pt-AO", { hour: "2-digit", minute: "2-digit" })}`;
+}
+
 export default function RequisicoesTab() {
   const { addToast } = useToast();
   const [requisicoes, setRequisicoes] = useState([]);
-  const [clientes, setClientes] = useState([]);
+  const [ordens, setOrdens] = useState([]);
   const [materiais, setMateriais] = useState([]);
   const [loading, setLoading] = useState(true);
   const [aberto, setAberto] = useState(false);
@@ -82,16 +91,16 @@ export default function RequisicoesTab() {
       );
     }
     if (aux.status === "fulfilled") {
-      setClientes(Array.isArray(aux.value?.clientes) ? aux.value.clientes : []);
+      setOrdens(Array.isArray(aux.value?.ordens) ? aux.value.ordens : []);
       setMateriais(Array.isArray(aux.value?.materiais) ? aux.value.materiais : []);
     } else {
-      setClientes([]);
+      setOrdens([]);
       setMateriais([]);
       const proibido = aux.reason?.response?.status === 403;
       addToast(
         proibido
-          ? "Não tem permissão para ver os clientes e materiais da requisição"
-          : aux.reason?.response?.data?.erro || "Erro ao carregar clientes e materiais",
+          ? "Não tem permissão para ver as ordens de produção e materiais da requisição"
+          : aux.reason?.response?.data?.erro || "Erro ao carregar ordens de produção e materiais",
         "error"
       );
     }
@@ -199,6 +208,7 @@ export default function RequisicoesTab() {
           <thead>
             <tr className="border-b border-border">
               <LedgerTh onSort={() => setOrdem((p) => (p.chave === "numero" ? { chave: "numero", dir: -p.dir } : { chave: "numero", dir: 1 }))} ativo={ordem.chave === "numero"}>Requisição</LedgerTh>
+              <LedgerTh>Ordem de produção</LedgerTh>
               <LedgerTh>Cliente</LedgerTh>
               <LedgerTh>Solicitada por</LedgerTh>
               <LedgerTh className="text-right">Itens</LedgerTh>
@@ -214,6 +224,13 @@ export default function RequisicoesTab() {
                 <LedgerTr key={r.id} onClick={() => setDetalhe(r.id)}>
                   <LedgerTd className="max-w-40">
                     <IdCell id={r.numero} meta={`${(r.itens || []).length} material(is)`} aoAbrir={() => setDetalhe(r.id)} />
+                  </LedgerTd>
+                  <LedgerTd className="max-w-40">
+                    {r.ordem_producao_numero ? (
+                      <IdCell id={r.ordem_producao_numero} meta="OP" aoAbrir={() => setDetalhe(r.id)} />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </LedgerTd>
                   <LedgerTd className="max-w-52">
                     <span className="block truncate text-sm">{r.cliente_nome || CONSUMO_INTERNO}</span>
@@ -264,11 +281,16 @@ export default function RequisicoesTab() {
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
               {[
+                { label: "Ordem de produção", value: reqDetalhe.ordem_producao_numero || "—" },
                 { label: "Cliente", value: reqDetalhe.cliente_nome || CONSUMO_INTERNO },
                 { label: "Solicitada por", value: reqDetalhe.solicitado_por || "—" },
                 { label: "Data", value: fmtData(reqDetalhe.data_requisicao) },
                 { label: "Aprovada por", value: reqDetalhe.aprovado_por || "—" },
                 { label: "Data de aprovação", value: fmtData(reqDetalhe.data_aprovacao) },
+                { label: "Quem preparou", value: reqDetalhe.preparado_por || "—" },
+                { label: "Quem entregou", value: reqDetalhe.entregue_por || "—" },
+                { label: "Quem recebeu", value: reqDetalhe.recebido_por || "—" },
+                { label: "Data e hora da entrega", value: fmtDataHora(reqDetalhe.entregue_em) },
                 { label: "Itens", value: (reqDetalhe.itens || []).length },
               ].map((f) => (
                 <div key={f.label}>
@@ -326,7 +348,7 @@ export default function RequisicoesTab() {
         key={`req-${sessao}`}
         open={aberto}
         onClose={() => setAberto(false)}
-        clientes={clientes}
+        ordens={ordens}
         materiais={materiais}
         nomeUsuario={getUsuario()?.nome || ""}
         onConfirm={confirmarCriacao}
