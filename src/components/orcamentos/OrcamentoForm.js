@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Icon from "@/components/Icon";
 import NumeroInput from "@/components/ui/NumeroInput";
+import SugestaoSelect from "@/components/ui/SugestaoSelect";
 import { Button } from "@/components/ui/Button";
 import { inputCls, especificacoesObjeto, normalizarFamilia, dimensaoPadrao, dimensoesFolhaMaterial, dimensoesFormatoFinal, encaixeGuilhotina, calcCustoParcialFolha, temComposicao, ehProduto, tipoChaveDe } from "@/lib/estoque";
 
@@ -243,6 +244,19 @@ export default function OrcamentoForm({ formId = "form-orcamento", form, setFiel
   const produtosComposicao = materiais.filter((m) => temComposicao(m));
   const materiaisEstoque = materiais.filter((m) => m.mover_estoque !== false);
 
+  // O campo Empresa é texto livre, mas com as empresas já registadas nos
+  // clientes como sugestões — evita escrever "Kamatambu" e "Kamatambu Lda.".
+  const empresasSugeridas = useMemo(() => {
+    const mapa = new Map();
+    const adicionar = (valor) => {
+      const texto = String(valor || "").trim();
+      if (texto) mapa.set(texto.toLowerCase(), texto);
+    };
+    clientes.forEach((c) => adicionar(c.empresa));
+    adicionar(form.empresa);
+    return [...mapa.values()].sort((a, b) => a.localeCompare(b, "pt"));
+  }, [clientes, form.empresa]);
+
   useEffect(() => {
     const vh = Number(valorHoraServicos) || 0;
     if (vh <= 0) return;
@@ -475,7 +489,14 @@ return (
               </select>
             </Campo>
             <Campo label="Empresa">
-              <input name="empresa" value={form.empresa} onChange={(e) => setField("empresa", e.target.value)} className={inputCls} placeholder="Nome da empresa" />
+              <SugestaoSelect
+                id={id("empresa")}
+                value={form.empresa || ""}
+                opcoes={empresasSugeridas}
+                onChange={(valor) => setField("empresa", valor)}
+                placeholder={empresasSugeridas.length ? "Seleccionar ou escrever..." : "Nome da empresa"}
+                icon="badge"
+              />
             </Campo>
             <Campo label="NIF" obrigatorio>
               <input required aria-required="true" name="nif" value={form.nif} onChange={(e) => setField("nif", e.target.value)} className={inputCls} placeholder="Nº de identificação fiscal" />
