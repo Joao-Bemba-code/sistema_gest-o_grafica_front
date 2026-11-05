@@ -72,7 +72,7 @@ function materiaisDe(orc) {
   return Array.from(mapa.values());
 }
 
-export default function NovaOpModal({ open, onClose, onCriada }) {
+export default function NovaOpModal({ open, onClose, onCriada, prefill = null }) {
   const { addToast } = useToast();
   const [clientes, setClientes] = useState([]);
   const [orcamentos, setOrcamentos] = useState([]);
@@ -86,29 +86,44 @@ export default function NovaOpModal({ open, onClose, onCriada }) {
   useEffect(() => {
     if (!open) return;
     let ativo = true;
-    setCarregando(true);
-    setClienteId("");
-    setSelecionadoId("");
-    Promise.all([
-      listarClientes().catch(() => []),
-      listarOrcamentos({ estado: "aprovado" }).catch(() => []),
-    ])
-      .then(([clientesData, orcData]) => {
+
+    (async () => {
+      const preCliente = prefill?.clienteId != null ? String(prefill.clienteId) : "";
+      const preOrcamento = prefill?.orcamentoId != null ? String(prefill.orcamentoId) : "";
+      setCarregando(true);
+      setClienteId("");
+      setSelecionadoId("");
+      setDataEntrega(prefill?.dataEntrega ? String(prefill.dataEntrega).slice(0, 10) : "");
+      try {
+        const [clientesData, orcData] = await Promise.all([
+          listarClientes().catch(() => []),
+          listarOrcamentos({ estado: "aprovado" }).catch(() => []),
+        ]);
         if (!ativo) return;
         const listaOrc = (Array.isArray(orcData) ? orcData : orcData?.data ?? []).filter((o) => !o.ordem_producao);
         const listaCli = Array.isArray(clientesData) ? clientesData : clientesData?.clientes ?? clientesData?.data ?? [];
+        // Ao criar a OP a partir de uma encomenda, o cliente e o orçamento
+        // vêm já escolhidos; o utilizador só confirma.
+        const orcamentoInicial = preOrcamento
+          ? listaOrc.find((o) => String(o.id) === preOrcamento)
+          : null;
+        const clienteInicial =
+          preCliente ||
+          (orcamentoInicial?.cliente_id != null ? String(orcamentoInicial.cliente_id) : "") ||
+          (listaCli.length === 1 ? String(listaCli[0].id) : "");
         setClientes(listaCli);
         setOrcamentos(listaOrc);
-        if (listaCli.length === 1) setClienteId(String(listaCli[0].id));
-      })
-      .catch(() => {
+        setClienteId(clienteInicial);
+        setSelecionadoId(orcamentoInicial ? preOrcamento : "");
+      } catch {
         if (ativo) addToast("Erro ao carregar clientes e orçamentos aprovados", "error");
-      })
-      .finally(() => {
+      } finally {
         if (ativo) setCarregando(false);
-      });
+      }
+    })();
+
     return () => { ativo = false; };
-  }, [open, addToast]);
+  }, [open, addToast, prefill]);
 
   const orcamentosDoCliente = useMemo(
     () => orcamentos.filter((o) => String(o.cliente_id) === String(clienteId)),

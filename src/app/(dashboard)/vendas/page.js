@@ -35,7 +35,7 @@ const TABS = [
   { value: "clientes", label: "Clientes", icone: "groups" },
   { value: "propostas", label: "Propostas", icone: "description" },
   { value: "orcamentos", label: "Orçamentos", icone: "request_quote" },
-  { value: "pedidos", label: "Encomendas", icone: "pending_actions" },
+  { value: "encomendas", label: "Encomendas", icone: "pending_actions" },
   { value: "vendas", label: "Facturação", icone: "receipt_long" },
 ];
 
@@ -44,7 +44,7 @@ const TITULO_ABA = {
   clientes: "Painel de clientes",
   propostas: "Propostas",
   orcamentos: "Orçamentos",
-  pedidos: "Encomendas",
+  encomendas: "Encomendas",
   vendas: "Facturação",
 };
 
@@ -398,17 +398,6 @@ function ConteudoComercial() {
         </div>
       </div>
 
-      {tab === "pedidos" && (
-        <EncomendasTab
-          orcamentos={orcamentos}
-          faturas={faturas}
-          empresa={empresa}
-          onAbrirOrcamento={abrirOrcDetalhe}
-          onVerFatura={abrirFaturaDetalhe}
-          onAtualizar={atualizarOrcamentos}
-        />
-      )}
-
       {tab === "orcamentos" && (
         <OrcamentosTab
           orcamentos={orcamentosVisiveis}
@@ -426,6 +415,17 @@ function ConteudoComercial() {
           onDuplicar={duplicarProposta}
           onHistoricos={abrirHistoricoProposta}
           onAnular={(p) => abrirAnulacao({ ...p, _tipo: "proposta" })}
+        />
+      )}
+
+      {tab === "encomendas" && (
+        <EncomendasTab
+          orcamentos={orcamentosVisiveis}
+          faturas={faturasVisiveis}
+          empresa={empresa}
+          onAbrirOrcamento={abrirOrcDetalhe}
+          onVerFatura={abrirFaturaDetalhe}
+          onAtualizar={atualizarOrcamentos}
         />
       )}
 

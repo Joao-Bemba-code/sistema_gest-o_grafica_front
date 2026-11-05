@@ -13,19 +13,25 @@ const linhaVazia = { material_id: "", quantidade: "", observacoes: "" };
 export default function RequisicaoMaterialFormModal({
   open,
   onClose,
-  clientes,
+  ordens = [],
   materiais,
   nomeUsuario,
+  // Quando a requisição é aberta a partir de uma OP (lista de Ordens ou aba
+  // Requisições), essa ordem já vem escolhida: o chão de fábrica não tem de a
+  // procurar outra vez no menu.
+  ordemInicial = null,
   onConfirm,
 }) {
   const [form, setForm] = useState(() => ({
-    cliente_id: "",
+    ordem_producao_id: ordemInicial != null ? String(ordemInicial) : "",
     solicitado_por: nomeUsuario || "",
     observacoes: "",
     itens: [{ ...linhaVazia }],
   }));
   const [erro, setErro] = useState("");
   const [submetendo, setSubmetendo] = useState(false);
+
+  const ordem = ordens.find((o) => String(o.id) === String(form.ordem_producao_id)) || null;
 
   const setItem = (idx, campo, valor) =>
     setForm((f) => ({
@@ -40,6 +46,10 @@ export default function RequisicaoMaterialFormModal({
     setForm((f) => ({ ...f, itens: f.itens.filter((_, i) => i !== idx) }));
 
   const valida = () => {
+    if (!form.ordem_producao_id) {
+      setErro("Selecione a ordem de produção a que se destina a requisição");
+      return false;
+    }
     const validos = form.itens.filter((i) => i.material_id && toNum(i.quantidade) > 0);
     if (!validos.length) {
       setErro("Adicione pelo menos um material com quantidade maior que zero");
@@ -60,7 +70,7 @@ export default function RequisicaoMaterialFormModal({
       }));
     setSubmetendo(true);
     const ok = await onConfirm({
-      cliente_id: form.cliente_id ? Number(form.cliente_id) : null,
+      ordem_producao_id: Number(form.ordem_producao_id),
       solicitado_por: form.solicitado_por,
       observacoes: form.observacoes,
       itens,
@@ -88,17 +98,20 @@ export default function RequisicaoMaterialFormModal({
       <div className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField
-            label="Destino"
-            hint="Deixe em consumo interno para material acabado ou uso da própria fábrica."
+            label="Ordem de produção *"
+            hint="A requisição é sempre feita com base numa OP aberta."
           >
             <select
-              value={form.cliente_id}
-              onChange={(e) => setForm((f) => ({ ...f, cliente_id: e.target.value }))}
+              value={form.ordem_producao_id}
+              onChange={(e) => setForm((f) => ({ ...f, ordem_producao_id: e.target.value }))}
               className={inputCls}
             >
-              <option value="">Consumo interno / produção</option>
-              {(clientes || []).map((c) => (
-                <option key={c.id} value={c.id}>{c.nome}</option>
+              <option value="">Selecionar ordem de produção...</option>
+              {(ordens || []).map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.numero || `OP #${o.id}`} — {o.cliente_nome || "Consumo interno"}
+                  {o.produto ? ` · ${o.produto}` : ""}
+                </option>
               ))}
             </select>
           </FormField>
@@ -111,6 +124,29 @@ export default function RequisicaoMaterialFormModal({
             />
           </FormField>
         </div>
+
+        {!ordens.length && (
+          <p className="rounded-xl border border-warning/30 bg-warning/10 px-3 py-2.5 text-xs text-foreground">
+            Não há ordens de produção abertas. Crie primeiro a OP na aba Encomendas ou em “Nova OP”.
+          </p>
+        )}
+
+        {ordem && (
+          <div className="grid grid-cols-1 gap-3 rounded-lg border border-border bg-muted/30 p-3 sm:grid-cols-3">
+            <div>
+              <p className="text-[11px] font-semibold text-muted-foreground">Cliente / destino</p>
+              <p className="text-sm text-foreground">{ordem.cliente_nome || "Consumo interno"}</p>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold text-muted-foreground">Produto</p>
+              <p className="text-sm text-foreground">{ordem.produto || "—"}</p>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold text-muted-foreground">Tiragem</p>
+              <p className="text-sm text-foreground">{ordem.quantidade ?? "—"}</p>
+            </div>
+          </div>
+        )}
 
         <div className="rounded-xl border border-border/60 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 bg-muted/50 border-b border-border/60">

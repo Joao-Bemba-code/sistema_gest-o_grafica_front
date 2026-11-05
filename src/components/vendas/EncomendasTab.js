@@ -122,7 +122,18 @@ function dentroDoPrazo(entrega, atrasada, filtro, hoje) {
   return true;
 }
 
-export default function EncomendasTab({ orcamentos = [], faturas = [], empresa = {}, onAbrirOrcamento, onVerFatura, onAtualizar }) {
+export default function EncomendasTab({
+  orcamentos = [],
+  faturas = [],
+  empresa = {},
+  onAbrirOrcamento,
+  onVerFatura,
+  onAtualizar,
+  // No módulo de Produção a encomenda serve para criar a OP: não se mostra a
+  // factura (o perfil de produção não tem acesso a ela) nem se marca entregas.
+  modoProducao = false,
+  onCriarOp,
+}) {
   const { addToast } = useToast();
   const [ordens, setOrdens] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -250,8 +261,9 @@ export default function EncomendasTab({ orcamentos = [], faturas = [], empresa =
   }, [base, filtro]);
 
   const contagem = useMemo(() => {
-    const total = { producao: 0, entregue: 0, facturada: 0, atrasadas: 0 };
+    const total = { nova: 0, producao: 0, entregue: 0, facturada: 0, atrasadas: 0 };
     for (const o of filtradas) {
+      if (o._estado === "nova") total.nova += 1;
       if (o._estado === "producao") total.producao += 1;
       if (o._estado === "entregue") total.entregue += 1;
       if (o._estado === "facturada") total.facturada += 1;
@@ -321,12 +333,26 @@ export default function EncomendasTab({ orcamentos = [], faturas = [], empresa =
     [base, detalheId]
   );
 
-  const kpis = [
-    { label: "Em produção", valor: contagem.producao, icone: "precision_manufacturing", tom: "bg-warning/10 text-warning" },
-    { label: "Atrasadas", valor: contagem.atrasadas, icone: "warning", tom: "bg-error/10 text-error" },
-    { label: "Entregues", valor: contagem.entregue, icone: "task_alt", tom: "bg-success/10 text-success" },
-    { label: "Facturadas", valor: contagem.facturada, icone: "receipt_long", tom: "bg-info/10 text-info" },
-  ];
+  // A partir da produção a acção útil é criar a OP das encomendas que ainda
+  // não a têm, por isso a ficha fecha primeiro para não ficarem dois modais.
+  const criarOp = (row) => {
+    setDetalheId(null);
+    onCriarOp?.(row);
+  };
+
+  const kpis = modoProducao
+    ? [
+        { label: "Sem OP", valor: contagem.nova, icone: "pending_actions", tom: "bg-warning/10 text-warning" },
+        { label: "Em produção", valor: contagem.producao, icone: "precision_manufacturing", tom: "bg-info/10 text-info" },
+        { label: "Atrasadas", valor: contagem.atrasadas, icone: "warning", tom: "bg-error/10 text-error" },
+        { label: "Entregues", valor: contagem.entregue, icone: "task_alt", tom: "bg-success/10 text-success" },
+      ]
+    : [
+        { label: "Em produção", valor: contagem.producao, icone: "precision_manufacturing", tom: "bg-warning/10 text-warning" },
+        { label: "Atrasadas", valor: contagem.atrasadas, icone: "warning", tom: "bg-error/10 text-error" },
+        { label: "Entregues", valor: contagem.entregue, icone: "task_alt", tom: "bg-success/10 text-success" },
+        { label: "Facturadas", valor: contagem.facturada, icone: "receipt_long", tom: "bg-info/10 text-info" },
+      ];
 
   return (
     <div className="space-y-4">
@@ -414,7 +440,7 @@ export default function EncomendasTab({ orcamentos = [], faturas = [], empresa =
                   <LedgerTh>Emissão</LedgerTh>
                   <LedgerTh>Estado</LedgerTh>
                   <LedgerTh>Entrega</LedgerTh>
-                  <LedgerTh>Fatura</LedgerTh>
+                  {!modoProducao && <LedgerTh>Fatura</LedgerTh>}
                   <LedgerTh>Valor</LedgerTh>
                   <LedgerTh className="w-10" />
                 </tr>
@@ -462,27 +488,32 @@ export default function EncomendasTab({ orcamentos = [], faturas = [], empresa =
                           <span className="block text-[11px] font-semibold text-error">Atrasada</span>
                         )}
                       </LedgerTd>
-                      <LedgerTd className="max-w-40">
-                        {fat ? (
-                          <IdCell
-                            id={fat.numero || `#${fat.id}`}
-                            meta={fatMeta.label}
-                            aoAbrir={() => onVerFatura?.(fat)}
-                          />
-                        ) : (
-                          <span className="text-xs text-muted-foreground">Sem fatura</span>
-                        )}
-                      </LedgerTd>
+                      {!modoProducao && (
+                        <LedgerTd className="max-w-40">
+                          {fat ? (
+                            <IdCell
+                              id={fat.numero || `#${fat.id}`}
+                              meta={fatMeta.label}
+                              aoAbrir={() => onVerFatura?.(fat)}
+                            />
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Sem fatura</span>
+                          )}
+                        </LedgerTd>
+                      )}
                       <LedgerTd className="whitespace-nowrap font-bold tabular-nums text-foreground">{formatKz(o._valor)}</LedgerTd>
                       <LedgerTd>
                         <RowMenu
                           ariaLabel="Ações da encomenda"
                           itens={[
                             { icone: "visibility", rotulo: "Ver detalhes", onClick: () => setDetalheId(o.orcamento.id) },
+                            ...(modoProducao && !o._op && onCriarOp
+                              ? [{ icone: "add_task", rotulo: "Criar OP", onClick: () => criarOp(o) }]
+                              : []),
                             ...(o._op || o.orcamento.entrega_ok
                               ? [{ icone: "picture_as_pdf", rotulo: "Ficha de entrega (PDF)", onClick: () => baixarGuia(o) }]
                               : []),
-                            ...(!o._op && !o._fatura && !o.orcamento.entrega_ok
+                            ...(!modoProducao && !o._op && !o._fatura && !o.orcamento.entrega_ok
                               ? [{ icone: "task_alt", rotulo: "Marcar como entregue", onClick: () => marcarEntregue(o) }]
                               : []),
                           ]}
@@ -515,6 +546,8 @@ export default function EncomendasTab({ orcamentos = [], faturas = [], empresa =
         onMarcarEntregue={marcarEntregue}
         onAbrirOrcamento={onAbrirOrcamento}
         onAbrirFatura={onVerFatura}
+        modoProducao={modoProducao}
+        onCriarOp={criarOp}
       />
     </div>
   );

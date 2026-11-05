@@ -7,46 +7,70 @@ import OrdensTab from "@/components/producao/OrdensTab";
 import OperacionalTab from "@/components/producao/OperacionalTab";
 import ProcessosTab from "@/components/producao/ProcessosTab";
 import RequisicoesTab from "@/components/producao/RequisicoesTab";
+import EncomendasProducaoTab from "@/components/producao/EncomendasProducaoTab";
 import NovaOpModal from "@/components/producao/NovaOpModal";
 import { podeAtual } from "@/lib/permissoes";
 import { getUsuario } from "@/services/auth";
 
 const abas = [
+  // A encomenda é o ponto de partida do dia: é dela que nasce a OP.
+  { id: "encomendas", label: "Encomendas", icon: "pending_actions" },
   { id: "ordens", label: "Ordens", icon: "construction" },
-  { id: "processos", label: "Processos", icon: "verified" },
   { id: "requisicoes", label: "Requisições", icon: "inventory_2", soProducao: true },
+  { id: "processos", label: "Processos", icon: "verified" },
   { id: "operacional", label: "Operacional", icon: "precision_manufacturing" },
 ];
 
 export default function ProducaoPage() {
-  const [tab, setTab] = useState("ordens");
+  const [tab, setTab] = useState("encomendas");
   const [novaOpOpen, setNovaOpOpen] = useState(false);
+  const [novaOpPrefill, setNovaOpPrefill] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
   // A aba Requisições é do pessoal de chão de fábrica. Quem gere o stock
   // faz saídas manuais no Provisionamento e só aceita/rejeita pedidos.
   // O administrador não fica preso a esta separação: cria e cancela também.
   const eAdmin = getUsuario()?.perfil === "admin";
   const podePedirMaterial = podeAtual("producao", "criar") && (eAdmin || !podeAtual("estoque", "editar"));
+  const podeCriarOp = podeAtual("producao", "criar");
   const abasVisiveis = abas.filter((a) => !a.soProducao || podePedirMaterial);
-  const abaAtual = abasVisiveis.some((a) => a.id === tab) ? tab : "ordens";
+  const abaAtual = abasVisiveis.some((a) => a.id === tab) ? tab : "encomendas";
+
+  const abrirNovaOp = (prefill = null) => {
+    setNovaOpPrefill(prefill);
+    setNovaOpOpen(true);
+  };
+
+  const fecharNovaOp = () => {
+    setNovaOpOpen(false);
+    setNovaOpPrefill(null);
+  };
+
+  // A OP nasce do orçamento aprovado da encomenda: a modal já abre com o
+  // cliente, o orçamento e a data de entrega preenchidos.
+  const criarOpDeEncomenda = (row) => {
+    const orcamento = row?.orcamento;
+    if (!orcamento) return;
+    abrirNovaOp({
+      clienteId: orcamento.cliente_id ?? row?._cliente?.id ?? null,
+      orcamentoId: orcamento.id,
+      dataEntrega: row?._entrega || orcamento.data_entrega || null,
+    });
+  };
 
   return (
     <div className="space-y-4">
-      {/* Faixa do módulo — identificação produção */}
-      <div className="flex items-center rounded-xl bg-[#FF5500] px-5 py-2.5 text-white shadow-sm">
-        <span className="text-lg font-bold uppercase tracking-wider">3. Produção</span>
-      </div>
-
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-extrabold tracking-tight text-foreground">Ordens de Produção</h2>
-          <p className="mt-0.5 text-xs font-medium text-muted-foreground">Planeamento, execução e controle dos trabalhos.</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">Ordens de Produção</h1>
+          <p className="mt-1 text-xs font-medium text-muted-foreground">
+            Planeamento, execução e controle dos trabalhos.
+          </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex shrink-0 flex-wrap items-center gap-2.5">
           <button
             type="button"
-            onClick={() => setNovaOpOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3.5 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+            onClick={() => abrirNovaOp()}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
           >
             <Icon name="add" className="text-base" />
             Nova OP
@@ -54,7 +78,7 @@ export default function ProducaoPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-border">
+      <div className="flex flex-wrap items-center gap-1">
         {abasVisiveis.map((t) => {
           const ativo = abaAtual === t.id;
           return (
@@ -62,9 +86,12 @@ export default function ProducaoPage() {
               key={t.id}
               type="button"
               onClick={() => setTab(t.id)}
+              aria-pressed={ativo}
               className={cn(
-                "-mb-px inline-flex items-center gap-1.5 border-b-2 pb-2.5 text-xs font-semibold transition-colors",
-                ativo ? "border-primary font-bold text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+                "inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+                ativo
+                  ? "bg-primary font-semibold text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
               )}
             >
               <Icon name={t.icon} className="text-base" />
@@ -75,6 +102,12 @@ export default function ProducaoPage() {
       </div>
 
       {abaAtual === "ordens" && <OrdensTab key={refreshKey} />}
+      {abaAtual === "encomendas" && (
+        <EncomendasProducaoTab
+          key={`encomendas-${refreshKey}`}
+          onCriarOp={podeCriarOp ? criarOpDeEncomenda : undefined}
+        />
+      )}
       {abaAtual === "operacional" && <OperacionalTab />}
       {abaAtual === "processos" && <ProcessosTab />}
       {abaAtual === "requisicoes" && podePedirMaterial && <RequisicoesTab />}
@@ -82,8 +115,9 @@ export default function ProducaoPage() {
       {novaOpOpen && (
         <NovaOpModal
           open
-          onClose={() => setNovaOpOpen(false)}
-          onCriada={() => { setNovaOpOpen(false); setTab("ordens"); setRefreshKey((k) => k + 1); }}
+          prefill={novaOpPrefill}
+          onClose={fecharNovaOp}
+          onCriada={() => { fecharNovaOp(); setRefreshKey((k) => k + 1); }}
         />
       )}
     </div>

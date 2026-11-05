@@ -83,6 +83,10 @@ export default function EncomendaDetalhesModal({
   onMarcarEntregue,
   onAbrirOrcamento,
   onAbrirFatura,
+  // Na produção a ficha serve para criar a OP e acompanhar o fabrico; a
+  // factura e as acções comerciais ficam de fora.
+  modoProducao = false,
+  onCriarOp,
 }) {
   const [tab, setTab] = useState("orcamento");
   const row = encomenda;
@@ -95,8 +99,10 @@ export default function EncomendaDetalhesModal({
   const fat = row._fatura || null;
   const opMeta = op ? OP_ESTADO[op.estado] || { label: op.estado, tom: "neutral" } : null;
   const fatMeta = fat ? FATURA_ESTADO[fat.estado] || { label: fat.estado, tom: "neutral" } : null;
-  const podeMarcar = !op && !fat && !o.entrega_ok;
+  const podeMarcar = !modoProducao && !op && !fat && !o.entrega_ok;
+  const podeCriarOp = modoProducao && !op && Boolean(onCriarOp);
   const itens = Array.isArray(o.itens) ? o.itens : [];
+  const tabs = modoProducao ? TABS.filter((t) => t.key !== "fatura") : TABS;
 
   return (
     <Modal
@@ -111,15 +117,22 @@ export default function EncomendaDetalhesModal({
             <Icon name="task_alt" className="text-[16px]" /> {marcando ? "A marcar…" : "Marcar como entregue"}
           </Button>
         )}
-        <Button variant="outline" onClick={() => { onClose?.(); onAbrirOrcamento?.(o); }}>
-          <Icon name="request_quote" className="text-[16px]" /> Abrir orçamento
-        </Button>
-        {fat && (
+        {podeCriarOp && (
+          <Button onClick={() => onCriarOp?.(row)}>
+            <Icon name="add_task" className="text-[16px]" /> Criar OP
+          </Button>
+        )}
+        {!modoProducao && onAbrirOrcamento && (
+          <Button variant="outline" onClick={() => { onClose?.(); onAbrirOrcamento?.(o); }}>
+            <Icon name="request_quote" className="text-[16px]" /> Abrir orçamento
+          </Button>
+        )}
+        {fat && !modoProducao && (
           <Button variant="outline" onClick={() => { onClose?.(); onAbrirFatura?.(fat); }}>
             <Icon name="receipt_long" className="text-[16px]" /> Abrir factura
           </Button>
         )}
-        <Button onClick={onClose}>Fechar</Button>
+        <Button variant={podeCriarOp ? "outline" : "default"} onClick={onClose}>Fechar</Button>
       </>}
     >
       <div className="space-y-4">
@@ -136,8 +149,19 @@ export default function EncomendaDetalhesModal({
             </p>
           </div>
           <div className="rounded-xl border border-border bg-card p-3">
-            <p className="mb-1 text-[10px] font-bold text-muted-foreground">Factura</p>
-            {fat ? (
+            <p className="mb-1 text-[10px] font-bold text-muted-foreground">
+              {modoProducao ? "Ordem de produção" : "Factura"}
+            </p>
+            {modoProducao ? (
+              op ? (
+                <p className="text-sm font-semibold text-foreground">
+                  {op.numero || `#${op.id}`}
+                  {opMeta && <span className="ml-2 text-[11px] font-semibold text-muted-foreground">{opMeta.label}</span>}
+                </p>
+              ) : (
+                <p className="text-sm font-semibold text-muted-foreground">Sem OP</p>
+              )
+            ) : fat ? (
               <p className="text-sm font-semibold text-foreground">
                 {fat.numero || `#${fat.id}`}
                 {fatMeta && <span className="ml-2 text-[11px] font-semibold text-muted-foreground">{fatMeta.label}</span>}
@@ -153,7 +177,7 @@ export default function EncomendaDetalhesModal({
         </div>
 
         <div role="tablist" aria-label="Secções da encomenda" className="flex gap-2 flex-wrap bg-muted/60 border border-border p-1.5 rounded-full">
-          {TABS.map((t) => (
+          {tabs.map((t) => (
             <button
               key={t.key}
               type="button"
@@ -168,7 +192,7 @@ export default function EncomendaDetalhesModal({
           ))}
         </div>
 
-        <div role="tabpanel" aria-label={TABS.find((t) => t.key === tab)?.label} className="animate-fade-up h-[400px] overflow-y-auto pr-1 custom-scrollbar">
+        <div role="tabpanel" aria-label={tabs.find((t) => t.key === tab)?.label} className="animate-fade-up h-[400px] overflow-y-auto pr-1 custom-scrollbar">
           {tab === "orcamento" && (
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -235,13 +259,22 @@ export default function EncomendaDetalhesModal({
                   <Icon name="precision_manufacturing" className="text-2xl" />
                 </span>
                 <div className="space-y-1">
-                  <p className="text-sm font-semibold text-foreground">Esta encomenda não vai para produção</p>
-                  {podeMarcar ? (
+                  <p className="text-sm font-semibold text-foreground">
+                    {modoProducao ? "Ainda sem ordem de produção" : "Esta encomenda não vai para produção"}
+                  </p>
+                  {modoProducao ? (
+                    <p className="text-xs text-muted-foreground">Crie a OP para iniciar a produção desta encomenda.</p>
+                  ) : podeMarcar ? (
                     <p className="text-xs text-muted-foreground">Pode marcá-la como entregue no rodapé, quando a entrega for feita.</p>
                   ) : (
                     <p className="text-xs text-muted-foreground">Sem ordem de produção associada.</p>
                   )}
                 </div>
+                {podeCriarOp && (
+                  <Button onClick={() => onCriarOp?.(row)}>
+                    <Icon name="add_task" className="text-[16px]" /> Criar OP
+                  </Button>
+                )}
               </div>
             )
           )}

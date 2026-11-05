@@ -19,7 +19,7 @@ export const SUBITENS_COMERCIAL = [
   { nome: "Clientes", tab: "clientes", icone: "groups" },
   { nome: "Propostas", tab: "propostas", icone: "description" },
   { nome: "Orçamentos", tab: "orcamentos", icone: "request_quote" },
-  { nome: "Encomendas", tab: "pedidos", icone: "pending_actions" },
+  { nome: "Encomendas", tab: "encomendas", icone: "pending_actions" },
   { nome: "Facturação", tab: "vendas", icone: "receipt_long" },
 ];
 

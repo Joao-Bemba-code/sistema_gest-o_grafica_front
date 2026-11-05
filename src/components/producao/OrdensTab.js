@@ -26,9 +26,11 @@ import { listarOrdens, requisitarMateriais, aprovarMateriais, removerOrdem } fro
 import { getUsuario } from "@/services/auth";
 import { descricaoErroApi } from "@/services/api";
 import { podeAtual } from "@/lib/permissoes";
-import { situacaoOP, situacaoMaterial, SITUACAO_MATERIAL, temReservas } from "@/lib/producaoStatus";
+import { situacaoOP, situacaoMaterial, SITUACAO_MATERIAL, temReservas, emCurso } from "@/lib/producaoStatus";
 import SaidaMateriaisModal from "@/components/producao/SaidaMateriaisModal";
+import RequisicaoMaterialFormModal from "@/components/producao/RequisicaoMaterialFormModal";
 import { listar as listarMateriais } from "@/services/materiais";
+import { auxiliares as auxiliaresRequisicao, criar as criarRequisicao } from "@/services/requisicoesMaterial";
 import { buscarOrganizacao } from "@/services/configuracoes";
 import gerarOrdemProducaoPdf from "@/lib/producaoPdf";
 
@@ -120,6 +122,12 @@ export default function OrdensTab() {
   const [materiais, setMateriais] = useState([]);
   const [libertarOp, setLibertarOp] = useState(null);
   const [aprovarOp, setAprovarOp] = useState(null);
+  // Requisição de material feita a partir da OP (formula standard do módulo
+  // Requisições), com os auxiliares carregados só quando o utilizador abre o
+  // formulário.
+  const [requisitarOp, setRequisitarOp] = useState(null);
+  const [sessaoRequisicao, setSessaoRequisicao] = useState(0);
+  const [auxRequisicao, setAuxRequisicao] = useState(null);
   const [eliminarItem, setEliminarItem] = useState(null);
   const [deletando, setDeletando] = useState(false);
   const [pdfGerandoId, setPdfGerandoId] = useState(null);
@@ -130,6 +138,38 @@ export default function OrdensTab() {
   const [filtrosAbertos, setFiltrosAbertos] = useState(true);
   const { addToast } = useToast();
   const podeAprovar = podeAtual("producao", "aprovar");
+  // Quem cria requisições é o pessoal de chão de fábrica; quem gere o stock
+  // aprova ou rejeita (e o administrador pode fazer as duas coisas).
+  const podePedirMaterial =
+    podeAtual("producao", "criar") && (getUsuario()?.perfil === "admin" || !podeAtual("estoque", "editar"));
+
+  const abrirRequisicao = async (op) => {
+    setDetalhe(null);
+    setSessaoRequisicao((s) => s + 1);
+    setRequisitarOp(op);
+    if (auxRequisicao) return;
+    try {
+      const dados = await auxiliaresRequisicao();
+      setAuxRequisicao({ ordens: dados?.ordens || [], materiais: dados?.materiais || [] });
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao carregar os dados da requisição", "error");
+    }
+  };
+
+  const confirmarRequisicao = async (dados) => {
+    try {
+      const criada = await criarRequisicao(dados);
+      addToast(
+        `Requisição ${criada?.numero || ""} enviada para o estoque${criada?.itens?.length ? ` · ${criada.itens.length} material(is)` : ""}`,
+        "success"
+      );
+      setRequisitarOp(null);
+      return true;
+    } catch (err) {
+      addToast(err.response?.data?.erro || "Erro ao enviar a requisição", "error");
+      return false;
+    }
+  };
 
   const carregarDados = () => {
     Promise.allSettled([listarOrdens(), listarMateriais(), buscarOrganizacao().catch(() => null)]).then(([ordensRes, materiaisRes, orgRes]) => {
@@ -296,7 +336,7 @@ export default function OrdensTab() {
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-border">
+      <div className="flex flex-wrap items-center gap-1">
         {STATUS_TABS.map((s) => {
           const ativo = statusFiltro === s.value;
           return (
@@ -305,8 +345,8 @@ export default function OrdensTab() {
               type="button"
               onClick={() => setStatusFiltro(s.value)}
               className={cn(
-                "-mb-px border-b-2 pb-2 text-xs font-semibold transition-colors",
-                ativo ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+                "inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                ativo ? "bg-primary font-semibold text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted hover:text-foreground"
               )}
             >
               {s.label}
@@ -389,6 +429,11 @@ export default function OrdensTab() {
                           itens={[
                             { icone: "visibility", rotulo: "Ver detalhes", onClick: () => setDetalhe(op.id) },
                             { icone: "picture_as_pdf", rotulo: "Folha de trabalho (PDF)", onClick: () => handlePdf(op) },
+                            // Requisição à partida: mesmo numa OP sem material
+                            // reservado, o chão de fábrica requisita ao estoque.
+                            ...(podePedirMaterial && emCurso(op)
+                              ? [{ icone: "inventory_2", rotulo: "Requisitar materiais", onClick: () => abrirRequisicao(op) }]
+                              : []),
                             ...(matSit === SITUACAO_MATERIAL.aguardando_requisicao ? [{ icone: "inventory", rotulo: "Requisição de material", onClick: () => setLibertarOp(op) }] : []),
                             ...(matSit === SITUACAO_MATERIAL.aguardando_liberacao && podeAprovar ? [{ icone: "check_circle", rotulo: "Aprovar requisição", onClick: () => setAprovarOp(op) }] : []),
                             { icone: "delete", rotulo: "Remover OP", danger: true, onClick: () => setEliminarItem(op) },
@@ -483,6 +528,19 @@ export default function OrdensTab() {
                   </Button>
                 </div>
               )}
+              {matSit === SITUACAO_MATERIAL.sem_material && (
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
+                  <p className="text-xs text-foreground">
+                    Nenhum material reservado nesta OP. Se o trabalho levar material do estoque,
+                    submete já a requisição — o estoque aprova e regista a saída.
+                  </p>
+                  {podePedirMaterial && (
+                    <Button size="sm" onClick={() => abrirRequisicao(opDetalhe)}>
+                      <Icon name="inventory_2" className="text-lg" /> Requisitar materiais
+                    </Button>
+                  )}
+                </div>
+              )}
               {matSit === SITUACAO_MATERIAL.aguardando_liberacao && (
                 <div className="flex items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3">
                   <div className="min-w-0">
@@ -511,6 +569,11 @@ export default function OrdensTab() {
               )}
 
               <div className="flex items-center gap-2 flex-wrap">
+                {podePedirMaterial && emCurso(opDetalhe) && matSit !== SITUACAO_MATERIAL.sem_material && (
+                  <Button size="sm" onClick={() => abrirRequisicao(opDetalhe)}>
+                    <Icon name="inventory_2" className="text-[16px]" /> Requisitar materiais
+                  </Button>
+                )}
                 <Button variant="secondary" size="sm" onClick={() => handlePdf(opDetalhe)}>
                   <Icon name="picture_as_pdf" className="text-[16px]" /> Folha de trabalho (PDF)
                 </Button>
@@ -544,6 +607,17 @@ export default function OrdensTab() {
         onClose={() => setAprovarOp(null)}
         onConfirm={handleAprovar}
         nomeUsuario={getUsuario()?.nome || ""}
+      />
+
+      <RequisicaoMaterialFormModal
+        key={`requisicao-${sessaoRequisicao}`}
+        open={Boolean(requisitarOp)}
+        onClose={() => setRequisitarOp(null)}
+        ordens={auxRequisicao?.ordens || []}
+        materiais={auxRequisicao?.materiais || []}
+        nomeUsuario={getUsuario()?.nome || ""}
+        ordemInicial={requisitarOp?.id ?? null}
+        onConfirm={confirmarRequisicao}
       />
 
       <ConfirmDialog
