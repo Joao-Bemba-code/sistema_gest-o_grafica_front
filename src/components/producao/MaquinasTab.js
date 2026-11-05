@@ -177,9 +177,9 @@ const CAMPOS = [
 
 const ESTADOS_FILTRO = ["todos", "operacional", "manutencao", "avariada", "desativada"];
 
-const pillBase = "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-sm font-medium whitespace-nowrap transition-colors";
-const pillAtiva = "border-primary/40 bg-primary/10 text-primary";
-const pillInativa = "border-border bg-card text-muted-foreground hover:bg-muted/60 hover:text-foreground";
+const pillBase = "inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium whitespace-nowrap transition-colors";
+const pillAtiva = "bg-primary/10 font-semibold text-primary";
+const pillInativa = "text-muted-foreground hover:bg-muted hover:text-foreground";
 
 export default function MaquinasTab({ showHeader = false, registarEstado = false }) {
   const { addToast } = useToast();
@@ -298,7 +298,7 @@ export default function MaquinasTab({ showHeader = false, registarEstado = false
             placeholder="Pesquisar por nome, código, marca, modelo..."
           />
         )}
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2">
+        <div className="flex flex-wrap items-center gap-1.5 px-4 py-2">
           {ESTADOS_FILTRO.map((e) => (
             <button
               key={e}

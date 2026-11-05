@@ -187,7 +187,7 @@ export default function ConciliacaoTab() {
           subtitulo={`${filtrados.length} movimentos confirmados · ${resumo.conciliados} conciliados · ${resumo.pendentes} por conciliar`}
         />
 
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2.5">
+        <div className="flex flex-wrap items-center gap-1.5 px-4 py-2.5">
           <select
             value={filtroConta}
             onChange={(e) => { setFiltroConta(e.target.value); setSelecionados([]); }}
@@ -296,7 +296,7 @@ export default function ConciliacaoTab() {
                         <IdCell id={m.descricao || "—"} meta={[m.categoria, m.referencia && `Ref: ${m.referencia}`].filter(Boolean).join(" · ") || "—"} />
                       </LedgerTd>
                       <LedgerTd className="max-w-40"><span className="block truncate text-muted-foreground">{conta ? rotuloConta(conta) : "—"}</span></LedgerTd>
-                      <LedgerTd className="whitespace-nowrap text-slate-700">{tipoLabel[m.tipo] || m.tipo}</LedgerTd>
+                      <LedgerTd className="whitespace-nowrap text-foreground">{tipoLabel[m.tipo] || m.tipo}</LedgerTd>
                       <LedgerTd className="text-right tabular-nums whitespace-nowrap">
                         <span className={`font-bold ${isEntrada ? "text-success" : isSaida ? "text-error" : "text-foreground"}`}>
                           {m.tipo === "entrada" ? "+" : m.tipo === "saida" ? "−" : ""}{Math.round(Number(m.valor || 0)).toLocaleString("pt-AO")}

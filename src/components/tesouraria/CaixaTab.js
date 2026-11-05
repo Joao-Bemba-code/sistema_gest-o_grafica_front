@@ -186,7 +186,7 @@ export default function CaixaTab() {
         <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="Caixas abertos">
           {abertas.map((s) => (
             <div key={s.id} className="overflow-hidden rounded-xl border border-border bg-card">
-              <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+              <div className="flex items-center justify-between gap-2 px-4 py-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-foreground">{rotuloConta(s.conta)}</p>
                   <p className="text-[11px] text-muted-foreground">Aberto em {formatDataHora(s.data_abertura)} por {s.usuario_abertura_nome || "—"}</p>
@@ -238,7 +238,7 @@ export default function CaixaTab() {
           titulo="Histórico de sessões"
           subtitulo={`${historico.length} sessões de caixa`}
         />
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2.5">
+        <div className="flex flex-wrap items-center gap-1.5 px-4 py-2.5">
           <select
             value={filtroConta}
             onChange={(e) => setFiltroConta(e.target.value)}

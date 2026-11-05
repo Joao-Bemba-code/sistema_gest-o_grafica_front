@@ -59,9 +59,9 @@ const CAMPOS = [
   { value: "responsavel", label: "Responsável", obter: (o) => o.responsavel || "" },
 ];
 
-const pillBase = "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-sm font-medium whitespace-nowrap transition-colors";
-const pillAtiva = "border-primary/40 bg-primary/10 text-primary";
-const pillInativa = "border-border bg-card text-muted-foreground hover:bg-muted/60 hover:text-foreground";
+const pillBase = "inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium whitespace-nowrap transition-colors";
+const pillAtiva = "bg-primary/10 font-semibold text-primary";
+const pillInativa = "text-muted-foreground hover:bg-muted hover:text-foreground";
 
 const estadoOrdem = (op) => {
   const todosConcluidos = servicos.every(s => op.servicos[s.id] === "concluido");
@@ -162,8 +162,8 @@ export default function AcabamentoPage() {
   return (
     <div className="space-y-4">
       <div className="min-w-0">
-        <h1 className="text-base font-normal text-foreground">Acabamento</h1>
-        <p className="mt-1 text-xs text-muted-foreground">Acompanhamento dos serviços de acabamento</p>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">Acabamento</h1>
+        <p className="mt-1 text-xs font-medium text-muted-foreground">Acompanhamento dos serviços de acabamento</p>
       </div>
 
       <Ledger rotulo="Acabamento ledger">
@@ -187,7 +187,7 @@ export default function AcabamentoPage() {
           />
         )}
 
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2">
+        <div className="flex flex-wrap items-center gap-1.5 px-4 py-2">
           {ESTADOS.map((e) => (
             <button
               key={e.value}

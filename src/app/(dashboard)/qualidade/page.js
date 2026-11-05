@@ -39,9 +39,9 @@ const CAMPOS = [
   { value: "responsavel", label: "Responsável", obter: (i) => i.responsavel || "" },
 ];
 
-const pillBase = "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-sm font-medium whitespace-nowrap transition-colors";
-const pillAtiva = "border-primary/40 bg-primary/10 text-primary";
-const pillInativa = "border-border bg-card text-muted-foreground hover:bg-muted/60 hover:text-foreground";
+const pillBase = "inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium whitespace-nowrap transition-colors";
+const pillAtiva = "bg-primary/10 font-semibold text-primary";
+const pillInativa = "text-muted-foreground hover:bg-muted hover:text-foreground";
 
 const statusTom = { aprovado: "success", reprovado: "error", pendente: "neutral" };
 const initialForm = { op: "", cliente: "", produto: "", responsavel: "", cor: "pendente", corte: "pendente", quantidade: "pendente", acabamento: "pendente", embalagem: "pendente" };
@@ -161,7 +161,7 @@ export default function QualidadePage() {
             placeholder="Pesquisar inspeções por OP, cliente, produto..."
           />
         )}
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2">
+        <div className="flex flex-wrap items-center gap-1.5 px-4 py-2">
           {["todos", "aprovado", "pendente", "reprovado"].map((f) => (
             <button
               key={f}

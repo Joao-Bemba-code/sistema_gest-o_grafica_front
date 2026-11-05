@@ -80,7 +80,7 @@ export default function LibertarMaquinaModal({ open, op, maquinas, onClose, onCo
             ))}
           </select>
           {operacionais.length === 0 && (
-            <p className="text-[10px] text-amber-600">
+            <p className="text-[10px] text-warning">
               Nenhum operacional disponível. Registe a máquina no parque de máquinas.
             </p>
           )}

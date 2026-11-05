@@ -53,9 +53,9 @@ const ESTADO_PEDIDO = {
   cancelado: { label: "Cancelada", badge: "border-transparent bg-muted text-muted-foreground" },
 };
 
-const tabBase = "-mb-px inline-flex items-center gap-1.5 whitespace-nowrap border-b-2 pb-2.5 pt-2 text-sm font-semibold transition-colors";
-const tabAtiva = "border-primary font-bold text-primary";
-const tabInativa = "border-transparent text-muted-foreground hover:text-foreground";
+const tabBase = "inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors";
+const tabAtiva = "bg-primary font-semibold text-primary-foreground shadow-sm";
+const tabInativa = "text-muted-foreground hover:bg-muted hover:text-foreground";
 
 function dataStr(v) {
   if (!v) return "—";
@@ -107,7 +107,7 @@ export default function ComprasPage() {
   const kpis = useMemo(
     () => [
       { key: "cot", icon: "request_quote", label: "Cotações", valor: "0", tom: "bg-primary/10 text-primary", cor: "text-foreground" },
-      { key: "enc", icon: "shopping_cart", label: "Encomendas", valor: String(pedidos.length), tom: "bg-success/10 text-success", cor: "text-foreground" },
+      { key: "enc", icon: "shopping_cart", label: "Encomendas", valor: String(pedidos.length), tom: "bg-primary/10 text-primary", cor: "text-foreground" },
       { key: "val", icon: "trending_up", label: "Valor Compras", valor: Math.round(valorTotal).toLocaleString("pt-AO"), sufixo: "Kz", tom: "bg-warning/15 text-warning", cor: "text-foreground", alerta: true },
     ],
     [pedidos.length, valorTotal]
@@ -221,7 +221,7 @@ export default function ComprasPage() {
   const vazio = !carregandoInicial && visiveis.length === 0;
 
   const tabsBar = (
-    <div className="flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-border">
+    <div className="flex flex-wrap items-center gap-1">
       {TABS.map((t) => (
         <button
           key={t.id}
@@ -238,15 +238,10 @@ export default function ComprasPage() {
 
   return (
     <div className="space-y-4">
-      {/* Faixa do módulo - identificação compras (red) */}
-      <div className="flex items-center rounded-xl bg-[#d32f2f] px-5 py-2.5 text-white shadow-sm">
-        <span className="text-lg font-extrabold uppercase tracking-wide">5. COMPRAS</span>
-      </div>
-
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-extrabold tracking-tight text-foreground">Gestão de Compras</h1>
-          <p className="mt-0.5 text-xs font-medium text-muted-foreground">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">Gestão de Compras</h1>
+          <p className="mt-1 text-xs font-medium text-muted-foreground">
             Fornecedores, encomendas e recepções.
           </p>
         </div>
@@ -275,10 +270,10 @@ export default function ComprasPage() {
               <Icon name={k.icon} />
             </span>
             <div className="min-w-0">
-              <p className={`text-xs font-semibold leading-tight ${k.alerta ? "text-warning" : "text-muted-foreground"}`}>{k.label}</p>
-              <p className={`text-2xl font-black leading-tight tabular-nums ${k.cor}`}>
+              <p className={`text-xs font-medium leading-tight ${k.alerta ? "text-warning" : "text-muted-foreground"}`}>{k.label}</p>
+              <p className={`text-xl font-semibold leading-tight tabular-nums ${k.cor}`}>
                 {k.valor}
-                {k.sufixo && <span className="ml-1 text-xs font-bold text-muted-foreground">{k.sufixo}</span>}
+                {k.sufixo && <span className="ml-1 text-xs font-medium text-muted-foreground">{k.sufixo}</span>}
               </p>
             </div>
           </div>
@@ -400,7 +395,7 @@ export default function ComprasPage() {
                         <LedgerTd className="whitespace-nowrap text-muted-foreground">{dataStr(p.data_recebimento)}</LedgerTd>
                         <LedgerTd className="max-w-40"><span className="block truncate">{p.fornecedor_nome}</span></LedgerTd>
                         <LedgerTd className="tabular-nums whitespace-nowrap">{toNum(p.total).toLocaleString("pt-AO")}</LedgerTd>
-                        <LedgerTd className="text-center"><StatusBadge tom="neutral" className="border-transparent bg-emerald-100 text-emerald-700">Recebida</StatusBadge></LedgerTd>
+                        <LedgerTd className="text-center"><StatusBadge tom="success">Recebida</StatusBadge></LedgerTd>
                         <LedgerTd>
                           <RowMenu ariaLabel="Ações da recepção" itens={[{ icone: "print", rotulo: "Imprimir (PDF)", onClick: () => pedidoPdf(p) }]} />
                         </LedgerTd>

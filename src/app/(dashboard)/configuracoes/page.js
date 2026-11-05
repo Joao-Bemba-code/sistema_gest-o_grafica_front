@@ -43,9 +43,9 @@ const SECCOES = [
 ];
 
 const tabClsBase =
-  "-mb-px inline-flex items-center whitespace-nowrap border-b-2 px-1 pb-3 pt-2 text-xs font-medium transition-colors";
-const tabClsAtiva = "border-primary font-semibold text-primary";
-const tabClsInativa = "border-transparent text-muted-foreground hover:border-border hover:text-foreground";
+  "inline-flex items-center whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-colors";
+const tabClsAtiva = "bg-primary font-semibold text-primary-foreground shadow-sm";
+const tabClsInativa = "text-muted-foreground hover:bg-muted hover:text-foreground";
 
 const btnAcaoBase =
   "inline-flex min-w-[9rem] flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all md:text-sm";
@@ -287,8 +287,8 @@ export default function ConfiguracoesPage() {
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Configurações do Sistema</h1>
-          <p className="mt-1 text-xs text-muted-foreground">Ajustes, utilizadores e parâmetros gerais de funcionamento da plataforma.</p>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">Configurações do Sistema</h1>
+          <p className="mt-1 text-xs font-medium text-muted-foreground">Ajustes, utilizadores e parâmetros gerais de funcionamento da plataforma.</p>
         </div>
         <button
           type="button"
@@ -299,8 +299,8 @@ export default function ConfiguracoesPage() {
         </button>
       </div>
 
-      <div className="border-b border-border">
-        <div className="flex flex-wrap gap-x-6 -mb-px">
+      <div>
+        <div className="flex flex-wrap items-center gap-1">
           {SECCOES.map((s) => (
             <button
               key={s.id}
@@ -350,13 +350,13 @@ export default function ConfiguracoesPage() {
         </section>
 
         <section className="flex flex-col rounded-xl border border-border bg-card shadow-sm lg:col-span-8">
-          <div className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <h3 className="truncate text-sm font-semibold text-foreground">{seccao.titulo}</h3>
               <span className="text-xs text-muted-foreground">{seccao.sub}</span>
             </div>
             <div className="flex shrink-0 items-center gap-2 sm:block sm:text-right">
-              <div className="truncate text-lg font-black tracking-tight text-foreground md:text-xl">{resumo.valor}</div>
+              <div className="truncate text-lg font-semibold tracking-tight text-foreground md:text-xl">{resumo.valor}</div>
               <StatusBadge tom={resumo.tom} className="mt-0.5">{resumo.badge}</StatusBadge>
             </div>
           </div>

@@ -422,7 +422,7 @@ export default function ProcessosTab() {
             type="button"
             onClick={() => setActiveProcesso(e.id)}
             className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-              activeProcesso === e.id ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              activeProcesso === e.id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
             }`}
           >
             <Icon name={e.icon} className="text-sm" />
@@ -455,16 +455,16 @@ export default function ProcessosTab() {
               aoLimpar={() => setFiltro((f) => ({ ...f, termo: "" }))}
               placeholder="Pesquisar..."
             />
-            <div className="flex flex-wrap items-center gap-1 border-b border-border px-4 py-2">
+            <div className="flex flex-wrap items-center gap-1 px-4 py-2">
               {situacaoConfig.map((f) => (
                 <button
                   key={f.value}
                   type="button"
                   onClick={() => setSituacao(f.value)}
-                  className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors border ${
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
                     situacao === f.value
-                      ? "border-border bg-card text-foreground shadow-sm"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
+                      ? "bg-primary/10 font-semibold text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
                   {f.label}

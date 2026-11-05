@@ -81,9 +81,9 @@ const blankFaturaForm = {
 
 function formatKz(v) { return `Kz ${Number(v || 0).toLocaleString("pt-AO")}`; }
 
-const tabClsBase = "-mb-px inline-flex items-center gap-1.5 whitespace-nowrap border-b-2 pb-2.5 pt-2 text-sm font-semibold transition-colors";
-const tabClsAtiva = "border-blue-600 font-bold text-blue-600";
-const tabClsInativa = "border-transparent text-muted-foreground hover:text-foreground";
+const tabClsBase = "inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors";
+const tabClsAtiva = "bg-primary font-semibold text-primary-foreground shadow-sm";
+const tabClsInativa = "text-muted-foreground hover:bg-muted hover:text-foreground";
 
 export default function FaturacaoPage() {
   const [faturas, setFaturas] = useState([]);
@@ -393,23 +393,18 @@ export default function FaturacaoPage() {
   const margem = entradasMes > 0 ? (resultado / entradasMes) * 100 : 0;
   const kpis = [
     { key: "receitas", icon: "trending_up", label: "Receitas", valor: Math.round(entradasMes).toLocaleString("pt-AO"), sufixo: "Kz", icone: "bg-primary/10 text-primary", cor: "text-foreground" },
-    { key: "despesas", icon: "account_balance_wallet", label: "Despesas", valor: Math.round(saidasMes).toLocaleString("pt-AO"), sufixo: "Kz", icone: "bg-error/10 text-error", cor: "text-foreground" },
-    { key: "resultado", icon: "bar_chart", label: "Resultado", valor: Math.round(resultado).toLocaleString("pt-AO"), sufixo: "Kz", icone: "bg-success/10 text-success", cor: resultado < 0 ? "text-error" : "text-success" },
-    { key: "margem", icon: "speed", label: "Margem", valor: `${margem.toFixed(1)}%`, icone: "bg-success/10 text-success", cor: "text-foreground" },
+    { key: "despesas", icon: "account_balance_wallet", label: "Despesas", valor: Math.round(saidasMes).toLocaleString("pt-AO"), sufixo: "Kz", icone: "bg-muted text-muted-foreground", cor: "text-foreground" },
+    { key: "resultado", icon: "bar_chart", label: "Resultado", valor: Math.round(resultado).toLocaleString("pt-AO"), sufixo: "Kz", icone: "bg-muted text-muted-foreground", cor: resultado < 0 ? "text-error" : "text-foreground" },
+    { key: "margem", icon: "speed", label: "Margem", valor: `${margem.toFixed(1)}%`, icone: "bg-muted text-muted-foreground", cor: "text-foreground" },
   ];
   const podeNovaDespesa = podeAtual("tesouraria", "criar");
 
   return (
     <div className="space-y-4">
-      {/* Faixa do módulo - identificação financeiro (teal) */}
-      <div className="flex items-center rounded-xl bg-[#0a615a] px-5 py-2.5 text-white shadow-sm">
-        <span className="text-lg font-extrabold uppercase tracking-wide">6. FINANCEIRO</span>
-      </div>
-
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-extrabold tracking-tight text-foreground">Gestão Financeira</h1>
-          <p className="mt-0.5 text-xs font-medium text-muted-foreground">Contabilidade, facturação e resultados.</p>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">Gestão Financeira</h1>
+          <p className="mt-1 text-xs font-medium text-muted-foreground">Contabilidade, facturação e resultados.</p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2.5">
           {faturas.length > 0 && (
@@ -418,11 +413,11 @@ export default function FaturacaoPage() {
             </button>
           )}
           {podeNovaDespesa && (
-            <button type="button" onClick={() => setDespesaModalOpen(true)} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#2563eb] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700">
+            <button type="button" onClick={() => setDespesaModalOpen(true)} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90">
               <Icon name="add" className="text-base" /> Nova Despesa
             </button>
           )}
-          <button onClick={() => setFatModalOpen(true)} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#2563eb] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700">
+          <button onClick={() => setFatModalOpen(true)} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90">
             <Icon name="add" className="text-base" /> Nova Factura
           </button>
         </div>
@@ -436,7 +431,7 @@ export default function FaturacaoPage() {
             </span>
             <div className="min-w-0">
               <p className="text-xs font-semibold leading-tight text-muted-foreground">{k.label}</p>
-              <p className={`truncate text-xl font-black leading-tight tabular-nums tracking-tight sm:text-2xl ${k.cor}`}>
+              <p className={`truncate text-xl font-semibold leading-tight tabular-nums tracking-tight sm:text-2xl ${k.cor}`}>
                 {k.valor}
                 {k.sufixo && <span className="ml-1 text-xs font-bold text-muted-foreground">{k.sufixo}</span>}
               </p>
@@ -445,8 +440,8 @@ export default function FaturacaoPage() {
         ))}
       </section>
 
-      <div className="flex flex-col gap-3 border-b border-border sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-1">
           {[
             { id: "faturas", label: "Facturação", icon: "receipt_long" },
             { id: "despesas", label: "Despesas", icon: "account_balance_wallet" },
@@ -502,12 +497,12 @@ export default function FaturacaoPage() {
               placeholder="Pesquisar por nº fatura, cliente..."
             />
           )}
-          <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2">
+          <div className="flex flex-wrap items-center gap-1.5 px-4 py-2">
             <button
               type="button"
               onClick={() => setFiltroEstado("todas")}
               aria-pressed={filtroEstado === "todas"}
-              className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-sm font-medium whitespace-nowrap transition-colors ${filtroEstado === "todas" ? "border-blue-600/40 bg-blue-50 text-blue-600" : "border-border bg-card text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}
+              className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-sm font-medium whitespace-nowrap transition-colors ${filtroEstado === "todas" ? "bg-primary/10 font-semibold text-primary" : "border-border bg-card text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}
             >
               Todas <span className="text-[11px] text-muted-foreground">{contagensEstado.todas}</span>
             </button>
@@ -517,7 +512,7 @@ export default function FaturacaoPage() {
                 type="button"
                 onClick={() => setFiltroEstado(k)}
                 aria-pressed={filtroEstado === k}
-                className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-sm font-medium whitespace-nowrap transition-colors ${filtroEstado === k ? "border-blue-600/40 bg-blue-50 text-blue-600" : "border-border bg-card text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}
+                className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-sm font-medium whitespace-nowrap transition-colors ${filtroEstado === k ? "bg-primary/10 font-semibold text-primary" : "border-border bg-card text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}
               >
                 {v.label} <span className="text-[11px] text-muted-foreground">{contagensEstado[k] ?? 0}</span>
               </button>
@@ -539,14 +534,14 @@ export default function FaturacaoPage() {
             <tbody>
               {faturasVisiveis.map((f) => (
                 <LedgerTr key={f.id} onClick={() => abrirFatura(f)}>
-                  <LedgerTd className="whitespace-nowrap font-semibold text-slate-800">
+                  <LedgerTd className="whitespace-nowrap font-semibold text-foreground">
                     <IdCell id={f.numero} meta={f.data_emissao ? new Date(f.data_emissao).toLocaleDateString("pt-AO") : "—"} aoAbrir={() => abrirFatura(f)} />
                   </LedgerTd>
                   <LedgerTd className="text-muted-foreground whitespace-nowrap">{f.data_emissao ? new Date(f.data_emissao).toLocaleDateString("pt-AO") : "—"}</LedgerTd>
                   <LedgerTd className="max-w-48"><span className="block truncate font-medium">{f.cliente?.nome || "—"}</span></LedgerTd>
-                  <LedgerTd className="whitespace-nowrap text-slate-700">{tiposDoc[f.tipo]?.label || f.tipo || "—"}</LedgerTd>
+                  <LedgerTd className="whitespace-nowrap text-foreground">{tiposDoc[f.tipo]?.label || f.tipo || "—"}</LedgerTd>
                   <LedgerTd className="text-right tabular-nums whitespace-nowrap">
-                    <span className="block font-semibold text-slate-800">{toNum(valorDoc(f)).toLocaleString("pt-AO")}</span>
+                    <span className="block font-semibold text-foreground">{toNum(valorDoc(f)).toLocaleString("pt-AO")}</span>
                     {f.iva > 0 && <span className="block text-xs text-muted-foreground">IVA {Number(f.iva)}%</span>}
                   </LedgerTd>
                   <LedgerTd>
@@ -601,13 +596,13 @@ export default function FaturacaoPage() {
             <tbody>
               {despesasVisiveis.map((m) => (
                 <LedgerTr key={m.id}>
-                  <LedgerTd className="whitespace-nowrap font-semibold text-slate-800">
+                  <LedgerTd className="whitespace-nowrap font-semibold text-foreground">
                     <IdCell id={m.referencia || `DES-${String(m.id).padStart(4, "0")}`} meta={m.categoria || "—"} />
                   </LedgerTd>
                   <LedgerTd className="text-muted-foreground whitespace-nowrap">{m.data_movimento || m.data ? new Date(m.data_movimento || m.data).toLocaleDateString("pt-AO") : "—"}</LedgerTd>
                   <LedgerTd className="max-w-48"><span className="block truncate font-medium">{m.descricao || "—"}</span></LedgerTd>
-                  <LedgerTd className="whitespace-nowrap font-medium text-red-500">Despesa</LedgerTd>
-                  <LedgerTd className="text-right tabular-nums whitespace-nowrap font-semibold text-slate-800">{toNum(m.valor).toLocaleString("pt-AO")}</LedgerTd>
+                  <LedgerTd className="whitespace-nowrap font-medium text-error">Despesa</LedgerTd>
+                  <LedgerTd className="text-right tabular-nums whitespace-nowrap font-semibold text-foreground">{toNum(m.valor).toLocaleString("pt-AO")}</LedgerTd>
                 </LedgerTr>
               ))}
             </tbody>
@@ -637,19 +632,19 @@ export default function FaturacaoPage() {
             <tbody>
               <LedgerTr>
                 <LedgerTd className="font-medium">Receitas</LedgerTd>
-                <LedgerTd className="text-right tabular-nums font-semibold text-slate-800">{toNum(entradasMes).toLocaleString("pt-AO")}</LedgerTd>
+                <LedgerTd className="text-right tabular-nums font-semibold text-foreground">{toNum(entradasMes).toLocaleString("pt-AO")}</LedgerTd>
               </LedgerTr>
               <LedgerTr>
                 <LedgerTd className="font-medium">Despesas</LedgerTd>
-                <LedgerTd className="text-right tabular-nums font-semibold text-slate-800">{toNum(saidasMes).toLocaleString("pt-AO")}</LedgerTd>
+                <LedgerTd className="text-right tabular-nums font-semibold text-foreground">{toNum(saidasMes).toLocaleString("pt-AO")}</LedgerTd>
               </LedgerTr>
               <LedgerTr>
                 <LedgerTd className="font-medium">Resultado</LedgerTd>
-                <LedgerTd className={`text-right tabular-nums font-semibold ${resultado < 0 ? "text-red-600" : "text-emerald-600"}`}>{toNum(resultado).toLocaleString("pt-AO")}</LedgerTd>
+                <LedgerTd className={`text-right tabular-nums font-semibold ${resultado < 0 ? "text-error" : "text-success"}`}>{toNum(resultado).toLocaleString("pt-AO")}</LedgerTd>
               </LedgerTr>
               <LedgerTr>
                 <LedgerTd className="font-medium">Margem</LedgerTd>
-                <LedgerTd className="text-right tabular-nums font-semibold text-slate-800">{margem.toFixed(1)}%</LedgerTd>
+                <LedgerTd className="text-right tabular-nums font-semibold text-foreground">{margem.toFixed(1)}%</LedgerTd>
               </LedgerTr>
             </tbody>
           </LedgerTable>
@@ -668,7 +663,7 @@ export default function FaturacaoPage() {
                 <option value="factura_recibo">Factura Recibo (já paga)</option>
               </select>
               {faturaForm.tipo === "factura_recibo" && (
-                <p className="text-[10px] text-amber-600">A Factura Recibo fica automaticamente marcada como paga pelo valor total.</p>
+                <p className="text-[10px] text-warning">A Factura Recibo fica automaticamente marcada como paga pelo valor total.</p>
               )}
             </div>
             <div className="flex flex-col gap-1.5">
@@ -940,14 +935,14 @@ export default function FaturacaoPage() {
                 <div className="flex justify-between border-t pt-1.5 font-bold text-sm"><span>Total:</span><span className="text-primary">{formatKz(selectedFatura.total || selectedFatura.valor)}</span></div>
               </div>
 
-              <div className="rounded-xl border bg-emerald-50/50 p-4 space-y-1.5 text-xs">
-                <p className="text-[10px] font-bold text-emerald-700 uppercase mb-2 tracking-wider">Pagamento</p>
-                <div className="flex justify-between"><span className="text-muted-foreground">Valor pago:</span><span className="font-semibold text-emerald-700">{formatKz(selectedFatura.valor_pago)}</span></div>
+              <div className="rounded-xl border border-success/20 bg-success/5 p-4 space-y-1.5 text-xs">
+                <p className="text-[10px] font-bold text-success uppercase mb-2 tracking-wider">Pagamento</p>
+                <div className="flex justify-between"><span className="text-muted-foreground">Valor pago:</span><span className="font-semibold text-success">{formatKz(selectedFatura.valor_pago)}</span></div>
                 {Number(selectedFatura.total || selectedFatura.valor) > Number(selectedFatura.valor_pago || 0) && (
-                  <div className="flex justify-between"><span className="text-muted-foreground">Em dívida a liquidar:</span><span className="font-semibold text-amber-600">{formatKz(Number(selectedFatura.total || selectedFatura.valor) - Number(selectedFatura.valor_pago || 0))}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Em dívida a liquidar:</span><span className="font-semibold text-warning">{formatKz(Number(selectedFatura.total || selectedFatura.valor) - Number(selectedFatura.valor_pago || 0))}</span></div>
                 )}
                 {Number(selectedFatura.total || selectedFatura.valor) <= Number(selectedFatura.valor_pago || 0) && (
-                  <p className="pt-1 text-[11px] text-emerald-700">Fatura integralmente paga.</p>
+                  <p className="pt-1 text-[11px] text-success">Fatura integralmente paga.</p>
                 )}
               </div>
             </div>

@@ -255,7 +255,7 @@ export default function ContasBancariasTab() {
         )}
 
         {mostrarForm && (
-          <div className="border-b border-border bg-muted/30 px-4 py-4 space-y-3">
+          <div className="bg-muted/30 px-4 py-4 space-y-3">
             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
               {editando ? "Editar Conta" : form.tipo_conta === "caixa" ? "Novo Caixa" : "Nova Conta Bancária"}
             </p>

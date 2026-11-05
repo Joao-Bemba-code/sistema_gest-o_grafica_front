@@ -161,7 +161,7 @@ export default function CustosRateiosTab() {
           titulo="Custos e Rateios"
           subtitulo={`${filtrados.length} despesas · ${resumo.ordens} ordens de produção com custo atribuído`}
         />
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2.5">
+        <div className="flex flex-wrap items-center gap-1.5 px-4 py-2.5">
           <input
             value={termo}
             onChange={(e) => setTermo(e.target.value)}

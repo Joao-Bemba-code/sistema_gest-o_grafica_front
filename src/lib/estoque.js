@@ -1,46 +1,50 @@
+const TOM_PRIMARIO = "text-primary bg-primary/10";
+const TOM_NEUTRO = "text-muted-foreground bg-muted";
+const TOM_ATENCAO = "text-warning bg-warning/10";
+
 export const categoriasTipo = {
-  consumiveis: { label: "Consumíveis", icon: "local_fire_department", classe: "text-orange-500 bg-orange-500/10" },
-  materiais: { label: "Materiais", icon: "inventory", classe: "text-blue-500 bg-blue-500/10" },
-  ferramentas: { label: "Ferramentas", icon: "handyman", classe: "text-gray-500 bg-gray-500/10" },
-  equipamentos: { label: "Equipamentos", icon: "precision_manufacturing", classe: "text-indigo-500 bg-indigo-500/10" },
-  produtos_quimicos: { label: "Produtos Químicos", icon: "science", classe: "text-yellow-600 bg-yellow-600/10" },
-  pecas_sobressalentes: { label: "Peças e Sobressalentes", icon: "settings_suggest", classe: "text-cyan-500 bg-cyan-500/10" },
-  servicos: { label: "Serviços", icon: "miscellaneous_services", classe: "text-violet-500 bg-violet-500/10" },
-  produtos_acabados: { label: "Produtos Acabados", icon: "inventory_2", classe: "text-emerald-500 bg-emerald-500/10" },
+  consumiveis: { label: "Consumíveis", icon: "local_fire_department", classe: TOM_ATENCAO },
+  materiais: { label: "Materiais", icon: "inventory", classe: TOM_PRIMARIO },
+  ferramentas: { label: "Ferramentas", icon: "handyman", classe: TOM_NEUTRO },
+  equipamentos: { label: "Equipamentos", icon: "precision_manufacturing", classe: TOM_NEUTRO },
+  produtos_quimicos: { label: "Produtos Químicos", icon: "science", classe: TOM_ATENCAO },
+  pecas_sobressalentes: { label: "Peças e Sobressalentes", icon: "settings_suggest", classe: TOM_NEUTRO },
+  servicos: { label: "Serviços", icon: "miscellaneous_services", classe: TOM_PRIMARIO },
+  produtos_acabados: { label: "Produtos Acabados", icon: "inventory_2", classe: TOM_PRIMARIO },
 };
 
 export const familias = {
-  papeis: { label: "Papéis", icon: "description", classe: "text-blue-500 bg-blue-500/10" },
-  tintas: { label: "Tintas", icon: "water_drop", classe: "text-amber-500 bg-amber-500/10" },
-  chapas: { label: "Chapas", icon: "square_foot", classe: "text-slate-500 bg-slate-500/10" },
-  produto_quimico: { label: "Produto Químico", icon: "science", classe: "text-yellow-600 bg-yellow-600/10" },
-  ferramentas: { label: "Ferramentas", icon: "construction", classe: "text-gray-500 bg-gray-500/10" },
-  suporte_especial: { label: "Suporte Especial", icon: "view_carousel", classe: "text-pink-500 bg-pink-500/10" },
-  material_acabamento: { label: "Material de Acabamento", icon: "palette", classe: "text-purple-500 bg-purple-500/10" },
-  consumiveis: { label: "Consumíveis", icon: "local_fire_department", classe: "text-orange-500 bg-orange-500/10" },
+  papeis: { label: "Papéis", icon: "description", classe: TOM_PRIMARIO },
+  tintas: { label: "Tintas", icon: "water_drop", classe: TOM_PRIMARIO },
+  chapas: { label: "Chapas", icon: "square_foot", classe: TOM_PRIMARIO },
+  produto_quimico: { label: "Produto Químico", icon: "science", classe: TOM_ATENCAO },
+  ferramentas: { label: "Ferramentas", icon: "construction", classe: TOM_NEUTRO },
+  suporte_especial: { label: "Suporte Especial", icon: "view_carousel", classe: TOM_NEUTRO },
+  material_acabamento: { label: "Material de Acabamento", icon: "palette", classe: TOM_NEUTRO },
+  consumiveis: { label: "Consumíveis", icon: "local_fire_department", classe: TOM_ATENCAO },
 };
 
 export const familiasServico = {
-  impressao: { label: "Impressão", icon: "print", classe: "text-blue-500 bg-blue-500/10" },
-  acabamento: { label: "Acabamento", icon: "palette", classe: "text-purple-500 bg-purple-500/10" },
-  pre_impressao: { label: "Pré-Impressão", icon: "settings", classe: "text-amber-500 bg-amber-500/10" },
-  design: { label: "Design / Arte", icon: "brush", classe: "text-pink-500 bg-pink-500/10" },
-  montagem: { label: "Montagem", icon: "build", classe: "text-indigo-500 bg-indigo-500/10" },
-  logistica: { label: "Logística / Entrega", icon: "local_shipping", classe: "text-emerald-500 bg-emerald-500/10" },
-  consultoria: { label: "Consultoria", icon: "support_agent", classe: "text-cyan-500 bg-cyan-500/10" },
-  manutencao: { label: "Manutenção", icon: "handyman", classe: "text-orange-500 bg-orange-500/10" },
-  servicos_gerais: { label: "Serviços Gerais", icon: "home_repair_service", classe: "text-gray-500 bg-gray-500/10" },
+  impressao: { label: "Impressão", icon: "print", classe: TOM_PRIMARIO },
+  acabamento: { label: "Acabamento", icon: "palette", classe: TOM_PRIMARIO },
+  pre_impressao: { label: "Pré-Impressão", icon: "settings", classe: TOM_PRIMARIO },
+  design: { label: "Design / Arte", icon: "brush", classe: TOM_NEUTRO },
+  montagem: { label: "Montagem", icon: "build", classe: TOM_NEUTRO },
+  logistica: { label: "Logística / Entrega", icon: "local_shipping", classe: TOM_NEUTRO },
+  consultoria: { label: "Consultoria", icon: "support_agent", classe: TOM_NEUTRO },
+  manutencao: { label: "Manutenção", icon: "handyman", classe: TOM_NEUTRO },
+  servicos_gerais: { label: "Serviços Gerais", icon: "home_repair_service", classe: TOM_NEUTRO },
 };
 
 export const tiposItem = {
-  materia_prima: { label: "Matéria-Prima", classe: "text-blue-500" },
-  artigo: { label: "Artigo / Produto", classe: "text-emerald-500" },
-  produto_acabado: { label: "Produto Acabado", classe: "text-emerald-500" },
-  servico: { label: "Serviço", classe: "text-violet-500" },
-  servicos: { label: "Serviço", classe: "text-violet-500" },
-  maquina: { label: "Maquinaria", classe: "text-slate-500" },
-  funcionario: { label: "Funcionário", classe: "text-amber-500" },
-  colaborador: { label: "Colaborador", classe: "text-cyan-500" },
+  materia_prima: { label: "Matéria-Prima", classe: "text-primary" },
+  artigo: { label: "Artigo / Produto", classe: "text-primary" },
+  produto_acabado: { label: "Produto Acabado", classe: "text-primary" },
+  servico: { label: "Serviço", classe: "text-primary" },
+  servicos: { label: "Serviço", classe: "text-primary" },
+  maquina: { label: "Maquinaria", classe: "text-muted-foreground" },
+  funcionario: { label: "Funcionário", classe: "text-muted-foreground" },
+  colaborador: { label: "Colaborador", classe: "text-muted-foreground" },
 };
 
 export const tipoRecursoOptions = [

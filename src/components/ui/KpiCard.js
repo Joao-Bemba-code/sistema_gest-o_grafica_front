@@ -18,9 +18,9 @@ const VARIANTS = {
     badge: "text-info",
   },
   secondary: {
-    chip: "border-secondary/25 bg-secondary/10 text-secondary",
-    bar: "bg-secondary",
-    badge: "text-secondary",
+    chip: "border-border bg-muted text-muted-foreground",
+    bar: "bg-muted-foreground",
+    badge: "text-muted-foreground",
   },
   error: {
     chip: "border-error/25 bg-error/10 text-error",
@@ -58,7 +58,7 @@ export default function KpiCard({ icon, label, value, unit, badge, barPct, iconV
         <div className="flex min-w-0 flex-1 flex-col">
           <p className="truncate text-xs font-medium text-muted-foreground">{label}</p>
           <div className="mt-0.5 flex items-baseline gap-1.5 flex-wrap">
-            <span className="text-[28px] font-bold leading-none tracking-tight text-foreground tabular-nums">{value}</span>
+            <span className="text-2xl font-semibold leading-none tracking-tight text-foreground tabular-nums">{value}</span>
             {unit && <span className="text-xs text-muted-foreground">{unit}</span>}
           </div>
           {badge && <span className={cn("mt-1 text-[11px] font-medium", v.badge)}>{badge}</span>}

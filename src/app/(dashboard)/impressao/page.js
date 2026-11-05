@@ -134,8 +134,8 @@ export default function ImpressaoPage() {
   return (
     <div className="space-y-4">
       <div className="min-w-0">
-        <h1 className="text-base font-normal text-foreground">Impressão</h1>
-        <p className="mt-1 text-xs text-muted-foreground">{registros.length} registos de impressão</p>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">Impressão</h1>
+        <p className="mt-1 text-xs font-medium text-muted-foreground">{registros.length} registos de impressão</p>
       </div>
 
       <section className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">

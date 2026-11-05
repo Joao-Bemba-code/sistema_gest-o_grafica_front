@@ -73,9 +73,9 @@ const ESTADOS_FILTRO = [
   { id: "todas", label: "Todas" },
 ];
 
-const pillBase = "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-sm font-medium whitespace-nowrap transition-colors";
-const pillAtiva = "border-primary/40 bg-primary/10 text-primary";
-const pillInativa = "border-border bg-card text-muted-foreground hover:bg-muted/60 hover:text-foreground";
+const pillBase = "inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium whitespace-nowrap transition-colors";
+const pillAtiva = "bg-primary/10 font-semibold text-primary";
+const pillInativa = "text-muted-foreground hover:bg-muted hover:text-foreground";
 
 // `toISOString()` converte para UTC e em Angola (UTC+1) a meia-noite local
 // recua um dia, o que faria as parcelas vencerem antes da data escolhida.
@@ -454,7 +454,7 @@ export default function DividasTab() {
             placeholder="Procurar dívida ou cliente..."
           />
         )}
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2">
+        <div className="flex flex-wrap items-center gap-1.5 px-4 py-2">
           {ESTADOS_FILTRO.map((f) => (
             <button
               key={f.id}

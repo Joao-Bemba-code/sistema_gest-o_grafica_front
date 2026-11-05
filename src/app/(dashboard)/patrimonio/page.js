@@ -33,10 +33,10 @@ import { gerarFichaBemPDF } from "@/lib/patrimonioPdf";
 import { buscarOrganizacao } from "@/services/configuracoes";
 
 const ESTADOS = {
-  ativo: { label: "Em uso", tom: "neutral", badge: "bg-emerald-50 text-emerald-600" },
-  manutencao: { label: "Em manutenção", tom: "neutral", badge: "bg-red-50 text-red-600" },
-  avariado: { label: "Avariado", tom: "neutral", badge: "bg-amber-50 text-amber-700" },
-  abate: { label: "Abatido", tom: "neutral", badge: "bg-slate-100 text-slate-600" },
+  ativo: { label: "Em uso", tom: "neutral", badge: "bg-success/10 text-success" },
+  manutencao: { label: "Em manutenção", tom: "neutral", badge: "bg-warning/10 text-warning" },
+  avariado: { label: "Avariado", tom: "neutral", badge: "bg-error/10 text-error" },
+  abate: { label: "Abatido", tom: "neutral", badge: "bg-muted text-muted-foreground" },
 };
 
 const OPCOES_ESTADO = [
@@ -84,9 +84,9 @@ const CATEGORIA_ICONE = {
 const VIDA_UTIL_ANOS = 5;
 
 const tabClsBase =
-  "-mb-px inline-flex items-center gap-1.5 whitespace-nowrap border-b-2 pb-2.5 pt-2 text-sm font-medium transition-colors";
-const tabClsAtiva = "border-blue-600 font-bold text-blue-600";
-const tabClsInativa = "border-transparent text-muted-foreground hover:text-foreground";
+  "inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors";
+const tabClsAtiva = "bg-primary font-semibold text-primary-foreground shadow-sm";
+const tabClsInativa = "text-muted-foreground hover:bg-muted hover:text-foreground";
 
 function tituloCategoria(c) {
   const s = String(c || "").trim();
@@ -366,10 +366,10 @@ export default function PatrimonioPage() {
 
   const kpis = useMemo(
     () => [
-      { key: "total", icon: "category", label: "Total de Bens", valor: String(bens.length), icone: "bg-error/10 text-error", cor: "text-foreground" },
-      { key: "valor", icon: "apartment", label: "Valor de Aquisição", valor: Math.round(totalValor).toLocaleString("pt-AO"), sufixo: "Kz", icone: "bg-blue-50 text-blue-600", cor: "text-blue-600", sufixoCor: "text-blue-600" },
-      { key: "uso", icon: "verified", label: "Em Uso", valor: String(emUso), icone: "bg-emerald-50 text-emerald-600", cor: "text-emerald-600" },
-      { key: "manut", icon: "build", label: "Em Manutenção", valor: String(emManutencao), icone: "bg-red-50 text-red-500", cor: "text-red-600" },
+      { key: "total", icon: "category", label: "Total de Bens", valor: String(bens.length), icone: "bg-muted text-muted-foreground", cor: "text-foreground" },
+      { key: "valor", icon: "apartment", label: "Valor de Aquisição", valor: Math.round(totalValor).toLocaleString("pt-AO"), sufixo: "Kz", icone: "bg-primary/10 text-primary", cor: "text-primary", sufixoCor: "text-primary" },
+      { key: "uso", icon: "verified", label: "Em Uso", valor: String(emUso), icone: "bg-success/10 text-success", cor: "text-success" },
+      { key: "manut", icon: "build", label: "Em Manutenção", valor: String(emManutencao), icone: "bg-warning/10 text-warning", cor: "text-warning" },
     ],
     [bens.length, totalValor, emUso, emManutencao]
   );
@@ -480,25 +480,17 @@ export default function PatrimonioPage() {
 
   return (
     <div className="space-y-4">
-      {/* Faixa do módulo - identificação património (castanho) */}
-      <div className="flex items-center justify-between rounded-xl bg-[#8d5b3d] px-5 py-2.5 text-white shadow-sm">
-        <span className="text-lg font-extrabold uppercase tracking-wide">8. PATRIMÓNIO</span>
-        <span className="hidden text-[11px] font-semibold uppercase tracking-wider text-amber-100 sm:block">
-          Sistema Integrado de Gestão Empresarial
-        </span>
-      </div>
-
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-extrabold tracking-tight text-foreground">Gestão Patrimonial</h1>
-          <p className="mt-0.5 text-xs font-medium text-muted-foreground">equipamentos, mobiliário e manutenção.</p>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">Gestão Patrimonial</h1>
+          <p className="mt-1 text-xs font-medium text-muted-foreground">Equipamentos, mobiliário e manutenção.</p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2.5">
           {podeCriar && (
             <button
               type="button"
               onClick={abrirNovo}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#d9531e] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#b45309]"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
             >
               <Icon name="add" className="text-base" /> Novo Bem
             </button>
@@ -507,7 +499,7 @@ export default function PatrimonioPage() {
             type="button"
             onClick={filtrarManutencao}
             title="Mostrar bens em manutenção"
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#e8d5c4] bg-[#faeee5] px-4 text-sm font-semibold text-[#8d5b3d] transition-colors hover:bg-amber-100"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-warning/25 bg-warning/10 px-4 text-sm font-semibold text-warning transition-colors hover:bg-warning/15"
           >
             <Icon name="build" className="text-base" /> Manutenção
           </button>
@@ -534,7 +526,7 @@ export default function PatrimonioPage() {
       <Ledger rotulo="Património ledger">
         <LedgerHeader titulo="Bens" subtitulo={`${filtrados.length} de ${bens.length} bens`} />
 
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-border px-4">
+        <div className="flex flex-wrap items-center gap-1 px-4 pt-3">
           {tabs.map((t) => (
             <button
               key={t.id || "todos"}
@@ -562,7 +554,7 @@ export default function PatrimonioPage() {
           ))}
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2.5">
+        <div className="flex flex-wrap items-center gap-1.5 px-4 py-1.5">
           <select
             value={categoriaAtiva}
             onChange={(e) => setCategoriaAtiva(e.target.value)}

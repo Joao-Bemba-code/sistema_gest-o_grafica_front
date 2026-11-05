@@ -93,7 +93,7 @@ function Kpi({ icon: Icone, chipCls, iconCls, label, value, delta, deltaCls = "t
       </div>
       <div className="overflow-hidden">
         <span className="block text-[11px] font-medium leading-tight text-muted-foreground">{label}</span>
-        <span className="mt-0.5 block truncate text-base font-bold tracking-tight text-foreground">{value}</span>
+        <span className="mt-0.5 block truncate text-base font-semibold tracking-tight text-foreground">{value}</span>
         {delta != null ? (
           <div className={cn("mt-1 flex items-center text-[10px] font-semibold", deltaCls)}>
             <span>
@@ -123,17 +123,17 @@ function CartaoMarca() {
       />
       <div className="absolute inset-0 bg-gradient-to-r from-[#061528] via-[#061528]/90 to-transparent" />
       <div className="pointer-events-none absolute bottom-0 left-0 h-24 w-24 overflow-hidden">
-        <div className="absolute bottom-0 left-0 h-16 w-16 rounded-tr-3xl bg-blue-600" />
-        <div className="absolute bottom-4 left-6 h-12 w-12 rounded-full bg-amber-500 opacity-90 mix-blend-screen" />
-        <div className="absolute bottom-8 left-0 h-10 w-10 bg-cyan-400" />
+        <div className="absolute bottom-0 left-0 h-16 w-16 rounded-tr-3xl bg-white/10" />
+        <div className="absolute bottom-4 left-6 h-12 w-12 rounded-full bg-primary/40 opacity-90 mix-blend-screen" />
+        <div className="absolute bottom-8 left-0 h-10 w-10 bg-white/5" />
       </div>
       <div className="relative z-10 space-y-0.5">
-        <h2 className="text-xl font-black leading-tight tracking-tight text-white">Mais controlo.</h2>
-        <h2 className="text-xl font-black leading-tight tracking-tight text-white">Mais eficiência.</h2>
-        <h2 className="text-xl font-black leading-tight tracking-tight text-white">Mais resultados.</h2>
+        <h2 className="text-xl font-semibold leading-tight tracking-tight text-white">Mais controlo.</h2>
+        <h2 className="text-xl font-semibold leading-tight tracking-tight text-white">Mais eficiência.</h2>
+        <h2 className="text-xl font-semibold leading-tight tracking-tight text-white">Mais resultados.</h2>
       </div>
       <div className="relative z-10">
-        <p className="max-w-[190px] text-[11px] font-medium leading-relaxed text-slate-300">
+        <p className="max-w-[190px] text-[11px] font-medium leading-relaxed text-white/70">
           Gestão integrada para a sua oficina de artes gráficas.
         </p>
       </div>
@@ -183,8 +183,8 @@ function Donut({ segmentos, centroValor, centroLabel }) {
           ))}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          <span className="max-w-20 truncate text-base font-bold leading-none text-foreground">{centroValor}</span>
-          <span className="mt-0.5 text-[9px] font-bold leading-none tracking-tight text-muted-foreground">{centroLabel}</span>
+          <span className="max-w-20 truncate text-base font-semibold leading-none text-foreground">{centroValor}</span>
+          <span className="mt-0.5 text-[9px] font-semibold leading-none tracking-tight text-muted-foreground">{centroLabel}</span>
         </div>
       </div>
       <div className="space-y-2 pl-3 text-[10px]">
@@ -194,7 +194,7 @@ function Donut({ segmentos, centroValor, centroLabel }) {
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
               <span className="text-muted-foreground">{s.label}</span>
             </div>
-            <span className="font-bold text-foreground">
+            <span className="font-semibold text-foreground">
               {formatNum(s.value)} ({Math.round((s.value / total) * 100)}%)
             </span>
           </div>
@@ -210,14 +210,14 @@ function Donut({ segmentos, centroValor, centroLabel }) {
 /* ─── Cores e rótulos das propostas por estado ─── */
 
 const ESTADO_PIZZA = [
-  { estado: "rascunho", rotulo: "Em preparação", cor: "#f59e0b" },
-  { estado: "enviada", rotulo: "Enviadas", cor: "#0ea5e9" },
-  { estado: "recebida", rotulo: "Em revisão", cor: "#64748b" },
-  { estado: "avaliada", rotulo: "Avaliadas", cor: "#8b5cf6" },
+  { estado: "rascunho", rotulo: "Em preparação", cor: "#f58220" },
+  { estado: "enviada", rotulo: "Enviadas", cor: "#0066ff" },
+  { estado: "recebida", rotulo: "Em revisão", cor: "#94a3b8" },
+  { estado: "avaliada", rotulo: "Avaliadas", cor: "#0047ab" },
   { estado: "aprovada", rotulo: "Aceites", cor: "#10b981" },
-  { estado: "rejeitada", rotulo: "Recusadas", cor: "#ef4444" },
-  { estado: "expirada", rotulo: "Expiradas", cor: "#94a3b8" },
-  { estado: "anulada", rotulo: "Anuladas", cor: "#475569" },
+  { estado: "rejeitada", rotulo: "Recusadas", cor: "#ee2a24" },
+  { estado: "expirada", rotulo: "Expiradas", cor: "#cbd5e1" },
+  { estado: "anulada", rotulo: "Anuladas", cor: "#64748b" },
 ];
 
 /* ═══════════════ Página ═══════════════ */
@@ -412,9 +412,9 @@ export default function DashboardPage() {
   let accSeg = 0;
   const segmentosDonut = [
     { label: "Concluídas", value: concluidas, color: "#10b981" },
-    { label: "Em produção", value: emProducao, color: "#0ea5e9" },
-    { label: "Em preparação", value: preparacao, color: "#f59e0b" },
-    { label: "Atrasadas", value: atrasadas.length, color: "#ef4444" },
+    { label: "Em produção", value: emProducao, color: "#0066ff" },
+    { label: "Em preparação", value: preparacao, color: "#f58220" },
+    { label: "Atrasadas", value: atrasadas.length, color: "#ee2a24" },
   ].map((s) => {
     const len = (s.value / totalSeg) * CIRC;
     const offset = -(accSeg / totalSeg) * CIRC;
@@ -535,7 +535,7 @@ export default function DashboardPage() {
           {/* Cabeçalho: título + filtros */}
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold tracking-tight text-foreground">Visão Geral</h2>
+              <h2 className="text-lg font-semibold tracking-tight text-foreground">Visão Geral</h2>
               <p className="mt-0.5 text-xs text-muted-foreground">Acompanhe o desempenho da sua gráfica em tempo real.</p>
             </div>
             <div className="flex items-center space-x-3">
@@ -623,7 +623,7 @@ export default function DashboardPage() {
             {/* Vendas vs Produção */}
             <div className="flex flex-col justify-between rounded-xl border border-border bg-card p-4 shadow-sm md:col-span-7 lg:col-span-5">
               <div className="mb-2 flex items-center justify-between">
-                <h3 className="text-xs font-bold text-foreground">Vendas vs Produção (últimos {nMeses} meses)</h3>
+                <h3 className="text-xs font-semibold text-foreground">Vendas vs Produção (últimos {nMeses} meses)</h3>
                 <div className="relative" ref={menuGraficoRef}>
                   <button
                     type="button"
@@ -698,7 +698,7 @@ export default function DashboardPage() {
             <div className="flex flex-col gap-3 md:col-span-5 lg:col-span-7 lg:grid lg:grid-cols-7">
               {/* Estado das Ordens de Produção (donut) */}
               <div className="flex flex-col justify-between rounded-xl border border-border bg-card p-4 shadow-sm lg:col-span-4">
-                <h3 className="mb-2 text-xs font-bold text-foreground">Estado das Ordens de Produção</h3>
+                <h3 className="mb-2 text-xs font-semibold text-foreground">Estado das Ordens de Produção</h3>
                 <div className="my-auto flex items-center justify-between">
                   <div className="relative flex h-28 w-28 flex-shrink-0 items-center justify-center">
                     <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
@@ -718,8 +718,8 @@ export default function DashboardPage() {
                       ))}
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                      <span className="text-base font-bold leading-none text-foreground">{ordens.length}</span>
-                      <span className="mt-0.5 text-[9px] font-bold leading-none tracking-tight text-muted-foreground">OP</span>
+                      <span className="text-base font-semibold leading-none text-foreground">{ordens.length}</span>
+                      <span className="mt-0.5 text-[9px] font-semibold leading-none tracking-tight text-muted-foreground">OP</span>
                     </div>
                   </div>
                   <div className="space-y-2 pl-3 text-[10px]">
@@ -729,7 +729,7 @@ export default function DashboardPage() {
                           <span className="h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
                           <span className="text-muted-foreground">{s.label}</span>
                         </div>
-                        <span className="font-bold text-foreground">
+                        <span className="font-semibold text-foreground">
                           {s.value} ({Math.round((s.value / totalSeg) * 100)}%)
                         </span>
                       </div>
@@ -742,7 +742,7 @@ export default function DashboardPage() {
               {/* Alertas do Sistema */}
               <div className="flex flex-col justify-between rounded-xl border border-border bg-card p-4 shadow-sm lg:col-span-3">
                 <div className="mb-2 flex items-center justify-between">
-                  <h3 className="text-xs font-bold text-foreground">Alertas do Sistema</h3>
+                  <h3 className="text-xs font-semibold text-foreground">Alertas do Sistema</h3>
                   <Link href="/relatorios" className="text-[10px] font-medium text-primary hover:underline">
                     Ver todos →
                   </Link>
@@ -759,7 +759,7 @@ export default function DashboardPage() {
                             <Icone className="h-3 w-3" />
                           </div>
                           <div>
-                            <h4 className="text-[11px] font-bold leading-tight text-foreground">{a.titulo}</h4>
+                            <h4 className="text-[11px] font-semibold leading-tight text-foreground">{a.titulo}</h4>
                             <p className="text-[9.5px] leading-tight text-muted-foreground">{a.desc}</p>
                           </div>
                         </div>
@@ -776,7 +776,7 @@ export default function DashboardPage() {
         <div className="min-w-0 lg:col-span-9">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div className="flex flex-col justify-between rounded-xl border border-border bg-card p-4 shadow-sm">
-              <h3 className="mb-2 text-xs font-bold text-foreground">Propostas por estado (quantidade)</h3>
+              <h3 className="mb-2 text-xs font-semibold text-foreground">Propostas por estado (quantidade)</h3>
               <Donut
                 segmentos={segmentosQtd}
                 centroValor={formatNum(propostas.length)}
@@ -784,7 +784,7 @@ export default function DashboardPage() {
               />
             </div>
             <div className="flex flex-col justify-between rounded-xl border border-border bg-card p-4 shadow-sm">
-              <h3 className="mb-2 text-xs font-bold text-foreground">Propostas por estado (valor)</h3>
+              <h3 className="mb-2 text-xs font-semibold text-foreground">Propostas por estado (valor)</h3>
               <Donut
                 segmentos={segmentosValor}
                 centroValor={compactKz(totalValorPropostas)}
@@ -796,7 +796,7 @@ export default function DashboardPage() {
 
         {/* ══════════ Acesso rápido: mesma linha dos gráficos ══════════ */}
         <div className="self-end rounded-xl border border-border bg-card p-3.5 shadow-sm lg:col-span-3 lg:col-start-10 lg:row-start-2">
-          <h3 className="mb-2.5 text-xs font-bold text-foreground">Acesso rápido</h3>
+          <h3 className="mb-2.5 text-xs font-semibold text-foreground">Acesso rápido</h3>
           <div className="grid grid-cols-4 gap-2">
             {acoesRapidas.map((a) => {
               const Icone = a.icon;

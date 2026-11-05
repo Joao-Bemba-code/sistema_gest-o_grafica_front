@@ -38,18 +38,18 @@ function tipoParaSalvar(texto) {
 }
 
 const RECURSO_META = {
-  materia_prima: { label: "Matéria-Prima", icon: "inventory", classe: "text-blue-500 bg-blue-500/10" },
-  artigo: { label: "Artigo / Produto", icon: "inventory_2", classe: "text-emerald-500 bg-emerald-500/10" },
-  produto_acabado: { label: "Produto Acabado", icon: "inventory_2", classe: "text-emerald-500 bg-emerald-500/10" },
-  servico: { label: "Serviço", icon: "home_repair_service", classe: "text-violet-500 bg-violet-500/10" },
-  servicos: { label: "Serviço", icon: "home_repair_service", classe: "text-violet-500 bg-violet-500/10" },
-  maquina: { label: "Maquinaria", icon: "precision_manufacturing", classe: "text-slate-500 bg-slate-500/10" },
-  funcionario: { label: "Funcionário", icon: "groups", classe: "text-amber-500 bg-amber-500/10" },
-  colaborador: { label: "Colaborador", icon: "group", classe: "text-cyan-500 bg-cyan-500/10" },
-  consumiveis: { label: "Consumíveis", icon: "local_fire_department", classe: "text-orange-500 bg-orange-500/10" },
-  materiais: { label: "Materiais", icon: "inventory", classe: "text-blue-500 bg-blue-500/10" },
-  ferramentas: { label: "Ferramentas", icon: "handyman", classe: "text-gray-500 bg-gray-500/10" },
-  equipamentos: { label: "Equipamentos", icon: "precision_manufacturing", classe: "text-indigo-500 bg-indigo-500/10" },
+  materia_prima: { label: "Matéria-Prima", icon: "inventory", classe: "text-primary bg-primary/10" },
+  artigo: { label: "Artigo / Produto", icon: "inventory_2", classe: "text-primary bg-primary/10" },
+  produto_acabado: { label: "Produto Acabado", icon: "inventory_2", classe: "text-primary bg-primary/10" },
+  servico: { label: "Serviço", icon: "home_repair_service", classe: "text-primary bg-primary/10" },
+  servicos: { label: "Serviço", icon: "home_repair_service", classe: "text-primary bg-primary/10" },
+  maquina: { label: "Maquinaria", icon: "precision_manufacturing", classe: "text-muted-foreground bg-muted" },
+  funcionario: { label: "Funcionário", icon: "groups", classe: "text-muted-foreground bg-muted" },
+  colaborador: { label: "Colaborador", icon: "group", classe: "text-muted-foreground bg-muted" },
+  consumiveis: { label: "Consumíveis", icon: "local_fire_department", classe: "text-warning bg-warning/10" },
+  materiais: { label: "Materiais", icon: "inventory", classe: "text-primary bg-primary/10" },
+  ferramentas: { label: "Ferramentas", icon: "handyman", classe: "text-muted-foreground bg-muted" },
+  equipamentos: { label: "Equipamentos", icon: "precision_manufacturing", classe: "text-muted-foreground bg-muted" },
 };
 
 function tipoChave(v) {

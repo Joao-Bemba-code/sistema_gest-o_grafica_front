@@ -275,7 +275,7 @@ export default function SaidaMateriaisModal({ open, op, matPorId, materiais, onC
                 </div>
               )}
               {!ehAprovacao && selMaterial && matPorId?.[Number(selMaterial)]?.percentual_quebra > 0 && (
-                <p className="text-[10px] text-amber-600">
+                <p className="text-[10px] text-warning">
                   Quebra técnica de {matPorId[Number(selMaterial)].percentual_quebra}% será adicionada à quantidade.
                 </p>
               )}

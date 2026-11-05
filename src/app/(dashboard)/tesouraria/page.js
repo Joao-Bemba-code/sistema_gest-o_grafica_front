@@ -27,17 +27,9 @@ export default function TesourariaPage() {
 
   return (
     <div className="space-y-4">
-      {/* Faixa do módulo - identificação tesouraria (âmbar) */}
-      <div className="flex items-center justify-between rounded-xl bg-[#c27b00] px-5 py-2.5 text-white shadow-sm">
-        <span className="text-lg font-extrabold uppercase tracking-wide">7. TESOURARIA</span>
-        <span className="hidden text-[11px] font-semibold uppercase tracking-wider text-amber-100 sm:block">
-          Sistema Integrado de Gestão Empresarial
-        </span>
-      </div>
-
       <div className="min-w-0">
-        <h1 className="text-2xl font-extrabold tracking-tight text-foreground">Gestão de Tesouraria</h1>
-        <p className="mt-0.5 text-xs font-medium text-muted-foreground">Caixa, bancos e pagamentos.</p>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">Gestão de Tesouraria</h1>
+        <p className="mt-1 text-xs font-medium text-muted-foreground">Caixa, bancos e pagamentos.</p>
       </div>
 
       <TesourariaTab aba={abaVisivel} setAba={setTab} abas={abas}>

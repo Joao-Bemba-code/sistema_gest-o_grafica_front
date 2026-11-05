@@ -106,19 +106,19 @@ function compactKz(v) {
 
 
 
-const CORES_DONUT = ["#4338ca", "#0ea5e9", "#14b8a6", "#f59e0b", "#a855f7", "#64748b"];
+const CORES_DONUT = ["#0066ff", "#2f80ff", "#5c9bff", "#89b6ff", "#64748b", "#10b981"];
 
 
 
 const ESTADOS_FATURA = [
 
-  { value: "emitida", label: "Emitida", cor: "#0369a1", icon: "receipt_long" },
+  { value: "emitida", label: "Emitida", cor: "#0066ff", icon: "receipt_long" },
 
-  { value: "parcial", label: "Pagamento parcial", cor: "#b45309", icon: "payments" },
+  { value: "parcial", label: "Pagamento parcial", cor: "#f58220", icon: "payments" },
 
-  { value: "paga", label: "Paga", cor: "#047857", icon: "check_circle" },
+  { value: "paga", label: "Paga", cor: "#10b981", icon: "check_circle" },
 
-  { value: "cancelada", label: "Cancelada", cor: "#b91c1c", icon: "block" },
+  { value: "cancelada", label: "Cancelada", cor: "#ee2a24", icon: "block" },
 
 ];
 
@@ -126,11 +126,11 @@ const ESTADOS_FATURA = [
 
 const TIPOS_FATURA = [
 
-  { value: "factura", label: "Fatura", cor: "#4338ca", icon: "receipt_long" },
+  { value: "factura", label: "Fatura", cor: "#0066ff", icon: "receipt_long" },
 
-  { value: "factura_recibo", label: "Factura-recibo", cor: "#0ea5e9", icon: "receipt" },
+  { value: "factura_recibo", label: "Factura-recibo", cor: "#0066ff", icon: "receipt" },
 
-  { value: "recibo", label: "Recibo", cor: "#14b8a6", icon: "request_quote" },
+  { value: "recibo", label: "Recibo", cor: "#10b981", icon: "request_quote" },
 
 ];
 
@@ -138,13 +138,13 @@ const TIPOS_FATURA = [
 
 const ESTADOS_ORDEM = [
 
-  { value: "aguardando", label: "Aguardando", cor: "#f59e0b", icon: "schedule" },
+  { value: "aguardando", label: "Aguardando", cor: "#f58220", icon: "schedule" },
 
-  { value: "em_producao", label: "Em produção", cor: "#4338ca", icon: "precision_manufacturing" },
+  { value: "em_producao", label: "Em produção", cor: "#0066ff", icon: "precision_manufacturing" },
 
-  { value: "finalizado", label: "Finalizado", cor: "#047857", icon: "check_circle" },
+  { value: "finalizado", label: "Finalizado", cor: "#10b981", icon: "check_circle" },
 
-  { value: "entregue", label: "Entregue", cor: "#a855f7", icon: "local_shipping" },
+  { value: "entregue", label: "Entregue", cor: "#64748b", icon: "local_shipping" },
 
 ];
 
@@ -152,11 +152,11 @@ const ESTADOS_ORDEM = [
 
 const ESTADOS_BEM = [
 
-  { value: "ativo", label: "Em uso", cor: "#047857", icon: "check_circle" },
+  { value: "ativo", label: "Em uso", cor: "#10b981", icon: "check_circle" },
 
-  { value: "manutencao", label: "Em manutenção", cor: "#b45309", icon: "build" },
+  { value: "manutencao", label: "Em manutenção", cor: "#f58220", icon: "build" },
 
-  { value: "avariado", label: "Avariado", cor: "#b91c1c", icon: "warning" },
+  { value: "avariado", label: "Avariado", cor: "#ee2a24", icon: "warning" },
 
   { value: "abate", label: "Abatido", cor: "#64748b", icon: "block" },
 
@@ -166,15 +166,15 @@ const ESTADOS_BEM = [
 
 const ESTADOS_PEDIDO = [
 
-  { value: "pendente", label: "Pendente", cor: "#f59e0b", icon: "schedule" },
+  { value: "pendente", label: "Pendente", cor: "#f58220", icon: "schedule" },
 
-  { value: "aprovado", label: "Aprovado", cor: "#4338ca", icon: "check_circle" },
+  { value: "aprovado", label: "Aprovado", cor: "#0066ff", icon: "check_circle" },
 
-  { value: "enviado", label: "Enviado", cor: "#0ea5e9", icon: "local_shipping" },
+  { value: "enviado", label: "Enviado", cor: "#0066ff", icon: "local_shipping" },
 
-  { value: "recebido", label: "Recebido", cor: "#047857", icon: "inventory_2" },
+  { value: "recebido", label: "Recebido", cor: "#10b981", icon: "inventory_2" },
 
-  { value: "rejeitado", label: "Rejeitado", cor: "#b91c1c", icon: "block" },
+  { value: "rejeitado", label: "Rejeitado", cor: "#ee2a24", icon: "block" },
 
   { value: "cancelado", label: "Cancelado", cor: "#64748b", icon: "close" },
 
@@ -184,17 +184,17 @@ const ESTADOS_PEDIDO = [
 
 const STATUS_MATERIAL = [
 
-  { value: "ok", label: "Saudável", cor: "#047857", icon: "check_circle" },
+  { value: "ok", label: "Saudável", cor: "#10b981", icon: "check_circle" },
 
-  { value: "repor", label: "Abaixo do mínimo", cor: "#b45309", icon: "warning" },
+  { value: "repor", label: "Abaixo do mínimo", cor: "#f58220", icon: "warning" },
 
-  { value: "esgotado", label: "Esgotado", cor: "#b91c1c", icon: "error" },
+  { value: "esgotado", label: "Esgotado", cor: "#ee2a24", icon: "error" },
 
 ];
 
 
 
-const COR_RELATORIO = "#0066CC";
+const COR_RELATORIO = "#0066ff";
 
 
 
@@ -220,23 +220,22 @@ const MODULOS_REL = [
 
 
 
-const tabClsBase =
-
-  "-mb-px inline-flex items-center gap-1.5 whitespace-nowrap border-b-2 pb-2.5 pt-2 text-sm font-medium transition-colors";
-
-const tabClsAtiva = "border-blue-600 font-bold text-blue-600";
-
-const tabClsInativa = "border-transparent text-muted-foreground hover:text-foreground";
-
-
-
-const botaoPdfCls =
-
-  "inline-flex h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 text-xs font-semibold text-red-700 transition-colors hover:bg-red-100";
-
-const botaoExcelCls =
-
-  "inline-flex h-9 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100";
+const tabClsBase =
+  "inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors";
+
+const tabClsAtiva = "bg-primary font-semibold text-primary-foreground shadow-sm";
+
+const tabClsInativa = "text-muted-foreground hover:bg-muted hover:text-foreground";
+
+
+
+const botaoPdfCls =
+
+  "inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted/60";
+
+const botaoExcelCls =
+
+  "inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted/60";
 
 
 
@@ -326,7 +325,7 @@ function CabecalhoGrafico({ icon, titulo, sub }) {
 
   return (
 
-    <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+    <div className="flex items-center gap-3 px-4 py-3">
 
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-muted">
 
@@ -386,7 +385,7 @@ function TabsPills({ opcoes, valor, onChange }) {
 
           className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
 
-            valor === o.value ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            valor === o.value ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
 
           }`}
 
@@ -474,7 +473,7 @@ function DonutGrafico({ dados, centro, tooltipFormat }) {
 
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
 
-        <span className="text-xl font-extrabold text-foreground font-mono">{centro}</span>
+        <span className="text-xl font-semibold text-foreground font-mono">{centro}</span>
 
         <span className="text-[9px] text-muted-foreground uppercase tracking-widest">total</span>
 
@@ -1851,33 +1850,17 @@ export default function RelatoriosPage() {
 
     <div className="space-y-5">
 
-      {/* Faixa do módulo - identificação Relatórios (azul) */}
-
-      <div className="flex items-center justify-between rounded-xl bg-[#0066CC] px-5 py-2.5 text-white shadow-sm">
-
-        <span className="text-lg font-extrabold uppercase tracking-wide">10. RELATÓRIOS</span>
-
-        <span className="hidden text-[11px] font-semibold uppercase tracking-wider text-blue-100 sm:block">
-
-          Sistema Integrado de Gestão Empresarial
-
-        </span>
-
-      </div>
-
-
-
-      <div className="min-w-0">
-
-        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Relatórios e Análises</h1>
-
-        <p className="mt-0.5 text-xs font-medium text-muted-foreground">Informação para melhores decisões.</p>
-
-      </div>
-
-
-
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-border">
+      <div className="min-w-0">
+
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">Relatórios e Análises</h1>
+
+        <p className="mt-1 text-xs font-medium text-muted-foreground">Informação para melhores decisões.</p>
+
+      </div>
+
+
+
+      <div className="flex flex-wrap items-center gap-1">
 
         {MODULOS_REL.map((m) => (
 
@@ -1911,8 +1894,8 @@ export default function RelatoriosPage() {
 
           <section className="overflow-hidden rounded-xl border border-border bg-card lg:col-span-5">
 
-            <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-
+            <div className="flex items-center gap-2 px-4 py-3">
+
               <Icon name="description" className="text-base text-muted-foreground" />
 
               <h2 className="text-sm font-semibold text-foreground">Relatórios Disponíveis</h2>
@@ -1937,7 +1920,7 @@ export default function RelatoriosPage() {
 
                       className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left text-sm transition-all ${
 
-                        ativo ? "bg-blue-50 text-blue-700 ring-1 ring-blue-100/80" : "text-slate-700 hover:bg-slate-50"
+                        ativo ? "bg-primary/10 text-primary" : "text-foreground hover:bg-muted/60"
 
                       }`}
 
@@ -1945,7 +1928,7 @@ export default function RelatoriosPage() {
 
                       <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
 
-                        ativo ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500"
+                        ativo ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
 
                       }`}>
 
@@ -1953,7 +1936,7 @@ export default function RelatoriosPage() {
 
                       </span>
 
-                      <span className={`min-w-0 flex-1 truncate ${ativo ? "font-semibold text-blue-900" : "font-medium"}`}>{r.titulo}</span>
+                      <span className={`min-w-0 flex-1 truncate ${ativo ? "font-semibold text-primary" : "font-medium"}`}>{r.titulo}</span>
 
                     </button>
 
@@ -1975,26 +1958,26 @@ export default function RelatoriosPage() {
 
               <>
 
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border px-4 py-3">
-
-                  <div className="min-w-0">
-
-                    <h3 className="truncate text-base font-bold text-slate-900">{relatorioAtivo.titulo}</h3>
-
-                    <p className="truncate text-xs text-slate-400">{relatorioAtivo.sub}</p>
-
-                  </div>
-
-                  <div className="flex shrink-0 flex-col sm:items-end">
-
-                    <p className="text-xl font-black tracking-tight text-slate-900 tabular-nums">{relatorioAtivo.totalTexto}</p>
-
-                    {relatorioAtivo.variacao !== null && (
-
-                      <span className={`mt-0.5 inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 ${
-
-                        relatorioAtivo.variacao >= 0 ? "bg-emerald-50 text-emerald-600 ring-emerald-200" : "bg-red-50 text-red-600 ring-red-200"
-
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3">
+
+                  <div className="min-w-0">
+
+                    <h3 className="truncate text-sm font-semibold text-foreground">{relatorioAtivo.titulo}</h3>
+
+                    <p className="truncate text-xs text-muted-foreground">{relatorioAtivo.sub}</p>
+
+                  </div>
+
+                  <div className="flex shrink-0 flex-col sm:items-end">
+
+                    <p className="text-xl font-semibold tracking-tight text-foreground tabular-nums">{relatorioAtivo.totalTexto}</p>
+
+                    {relatorioAtivo.variacao !== null && (
+
+                      <span className={`mt-0.5 inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${
+
+                        relatorioAtivo.variacao >= 0 ? "bg-success/10 text-success ring-success/20" : "bg-error/10 text-error ring-error/20"
+
                       }`}>
 
                         <Icon name={relatorioAtivo.variacao >= 0 ? "trending_up" : "trending_down"} className="text-sm" />
@@ -2055,23 +2038,23 @@ export default function RelatoriosPage() {
 
                     onClick={() => setRelatorioVer(relatorioAtivo)}
 
-                    className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-100"
+                    className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/60"
 
                   >
 
-                    <Icon name="visibility" className="text-sm text-slate-500" /> Visualizar
+                    <Icon name="visibility" className="text-sm text-muted-foreground" /> Visualizar
 
                   </button>
 
                   <button type="button" onClick={relatorioAtivo.onExportPdf} className={botaoPdfCls}>
 
-                    <Icon name="picture_as_pdf" className="text-sm text-red-600" /> Exportar PDF
+                    <Icon name="picture_as_pdf" className="text-sm text-error" /> Exportar PDF
 
                   </button>
 
                   <button type="button" onClick={relatorioAtivo.onExportExcel} className={botaoExcelCls}>
 
-                    <Icon name="grid_on" className="text-sm text-emerald-600" /> Exportar Excel
+                    <Icon name="grid_on" className="text-sm text-success" /> Exportar Excel
 
                   </button>
 
@@ -2195,7 +2178,7 @@ export default function RelatoriosPage() {
 
               <div className="h-52">
 
-                <AreaGrafico dados={vendasPorMes} serie="faturacao" nome="Faturação" cor="#4338ca" formato={compactKz} />
+                <AreaGrafico dados={vendasPorMes} serie="faturacao" nome="Faturação" cor="#0066ff" formato={compactKz} />
 
               </div>
 
@@ -2207,7 +2190,7 @@ export default function RelatoriosPage() {
 
               <div className="h-52">
 
-                <AreaGrafico dados={recebidoPorMes} serie="recebido" nome="Recebido" cor="#047857" formato={compactKz} />
+                <AreaGrafico dados={recebidoPorMes} serie="recebido" nome="Recebido" cor="#10b981" formato={compactKz} />
 
               </div>
 
@@ -2302,7 +2285,7 @@ export default function RelatoriosPage() {
 
                   <p className="text-xs font-semibold text-muted-foreground">{k.label}</p>
 
-                  <p className="text-2xl font-black leading-tight tracking-tight text-foreground tabular-nums">{k.valor}</p>
+                  <p className="text-xl font-semibold leading-tight tracking-tight text-foreground tabular-nums">{k.valor}</p>
 
                   {k.legenda && <p className="text-[10px] font-medium text-muted-foreground">{k.legenda}</p>}
 
@@ -2327,7 +2310,7 @@ export default function RelatoriosPage() {
 
             />
 
-            <div className="flex flex-col gap-2.5 border-b border-border px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2.5 px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between">
 
               <TabsPills
 
@@ -2481,7 +2464,7 @@ export default function RelatoriosPage() {
 
       {aba === "producao" && (() => {
 
-        const statusCores = { aguardando: "#f59e0b", em_producao: "#4338ca", finalizado: "#047857", entregue: "#a855f7" };
+        const statusCores = { aguardando: "#f58220", em_producao: "#0066ff", finalizado: "#10b981", entregue: "#64748b" };
 
         const totalOrdens = opsPorStatus.reduce((t, x) => t + x.quantidade, 0) || 1;
 
@@ -2631,17 +2614,17 @@ export default function RelatoriosPage() {
 
                         <linearGradient id="grad-produzidas" x1="0" y1="0" x2="0" y2="1">
 
-                          <stop offset="0%" stopColor="#4338ca" stopOpacity={0.35} />
+                          <stop offset="0%" stopColor="#0066ff" stopOpacity={0.35} />
 
-                          <stop offset="100%" stopColor="#4338ca" stopOpacity={0.02} />
+                          <stop offset="100%" stopColor="#0066ff" stopOpacity={0.02} />
 
                         </linearGradient>
 
                         <linearGradient id="grad-entregues" x1="0" y1="0" x2="0" y2="1">
 
-                          <stop offset="0%" stopColor="#047857" stopOpacity={0.3} />
+                          <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
 
-                          <stop offset="100%" stopColor="#047857" stopOpacity={0.02} />
+                          <stop offset="100%" stopColor="#10b981" stopOpacity={0.02} />
 
                         </linearGradient>
 
@@ -2655,9 +2638,9 @@ export default function RelatoriosPage() {
 
                       <Tooltip content={<ChartTooltip />} />
 
-                      <Area type="monotone" dataKey="valor" name="Produzidas" stroke="#4338ca" strokeWidth={2.5} fill="url(#grad-produzidas)" activeDot={{ r: 4 }} />
+                      <Area type="monotone" dataKey="valor" name="Produzidas" stroke="#0066ff" strokeWidth={2.5} fill="url(#grad-produzidas)" activeDot={{ r: 4 }} />
 
-                      <Area type="monotone" dataKey="entregues" name="Entregues" stroke="#047857" strokeWidth={2.5} fill="url(#grad-entregues)" activeDot={{ r: 4 }} />
+                      <Area type="monotone" dataKey="entregues" name="Entregues" stroke="#10b981" strokeWidth={2.5} fill="url(#grad-entregues)" activeDot={{ r: 4 }} />
 
                     </AreaChart>
 
@@ -2827,8 +2810,8 @@ export default function RelatoriosPage() {
 
               <Ledger rotulo="Resumo por categoria ledger" className="lg:col-span-2">
 
-                <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
-
+                <div className="flex items-center justify-between gap-2 px-4 py-3">
+
                   <h2 className="truncate text-sm font-semibold text-foreground">Resumo por Categoria</h2>
 
                   <button
@@ -3811,7 +3794,7 @@ export default function RelatoriosPage() {
 
             <p className="text-xs text-muted-foreground">{relatorioVer.sub}</p>
 
-            <p className="text-lg font-extrabold tracking-tight text-foreground tabular-nums">{relatorioVer.totalTexto}</p>
+            <p className="text-lg font-semibold tracking-tight text-foreground tabular-nums">{relatorioVer.totalTexto}</p>
 
             <LedgerTable>
 

@@ -43,9 +43,9 @@ const estadoCfg = {
 };
 
 const tipoBadge = {
-  entrada: "bg-emerald-50 text-emerald-600",
-  saida: "bg-red-50 text-red-600",
-  transferencia: "bg-blue-50 text-blue-600",
+  entrada: "bg-success/10 text-success",
+  saida: "bg-error/10 text-error",
+  transferencia: "bg-primary/10 text-primary",
 };
 
 const metodos = [
@@ -116,13 +116,13 @@ const CAMPOS = [
   { value: "referencia", label: "Referência", obter: (m) => m.referencia || "" },
 ];
 
-const pillBase = "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-sm font-medium whitespace-nowrap transition-colors";
-const pillAtiva = "border-primary/40 bg-primary/10 text-primary";
-const pillInativa = "border-border bg-card text-muted-foreground hover:bg-muted/60 hover:text-foreground";
+const pillBase = "inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium whitespace-nowrap transition-colors";
+const pillAtiva = "bg-primary/10 font-semibold text-primary";
+const pillInativa = "text-muted-foreground hover:bg-muted hover:text-foreground";
 
-const tabClsBase = "-mb-px inline-flex items-center gap-1.5 whitespace-nowrap border-b-2 pb-2.5 pt-2 text-sm font-medium transition-colors";
-const tabClsAtiva = "border-primary font-bold text-primary";
-const tabClsInativa = "border-transparent text-muted-foreground hover:text-foreground";
+const tabClsBase = "inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors";
+const tabClsAtiva = "bg-primary font-semibold text-primary-foreground shadow-sm";
+const tabClsInativa = "text-muted-foreground hover:bg-muted hover:text-foreground";
 
 function formatKz(v) { return `Kz ${Number(v || 0).toLocaleString("pt-AO")}`; }
 
@@ -493,7 +493,7 @@ export default function TesourariaTab({ aba = "movimentos", setAba, abas = [], c
         ))}
       </section>
 
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-border">
+      <div className="flex flex-wrap items-center gap-1">
         {abas.map((t) => (
           <button
             key={t.id}
@@ -530,7 +530,7 @@ export default function TesourariaTab({ aba = "movimentos", setAba, abas = [], c
             placeholder="Pesquisar por descrição, referência ou categoria..."
           />
         )}
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2">
+        <div className="flex flex-wrap items-center gap-1.5 px-4 py-2">
           {filterConfig.map((f) => (
             <button
               key={f.value}

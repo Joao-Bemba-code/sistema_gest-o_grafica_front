@@ -128,7 +128,7 @@ function CampoFiltro({ label, children }) {
 function CartaoGrafico({ icon, titulo, sub, children }) {
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-card">
-      <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+      <div className="flex items-center gap-3 px-4 py-3">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-muted">
           <Icon name={icon} className="text-lg text-muted-foreground" />
         </span>
@@ -146,7 +146,7 @@ function CartaoDistribuicao({ icon, titulo, sub, dados, total }) {
   const max = Math.max(...dados.map((d) => d.valor), 1);
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-card">
-      <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+      <div className="flex items-center gap-3 px-4 py-3">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-muted">
           <Icon name={icon} className="text-lg text-muted-foreground" />
         </span>
