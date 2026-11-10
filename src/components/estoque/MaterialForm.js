@@ -232,7 +232,7 @@ export default function MaterialForm({ formId = "form-material", form, onChange,
         ))}
       </div>
 
-      <div role="tabpanel" id={`${formId}-painel-${tabAtiva}`} aria-labelledby={id(`tab-${tabAtiva}`)} className="animate-fade-up">
+      <div role="tabpanel" id={`${formId}-painel-${tabAtiva}`} aria-labelledby={id(`tab-${tabAtiva}`)} className="">
         {tabAtiva === "identificacao" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Campo label="Código">

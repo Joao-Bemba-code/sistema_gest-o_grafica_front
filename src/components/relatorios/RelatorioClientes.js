@@ -54,8 +54,10 @@ const ROTULOS_PERIODO = {
 };
 
 const nomesMeses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-const CORES = ["#0066CC", "#0ea5e9", "#14b8a6", "#f59e0b", "#a855f7", "#64748b", "#ef4444", "#84cc16"];
-const COR_RELATORIO = "#0066CC";
+/* Paleta categórica de séries (1 por cliente). Cores com equivalente no tema
+   usam tokens; os matizes sem token (sky, teal, purple, lime) ficam fixos. */
+const CORES = ["var(--data-1)", "#0ea5e9", "#14b8a6", "var(--data-3)", "#a855f7", "var(--data-6)", "var(--data-2)", "#84cc16"];
+const COR_RELATORIO = "var(--data-1)";
 
 const FILTROS_INICIAIS = {
   periodo: "tudo",
@@ -76,9 +78,9 @@ const FILTROS_INICIAIS = {
 const selectCls =
   "h-9 w-full rounded-lg border border-border bg-card px-2.5 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/25";
 
-const preenchido = (v) => String(v ?? "").trim() !== "";
+export const preenchido = (v) => String(v ?? "").trim() !== "";
 
-function dataRegisto(c) {
+export function dataRegisto(c) {
   const raw = c.dataCadastro || c.createdAt;
   if (!raw) return null;
   const d = new Date(raw);
@@ -94,13 +96,11 @@ function unidadesDoCliente(c) {
   return set;
 }
 
-function camposEmFalta(c) {
+export function camposEmFalta(c) {
   return CAMPOS_ESSENCIAIS.filter((k) => !preenchido(c[k]));
 }
 
-function cadastroCompleto(c) {
-  return camposEmFalta(c).length === 0;
-}
+export const cadastroCompleto = (c) => camposEmFalta(c).length === 0;
 
 const ehMultiunidade = (c) => unidadesDoCliente(c).size >= 2;
 

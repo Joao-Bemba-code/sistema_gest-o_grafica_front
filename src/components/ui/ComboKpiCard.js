@@ -22,14 +22,14 @@ export default function ComboKpiCard({ icon, title, subtitle, stats, iconVariant
     <Card
       style={style}
       className={cn(
-        "relative overflow-hidden rounded-2xl transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg",
+        "relative overflow-hidden rounded-xl transition-colors duration-200",
         className
       )}
     >
       <div className={cn("absolute inset-x-0 top-0 h-1", v.bar)} aria-hidden="true" />
       <CardContent className="p-5 sm:p-6">
         <div className="flex items-center gap-3.5 mb-5">
-          <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border", v.chip)}>
+          <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border", v.chip)}>
             <Icon name={icon} className="text-xl" />
           </div>
           <div className="min-w-0">

@@ -107,8 +107,7 @@ export default function SuporteResumoPage() {
       )}
 
       {/* Faixa de cabeçalho */}
-      <div className="gradient-hero relative overflow-hidden rounded-xl border border-border px-5 py-5">
-        <span className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-primary via-primary/60 to-tertiary" aria-hidden="true" />
+      <div className="bg-card relative overflow-hidden rounded-xl border border-border px-5 py-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <span className="pill pill-primary">
@@ -146,7 +145,7 @@ export default function SuporteResumoPage() {
       <div className="grid grid-cols-1 gap-4 @5xl:grid-cols-3">
         {carregando || !resumo ? (
           [...Array(3)].map((_, i) => (
-            <div key={i} className="h-[172px] animate-pulse rounded-xl border border-border bg-card shadow-card" />
+            <div key={i} className="h-[172px] rounded-xl border border-border bg-card shadow-card" />
           ))
         ) : (
           <>
@@ -258,7 +257,7 @@ export default function SuporteResumoPage() {
       >
         <FramePanel className="p-3.5">
           {carregando ? (
-            <div className="h-[280px] animate-pulse rounded-lg bg-muted" />
+            <div className="h-[280px] rounded-lg bg-muted" />
           ) : (
             <div className="h-[280px] w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -389,7 +388,7 @@ export default function SuporteResumoPage() {
           <FramePanel className="p-1.5">
             {carregando ? (
               <div className="flex flex-col gap-2 p-2">
-                {[...Array(4)].map((_, i) => <div key={i} className="h-12 animate-pulse rounded-lg bg-muted" />)}
+                {[...Array(4)].map((_, i) => <div key={i} className="h-12 rounded-lg bg-muted" />)}
               </div>
             ) : orgs.length === 0 ? (
               <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">

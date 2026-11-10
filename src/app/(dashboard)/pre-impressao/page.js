@@ -160,7 +160,7 @@ export default function PreImpressaoPage() {
   ];
 
   if (loading) return <CardSkeleton lines={6} />;
-  if (error) return <div className="bg-destructive/10 text-destructive rounded-2xl p-6 text-center font-semibold">{error}</div>;
+  if (error) return <div className="bg-destructive/10 text-destructive rounded-xl p-6 text-center font-semibold">{error}</div>;
 
   return (
     <div className="space-y-4">

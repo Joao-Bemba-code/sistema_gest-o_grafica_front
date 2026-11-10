@@ -187,7 +187,7 @@ export default function FaturaModal({ open, onClose, onSaved }) {
       </>}>
       {carregando ? (
         <div className="space-y-3" aria-label="A carregar formulário">
-          {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-10 bg-muted rounded-xl animate-pulse" />)}
+          {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-10 bg-muted rounded-xl" />)}
         </div>
       ) : (
         <form id="form-fatura" onSubmit={handleSubmitFatura} className="space-y-5">
@@ -210,7 +210,7 @@ export default function FaturaModal({ open, onClose, onSaved }) {
           </div>
 
           {/* Altura fixa: o modal nunca muda de tamanho ao trocar de secção */}
-          <div role="tabpanel" id={`${id("painel")}-${tab}`} aria-labelledby={id(`tab-${tab}`)} className="animate-fade-up h-[400px] overflow-y-auto pr-1 custom-scrollbar">
+          <div role="tabpanel" id={`${id("painel")}-${tab}`} aria-labelledby={id(`tab-${tab}`)} className="h-[400px] overflow-y-auto pr-1 custom-scrollbar">
             {tab === "documento" && (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Campo label="Tipo de Documento" obrigatorio full>

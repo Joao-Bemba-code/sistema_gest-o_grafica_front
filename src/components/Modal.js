@@ -20,6 +20,7 @@ export default function Modal({
 }) {
   const titleId = useId();
   const closeRef = useRef(null);
+  const panelRef = useRef(null);
 
   useEffect(() => {
     if (open) closeRef.current?.focus();
@@ -28,7 +29,23 @@ export default function Modal({
   useEffect(() => {
     if (!open) return;
     document.body.style.overflow = "hidden";
-    const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
+    const onKey = (e) => {
+      if (e.key === "Escape") { onClose?.(); return; }
+      if (e.key !== "Tab" || !panelRef.current) return;
+      const focaveis = panelRef.current.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (!focaveis.length) return;
+      const primeiro = focaveis[0];
+      const ultimo = focaveis[focaveis.length - 1];
+      if (e.shiftKey && document.activeElement === primeiro) {
+        e.preventDefault();
+        ultimo.focus();
+      } else if (!e.shiftKey && document.activeElement === ultimo) {
+        e.preventDefault();
+        primeiro.focus();
+      }
+    };
     document.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = "";
@@ -59,7 +76,7 @@ export default function Modal({
       aria-labelledby={titleId}
     >
       <div
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm"
+        className="fixed inset-0 bg-black/40"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -71,10 +88,11 @@ export default function Modal({
         }
       >
         <div
+          ref={panelRef}
           className={`pointer-events-auto bg-card border border-border rounded-2xl shadow-modal overflow-hidden flex flex-col max-h-[calc(100vh-2rem)] ${
             arrastavel
               ? `absolute left-1/2 top-1/2 w-[calc(100%-2rem)] ${maxW}`
-              : `w-full ${maxW} animate-modal-in`
+              : `w-full ${maxW}`
           } ${dragging ? "select-none" : ""}`}
           style={
             arrastavel
@@ -86,7 +104,7 @@ export default function Modal({
           }
           onClick={(e) => e.stopPropagation()}
         >
-          <div className={`flex flex-col flex-1 min-h-0 ${arrastavel ? "animate-modal-fade" : ""}`}>
+          <div className="flex flex-col flex-1 min-h-0">
             <div
               onMouseDown={onHeaderMouseDown}
               className={`flex items-center justify-between gap-3 px-4 sm:px-5 py-3.5 border-b border-border bg-card shrink-0 ${

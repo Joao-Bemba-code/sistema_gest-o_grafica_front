@@ -31,7 +31,7 @@ function CardGrid({
         if (!isValidElement(child)) return child;
         if (!animate) return child;
         return cloneElement(child, {
-          className: cn(child.props.className, "animate-card-in h-full", itemClassName),
+          className: cn(child.props.className, " h-full", itemClassName),
           style: { ...child.props.style, "--stagger": `${index * stagger}ms` },
         });
       })}

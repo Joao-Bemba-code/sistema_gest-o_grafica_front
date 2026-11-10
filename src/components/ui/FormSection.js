@@ -3,7 +3,7 @@ import Icon from "@/components/Icon";
 
 function FormSection({ title, description, icon, step, children, className }) {
   return (
-    <fieldset className={cn("rounded-2xl border border-outline-variant/30 bg-card p-4 sm:p-6", className)}>
+    <fieldset className={cn("rounded-xl border border-outline-variant/30 bg-card p-4 sm:p-6", className)}>
       <legend className="sr-only">{title}</legend>
       <div className="mb-5 flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">

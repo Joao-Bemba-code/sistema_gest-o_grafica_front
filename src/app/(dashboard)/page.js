@@ -35,6 +35,8 @@ import {
   LuUserPlus,
   LuFilePlus2,
   LuCheck,
+  LuTrendingUp,
+  LuBanknote,
 } from "react-icons/lu";
 
 const DIA_MS = 86400000;
@@ -85,7 +87,7 @@ function estaAtrasada(o, ref) {
 
 /* ═══════════════ Componentes ═══════════════ */
 
-function Kpi({ icon: Icone, chipCls, iconCls, label, value, delta, deltaCls = "text-success", sub }) {
+function Kpi({ icon: Icone, chipCls, iconCls, label, value, delta, deltaCls = "text-success", sub, valueCls = "text-foreground" }) {
   return (
     <div className="flex items-start space-x-3 rounded-xl border border-border bg-card p-3.5 shadow-sm">
       <div className={cn("mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg", chipCls)}>
@@ -93,7 +95,7 @@ function Kpi({ icon: Icone, chipCls, iconCls, label, value, delta, deltaCls = "t
       </div>
       <div className="overflow-hidden">
         <span className="block text-[11px] font-medium leading-tight text-muted-foreground">{label}</span>
-        <span className="mt-0.5 block truncate text-base font-semibold tracking-tight text-foreground">{value}</span>
+        <span className={cn("mt-0.5 block truncate text-base font-semibold tracking-tight", valueCls)}>{value}</span>
         {delta != null ? (
           <div className={cn("mt-1 flex items-center text-[10px] font-semibold", deltaCls)}>
             <span>
@@ -113,26 +115,13 @@ function Kpi({ icon: Icone, chipCls, iconCls, label, value, delta, deltaCls = "t
 
 function CartaoMarca() {
   return (
-    <div className="relative flex h-full flex-col justify-between overflow-hidden rounded-xl bg-[#061528] p-5 text-white shadow-sm">
-      <div
-        className="absolute bottom-0 right-0 top-0 w-3/5 bg-cover bg-right opacity-90 mix-blend-luminosity"
-        style={{
-          backgroundImage:
-            "url('https://lh3.googleusercontent.com/aida-public/AB6AXuDhI9g_ceAsrhLbFjXmMlLPfN8mRlghz9NW5U-wsm5i8YaMF3gxR0b96dX0jPiYfu26bWKB8R5L0o5_Ykk4356dkW5TE4m9kRJGZy0N4QfglBIi702terU2jbq0W7pXQ6-PVVGZDORHLbzx6c5ik8n0l2jtA_dXlRU55FyWD1vQdlU532gHL8wsaEvSm9BWKfbqjJP9rgqar3RNxoZAgYjck4NroOiyWDiBgHNp4gYD-h62me317MN4uw')",
-        }}
-      />
-      <div className="absolute inset-0 bg-gradient-to-r from-[#061528] via-[#061528]/90 to-transparent" />
-      <div className="pointer-events-none absolute bottom-0 left-0 h-24 w-24 overflow-hidden">
-        <div className="absolute bottom-0 left-0 h-16 w-16 rounded-tr-3xl bg-white/10" />
-        <div className="absolute bottom-4 left-6 h-12 w-12 rounded-full bg-primary/40 opacity-90 mix-blend-screen" />
-        <div className="absolute bottom-8 left-0 h-10 w-10 bg-white/5" />
-      </div>
-      <div className="relative z-10 space-y-0.5">
+    <div className="flex h-full flex-col justify-between rounded-xl border border-white/10 bg-[#061528] p-5 text-white">
+      <div className="space-y-0.5">
         <h2 className="text-xl font-semibold leading-tight tracking-tight text-white">Mais controlo.</h2>
         <h2 className="text-xl font-semibold leading-tight tracking-tight text-white">Mais eficiência.</h2>
         <h2 className="text-xl font-semibold leading-tight tracking-tight text-white">Mais resultados.</h2>
       </div>
-      <div className="relative z-10">
+      <div>
         <p className="max-w-[190px] text-[11px] font-medium leading-relaxed text-white/70">
           Gestão integrada para a sua oficina de artes gráficas.
         </p>
@@ -210,14 +199,14 @@ function Donut({ segmentos, centroValor, centroLabel }) {
 /* ─── Cores e rótulos das propostas por estado ─── */
 
 const ESTADO_PIZZA = [
-  { estado: "rascunho", rotulo: "Em preparação", cor: "#f58220" },
-  { estado: "enviada", rotulo: "Enviadas", cor: "#0066ff" },
-  { estado: "recebida", rotulo: "Em revisão", cor: "#94a3b8" },
-  { estado: "avaliada", rotulo: "Avaliadas", cor: "#0047ab" },
-  { estado: "aprovada", rotulo: "Aceites", cor: "#10b981" },
-  { estado: "rejeitada", rotulo: "Recusadas", cor: "#ee2a24" },
-  { estado: "expirada", rotulo: "Expiradas", cor: "#cbd5e1" },
-  { estado: "anulada", rotulo: "Anuladas", cor: "#64748b" },
+  { estado: "rascunho", rotulo: "Em preparação", cor: "var(--data-3)" },
+  { estado: "enviada", rotulo: "Enviadas", cor: "var(--data-1)" },
+  { estado: "recebida", rotulo: "Em revisão", cor: "var(--muted-foreground)" },
+  { estado: "avaliada", rotulo: "Avaliadas", cor: "var(--tertiary)" },
+  { estado: "aprovada", rotulo: "Aceites", cor: "var(--data-5)" },
+  { estado: "rejeitada", rotulo: "Recusadas", cor: "var(--data-2)" },
+  { estado: "expirada", rotulo: "Expiradas", cor: "var(--input)" },
+  { estado: "anulada", rotulo: "Anuladas", cor: "var(--data-6)" },
 ];
 
 /* ═══════════════ Página ═══════════════ */
@@ -347,6 +336,12 @@ export default function DashboardPage() {
       const dd = parseDataISO(mv.data_movimento);
       return dd && dd >= ini && dd < fim ? s + Number(mv.valor || 0) : s;
     }, 0);
+  const somarEntradas = (ini, fim) =>
+    movimentos.reduce((s, mv) => {
+      if (mv.tipo !== "entrada") return s;
+      const dd = parseDataISO(mv.data_movimento);
+      return dd && dd >= ini && dd < fim ? s + Number(mv.valor || 0) : s;
+    }, 0);
 
   const vendasAtual = somarFaturas(intervalo.ini, intervalo.fim);
   const vendasAnt = somarFaturas(intervalo.iniAnt, intervalo.fimAnt);
@@ -356,10 +351,16 @@ export default function DashboardPage() {
   const comprasAnt = somarPedidos(intervalo.iniAnt, intervalo.fimAnt);
   const despesasAtual = somarSaidas(intervalo.ini, intervalo.fim);
   const despesasAnt = somarSaidas(intervalo.iniAnt, intervalo.fimAnt);
+  const receitasAtual = somarEntradas(intervalo.ini, intervalo.fim);
+  const receitasAnt = somarEntradas(intervalo.iniAnt, intervalo.fimAnt);
+  const resultadoAtual = receitasAtual - despesasAtual;
+  const resultadoAnt = receitasAnt - despesasAnt;
   const deltaVendas = variacao(vendasAtual, vendasAnt);
   const deltaOps = variacao(opsAtual, opsAnt);
   const deltaCompras = variacao(comprasAtual, comprasAnt);
   const deltaDespesas = variacao(despesasAtual, despesasAnt);
+  const deltaReceitas = variacao(receitasAtual, receitasAnt);
+  const deltaResultado = variacao(resultadoAtual, resultadoAnt);
 
   const atrasadas = ordens.filter((o) => estaAtrasada(o, hoje));
   const emProducao = ordens.filter((o) => o.estado === "em_producao").length;
@@ -411,10 +412,10 @@ export default function DashboardPage() {
   const totalSeg = Math.max(1, concluidas + emProducao + preparacao + atrasadas.length);
   let accSeg = 0;
   const segmentosDonut = [
-    { label: "Concluídas", value: concluidas, color: "#10b981" },
-    { label: "Em produção", value: emProducao, color: "#0066ff" },
-    { label: "Em preparação", value: preparacao, color: "#f58220" },
-    { label: "Atrasadas", value: atrasadas.length, color: "#ee2a24" },
+    { label: "Concluídas", value: concluidas, color: "var(--data-5)" },
+    { label: "Em produção", value: emProducao, color: "var(--data-1)" },
+    { label: "Em preparação", value: preparacao, color: "var(--data-3)" },
+    { label: "Atrasadas", value: atrasadas.length, color: "var(--data-2)" },
   ].map((s) => {
     const len = (s.value / totalSeg) * CIRC;
     const offset = -(accSeg / totalSeg) * CIRC;
@@ -480,10 +481,12 @@ export default function DashboardPage() {
 
   const kpis = [
     { icon: LuChartColumn, chipCls: "bg-primary/10", iconCls: "text-primary", label: "Vendas", value: `${formatNum(vendasAtual)} Kz`, delta: deltaVendas, sub: "vs. mês anterior" },
+    { icon: LuTrendingUp, chipCls: "bg-info/10", iconCls: "text-info", label: "Receitas", value: `${formatNum(receitasAtual)} Kz`, delta: deltaReceitas, sub: "vs. mês anterior" },
     { icon: LuCog, chipCls: "bg-error/10", iconCls: "text-error", label: "Produção (OP)", value: formatNum(opsAtual), delta: deltaOps, sub: "ordens concluídas" },
     { icon: LuShoppingCart, chipCls: "bg-warning/10", iconCls: "text-warning", label: "Compras", value: `${formatNum(comprasAtual)} Kz`, delta: deltaCompras, sub: "em materiais" },
     { icon: LuBox, chipCls: "bg-success/10", iconCls: "text-success", label: "Stocks", value: formatNum(materiais.length), delta: null, sub: "artigos activos" },
     { icon: LuCreditCard, chipCls: "bg-error/10", iconCls: "text-error", label: "Despesas", value: `${formatNum(despesasAtual)} Kz`, delta: deltaDespesas, deltaCls: "text-error", sub: "vs. mês anterior" },
+    { icon: LuBanknote, chipCls: "bg-success/10", iconCls: "text-success", label: "Resultado", value: `${formatNum(resultadoAtual)} Kz`, delta: deltaResultado, deltaCls: resultadoAtual < 0 ? "text-error" : "text-success", sub: "receitas − despesas", valueCls: resultadoAtual < 0 ? "text-error" : "text-success" },
   ];
 
   const acoesRapidas = [
@@ -498,30 +501,30 @@ export default function DashboardPage() {
       <div className="flex flex-1 flex-col">
         <div className="mx-auto grid w-full max-w-[1300px] flex-1 grid-cols-1 content-start gap-4 lg:grid-cols-12">
           <div className="min-w-0 space-y-4 lg:col-span-9">
-            <div className="h-12 animate-pulse rounded-xl bg-card" />
+            <div className="h-12 rounded-xl bg-card" />
             <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
               <div className="grid grid-cols-2 gap-3 md:col-span-7 lg:col-span-5">
                 {Array.from({ length: 2 }).map((_, i) => (
-                  <div key={i} className="h-[92px] animate-pulse rounded-xl bg-card" />
+                  <div key={i} className="h-[92px] rounded-xl bg-card" />
                 ))}
               </div>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:col-span-5 lg:col-span-7">
                 {Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="h-[92px] animate-pulse rounded-xl bg-card" />
+                  <div key={i} className="h-[92px] rounded-xl bg-card" />
                 ))}
               </div>
             </div>
           </div>
           <div className="lg:col-span-3 lg:col-start-10 lg:row-span-2 lg:row-start-1 lg:mb-[144px]">
-            <div className="h-full min-h-[240px] animate-pulse rounded-xl bg-card" />
+            <div className="h-full min-h-[240px] rounded-xl bg-card" />
           </div>
           <div className="min-w-0 lg:col-span-9">
             <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
-              <div className="h-64 animate-pulse rounded-xl bg-card md:col-span-7 lg:col-span-5" />
-              <div className="h-64 animate-pulse rounded-xl bg-card md:col-span-5 lg:col-span-7" />
+              <div className="h-64 rounded-xl bg-card md:col-span-7 lg:col-span-5" />
+              <div className="h-64 rounded-xl bg-card md:col-span-5 lg:col-span-7" />
             </div>
           </div>
-          <div className="h-[114px] animate-pulse rounded-xl bg-card self-end lg:col-span-3 lg:col-start-10 lg:row-start-2" />
+          <div className="h-[114px] rounded-xl bg-card self-end lg:col-span-3 lg:col-start-10 lg:row-start-2" />
         </div>
       </div>
     );
@@ -596,7 +599,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Linha de KPIs: 2 + 3 alinhados com os cartões de baixo */}
+          {/* Linha de KPIs: 2 + 5 em grelha adaptável */}
           <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
             <div className="grid grid-cols-2 gap-3 md:col-span-7 lg:col-span-5">
               {kpis.slice(0, 2).map((k) => (
@@ -811,7 +814,7 @@ export default function DashboardPage() {
                 >
                   <div
                     className={cn(
-                      "mb-1 flex h-7 w-7 items-center justify-center rounded-md text-white shadow-xs transition-transform group-hover:scale-105",
+                      "mb-1 flex h-7 w-7 items-center justify-center rounded-md text-white shadow-xs transition-transform",
                       a.chip
                     )}
                   >

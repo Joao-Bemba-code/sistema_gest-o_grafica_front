@@ -7,7 +7,7 @@ export default function FiltroChips({ titulo, icon, opcoes = [], valor = [], onC
 
   return (
     <div>
-      <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">
+      <p className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground mb-2">
         <Icon name={icon} className="text-sm" />
         {titulo}
       </p>

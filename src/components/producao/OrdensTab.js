@@ -164,12 +164,35 @@ export default function OrdensTab() {
         "success"
       );
       setRequisitarOp(null);
+      // A OP de origem passa a "requisitada" no servidor: recarrega a lista
+      // para o estado da OP reflectir a requisição submetida.
+      carregarDados();
       return true;
     } catch (err) {
       addToast(err.response?.data?.erro || "Erro ao enviar a requisição", "error");
       return false;
     }
   };
+
+  // A OP de onde se abriu o formulário tem de aparecer sempre na lista do
+  // select — mesmo que os auxiliares ainda estejam a carregar (ou falhem).
+  const ordensRequisicao = useMemo(() => {
+    const base = Array.isArray(auxRequisicao?.ordens) ? auxRequisicao.ordens : [];
+    const op = requisitarOp;
+    if (op && !base.some((o) => String(o.id) === String(op.id))) {
+      return [
+        {
+          id: op.id,
+          numero: op.numero || null,
+          produto: op.produto || "",
+          quantidade: op.quantidade ?? 0,
+          cliente_nome: op.cliente && op.cliente !== "—" ? op.cliente : "Consumo interno",
+        },
+        ...base,
+      ];
+    }
+    return base;
+  }, [auxRequisicao, requisitarOp]);
 
   const carregarDados = () => {
     Promise.allSettled([listarOrdens(), listarMateriais(), buscarOrganizacao().catch(() => null)]).then(([ordensRes, materiaisRes, orgRes]) => {
@@ -613,8 +636,8 @@ export default function OrdensTab() {
         key={`requisicao-${sessaoRequisicao}`}
         open={Boolean(requisitarOp)}
         onClose={() => setRequisitarOp(null)}
-        ordens={auxRequisicao?.ordens || []}
-        materiais={auxRequisicao?.materiais || []}
+        ordens={ordensRequisicao}
+        materiais={auxRequisicao?.materiais?.length ? auxRequisicao.materiais : materiais}
         nomeUsuario={getUsuario()?.nome || ""}
         ordemInicial={requisitarOp?.id ?? null}
         onConfirm={confirmarRequisicao}

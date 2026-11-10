@@ -116,9 +116,9 @@ export default function SuporteOrgDetalhePage() {
   if (carregando) {
     return (
       <div className="flex flex-col gap-4 sm:gap-5">
-        <div className="h-14 animate-pulse rounded-xl border border-border bg-card" />
-        <div className="h-40 animate-pulse rounded-xl border border-border bg-card" />
-        <div className="h-64 animate-pulse rounded-xl border border-border bg-card" />
+        <div className="h-14 rounded-xl border border-border bg-card" />
+        <div className="h-40 rounded-xl border border-border bg-card" />
+        <div className="h-64 rounded-xl border border-border bg-card" />
       </div>
     );
   }
@@ -283,7 +283,7 @@ export default function SuporteOrgDetalhePage() {
       {/* Modal: novo utilizador */}
       {modalUsuario && (
         <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setModalUsuario(false)} />
+          <div className="fixed inset-0 bg-black/40" onClick={() => setModalUsuario(false)} />
           <div className="fixed inset-0 z-10 flex items-center justify-center p-4 pointer-events-none">
             <div className="pointer-events-auto w-full max-w-md rounded-xl border border-border bg-card shadow-modal" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between border-b border-border px-4 py-3">

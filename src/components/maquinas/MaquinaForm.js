@@ -239,7 +239,7 @@ export default function MaquinaForm({ formId = "form-maquina", form, onChange, o
         ))}
       </div>
 
-      <div role="tabpanel" id={`${formId}-painel-${tab}`} aria-labelledby={id(`tab-${tab}`)} className="animate-scale-in">
+      <div role="tabpanel" id={`${formId}-painel-${tab}`} aria-labelledby={id(`tab-${tab}`)} className="">
         {tab === "identificacao" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField label="Código">

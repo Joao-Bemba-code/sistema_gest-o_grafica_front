@@ -75,7 +75,7 @@ export default function NovoMaterialPage() {
               {carregando && categorias.length === 0 ? (
                 <div className="space-y-3" aria-label="A carregar formulário">
                   {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="h-10 bg-muted rounded-xl animate-pulse" />
+                    <div key={i} className="h-10 bg-muted rounded-xl" />
                   ))}
                 </div>
               ) : (
@@ -99,10 +99,10 @@ export default function NovoMaterialPage() {
             <p className="cyber-label flex items-center gap-1.5">
               <Icon name="visibility" className="text-sm text-primary" /> Pré-visualização
             </p>
-            <span className="w-2 h-2 rounded-full bg-success animate-pulse" aria-hidden="true" />
+            <span className="w-2 h-2 rounded-full bg-success" aria-hidden="true" />
           </div>
 
-          <div className="relative w-24 h-24 rounded-2xl bg-card border border-border flex items-center justify-center mx-auto">
+          <div className="relative w-24 h-24 rounded-xl bg-card border border-border flex items-center justify-center mx-auto">
             <Icon name={iconeCategoria} className="text-4xl text-primary" />
             <span className="absolute -top-2 -right-2 w-6 h-6 rounded-lg bg-success flex items-center justify-center">
               <Icon name="check" className="text-sm text-on-success" />

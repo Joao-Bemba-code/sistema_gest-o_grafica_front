@@ -128,7 +128,7 @@ function Disclosure({ title, icon, children }) {
           className={cn("ds-motion text-muted-foreground", open && "rotate-180")}
         />
       </button>
-      {open && <div className="animate-msg-in px-4 pb-4">{children}</div>}
+      {open && <div className="px-4 pb-4">{children}</div>}
     </div>
   );
 }
@@ -471,7 +471,7 @@ export default function DesignSystemPage() {
                       style={{ width: size * 1.5 }}
                     />
                     <span className="font-mono text-[10px] text-muted-foreground/60">
-                      --ds-space-{Math.round(size / 8)}
+                      p-{Math.round(size / 4)} / gap-{Math.round(size / 4)}
                     </span>
                   </div>
                 ))}
@@ -587,7 +587,7 @@ export default function DesignSystemPage() {
               {submitted && (
                 <div
                   role="status"
-                  className="animate-msg-in mb-6 flex items-center gap-3 rounded-2xl border border-success/30 bg-success/10 p-4"
+                  className="mb-6 flex items-center gap-3 rounded-2xl border border-success/30 bg-success/10 p-4"
                 >
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-success text-white">
                     <Icon name="check" className="text-lg" />
@@ -809,7 +809,7 @@ export default function DesignSystemPage() {
                   </label>
 
                   {form.temCredito && (
-                    <div className="animate-msg-in grid grid-cols-1 gap-5 rounded-xl border border-primary/20 bg-primary/5 p-4 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-5 rounded-xl border border-primary/20 bg-primary/5 p-4 sm:grid-cols-2">
                       <TextField
                         name="limiteCredito"
                         label="Limite de crédito (AOA)"
@@ -886,7 +886,7 @@ export default function DesignSystemPage() {
             {banner && (
               <div
                 role="status"
-                className="animate-msg-in flex items-center gap-3 rounded-2xl border border-primary/25 bg-primary/5 p-4 text-sm"
+                className="flex items-center gap-3 rounded-2xl border border-primary/25 bg-primary/5 p-4 text-sm"
               >
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary">
                   <Icon name="add_shopping_cart" className="text-base" />

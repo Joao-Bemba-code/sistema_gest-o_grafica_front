@@ -192,7 +192,7 @@ export default function EncomendaDetalhesModal({
           ))}
         </div>
 
-        <div role="tabpanel" aria-label={tabs.find((t) => t.key === tab)?.label} className="animate-fade-up h-[400px] overflow-y-auto pr-1 custom-scrollbar">
+        <div role="tabpanel" aria-label={tabs.find((t) => t.key === tab)?.label} className="h-[400px] overflow-y-auto pr-1 custom-scrollbar">
           {tab === "orcamento" && (
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -255,7 +255,7 @@ export default function EncomendaDetalhesModal({
               </div>
             ) : (
               <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-                <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+                <span className="flex h-14 w-14 items-center justify-center rounded-xl bg-muted text-muted-foreground">
                   <Icon name="precision_manufacturing" className="text-2xl" />
                 </span>
                 <div className="space-y-1">
@@ -328,7 +328,7 @@ export default function EncomendaDetalhesModal({
               </div>
             ) : (
               <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-                <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+                <span className="flex h-14 w-14 items-center justify-center rounded-xl bg-muted text-muted-foreground">
                   <Icon name="receipt_long" className="text-2xl" />
                 </span>
                 <div className="space-y-1">

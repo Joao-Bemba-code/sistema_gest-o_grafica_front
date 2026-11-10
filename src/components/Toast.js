@@ -1,38 +1,49 @@
 "use client";
-import { createContext, useContext, useState, useCallback } from "react";
+import { createContext, useContext, useState, useCallback, useRef } from "react";
 import Icon from "./Icon";
 
 const ToastContext = createContext();
 
 const variants = {
-  success: { chip: "bg-success/10 text-success", icon: "check_circle" },
-  error: { chip: "bg-error/10 text-error", icon: "warning" },
-  warning: { chip: "bg-warning/10 text-warning", icon: "warning" },
-  info: { chip: "bg-info/10 text-info", icon: "info" },
+  success: { chip: "bg-success/15 text-success-ink", icon: "check_circle", role: "status" },
+  error: { chip: "bg-error/15 text-error-ink", icon: "warning", role: "alert" },
+  warning: { chip: "bg-warning/15 text-warning-ink", icon: "warning", role: "alert" },
+  info: { chip: "bg-info/15 text-info-ink", icon: "info", role: "status" },
 };
 
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
+  const timers = useRef(new Map());
+
+  const removeToast = useCallback((id) => {
+    clearTimeout(timers.current.get(id));
+    timers.current.delete(id);
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
 
   const addToast = useCallback((message, type = "success", duration = 3500) => {
     const id = Date.now() + Math.random();
-    setToasts((prev) => [...prev, { id, message, type }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), duration);
-  }, []);
-
-  const removeToast = (id) => setToasts((prev) => prev.filter((t) => t.id !== id));
+    setToasts((prev) => [...prev.slice(-3), { id, message, type }]);
+    const t = setTimeout(() => removeToast(id), duration);
+    timers.current.set(id, t);
+  }, [removeToast]);
 
   return (
     <ToastContext.Provider value={{ addToast }}>
       {children}
-      <div className="fixed top-20 right-4 sm:right-6 z-[9999] flex flex-col gap-2.5 pointer-events-none items-end" aria-live="polite">
+      <div className="fixed top-20 right-4 sm:right-6 z-[9999] flex flex-col gap-2.5 pointer-events-none items-end">
         {toasts.map((toast) => {
           const v = variants[toast.type] || variants.success;
           return (
             <div
               key={toast.id}
-              className={`pointer-events-auto flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-xs font-semibold shadow-md animate-slide-down`}
-              role="alert"
+              role={v.role}
+              onMouseEnter={() => clearTimeout(timers.current.get(toast.id))}
+              onMouseLeave={() => {
+                const t = setTimeout(() => removeToast(toast.id), 3500);
+                timers.current.set(toast.id, t);
+              }}
+              className={`pointer-events-auto flex max-w-sm items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-xs font-semibold shadow-md`}
             >
               <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${v.chip}`}>
                 <Icon name={v.icon} className="text-base" />

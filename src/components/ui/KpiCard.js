@@ -45,7 +45,7 @@ export default function KpiCard({ icon, label, value, unit, badge, barPct, iconV
       className={cn(
         "relative w-full rounded-xl border border-border bg-card p-4 text-left shadow-sm",
         onClick && "cursor-pointer transition-colors hover:border-outline-variant hover:bg-muted/30 focus-ring-soft",
-        active && "ring-2 ring-primary/50",
+        active && "border-primary ring-2 ring-primary/25",
         className
       )}
     >

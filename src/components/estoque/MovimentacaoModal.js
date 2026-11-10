@@ -10,6 +10,16 @@ import NumeroInput from "@/components/ui/NumeroInput";
 import { inputCls, toNum } from "@/lib/estoque";
 import { FormField } from "@/components/ui/FormField";
 
+const CONSUMO_INTERNO = "Consumo interno";
+
+// Materiais da categoria "consumo interno" não têm preço de venda nem
+// cliente/fornecedor: a movimentação usa "Consumo interno" como contraparte.
+function ehConsumoInterno(item) {
+  const nome = String(item?.categoria?.nome || "").toLowerCase();
+  const tipo = String(item?.categoria?.tipo || "").toLowerCase();
+  return nome.includes("consumo interno") || tipo.includes("consumo interno");
+}
+
 const formVazio = {
   quantidade: "",
   fornecedor: "",
@@ -24,8 +34,17 @@ const formVazio = {
 
 export default function MovimentacaoModal({ open, item, tipo, onClose, onConfirm, clientes, fornecedores, nomeUsuario }) {
   const ehEntrada = tipo === "entrada";
+  const consumoInterno = useMemo(() => ehConsumoInterno(item), [item]);
   const [passo, setPasso] = useState(1);
-  const [form, setForm] = useState(() => ({ ...formVazio, solicitado_por: nomeUsuario || "" }));
+  // O modal é remontado a cada abertura (key por sessão): para materiais de
+  // consumo interno a contraparte já nasce "Consumo interno", sem exigir
+  // cliente/fornecedor.
+  const [form, setForm] = useState(() => ({
+    ...formVazio,
+    solicitado_por: nomeUsuario || "",
+    fornecedor: consumoInterno && tipo === "entrada" ? CONSUMO_INTERNO : "",
+    cliente: consumoInterno && tipo === "saida" ? CONSUMO_INTERNO : "",
+  }));
   const [erro, setErro] = useState("");
   const [submetendo, setSubmetendo] = useState(false);
 
@@ -39,7 +58,7 @@ export default function MovimentacaoModal({ open, item, tipo, onClose, onConfirm
 
   const validaPasso1 = () => {
     if (!qtd || qtd <= 0) { setErro("Informe uma quantidade válida"); return false; }
-    if (!parte) { setErro(ehEntrada ? "Informe o fornecedor da entrada" : "Informe o cliente da saída"); return false; }
+    if (!consumoInterno && !parte) { setErro(ehEntrada ? "Informe o fornecedor da entrada" : "Informe o cliente da saída"); return false; }
     if (!ehEntrada && qtd > toNum(item?.estoque_disponivel)) {
       setErro("A quantidade excede o disponível em estoque");
       return false;
@@ -101,7 +120,7 @@ export default function MovimentacaoModal({ open, item, tipo, onClose, onConfirm
           ].map((s) => (
             <div key={s.n} className="flex-1" aria-current={passo === s.n ? "step" : undefined}>
               <div
-                className={`h-1.5 rounded-full transition-all duration-300 ${passo >= s.n ? "gradient-brand" : "bg-muted"}`}
+                className={`h-1.5 rounded-full transition-all duration-300 ${passo >= s.n ? "bg-primary" : "bg-muted"}`}
               />
               <p className={`mt-1.5 text-[10px] font-bold uppercase tracking-widest ${passo === s.n ? "text-primary" : "text-muted-foreground"}`}>
                 {s.n}. {s.label}
@@ -111,7 +130,7 @@ export default function MovimentacaoModal({ open, item, tipo, onClose, onConfirm
         </div>
 
         {passo === 1 ? (
-          <div className="space-y-4 animate-slide-up" key="passo1">
+          <div className="space-y-4" key="passo1">
             <div className="bg-muted/50 rounded-xl p-4 space-y-1 border border-border/60">
               <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Material</p>
               <p className="text-base font-bold text-foreground">{item?.nome || "—"}</p>
@@ -133,8 +152,13 @@ export default function MovimentacaoModal({ open, item, tipo, onClose, onConfirm
               />
             </FormField>
 
-            <FormField label={ehEntrada ? "Fornecedor" : "Cliente"} obrigatorio>
-              {ehEntrada ? (
+            <FormField label={ehEntrada ? "Fornecedor" : "Cliente"} obrigatorio={!consumoInterno}>
+              {consumoInterno ? (
+                <div className={`${inputCls} flex items-center gap-2 cursor-default bg-muted/60 text-foreground`}>
+                  <Icon name="factory" className="text-base text-muted-foreground" />
+                  {CONSUMO_INTERNO}
+                </div>
+              ) : ehEntrada ? (
                 <FornecedorSelect
                   value={form.fornecedor}
                   onChange={(v) => setForm((f) => ({ ...f, fornecedor: v }))}
@@ -189,7 +213,7 @@ export default function MovimentacaoModal({ open, item, tipo, onClose, onConfirm
             </FormField>
           </div>
         ) : (
-          <div className="space-y-4 animate-slide-up" key="passo2">
+          <div className="space-y-4" key="passo2">
             <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Resumo da movimentação</p>
               <Linha label="Material" valor={item?.nome || "—"} />
@@ -229,7 +253,7 @@ export default function MovimentacaoModal({ open, item, tipo, onClose, onConfirm
         )}
 
         {erro && (
-          <p role="alert" className="flex items-center gap-2 text-xs font-semibold text-destructive bg-destructive/10 rounded-xl px-3 py-2.5 animate-msg-in">
+          <p role="alert" className="flex items-center gap-2 text-xs font-semibold text-destructive bg-destructive/10 rounded-xl px-3 py-2.5">
             <Icon name="error" className="text-base" /> {erro}
           </p>
         )}

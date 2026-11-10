@@ -115,7 +115,7 @@ export default function SugestaoSelect({
           id={listaId}
           role="listbox"
           aria-label="Sugestões registadas"
-          className="absolute z-30 mt-1 w-full max-h-52 overflow-y-auto custom-scrollbar bg-card border border-border rounded-xl shadow-lg py-1"
+          className="absolute z-30 mt-1 w-full max-h-52 overflow-y-auto custom-scrollbar bg-card border border-border rounded-xl shadow-md py-1"
         >
           {filtrados.length === 0 && (
             <li className="px-3 py-3 text-xs text-muted-foreground text-center">

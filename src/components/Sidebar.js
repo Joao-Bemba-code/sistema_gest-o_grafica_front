@@ -5,7 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import { cn } from "@/lib/utils";
-import { podeAtual } from "@/lib/permissoes";
+import { podeAcederItem } from "@/lib/permissoes";
 import { ITENS_NAVEGACAO, itemAtivo } from "@/lib/navegacao";
 import { LuArrowLeft, LuChevronRight, LuX } from "react-icons/lu";
 
@@ -222,7 +222,7 @@ export default function Sidebar({
   colapsado = false,
 }) {
   const caminho = usePathname();
-  const itens = ITENS_NAVEGACAO.filter((it) => podeAtual(...it.perm));
+  const itens = ITENS_NAVEGACAO.filter((it) => podeAcederItem(it));
   const ativo = itemAtivo(caminho, itens)?.para || null;
 
   useEffect(() => {
@@ -261,7 +261,7 @@ export default function Sidebar({
       {/* Menu deslizante (telemóvel) */}
       {aberto && (
         <div
-          className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-[1px] md:hidden"
+          className="fixed inset-0 z-40 bg-slate-900/40 md:hidden"
           onClick={onFechar}
         />
       )}

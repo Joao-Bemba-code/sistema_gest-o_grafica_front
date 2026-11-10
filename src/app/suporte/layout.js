@@ -115,7 +115,7 @@ function PainelNotificacoes({ aberto, onFechar }) {
         <div className="max-h-80 overflow-y-auto">
           {carregando ? (
             <div className="flex flex-col gap-2 p-3">
-              {[...Array(3)].map((_, i) => <div key={i} className="h-10 animate-pulse rounded-lg bg-muted" />)}
+              {[...Array(3)].map((_, i) => <div key={i} className="h-10 rounded-lg bg-muted" />)}
             </div>
           ) : erro ? (
             <p className="px-3.5 py-4 text-xs text-destructive">{erro}</p>
@@ -299,7 +299,7 @@ export default function SuporteLayout({ children }) {
           {menuAberto && (
             <>
               <div
-                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px] md:hidden"
+                className="fixed inset-0 z-40 bg-black/40-[1px] md:hidden"
                 onClick={() => setMenuAberto(false)}
               />
               <div className="fixed inset-y-0 left-0 z-50 md:hidden">
@@ -486,7 +486,7 @@ export default function SuporteLayout({ children }) {
 
             <main className="flex flex-1 flex-col p-4 sm:p-5 lg:p-6">
               <div className="@container mx-auto flex w-full max-w-[1500px] flex-col gap-5 text-foreground">
-                <div key={caminho} className="flex flex-col gap-4 sm:gap-5 animate-page-fade">{children}</div>
+                <div key={caminho} className="flex flex-col gap-4 sm:gap-5">{children}</div>
               </div>
             </main>
           </div>

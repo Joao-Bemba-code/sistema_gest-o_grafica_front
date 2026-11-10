@@ -73,7 +73,7 @@ function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEdita
 
   return (
     <article
-      className={`relative overflow-visible rounded-2xl bg-card border p-4 shadow-card transition-shadow duration-300 group animate-card-in ${
+      className={`relative overflow-visible rounded-xl bg-card border p-4 shadow-card transition-shadow duration-300 group ${
         critico ? "border-error/50 bg-error/5 shadow-card" : "border-border hover:shadow-card-hover"
       }`}
       style={{ "--stagger": `${Math.min(index, 14) * 60}ms` }}
@@ -82,7 +82,7 @@ function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEdita
       <div className={`grid grid-cols-1 md:grid-cols-12 gap-4 items-center relative ${critico ? "pl-2" : ""}`}>
         {/* Col 1: Detalhes */}
         <div className="md:col-span-5 flex gap-4 items-center min-w-0">
-          <div className={`w-10 h-10 rounded flex items-center justify-center shrink-0 border ${critico ? "bg-error/10 border-error/30 animate-pulse" : "bg-surface-variant border-outline-variant group-hover:border-primary/50"} transition-colors`}>
+          <div className={`w-10 h-10 rounded flex items-center justify-center shrink-0 border ${critico ? "bg-error/10 border-error/30" : "bg-surface-variant border-outline-variant group-hover:border-primary/50"} transition-colors`}>
             <Icon name={familiaCfg.icon} className={`text-[20px] ${critico ? "text-error" : "text-primary"}`} />
           </div>
           <div className="min-w-0">
@@ -183,7 +183,7 @@ function MaterialCard({ item, index = 0, onEntrada, onSaida, onReservas, onEdita
             <div className="relative" ref={menuRef}>
               <BotaoIcone icon="more_vert" label="Mais opções" critico={critico} onClick={() => setMenuAberto((v) => !v)} />
               {menuAberto && (
-                <div className="absolute right-0 bottom-full mb-1 z-[60] w-48 bg-popover border border-border rounded-xl shadow-lg overflow-y-auto max-h-[80vh]">
+                <div className="absolute right-0 bottom-full mb-1 z-[60] w-48 bg-popover border border-border rounded-xl shadow-md overflow-y-auto max-h-[80vh]">
                   {mover && <MenuItem icon="swap_horiz" label="Transferência" onClick={() => executar(onTransferencia, item)} />}
                   {mover && <MenuItem icon="warning" label="Registar perda" onClick={() => executar(onPerda, item)} />}
                   {mover && <MenuItem icon="delete_sweep" label="Registar desperdício" onClick={() => executar(onDesperdicio, item)} />}
@@ -216,7 +216,7 @@ function MenuItem({ icon, label, onClick }) {
 
 function MaterialCardSkeleton() {
   return (
-    <div className="bg-card border border-border rounded-2xl p-4 animate-pulse" aria-hidden="true">
+    <div className="bg-card border border-border rounded-xl p-4" aria-hidden="true">
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
         <div className="md:col-span-5 flex gap-4 items-center">
           <div className="w-10 h-10 rounded bg-surface-variant" />

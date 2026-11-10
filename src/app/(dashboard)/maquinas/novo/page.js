@@ -60,7 +60,7 @@ export default function NovaMaquinaPage() {
           {carregando && categorias.length === 0 ? (
             <div className="space-y-3" aria-label="A carregar formulário">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-10 bg-muted rounded-xl animate-pulse" />
+                <div key={i} className="h-10 bg-muted rounded-xl" />
               ))}
             </div>
           ) : (

@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import Icon from "@/components/Icon";
+import { Button } from "./Button";
 
 /**
  * Modelo "ledger" da referência (Delivery Console): um único frame com
@@ -34,14 +35,10 @@ export function LedgerHeader({ novo, aoNovo, onToggleFiltros, filtrosAbertos, cl
     <div className={cn("flex flex-wrap items-center justify-end gap-2 px-4 py-3", className)}>
       <div className="flex items-center gap-2 shrink-0">
         {novo && (
-          <button
-            type="button"
-            onClick={aoNovo}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 active:scale-[0.98]"
-          >
+          <Button size="sm" onClick={aoNovo}>
             <Icon name="add" className="text-base" />
             <span className="whitespace-nowrap">{novo}</span>
-          </button>
+          </Button>
         )}
         {onToggleFiltros && (
           <button
@@ -79,7 +76,7 @@ export function FilterRow({
         onChange={(e) => setTermo?.(e.target.value)}
         placeholder={placeholder}
         aria-label="Pesquisar"
-        className="h-9 w-full min-w-0 basis-40 rounded-lg border border-border bg-card px-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus-visible:ring-2 focus-visible:ring-primary/25 transition-colors sm:w-64 sm:basis-auto sm:flex-none"
+        className="h-9 w-full min-w-0 basis-40 rounded-lg border border-border bg-card px-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 transition-[border-color,box-shadow] duration-[var(--duration-base)] sm:w-64 sm:basis-auto sm:flex-none"
       />
       {termo && (
         <button
@@ -97,10 +94,10 @@ export function FilterRow({
 /* ── Badge de estado (6px, 12px, tom por estado) ──────────────────── */
 
 const TONS = {
-  success: "bg-success/15 text-success border-success/25",
-  warning: "bg-warning/15 text-warning border-warning/25",
-  error: "bg-error/15 text-error border-error/25",
-  info: "bg-info/15 text-info border-info/25",
+  success: "bg-success/15 text-success-ink border-success/25",
+  warning: "bg-warning/15 text-warning-ink border-warning/25",
+  error: "bg-error/15 text-error-ink border-error/25",
+  info: "bg-info/15 text-info-ink border-info/25",
   primary: "bg-primary/15 text-primary border-primary/25",
   neutral: "bg-muted/60 text-muted-foreground border-border",
 };

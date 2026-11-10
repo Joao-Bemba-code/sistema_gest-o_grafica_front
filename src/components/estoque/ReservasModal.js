@@ -84,7 +84,7 @@ export default function ReservasModal({ open, onClose, item, reservas, carregand
         {carregando ? (
           <div className="space-y-2" aria-label="A carregar reservas">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-16 bg-muted rounded-xl animate-pulse" />
+              <div key={i} className="h-16 bg-muted rounded-xl" />
             ))}
           </div>
         ) : (

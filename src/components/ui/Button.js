@@ -3,23 +3,21 @@ import { cn } from "@/lib/utils";
 import { cva } from "class-variance-authority";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium shadow-none transition-[color,background-color,border-color,transform] duration-150 ease-out active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium shadow-none transition-[color,background-color,border-color,box-shadow] duration-[var(--duration-fast)] ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground hover:bg-primary/90",
-        gradient:
-          "bg-primary text-primary-foreground hover:bg-primary/90",
+          "bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-active",
         destructive:
-          "bg-error/15 text-error border border-error/30 hover:bg-error hover:text-on-error",
+          "bg-error/15 text-error-ink border border-error/30 hover:bg-error hover:text-error-foreground",
         outline:
           "border border-input bg-transparent text-foreground hover:bg-muted hover:text-foreground",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "text-muted-foreground hover:bg-muted hover:text-foreground",
         success:
-          "bg-success text-white hover:bg-success/90",
+          "bg-success text-success-foreground hover:bg-success/85",
         link: "text-primary underline-offset-4 hover:underline p-0",
       },
       size: {

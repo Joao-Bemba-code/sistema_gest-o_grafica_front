@@ -283,7 +283,7 @@ export default function SuporteConfiguracoesPage() {
         <FramePanel className="p-3.5">
           {!resumo ? (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {[...Array(4)].map((_, i) => <div key={i} className="h-16 animate-pulse rounded-lg bg-muted" />)}
+              {[...Array(4)].map((_, i) => <div key={i} className="h-16 rounded-lg bg-muted" />)}
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

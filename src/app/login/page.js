@@ -119,7 +119,7 @@ export default function LoginPage() {
           <ul className="mt-8 space-y-2.5">
             {DESTAQUES.map((d) => (
               <li key={d.titulo} className="flex items-start gap-3 rounded-xl border border-border bg-card p-3.5">
-                <span className="chip-icon-grad h-9 w-9 shrink-0">
+                <span className="inline-flex items-center justify-center rounded-lg bg-muted border border-border text-primary h-9 w-9 shrink-0">
                   <Icon name={d.icone} className="text-lg" />
                 </span>
                 <span className="min-w-0">
@@ -221,7 +221,7 @@ export default function LoginPage() {
             </div>
 
             {erro && (
-              <div role="alert" aria-live="assertive" className={`flex items-start gap-2 rounded-xl border px-4 py-3 animate-msg-in ${tomDoErro}`}>
+              <div role="alert" aria-live="assertive" className={`flex items-start gap-2 rounded-xl border px-4 py-3 ${tomDoErro}`}>
                 <Icon name={erro.tom === "aviso" ? "schedule" : "error"} className="text-base shrink-0 mt-px" />
                 <p className="text-xs font-medium leading-relaxed">{erro.texto}</p>
               </div>

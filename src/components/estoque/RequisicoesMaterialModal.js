@@ -270,7 +270,7 @@ export default function RequisicoesMaterialModal({
                       </p>
                     )}
 
-                    <div className="rounded-lg border border-border/60 overflow-hidden">
+                    <div className="rounded-lg border border-border/60 overflow-x-auto">
                       <table className="w-full text-xs">
                         <thead className="bg-muted/50">
                           <tr className="text-left text-[10px] tracking-wider text-muted-foreground">

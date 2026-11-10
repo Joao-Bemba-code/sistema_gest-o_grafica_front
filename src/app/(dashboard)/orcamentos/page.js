@@ -53,11 +53,11 @@ function BarChart({ dados }) {
 }
 
 const estadoCor = {
-  aprovado: "#10b981",
-  pendente: "#f59e0b",
-  cancelado: "#94a3b8",
-  rejeitado: "#ef4444",
-  anulado: "#6b7280",
+  aprovado: "var(--data-5)",
+  pendente: "var(--data-3)",
+  cancelado: "var(--muted-foreground)",
+  rejeitado: "var(--data-2)",
+  anulado: "var(--input)",
 };
 
 function parseDataOrc(o) {
@@ -243,7 +243,7 @@ export default function OrcamentosPage() {
           </div>
           <div className="flex flex-wrap gap-3">
             <Link href="/orcamentos/novo">
-              <button className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium shadow-sm hover:bg-primary/90 transition-colors ">
+              <button className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium shadow-sm hover:bg-primary/90 transition-colors">
                 <Icon name="add" className="text-[16px]" /> Novo Orçamento
               </button>
             </Link>

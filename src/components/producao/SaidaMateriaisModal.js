@@ -195,7 +195,7 @@ export default function SaidaMateriaisModal({ open, op, matPorId, materiais, onC
           ].map((s) => (
             <div key={s.n} className="flex-1" aria-current={passo === s.n ? "step" : undefined}>
               <div
-                className={`h-1.5 rounded-full transition-all duration-300 ${passo >= s.n ? "gradient-brand" : "bg-muted"}`}
+                className={`h-1.5 rounded-full transition-all duration-300 ${passo >= s.n ? "bg-primary" : "bg-muted"}`}
               />
               <p className={`mt-1.5 text-[10px] font-bold uppercase tracking-widest ${passo === s.n ? "text-primary" : "text-muted-foreground"}`}>
                 {s.n}. {s.label}
@@ -205,7 +205,7 @@ export default function SaidaMateriaisModal({ open, op, matPorId, materiais, onC
         </div>
 
         {passo === 1 ? (
-          <div className="space-y-4 animate-slide-up" key="passo1">
+          <div className="space-y-4" key="passo1">
             <div className="bg-muted/50 rounded-xl p-4 space-y-1 border border-border/60">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">OP #{op?.id}</p>
@@ -304,7 +304,7 @@ export default function SaidaMateriaisModal({ open, op, matPorId, materiais, onC
             </FormField>
           </div>
         ) : (
-          <div className="space-y-4 animate-slide-up" key="passo2">
+          <div className="space-y-4" key="passo2">
             <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Resumo da {ehAprovacao ? "aprovação" : ehComplemento ? "pedida de material" : "requisição"}</p>
               <Linha label="OP" valor={`#${op?.id} — ${op?.produto || "—"}`} />
@@ -357,7 +357,7 @@ export default function SaidaMateriaisModal({ open, op, matPorId, materiais, onC
         )}
 
         {erro && (
-          <p role="alert" className="flex items-center gap-2 text-xs font-semibold text-destructive bg-destructive/10 rounded-xl px-3 py-2.5 animate-msg-in">
+          <p role="alert" className="flex items-center gap-2 text-xs font-semibold text-destructive bg-destructive/10 rounded-xl px-3 py-2.5">
             <Icon name="error" className="text-base" /> {erro}
           </p>
         )}

@@ -61,7 +61,7 @@ export default function MovimentacoesModal({ open, onClose, movimentos, filtrado
         {carregando ? (
           <div className="space-y-1.5" aria-label="A carregar movimentações">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-16 bg-muted rounded-xl animate-pulse" />
+              <div key={i} className="h-16 bg-muted rounded-xl" />
             ))}
           </div>
         ) : (

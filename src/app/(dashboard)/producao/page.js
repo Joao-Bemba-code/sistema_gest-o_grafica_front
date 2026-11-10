@@ -27,7 +27,7 @@ export default function ProducaoPage() {
   const [novaOpPrefill, setNovaOpPrefill] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
   // A aba Requisições é do pessoal de chão de fábrica. Quem gere o stock
-  // faz saídas manuais no Provisionamento e só aceita/rejeita pedidos.
+  // faz saídas manuais no Stock e só aceita/rejeita pedidos.
   // O administrador não fica preso a esta separação: cria e cancela também.
   const eAdmin = getUsuario()?.perfil === "admin";
   const podePedirMaterial = podeAtual("producao", "criar") && (eAdmin || !podeAtual("estoque", "editar"));

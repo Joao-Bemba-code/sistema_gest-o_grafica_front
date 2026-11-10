@@ -59,7 +59,7 @@ export default function PedidosModal({ open, onClose, pedidos, carregando, onNov
         {carregando && pedidos.length === 0 ? (
           <div className="space-y-2">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-20 rounded-xl bg-muted animate-pulse" />
+              <div key={i} className="h-20 rounded-xl bg-muted" />
             ))}
           </div>
         ) : filtrados.length === 0 ? (
@@ -97,7 +97,7 @@ export default function PedidosModal({ open, onClose, pedidos, carregando, onNov
 
                   <div className="flex items-center gap-3">
                     <div className="h-1.5 flex-1 rounded-full bg-muted overflow-hidden">
-                      <div className="h-full gradient-brand rounded-full" style={{ width: `${pct}%` }} />
+                      <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />
                     </div>
                     <span className="text-[10px] font-mono font-bold text-muted-foreground whitespace-nowrap">
                       {pct}% recebido ({p.itens.length} {p.itens.length === 1 ? "item" : "itens"})

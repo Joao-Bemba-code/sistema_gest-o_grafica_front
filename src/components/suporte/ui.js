@@ -35,7 +35,7 @@ export function Avatar({ nome, className }) {
   return (
     <span
       className={cn(
-        "relative flex size-6 shrink-0 select-none items-center justify-center rounded-full bg-muted text-xs text-muted-foreground after:absolute after:inset-0 after:rounded-full after:border after:border-border after:mix-blend-darken dark:after:mix-blend-lighten",
+        "relative flex size-6 shrink-0 select-none items-center justify-center rounded-full bg-muted text-xs text-muted-foreground after:absolute after:inset-0 after:rounded-full after:border after:border-border",
         className
       )}
     >
@@ -51,9 +51,7 @@ export function Frame({ titulo, descricao, acao, label, children, className }) {
       className={cn("relative flex w-full flex-col gap-2 rounded-xl border border-border bg-muted/40 p-2", className)}
     >
       <div className="relative overflow-hidden rounded-lg border border-border bg-card">
-        {/* Barra de acento superior */}
-        <span className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-primary via-primary/60 to-tertiary" aria-hidden="true" />
-        <div className="gradient-hero flex flex-row items-center justify-between gap-3 px-3.5 py-2.5">
+        <div className="bg-card flex flex-row items-center justify-between gap-3 px-3.5 py-2.5">
           <div className="flex min-w-0 flex-col gap-0.5">
             <div className="truncate text-sm font-semibold text-balance text-foreground">{titulo}</div>
             {descricao && <div className="truncate text-xs text-pretty text-muted-foreground">{descricao}</div>}
@@ -92,13 +90,12 @@ export function BarraProgresso({ valor, total, cor = "var(--primary)", className
 export function CartaoKpi({ icone: Icone, titulo, descricao, valor, nota, notaCor = "text-success", children }) {
   return (
     <div className="relative flex min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card p-5 shadow-card">
-      <span className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-primary via-primary/50 to-tertiary" aria-hidden="true" />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="truncate text-base leading-tight font-semibold text-foreground">{titulo}</h3>
           <p className="mt-0.5 truncate text-sm text-muted-foreground">{descricao}</p>
         </div>
-        <span className="chip-icon-grad flex size-10 shrink-0 items-center justify-center">
+        <span className="rounded-lg bg-muted border border-border text-primary flex size-10 shrink-0 items-center justify-center">
           <Icone className="size-5" />
         </span>
       </div>

@@ -6,7 +6,9 @@ export const MODULOS = [
   { valor: "tesouraria", label: "Tesouraria" },
   { valor: "dividas", label: "Dívidas" },
   { valor: "producao", label: "Produção" },
-  { valor: "estoque", label: "Provisionamento" },
+  { valor: "estoque", label: "Stock" },
+  { valor: "compras", label: "Compras" },
+  { valor: "financeiro", label: "Financeiro" },
   { valor: "maquinas", label: "Maquinária" },
   { valor: "patrimonio", label: "Património" },
   { valor: "categorias", label: "Recursos" },
@@ -44,6 +46,8 @@ const PERMISSOES_PADRAO = {
     tesouraria: { ver: true, criar: true, editar: true, eliminar: true, aprovar: true },
     dividas: { ver: true, criar: true, editar: true, eliminar: true, aprovar: true },
     estoque: { ver: true, criar: true, editar: true, eliminar: true, aprovar: true },
+    compras: { ver: true, criar: true, editar: true, eliminar: true, aprovar: true },
+    financeiro: { ver: true, criar: true, editar: true, eliminar: true, aprovar: true },
     maquinas: { ver: true, criar: true, editar: true, eliminar: true, aprovar: true },
     patrimonio: { ver: true, criar: true, editar: true, eliminar: true, aprovar: true },
     categorias: { ver: true, criar: true, editar: true, eliminar: true, aprovar: true },
@@ -61,6 +65,8 @@ const PERMISSOES_PADRAO = {
     tesouraria: { ver: false, criar: false, editar: false, eliminar: false, aprovar: false },
     dividas: { ver: false, criar: false, editar: false, eliminar: false, aprovar: false },
     estoque: { ver: false, criar: false, editar: false, eliminar: false, aprovar: false },
+    compras: { ver: true, criar: true, editar: false, eliminar: false, aprovar: false },
+    financeiro: { ver: false, criar: false, editar: false, eliminar: false, aprovar: false },
     categorias: { ver: false, criar: false, editar: false, eliminar: false, aprovar: false },
     relatorios: { ver: false, criar: false, editar: false, eliminar: false, aprovar: false },
     configuracao: { ver: false, criar: false, editar: false, eliminar: false, aprovar: false },
@@ -73,6 +79,8 @@ const PERMISSOES_PADRAO = {
     dividas: { ver: true, criar: false, editar: false, eliminar: false, aprovar: false },
     producao: { ver: true, criar: false, editar: false, eliminar: false, aprovar: false },
     estoque: { ver: true, criar: false, editar: false, eliminar: false, aprovar: false },
+    compras: { ver: true, criar: false, editar: false, eliminar: false, aprovar: false },
+    financeiro: { ver: true, criar: false, editar: false, eliminar: false, aprovar: false },
     maquinas: { ver: true, criar: false, editar: false, eliminar: false, aprovar: false },
     patrimonio: { ver: true, criar: false, editar: false, eliminar: false, aprovar: false },
     categorias: { ver: true, criar: false, editar: false, eliminar: false, aprovar: false },
@@ -118,6 +126,13 @@ export function pode(usuario, modulo, acao) {
 // Verifica a permissão para o utilizador atualmente autenticado.
 export function podeAtual(modulo, acao) {
   return pode(getUsuario(), modulo, acao);
+}
+
+// Verifica o acesso a um item de navegação que pode ter permissões
+// alternativas (ex.: "Compras" acessível com estoque OU compras).
+export function podeAcederItem(item) {
+  if (podeAtual(...item.perm)) return true;
+  return !!(item.permOu && item.permOu.some(([m, a]) => podeAtual(m, a)));
 }
 
 export const perfilLabel = (perfil) => {

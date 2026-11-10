@@ -77,7 +77,7 @@ export default function SuporteLoginPage() {
 
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center">
-          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/25">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
             <LuShield className="h-6 w-6" />
           </div>
           <p className="text-xl font-bold tracking-tight text-foreground">KAMGEST · Suporte</p>
@@ -169,7 +169,7 @@ export default function SuporteLoginPage() {
             )}
 
             {erro && (
-              <div role="alert" className="flex items-start gap-2 rounded-xl border border-error/30 bg-error/10 px-4 py-3 animate-msg-in">
+              <div role="alert" className="flex items-start gap-2 rounded-xl border border-error/30 bg-error/10 px-4 py-3">
                 <Icon name="error" className="mt-px shrink-0 text-base text-error" />
                 <p className="text-xs font-medium leading-relaxed text-error">{erro}</p>
               </div>

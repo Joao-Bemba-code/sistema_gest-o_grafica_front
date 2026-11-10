@@ -105,7 +105,7 @@ export default function ClienteForm({
       </div>
 
       {/* Altura fixa para o modal não mudar de tamanho ao trocar de secção. */}
-      <div role="tabpanel" id={`${formId}-painel-${tab}`} aria-labelledby={id(`tab-${tab}`)} className="animate-fade-up h-[400px] overflow-y-auto pr-1 custom-scrollbar">
+      <div role="tabpanel" id={`${formId}-painel-${tab}`} aria-labelledby={id(`tab-${tab}`)} className="h-[400px] overflow-y-auto pr-1 custom-scrollbar">
         {tab === "identificacao" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Campo label="Código do Cliente">

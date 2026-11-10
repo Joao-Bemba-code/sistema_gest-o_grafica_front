@@ -25,8 +25,8 @@ export default function DashboardLayout({ children }) {
               onFechar={() => setMenuAberto(false)}
               colapsado={colapsado}
             />
-            <main className="flex-1 overflow-y-auto custom-scroll p-4 sm:p-5 lg:p-6">
-              <div key={pathname} className="mx-auto flex min-h-full w-full max-w-[1500px] flex-col animate-page-fade">
+            <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden custom-scroll p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-5 lg:p-6">
+              <div key={pathname} className="mx-auto flex min-h-full w-full max-w-[1500px] min-w-0 flex-col">
                 {children}
               </div>
             </main>

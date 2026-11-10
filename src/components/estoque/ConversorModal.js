@@ -262,7 +262,7 @@ export default function ConversorModal({ open, onClose, formatos, onCalcular }) 
               {resultado ? "Escala Otimizada" : "Aguarda Processamento"}
             </div>
           </div>
-          <div className="flex-1 bg-surface-container-lowest/50 rounded-lg border border-outline-variant/30 relative diagram-bg p-4 flex items-center justify-center overflow-hidden shadow-inner">
+          <div className="flex-1 bg-surface-container-lowest/50 rounded-lg border border-outline-variant/30 relative diagram-bg p-4 flex items-center justify-center overflow-hidden">
             {!resultado && (
               <p className="text-on-surface-variant font-mono text-xs text-center">
                 Defina os parâmetros e processe a matriz
@@ -289,9 +289,9 @@ export default function ConversorModal({ open, onClose, formatos, onCalcular }) 
                     <span className="text-[8px] font-mono text-primary/60">{i + 1}</span>
                   </div>
                 ))}
-                {/* Waste areas */}
-                <div className="absolute bottom-0 right-0 w-[6%] h-full bg-[repeating-linear-gradient(45deg,transparent,transparent_5px,rgba(255,180,171,0.1)_5px,rgba(255,180,171,0.1)_10px)] border border-error/20" />
-                <div className="absolute bottom-0 left-0 w-full h-[6%] bg-[repeating-linear-gradient(45deg,transparent,transparent_5px,rgba(255,180,171,0.1)_5px,rgba(255,180,171,0.1)_10px)] border border-error/20" />
+                {/* Áreas de desperdício */}
+                <div className="absolute bottom-0 right-0 h-full w-[6%] border border-error/20 bg-error/10" />
+                <div className="absolute bottom-0 left-0 h-[6%] w-full border border-error/20 bg-error/10" />
               </div>
             )}
           </div>
@@ -299,8 +299,7 @@ export default function ConversorModal({ open, onClose, formatos, onCalcular }) 
 
         {/* Métricas */}
         <div className="lg:col-span-3 flex flex-col gap-4">
-          <div className="glass-panel rounded-xl p-5 flex flex-col justify-center relative overflow-hidden group">
-            <div className="absolute -right-4 -top-4 w-24 h-24 bg-primary/10 rounded-full blur-2xl group-hover:bg-primary/20 transition-colors" />
+          <div className="glass-panel rounded-xl p-5 flex flex-col justify-center relative overflow-hidden">
             <p className="font-mono text-[10px] text-on-surface-variant uppercase tracking-wider mb-2 flex items-center gap-2">
               <Icon name="layers" className="text-primary text-sm" /> Total de Folhas
             </p>
@@ -316,8 +315,7 @@ export default function ConversorModal({ open, onClose, formatos, onCalcular }) 
             </div>
           </div>
 
-          <div className="glass-panel rounded-xl p-5 flex flex-col justify-center relative overflow-hidden group">
-            <div className="absolute -right-4 -top-4 w-24 h-24 bg-error/10 rounded-full blur-2xl group-hover:bg-error/20 transition-colors" />
+          <div className="glass-panel rounded-xl p-5 flex flex-col justify-center relative overflow-hidden">
             <p className="font-mono text-[10px] text-on-surface-variant uppercase tracking-wider mb-2 flex items-center gap-2">
               <Icon name="delete_sweep" className="text-error text-sm" /> Desperdício
             </p>
@@ -330,8 +328,7 @@ export default function ConversorModal({ open, onClose, formatos, onCalcular }) 
             </p>
           </div>
 
-          <div className="glass-panel rounded-xl p-5 flex flex-col justify-center relative overflow-hidden group">
-            <div className="absolute -right-4 -top-4 w-24 h-24 bg-secondary/10 rounded-full blur-2xl group-hover:bg-secondary/20 transition-colors" />
+          <div className="glass-panel rounded-xl p-5 flex flex-col justify-center relative overflow-hidden">
             <p className="font-mono text-[10px] text-on-surface-variant uppercase tracking-wider mb-2 flex items-center gap-2">
               <Icon name="weight" className="text-secondary text-sm" /> Peso Total
             </p>

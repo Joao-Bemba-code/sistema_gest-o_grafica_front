@@ -172,7 +172,7 @@ export default function SuporteOrganizacoesPage() {
                   [...Array(5)].map((_, i) => (
                     <tr key={i}>
                       <td colSpan={6} className="border-b border-border px-2 py-1.5 last:border-0">
-                        <div className="h-5 animate-pulse rounded bg-muted" />
+                        <div className="h-5 rounded bg-muted" />
                       </td>
                     </tr>
                   ))
@@ -246,7 +246,7 @@ export default function SuporteOrganizacoesPage() {
       {/* Modal: nova organização */}
       {modalOrg && (
         <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setModalOrg(false)} />
+          <div className="fixed inset-0 bg-black/40" onClick={() => setModalOrg(false)} />
           <div className="fixed inset-0 z-10 flex items-center justify-center p-4 pointer-events-none">
             <div className="pointer-events-auto w-full max-w-lg rounded-xl border border-border bg-card shadow-modal" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between border-b border-border px-4 py-3">

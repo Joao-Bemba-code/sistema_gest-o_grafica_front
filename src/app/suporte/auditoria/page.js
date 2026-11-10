@@ -145,7 +145,7 @@ export default function SuporteAuditoriaPage() {
                   [...Array(8)].map((_, i) => (
                     <tr key={i}>
                       <td colSpan={6} className="border-b border-border px-2 py-1.5 last:border-0">
-                        <div className="h-5 animate-pulse rounded bg-muted" />
+                        <div className="h-5 rounded bg-muted" />
                       </td>
                     </tr>
                   ))

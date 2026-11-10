@@ -33,6 +33,14 @@
   --color-info-foreground: var(--info-foreground);
   --color-on-info: var(--info-foreground);
 
+  /* Estados de marca e tinta de status (AA sobre tint) */
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
+  --color-success-ink: var(--success-ink);
+  --color-warning-ink: var(--warning-ink);
+  --color-error-ink: var(--error-ink);
+  --color-info-ink: var(--info-ink);
+
   /* Data visualization palette (charts, category identity) */
   --color-data-1: var(--data-1);
   --color-data-2: var(--data-2);
@@ -41,13 +49,14 @@
   --color-data-5: var(--data-5);
   --color-data-6: var(--data-6);
 
-  /* Shadcn-style radius tokens (referência: cards 14px, botões 10px) */
+  /* Raios — regra: botão/input 10px · card 14px · modal 16px · pill 999px */
+  --radius-xs: 0.25rem;
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.625rem;
   --radius-xl: 0.875rem;
-  --radius-2xl: 0.875rem;
-  --radius-3xl: 0.875rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.25rem;
 
   /* Semantic utility tokens (MD3-style mapping) */
   --color-surface: var(--background);
@@ -80,15 +89,15 @@
   --color-on-warning: var(--primary-foreground);
   --color-on-error-state: var(--destructive-foreground);
 
-  /* Shadow system — camadas subtis com tom slate (elevação por opacidade + blur alto) */
-  --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.04);
-  --shadow-md: 0 1px 3px 0 rgb(15 23 42 / 0.05), 0 8px 20px -8px rgb(15 23 42 / 0.08);
-  --shadow-lg: 0 1px 2px 0 rgb(15 23 42 / 0.05), 0 2px 4px 0 rgb(15 23 42 / 0.04), 0 20px 40px -16px rgb(15 23 42 / 0.14);
-  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.03);
-  --shadow-card-hover: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 2px 4px 0 rgb(15 23 42 / 0.03), 0 12px 28px -12px rgb(15 23 42 / 0.10);
-  --shadow-dropdown: 0 1px 2px 0 rgb(15 23 42 / 0.05), 0 4px 8px 0 rgb(15 23 42 / 0.04), 0 16px 32px -12px rgb(15 23 42 / 0.12);
-  --shadow-modal: 0 2px 4px 0 rgb(15 23 42 / 0.06), 0 8px 16px -8px rgb(15 23 42 / 0.10), 0 32px 64px -24px rgb(15 23 42 / 0.18);
-  --shadow-lift: 0 2px 4px 0 rgb(15 23 42 / 0.05), 0 16px 40px -16px rgb(15 23 42 / 0.14);
+  /* Shadow system — elevação mínima; a hierarquia faz-se por bordas */
+  --shadow-sm: 0 1px 1px 0 rgb(15 23 42 / 0.03);
+  --shadow-md: 0 1px 2px 0 rgb(15 23 42 / 0.04);
+  --shadow-lg: 0 1px 2px 0 rgb(15 23 42 / 0.05);
+  --shadow-card: 0 1px 1px 0 rgb(15 23 42 / 0.03);
+  --shadow-card-hover: 0 1px 2px 0 rgb(15 23 42 / 0.05);
+  --shadow-dropdown: 0 1px 3px 0 rgb(15 23 42 / 0.06);
+  --shadow-modal: 0 2px 8px -2px rgb(15 23 42 / 0.12);
+  --shadow-lift: 0 1px 2px 0 rgb(15 23 42 / 0.05);
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: var(--font-jbmono), ui-monospace, "Cascadia Code", "Consolas", monospace;
@@ -105,34 +114,49 @@
   --popover-foreground: #1e293b;
   --primary: #0066ff;
   --primary-foreground: #ffffff;
+  --primary-hover: #0052cc;
+  --primary-active: #004099;
   --secondary: #64748b;
   --secondary-foreground: #ffffff;
   --muted: #f1f5f9;
   --muted-foreground: #64748b;
   --accent: #eff4fb;
   --accent-foreground: #1e293b;
-  --destructive: #ee2a24;
-  --destructive-foreground: #ffffff;
+  /* destructive = alias de error (compatibilidade shadcn) */
+  --destructive: var(--error);
+  --destructive-foreground: var(--error-foreground);
   --border: #e2e8f0;
   --input: #cbd5e1;
   --ring: #0066ff;
-  --success: #10b981;
-  --warning: #f58220;
-  --error: #ee2a24;
+  /* Estados escurecidos para AA como texto sobre superfície clara;
+     texto sobre tint usa os tokens *-ink */
+  --success: #059669;
+  --warning: #d97706;
+  --error: #dc2626;
   --success-foreground: #ffffff;
   --warning-foreground: #ffffff;
   --error-foreground: #ffffff;
+  --success-ink: #047857;
+  --warning-ink: #b45309;
+  --error-ink: #b91c1c;
   --info: #0066ff;
   --info-foreground: #ffffff;
+  --info-ink: #1d4ed8;
+  /* Paleta de dados — mesma identidade de categoria nos dois temas */
   --data-1: #0066ff;
-  --data-2: #ee2a24;
-  --data-3: #f58220;
-  --data-4: #ffc72c;
-  --data-5: #10b981;
+  --data-2: #dc2626;
+  --data-3: #d97706;
+  --data-4: #ca8a04;
+  --data-5: #059669;
   --data-6: #64748b;
   --tertiary: #0047ab;
   --tertiary-foreground: #0047ab;
   --surface-variant: #f1f5f9;
+
+  /* Durações de transição */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 300ms;
 }
 
 .dark {
@@ -146,14 +170,17 @@
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.922 0 0);
   --primary-foreground: oklch(0.205 0 0);
+  --primary-hover: oklch(0.85 0 0);
+  --primary-active: oklch(0.78 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(1 0 0 / 0.06);
   --muted-foreground: oklch(0.708 0 0);
   --accent: oklch(1 0 0 / 0.08);
   --accent-foreground: oklch(0.985 0 0);
-  --destructive: #f87171;
-  --destructive-foreground: #450a0a;
+  /* destructive = alias de error (compatibilidade shadcn) */
+  --destructive: var(--error);
+  --destructive-foreground: var(--error-foreground);
   --border: oklch(1 0 0 / 0.1);
   --input: oklch(1 0 0 / 0.15);
   --ring: oklch(0.922 0 0);
@@ -163,8 +190,12 @@
   --success-foreground: #052e16;
   --warning-foreground: #451a03;
   --error-foreground: #450a0a;
+  --success-ink: #6ee7b7;
+  --warning-ink: #fcd34d;
+  --error-ink: #fca5a5;
   --info: #7aa2f7;
   --info-foreground: #0b1220;
+  --info-ink: #93c5fd;
   --data-1: #60a5fa;
   --data-2: #f87171;
   --data-3: #fbbf24;
@@ -190,90 +221,14 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Brand-tinted ambient background (subtle, follows theme) */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-color: var(--background);
-}
-
 /* ===== Typography ===== */
-.text-display {
-  font-size: 2.25rem;
-  font-weight: 800;
-  line-height: 2.5rem;
-  letter-spacing: -0.035em;
-}
-
-.text-headline-md {
-  font-size: 1.5rem;
-  font-weight: 800;
-  line-height: 2rem;
-  letter-spacing: -0.02em;
-}
-
-.text-headline-sm {
-  font-size: 1.25rem;
-  font-weight: 700;
-  line-height: 1.75rem;
-  letter-spacing: -0.015em;
-}
-
 .text-body {
   font-size: 0.875rem;
   font-weight: 400;
   line-height: 1.375rem;
 }
 
-.text-label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  line-height: 1rem;
-  letter-spacing: 0.02em;
-}
-
-.text-caption {
-  font-size: 0.625rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-/* ===== Card Styles ===== */
-.card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
-  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
-}
-
-.card:hover {
-  box-shadow: var(--shadow-card-hover);
-}
-
-.card-content {
-  padding: 1.5rem;
-}
-
-@media (min-width: 640px) {
-  .card-content {
-    padding: 1.5rem;
-  }
-}
-
 /* ===== Form Styles ===== */
-.form-group {
-  margin-bottom: 1rem;
-}
-
-.form-group:last-child {
-  margin-bottom: 0;
-}
-
 .form-label {
   display: block;
   font-size: 0.75rem;
@@ -281,50 +236,6 @@ body::before {
   letter-spacing: 0;
   color: var(--muted-foreground);
   margin-bottom: 0.5rem;
-}
-
-.form-input,
-.form-select,
-.form-textarea {
-  display: block;
-  width: 100%;
-  height: 2.5rem;
-  padding: 0.5rem 0.75rem;
-  background-color: var(--background);
-  border: 1px solid var(--input);
-  border-radius: 0.625rem;
-  font-size: 0.875rem;
-  color: var(--foreground);
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.form-input:focus,
-.form-select:focus,
-.form-textarea:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent);
-}
-
-.form-input::placeholder,
-.form-select::placeholder,
-.form-textarea::placeholder {
-  color: color-mix(in srgb, var(--muted-foreground) 60%, transparent);
-}
-
-/* ===== Section & List Spacing ===== */
-.section-spacing {
-  margin-bottom: 1.5rem;
-}
-
-.list-item {
-  padding: 1rem 1.5rem;
-}
-
-@media (min-width: 640px) {
-  .list-item {
-    padding: 1.5rem;
-  }
 }
 
 /* ===== Scrollbar ===== */
@@ -374,156 +285,14 @@ input[type="radio"] {
   accent-color: var(--primary);
 }
 
-/* ===== Animations ===== */
-@keyframes fade-up {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+/* ===== Motion =====
+   Interface sóbria: sem animações decorativas de entrada, brilho ou pulso.
+   Mantém-se apenas feedback funcional (spinner de carregamento e transições
+   curtas de cor/borda). */
 
-@keyframes scale-in {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-@keyframes modalIn {
-  from { opacity: 0; transform: scale(0.92) translateY(12px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes slideDown {
-  from { opacity: 0; transform: translateY(-12px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes badgePulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-}
-
-@keyframes skeletonShimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-@keyframes pulse-slow {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-/* ===== Animation Utilities ===== */
-.animate-badge-pulse {
-  animation: badgePulse 2s ease-in-out infinite;
-}
-
-.animate-slide-up {
-  animation: slideUp 0.3s ease-out;
-}
-
-.animate-slide-down {
-  animation: slideDown 0.3s ease-out;
-}
-
-.animate-scale-in {
-  animation: scale-in 0.2s ease-out;
-}
-
-.animate-pulse-slow {
-  animation: pulse-slow 2s ease-in-out infinite;
-}
-
-/* ===== Entrada de modais ===== */
-@keyframes ds-modal-in {
-  from { opacity: 0; transform: scale(0.96) translateY(10px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
-}
-.animate-modal-in {
-  animation: ds-modal-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-@keyframes ds-modal-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-.animate-modal-fade {
-  animation: ds-modal-fade 0.2s ease-out both;
-}
-
-/* ===== Hover Utilities ===== */
+/* ===== Hover Utilities (sem deslocamento nem escala) ===== */
 .hover-lift {
-  transition: all 0.2s ease-in-out;
-}
-.hover-lift:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-card-hover);
-}
-
-.hover-scale {
-  transition: transform 0.2s ease-in-out;
-}
-.hover-scale:hover {
-  transform: scale(1.02);
-}
-
-/* ===== Status Icon Colors ===== */
-.icon-success { color: var(--success); }
-.icon-warning { color: var(--warning); }
-.icon-error { color: var(--error); }
-.icon-info { color: var(--secondary); }
-.icon-primary { color: var(--primary); }
-
-/* ===== Table Row Hover ===== */
-.table-row-hover:hover {
-  background-color: var(--muted);
-}
-
-/* ===== Page Transitions ===== */
-/* Nota: apenas opacidade — transform persistente criaria um bloco de
-   contenção que quebraria os modais (fixed inline, sem portal). */
-@keyframes page-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-.animate-page-fade {
-  animation: page-fade 0.3s ease-out;
-}
-
-.page-enter {
-  opacity: 0;
-  transform: translateY(8px);
-}
-.page-enter-active {
-  opacity: 1;
-  transform: translateY(0);
-  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
-}
-
-/* ===== Focus Ring ===== */
-.focus-ring {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
-
-/* ===== Fluid Card System ===== */
-.fluid-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-card);
-  border-radius: var(--radius-lg);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-.fluid-card:hover {
-  border-color: color-mix(in srgb, var(--border) 60%, var(--foreground));
-  box-shadow: var(--shadow-card-hover);
+  transition: border-color var(--duration-base) ease, background-color var(--duration-base) ease;
 }
 
 /* ===== Material Symbols ===== */
@@ -545,41 +314,17 @@ input[type="radio"] {
 
 /* ==========================================================================
    DESIGN SYSTEM — KAMGEST
-   Tokens: grade 8px, escala tipográfica, semântica de estados
+   Tokens na secção de cima do ficheiro (@theme inline + :root + .dark).
+   Espaçamento usa a escala padrão do Tailwind (base 4px: p-1…p-16).
    ========================================================================== */
 
-:root {
-  /* Grade de espaçamento 8px (multiplicadores) */
-  --ds-space-1: 0.5rem;    /* 8px  */
-  --ds-space-2: 1rem;      /* 16px */
-  --ds-space-3: 1.5rem;    /* 24px */
-  --ds-space-4: 2rem;      /* 32px */
-  --ds-space-5: 2.5rem;    /* 40px */
-  --ds-space-6: 3rem;      /* 48px */
-  --ds-space-7: 4rem;      /* 64px */
-  --ds-space-8: 5rem;      /* 80px */
-
-  /* Escala tipográfica base */
-  --ds-type-2xs: 0.75rem;  /* 12px */
-  --ds-type-sm: 0.875rem;  /* 14px */
-  --ds-type-base: 1rem;    /* 16px */
-  --ds-type-lg: 1.25rem;   /* 20px */
-  --ds-type-xl: 1.5rem;    /* 24px */
-  --ds-type-2xl: 2rem;     /* 32px */
-
-  /* Raio de cantos (12px / 16px) */
-  --ds-radius-md: 0.75rem; /* 12px */
-  --ds-radius-lg: 1rem;    /* 16px */
-}
-
-/* ===== Microinterações: transição padrão 200ms ease-in-out ===== */
+/* ===== Microinterações: transição padrão ===== */
 .ds-motion {
-  transition: all 0.2s ease-in-out;
+  transition: all var(--duration-base) ease-in-out;
 }
 
 /* ===== Lei de Fitts: alvos de toque >= 44px ===== */
 .min-h-touch { min-height: 44px; }
-.min-w-touch { min-width: 44px; }
 
 /* ===== Spinner (estado de loading) ===== */
 @keyframes ds-spin {
@@ -594,24 +339,11 @@ input[type="radio"] {
   animation: ds-spin 0.7s linear infinite;
 }
 
-/* ===== Mensagem de validação inline (entrada) ===== */
-@keyframes ds-msg-in {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.animate-msg-in {
-  animation: ds-msg-in 0.25s ease-in-out both;
-}
-
-/* ===== Entrada staggered de cards ===== */
-@keyframes ds-card-in {
-  from { opacity: 0; transform: translateY(16px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
+/* ===== Mensagens e cartões (sem animação de entrada) ===== */
+.animate-msg-in,
 .animate-card-in {
-  opacity: 0;
-  animation: ds-card-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-  animation-delay: var(--stagger, 0ms);
+  opacity: 1;
+  animation: none;
 }
 
 /* ===== Estado focus visível (navegação por teclado) ===== */
@@ -653,18 +385,12 @@ input[type="radio"] {
   box-shadow: var(--shadow-card-hover);
 }
 
-/* Fundos de marca — sólidos no escuro (sem gradientes decorativos) */
+/* Fundos de marca — sempre sólidos (sem gradientes) */
 .gradient-brand {
-  background-image: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 55%, var(--tertiary)));
-}
-.dark .gradient-brand {
   background-image: none;
   background-color: var(--primary);
 }
 .gradient-soft {
-  background-image: linear-gradient(135deg, color-mix(in srgb, var(--primary) 10%, transparent), color-mix(in srgb, var(--tertiary) 8%, transparent));
-}
-.dark .gradient-soft {
   background-image: none;
   background-color: var(--muted);
 }
@@ -713,7 +439,7 @@ body {
 
 /* Input glow (clean focus, kept name for compatibility) */
 .input-glow:focus-within {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent);
   border-color: var(--primary);
 }
 
@@ -730,13 +456,10 @@ body {
   position: relative;
 }
 
-/* Fundo de grelha subtil (kept name for compatibility) */
+/* Fundo de diagrama (superfície lisa, sem grelha decorativa) */
 .diagram-bg {
-  background-color: color-mix(in srgb, var(--muted) 30%, transparent);
-  background-size: 32px 32px;
-  background-image:
-    linear-gradient(to right, color-mix(in srgb, var(--border) 45%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in srgb, var(--border) 45%, transparent) 1px, transparent 1px);
+  background-color: var(--muted);
+  background-image: none;
 }
 
 /* Telemetry sparklines (neutralizadas — sem decoração) */
@@ -778,11 +501,11 @@ body {
 .glass-input {
   background: var(--background);
   border: 1px solid var(--input);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color var(--duration-base) ease, box-shadow var(--duration-base) ease;
 }
-.glass-input:focus {
+.glass-input:focus-visible {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent);
   outline: none;
 }
 
@@ -804,16 +527,9 @@ body {
 .tab-btn.active { color: var(--primary); }
 .tab-btn.active::after { transform: scaleX(1); }
 
-/* Texto de marca — cor sólida no escuro (sem gradiente) */
+/* Texto de marca — cor sólida (sem gradiente) */
 .text-gradient-brand,
 .text-gradient {
-  background-image: linear-gradient(120deg, var(--primary), color-mix(in srgb, var(--primary) 50%, var(--tertiary)));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-.dark .text-gradient-brand,
-.dark .text-gradient {
   background-image: none;
   -webkit-background-clip: initial;
   background-clip: initial;
@@ -845,10 +561,10 @@ body {
   background: var(--card);
 }
 
-/* ---- Glow reduzido a sombra neutra subtil ---- */
-.glow-primary { box-shadow: var(--shadow-card-hover); }
-.glow-purple { box-shadow: var(--shadow-card-hover); }
-.glow-brand { box-shadow: var(--shadow-card-hover); }
+/* ---- Sem glow: elevação apenas por borda ---- */
+.glow-primary,
+.glow-purple,
+.glow-brand { box-shadow: none; }
 
 /* ---- Chip de ícone (headers) ---- */
 .icon-chip {
@@ -920,18 +636,9 @@ body {
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* ---- Animações adicionais ---- */
-@keyframes ds-pop {
-  from { opacity: 0; transform: scale(0.96); }
-  to { opacity: 1; transform: scale(1); }
-}
-.animate-pop { animation: ds-pop 0.18s ease-out; }
-
-@keyframes ds-fade-up {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.animate-fade-up { animation: ds-fade-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+/* ---- Sem animações adicionais ---- */
+.animate-pop,
+.animate-fade-up { animation: none; }
 
 /* ---- Ajuste fino de foco (teclado) ---- */
 .ring-focus-soft:focus-visible {
@@ -940,20 +647,14 @@ body {
 }
 
 /* ==========================================================================
-   LAYER PROFISSIONAL — gradientes, pills e ondas (KAMGEST)
+   LAYER PROFISSIONAL — superfícies, pills e tipografia (KAMGEST)
    ========================================================================== */
 
-/* ---- Faixa (hero) — sólida no escuro ---- */
+/* ---- Faixa (hero) — superfície sólida ---- */
 .gradient-hero {
-  background-image:
-    radial-gradient(90% 160% at 0% 0%, color-mix(in srgb, var(--primary) 14%, transparent), transparent 52%),
-    radial-gradient(70% 130% at 100% 0%, color-mix(in srgb, var(--tertiary) 12%, transparent), transparent 50%),
-    var(--card);
-  border: 1px solid var(--border);
-}
-.dark .gradient-hero {
   background-image: none;
   background-color: var(--card);
+  border: 1px solid var(--border);
 }
 
 /* ---- Chip de ícone (cabeçalhos) ---- */
@@ -962,15 +663,10 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: 0.625rem;
-  background-image: linear-gradient(135deg, color-mix(in srgb, var(--primary) 14%, transparent), color-mix(in srgb, var(--tertiary) 12%, transparent));
-  border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent);
-  color: var(--primary);
-}
-.dark .chip-icon-grad {
-  background-image: none;
   background-color: var(--muted);
-  border-color: var(--border);
-  color: var(--foreground);
+  background-image: none;
+  border: 1px solid var(--border);
+  color: var(--primary);
 }
 
 /* ---- Pill (etiqueta arredondada) ---- */
@@ -987,15 +683,10 @@ body {
   white-space: nowrap;
 }
 .pill-primary {
-  background-image: linear-gradient(135deg, color-mix(in srgb, var(--primary) 14%, transparent), color-mix(in srgb, var(--tertiary) 12%, transparent));
+  background-color: color-mix(in srgb, var(--primary) 10%, transparent);
+  background-image: none;
   color: var(--primary);
   border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent);
-}
-.dark .pill-primary {
-  background-image: none;
-  background-color: var(--muted);
-  color: var(--foreground);
-  border-color: var(--border);
 }
 .pill-muted {
   background-color: var(--muted);
@@ -1008,12 +699,38 @@ body {
   border: 1px solid var(--border);
 }
 
-/* ---- Onda decorativa (base de faixas hero) ---- */
+/* ==========================================================================
+   BASE RESPONSIVA
+   ========================================================================== */
+
+html,
+body {
+  max-width: 100%;
+}
+
+img,
+video {
+  max-width: 100%;
+}
+
+/* Alvos de toque confortáveis em ecrãs pequenos */
+@media (max-width: 639px) {
+  .card-content {
+    padding: 1rem;
+  }
+  .list-item {
+    padding: 0.875rem 1rem;
+  }
+  .form-input,
+  .form-select,
+  .form-textarea {
+    height: 2.75rem;
+  }
+}
+
+/* ---- Onda decorativa (desativada) ---- */
 .wave-overlay {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
+  display: none;
 }
 .wave-overlay::before {
   content: "";

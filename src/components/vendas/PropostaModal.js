@@ -318,7 +318,7 @@ export default function PropostaModal({ open, proposta, existentes = [], onClose
       {carregando ? (
         <div className="space-y-3" aria-label="A carregar formulário">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-10 rounded-lg bg-muted animate-pulse" />
+            <div key={i} className="h-10 rounded-lg bg-muted" />
           ))}
         </div>
       ) : (
@@ -342,7 +342,7 @@ export default function PropostaModal({ open, proposta, existentes = [], onClose
           </div>
 
           {/* Altura fixa: o modal nunca muda de tamanho ao trocar de secção */}
-          <div role="tabpanel" id={`${id("painel")}-${tab}`} aria-labelledby={id(`tab-${tab}`)} className="animate-fade-up h-[400px] overflow-y-auto pr-1 custom-scrollbar">
+          <div role="tabpanel" id={`${id("painel")}-${tab}`} aria-labelledby={id(`tab-${tab}`)} className="h-[400px] overflow-y-auto pr-1 custom-scrollbar">
             {tab === "identificacao" && (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Campo label="Referência da Proposta">

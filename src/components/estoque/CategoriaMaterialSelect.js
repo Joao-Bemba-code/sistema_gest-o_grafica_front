@@ -132,7 +132,7 @@ export default function CategoriaMaterialSelect({
           id={listaId}
           role="listbox"
           aria-label="Categorias registadas"
-          className="absolute z-30 mt-1 w-full max-h-60 overflow-y-auto custom-scrollbar bg-card border border-border rounded-xl shadow-lg py-1"
+          className="absolute z-30 mt-1 w-full max-h-60 overflow-y-auto custom-scrollbar bg-card border border-border rounded-xl shadow-md py-1"
         >
           {novaCategoria && (
             <li className="px-3 py-2 text-[11px] text-primary border-b border-border/60 flex items-start gap-2">

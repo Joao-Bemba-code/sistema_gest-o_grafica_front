@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PAGINAS_BUSCA } from "@/lib/navegacao";
-import { podeAtual } from "@/lib/permissoes";
+import { podeAcederItem } from "@/lib/permissoes";
 import { cn } from "@/lib/utils";
 import { LuSearch, LuCornerDownLeft } from "react-icons/lu";
 
@@ -18,7 +18,7 @@ export default function CommandPalette() {
   const resultados = useMemo(() => {
     const q = termo.trim().toLowerCase();
     return PAGINAS_BUSCA.filter((p) => {
-      if (!podeAtual(...p.perm)) return false;
+      if (!podeAcederItem(p)) return false;
       if (!q) return true;
       return p.nome.toLowerCase().includes(q) || p.para.toLowerCase().includes(q);
     });
@@ -60,7 +60,7 @@ export default function CommandPalette() {
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-start justify-center bg-black/50 p-4 pt-[12vh] animate-modal-fade"
+      className="fixed inset-0 z-[70] flex items-start justify-center bg-black/50 p-4 pt-[12vh]"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) setAberto(false);
       }}
@@ -69,7 +69,7 @@ export default function CommandPalette() {
         role="dialog"
         aria-modal="true"
         aria-label="Busca global"
-        className="w-full max-w-lg overflow-hidden rounded-xl border border-border bg-popover shadow-modal animate-modal-in"
+        className="w-full max-w-lg overflow-hidden rounded-xl border border-border bg-popover shadow-modal"
       >
         <div className="flex items-center gap-2.5 border-b border-border px-4 py-3">
           <LuSearch className="h-4 w-4 shrink-0 text-muted-foreground" />

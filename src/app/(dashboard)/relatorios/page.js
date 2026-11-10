@@ -1,225 +1,280 @@
-﻿"use client";
-
-
-
-import { useState, useEffect, useMemo, useCallback } from "react";
-
-import Icon from "@/components/Icon";
-
-import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-
-import Modal from "@/components/Modal";
-
-import KpiCard from "@/components/ui/KpiCard";
-
-import MultiSelect from "@/components/ui/MultiSelect";
-
-import FiltroChips from "@/components/ui/FiltroChips";
-
-import { Ledger, LedgerHeader, LedgerTable, LedgerTh, LedgerTr, LedgerTd, StatusBadge, LedgerEmpty } from "@/components/ui/Ledger";
-
-import { useToast } from "@/components/Toast";
-
-import { listarOrdens } from "@/services/producao";
-
-import { listar } from "@/services/clientes";
-
-import { listar as listarFaturas } from "@/services/faturacao";
-
-import { listar as listarMateriais } from "@/services/materiais";
-
-import { listar as listarCategorias } from "@/services/categorias";
-
-import { listar as listarBens } from "@/services/bens";
-
-import { listar as listarPedidos } from "@/services/pedidos";
-
-import { listar as listarUsuarios } from "@/services/usuarios";
-
-import { listar as listarPropostas } from "@/services/propostas";
-
-import { resumoTesouraria } from "@/services/tesouraria";
-
-import { gerarRelatorioStockPDF, gerarRelatorioCadastrosPDF, gerarRelatorioCategoriasPDF, gerarRelatorioFaturacoesPDF, gerarRelatorioProducaoPDF } from "@/lib/estoquePdf";
-
-import { exportarRelatorioExcel, exportarRelatorioPDF } from "@/lib/relatoriosExport";
-
-import RelatorioClientes from "@/components/relatorios/RelatorioClientes";
-
-import { toNum, familias, normalizarFamilia, tiposItem, normalizarTipoItem } from "@/lib/estoque";
-
-import { buscarOrganizacao } from "@/services/configuracoes";
-
-
-
-const nomesMeses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-
-
-
-function getUltimos6Meses() {
-
-  const hoje = new Date();
-
-  const result = [];
-
-  for (let i = 5; i >= 0; i--) {
-
-    const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
-
-    result.push({
-
-      mes: d.getMonth(),
-
-      label: nomesMeses[d.getMonth()],
-
-      labelCurto: nomesMeses[d.getMonth()].slice(0, 3).toLowerCase(),
-
-    });
-
-  }
-
-  return result;
-
-}
-
-
-
-function fmtKz(v) {
-
-  return "Kz " + Math.round(Number(v) || 0).toLocaleString("pt-PT");
-
-}
-
-
-
-function compactKz(v) {
-
-  const n = Number(v) || 0;
-
-  if (n >= 1000000) return (n / 1000000).toLocaleString("pt-PT", { maximumFractionDigits: 1 }) + "M";
-
-  if (n >= 1000) return Math.round(n / 1000) + "k";
-
-  return String(Math.round(n));
-
-}
-
-
-
-const CORES_DONUT = ["#0066ff", "#2f80ff", "#5c9bff", "#89b6ff", "#64748b", "#10b981"];
-
-
-
-const ESTADOS_FATURA = [
-
-  { value: "emitida", label: "Emitida", cor: "#0066ff", icon: "receipt_long" },
-
-  { value: "parcial", label: "Pagamento parcial", cor: "#f58220", icon: "payments" },
-
-  { value: "paga", label: "Paga", cor: "#10b981", icon: "check_circle" },
-
-  { value: "cancelada", label: "Cancelada", cor: "#ee2a24", icon: "block" },
-
-];
-
-
-
-const TIPOS_FATURA = [
-
-  { value: "factura", label: "Fatura", cor: "#0066ff", icon: "receipt_long" },
-
-  { value: "factura_recibo", label: "Factura-recibo", cor: "#0066ff", icon: "receipt" },
-
-  { value: "recibo", label: "Recibo", cor: "#10b981", icon: "request_quote" },
-
-];
-
-
-
-const ESTADOS_ORDEM = [
-
-  { value: "aguardando", label: "Aguardando", cor: "#f58220", icon: "schedule" },
-
-  { value: "em_producao", label: "Em produção", cor: "#0066ff", icon: "precision_manufacturing" },
-
-  { value: "finalizado", label: "Finalizado", cor: "#10b981", icon: "check_circle" },
-
-  { value: "entregue", label: "Entregue", cor: "#64748b", icon: "local_shipping" },
-
-];
-
-
-
-const ESTADOS_BEM = [
-
-  { value: "ativo", label: "Em uso", cor: "#10b981", icon: "check_circle" },
-
-  { value: "manutencao", label: "Em manutenção", cor: "#f58220", icon: "build" },
-
-  { value: "avariado", label: "Avariado", cor: "#ee2a24", icon: "warning" },
-
-  { value: "abate", label: "Abatido", cor: "#64748b", icon: "block" },
-
-];
-
-
-
-const ESTADOS_PEDIDO = [
-
-  { value: "pendente", label: "Pendente", cor: "#f58220", icon: "schedule" },
-
-  { value: "aprovado", label: "Aprovado", cor: "#0066ff", icon: "check_circle" },
-
-  { value: "enviado", label: "Enviado", cor: "#0066ff", icon: "local_shipping" },
-
-  { value: "recebido", label: "Recebido", cor: "#10b981", icon: "inventory_2" },
-
-  { value: "rejeitado", label: "Rejeitado", cor: "#ee2a24", icon: "block" },
-
-  { value: "cancelado", label: "Cancelado", cor: "#64748b", icon: "close" },
-
-];
-
-
-
-const STATUS_MATERIAL = [
-
-  { value: "ok", label: "Saudável", cor: "#10b981", icon: "check_circle" },
-
-  { value: "repor", label: "Abaixo do mínimo", cor: "#f58220", icon: "warning" },
-
-  { value: "esgotado", label: "Esgotado", cor: "#ee2a24", icon: "error" },
-
-];
-
-
-
-const COR_RELATORIO = "#0066ff";
-
-
-
-const MODULOS_REL = [
-
-  { value: "comercial", label: "Comercial", icon: "trending_up" },
-
-  { value: "producao", label: "Produção", icon: "precision_manufacturing" },
-
-  { value: "stocks", label: "Stocks", icon: "inventory_2" },
-
-  { value: "compras", label: "Compras", icon: "add_shopping_cart" },
-
-  { value: "financeiro", label: "Financeiro", icon: "account_balance" },
-
-  { value: "tesouraria", label: "Tesouraria", icon: "savings" },
-
-  { value: "patrimonio", label: "Património", icon: "apartment" },
-
-  { value: "rh", label: "Recursos Humanos", icon: "groups" },
-
-];
-
-
-
+﻿"use client";
+
+
+
+import { useState, useEffect, useMemo, useCallback } from "react";
+
+import Icon from "@/components/Icon";
+
+import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+
+import Modal from "@/components/Modal";
+
+import KpiCard from "@/components/ui/KpiCard";
+
+import MultiSelect from "@/components/ui/MultiSelect";
+
+import FiltroChips from "@/components/ui/FiltroChips";
+
+import { Ledger, LedgerHeader, LedgerTable, LedgerTh, LedgerTr, LedgerTd, StatusBadge, LedgerEmpty } from "@/components/ui/Ledger";
+
+import { useToast } from "@/components/Toast";
+
+import { listarOrdens } from "@/services/producao";
+
+import { listar } from "@/services/clientes";
+
+import { listar as listarFaturas } from "@/services/faturacao";
+
+import { listar as listarMateriais } from "@/services/materiais";
+
+import { listar as listarCategorias } from "@/services/categorias";
+
+import { listar as listarBens } from "@/services/bens";
+
+import { listar as listarPedidos } from "@/services/pedidos";
+
+import { listar as listarUsuarios } from "@/services/usuarios";
+
+import { listar as listarPropostas } from "@/services/propostas";
+
+import { resumoTesouraria } from "@/services/tesouraria";
+
+import { gerarRelatorioStockPDF, gerarRelatorioCadastrosPDF, gerarRelatorioCategoriasPDF, gerarRelatorioFaturacoesPDF, gerarRelatorioProducaoPDF } from "@/lib/estoquePdf";
+
+import { exportarRelatorioExcel, exportarRelatorioPDF } from "@/lib/relatoriosExport";
+
+import RelatorioClientes, { camposEmFalta } from "@/components/relatorios/RelatorioClientes";
+
+import BarraContexto from "@/components/relatorios/BarraContexto";
+
+import Bloco from "@/components/relatorios/Bloco";
+
+import CardRelatorioModulo from "@/components/relatorios/CardRelatorioModulo";
+
+import PainelVista from "@/components/relatorios/PainelVista";
+
+import useVistaRelatorios from "@/components/relatorios/useVistaRelatorios";
+
+import { itensDe } from "@/components/relatorios/blocos";
+
+import { toNum, familias, normalizarFamilia, tiposItem, normalizarTipoItem } from "@/lib/estoque";
+
+import { buscarOrganizacao } from "@/services/configuracoes";
+
+
+
+const nomesMeses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+
+
+const chaveMes = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+
+function itemMes(ano, mes) {
+  const d = new Date(ano, mes, 1);
+  return {
+    chave: chaveMes(d),
+    ano,
+    mes,
+    label: `${nomesMeses[mes]} ${String(ano).slice(2)}`,
+    labelCurto: nomesMeses[mes].slice(0, 3).toLowerCase(),
+  };
+}
+
+function mesesDoIntervalo(intervalo) {
+  const hoje = new Date();
+  const ano = hoje.getFullYear();
+  const mesAtual = hoje.getMonth();
+  let inicio = null;
+  let fim = new Date(ano, mesAtual, 1);
+
+  if (intervalo.modo === "3m" || intervalo.modo === "6m" || intervalo.modo === "12m") {
+    const n = Number(intervalo.modo.replace("m", ""));
+    inicio = new Date(ano, mesAtual - (n - 1), 1);
+  } else if (intervalo.modo === "ano") {
+    inicio = new Date(ano, 0, 1);
+  } else {
+    const dIni = intervalo.inicio ? new Date(`${intervalo.inicio}T00:00:00`) : null;
+    const dFim = intervalo.fim ? new Date(`${intervalo.fim}T00:00:00`) : null;
+    inicio =
+      dIni && !isNaN(dIni.getTime())
+        ? new Date(dIni.getFullYear(), dIni.getMonth(), 1)
+        : new Date(ano, mesAtual - 5, 1);
+    if (dFim && !isNaN(dFim.getTime()) && dFim >= inicio) {
+      fim = new Date(dFim.getFullYear(), dFim.getMonth(), 1);
+    }
+  }
+
+  const result = [];
+  const cursor = new Date(inicio);
+  let guarda = 0;
+  while (cursor <= fim && guarda < 36) {
+    result.push(itemMes(cursor.getFullYear(), cursor.getMonth()));
+    cursor.setMonth(cursor.getMonth() + 1);
+    guarda += 1;
+  }
+  return result.length > 0 ? result : [itemMes(ano, mesAtual)];
+}
+
+// Um relatório temporal só soma registos cuja data pertence ao intervalo escolhido.
+// A data é opcional no cadastro; esses registos mantêm-se visíveis na lista completa,
+// mas nunca são atribuídos a um mês que não conhecemos.
+function dataDoRegisto(registo, campos) {
+  for (const campo of campos) {
+    const raw = registo?.[campo];
+    if (!raw) continue;
+    const data = new Date(raw);
+    if (!isNaN(data.getTime())) return data;
+  }
+  return null;
+}
+
+function registosDoPeriodo(registos, meses, campos) {
+  const chaves = new Set(meses.map((m) => m.chave));
+  return registos.filter((r) => {
+    const data = dataDoRegisto(r, campos);
+    return data && chaves.has(chaveMes(data));
+  });
+}
+
+function fmtKz(v) {
+
+  return "Kz " + Math.round(Number(v) || 0).toLocaleString("pt-PT");
+
+}
+
+
+
+function compactKz(v) {
+
+  const n = Number(v) || 0;
+
+  if (n >= 1000000) return (n / 1000000).toLocaleString("pt-PT", { maximumFractionDigits: 1 }) + "M";
+
+  if (n >= 1000) return Math.round(n / 1000) + "k";
+
+  return String(Math.round(n));
+
+}
+
+
+
+const CORES_DONUT = ["var(--data-1)", "color-mix(in srgb, var(--data-1) 75%, white)", "color-mix(in srgb, var(--data-1) 50%, white)", "color-mix(in srgb, var(--data-1) 25%, white)", "var(--data-6)", "var(--data-5)"];
+
+
+
+const ESTADOS_FATURA = [
+
+  { value: "emitida", label: "Emitida", cor: "var(--data-1)", icon: "receipt_long" },
+
+  { value: "parcial", label: "Pagamento parcial", cor: "var(--data-3)", icon: "payments" },
+
+  { value: "paga", label: "Paga", cor: "var(--data-5)", icon: "check_circle" },
+
+  { value: "cancelada", label: "Cancelada", cor: "var(--data-2)", icon: "block" },
+
+];
+
+
+
+const TIPOS_FATURA = [
+
+  { value: "factura", label: "Fatura", cor: "var(--data-1)", icon: "receipt_long" },
+
+  { value: "factura_recibo", label: "Factura-recibo", cor: "var(--data-1)", icon: "receipt" },
+
+  { value: "recibo", label: "Recibo", cor: "var(--data-5)", icon: "request_quote" },
+
+];
+
+
+
+const ESTADOS_ORDEM = [
+
+  { value: "aguardando", label: "Aguardando", cor: "var(--data-3)", icon: "schedule" },
+
+  { value: "em_producao", label: "Em produção", cor: "var(--data-1)", icon: "precision_manufacturing" },
+
+  { value: "finalizado", label: "Finalizado", cor: "var(--data-5)", icon: "check_circle" },
+
+  { value: "entregue", label: "Entregue", cor: "var(--data-6)", icon: "local_shipping" },
+
+];
+
+
+
+const ESTADOS_BEM = [
+
+  { value: "ativo", label: "Em uso", cor: "var(--data-5)", icon: "check_circle" },
+
+  { value: "manutencao", label: "Em manutenção", cor: "var(--data-3)", icon: "build" },
+
+  { value: "avariado", label: "Avariado", cor: "var(--data-2)", icon: "warning" },
+
+  { value: "abate", label: "Abatido", cor: "var(--data-6)", icon: "block" },
+
+];
+
+
+
+const ESTADOS_PEDIDO = [
+
+  { value: "pendente", label: "Pendente", cor: "var(--data-3)", icon: "schedule" },
+
+  { value: "aprovado", label: "Aprovado", cor: "var(--data-1)", icon: "check_circle" },
+
+  { value: "enviado", label: "Enviado", cor: "var(--data-1)", icon: "local_shipping" },
+
+  { value: "recebido", label: "Recebido", cor: "var(--data-5)", icon: "inventory_2" },
+
+  { value: "rejeitado", label: "Rejeitado", cor: "var(--data-2)", icon: "block" },
+
+  { value: "cancelado", label: "Cancelado", cor: "var(--data-6)", icon: "close" },
+
+];
+
+
+
+const STATUS_MATERIAL = [
+
+  { value: "ok", label: "Saudável", cor: "var(--data-5)", icon: "check_circle" },
+
+  { value: "repor", label: "Abaixo do mínimo", cor: "var(--data-3)", icon: "warning" },
+
+  { value: "esgotado", label: "Esgotado", cor: "var(--data-2)", icon: "error" },
+
+];
+
+
+
+const COR_RELATORIO = "var(--data-1)";
+
+const rotuloDe = (lista, valor) => lista.find((x) => x.value === valor)?.label || valor;
+
+
+
+const MODULOS_REL = [
+
+  { value: "comercial", label: "Comercial", icon: "trending_up" },
+
+  { value: "producao", label: "Produção", icon: "precision_manufacturing" },
+
+  { value: "stocks", label: "Stocks", icon: "inventory_2" },
+
+  { value: "compras", label: "Compras", icon: "add_shopping_cart" },
+
+  { value: "financeiro", label: "Financeiro", icon: "account_balance" },
+
+  { value: "tesouraria", label: "Tesouraria", icon: "savings" },
+
+  { value: "patrimonio", label: "Património", icon: "apartment" },
+
+  { value: "rh", label: "Recursos Humanos", icon: "groups" },
+
+];
+
+
+
 const tabClsBase =
   "inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors";
 
@@ -235,3617 +290,3184 @@ const botaoPdfCls =
 
 const botaoExcelCls =
 
-  "inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted/60";
-
-
-
-function variacaoDe(serie) {
-
-  if (!Array.isArray(serie) || serie.length < 2) return null;
-
-  const anterior = Number(serie[serie.length - 2]?.valor) || 0;
-
-  const atual = Number(serie[serie.length - 1]?.valor) || 0;
-
-  if (!anterior) return atual ? 100 : null;
-
-  return Math.round(((atual - anterior) / anterior) * 100);
-
-}
-
-
-
-function PainelFiltros({ icon, titulo, acoes, children }) {
-
-  return (
-
-    <div className="rounded-xl border border-border bg-card p-4">
-
-      <div className="mb-3 flex items-center justify-between gap-2">
-
-        <div className="flex min-w-0 items-center gap-2">
-
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border bg-muted">
-
-            <Icon name={icon} className="text-base text-muted-foreground" />
-
-          </span>
-
-          <p className="truncate text-sm font-semibold text-foreground">{titulo}</p>
-
-        </div>
-
-        {acoes && <div className="flex shrink-0 items-center gap-2">{acoes}</div>}
-
-      </div>
-
-      <div className="space-y-3">{children}</div>
-
-    </div>
-
-  );
-
-}
-
-
-
-function ChartTooltip({ active, payload, label, formato }) {
-
-  if (!active || !payload || payload.length === 0) return null;
-
-  return (
-
-    <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs space-y-1">
-
-      <p className="font-semibold text-foreground">{label}</p>
-
-      {payload.map((p, i) => (
-
-        <p key={i} className="flex items-center gap-2 text-muted-foreground">
-
-          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: p.color || p.payload?.fill }} />
-
-          <span>{p.name}:</span>
-
-          <span className="font-bold text-foreground font-mono">{formato ? formato(p.value) : p.value}</span>
-
-        </p>
-
-      ))}
-
-    </div>
-
-  );
-
-}
-
-
-
-function CabecalhoGrafico({ icon, titulo, sub }) {
-
-  return (
-
-    <div className="flex items-center gap-3 px-4 py-3">
-
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-muted">
-
-        <Icon name={icon} className="text-lg text-muted-foreground" />
-
-      </span>
-
-      <div className="min-w-0">
-
-        <h3 className="truncate text-sm font-semibold text-foreground">{titulo}</h3>
-
-        {sub && <p className="truncate text-[11px] text-muted-foreground">{sub}</p>}
-
-      </div>
-
-    </div>
-
-  );
-
-}
-
-
-
-function CartaoGrafico({ icon, titulo, sub, children, className = "" }) {
-
-  return (
-
-    <section className={`overflow-hidden rounded-xl border border-border bg-card ${className}`}>
-
-      <CabecalhoGrafico icon={icon} titulo={titulo} sub={sub} />
-
-      <div className="p-4">{children}</div>
-
-    </section>
-
-  );
-
-}
-
-
-
-function TabsPills({ opcoes, valor, onChange }) {
-
-  return (
-
-    <div className="inline-flex items-center gap-0.5 rounded-lg border border-border bg-muted/50 p-0.5">
-
-      {opcoes.map((o) => (
-
-        <button
-
-          key={o.value}
-
-          type="button"
-
-          onClick={() => onChange(o.value)}
-
-          className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-
-            valor === o.value ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-
-          }`}
-
-        >
-
-          {o.icon && <Icon name={o.icon} className="text-sm" />}
-
-          {o.label}
-
-        </button>
-
-      ))}
-
-    </div>
-
-  );
-
-}
-
-
-
-function AreaGrafico({ dados, serie, nome, cor, formato, xKey = "label" }) {
-
-  const gradId = `grad-${serie}`;
-
-  return (
-
-    <ResponsiveContainer width="100%" height="100%">
-
-      <AreaChart data={dados} margin={{ top: 10, right: 10, left: -14, bottom: 0 }}>
-
-        <defs>
-
-          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-
-            <stop offset="0%" stopColor={cor} stopOpacity={0.35} />
-
-            <stop offset="100%" stopColor={cor} stopOpacity={0.02} />
-
-          </linearGradient>
-
-        </defs>
-
-        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-
-        <XAxis dataKey={xKey} tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} dy={4} />
-
-        <YAxis tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} width={52} tickFormatter={formato} allowDecimals={false} />
-
-        <Tooltip content={<ChartTooltip formato={formato} />} />
-
-        <Area type="monotone" dataKey="valor" name={nome} stroke={cor} strokeWidth={2.5} fill={`url(#${gradId})`} activeDot={{ r: 4 }} />
-
-      </AreaChart>
-
-    </ResponsiveContainer>
-
-  );
-
-}
-
-
-
-function DonutGrafico({ dados, centro, tooltipFormat }) {
-
-  return (
-
-    <div className="relative h-52">
-
-      <ResponsiveContainer width="100%" height="100%">
-
-        <PieChart>
-
-          <Tooltip content={<ChartTooltip formato={tooltipFormat} />} />
-
-          <Pie data={dados} dataKey="value" nameKey="name" innerRadius={60} outerRadius={84} paddingAngle={2.5} strokeWidth={0} cornerRadius={6}>
-
-            {dados.map((d, i) => <Cell key={i} fill={d.color} />)}
-
-          </Pie>
-
-        </PieChart>
-
-      </ResponsiveContainer>
-
-      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-
-        <span className="text-xl font-semibold text-foreground font-mono">{centro}</span>
-
-        <span className="text-[9px] text-muted-foreground uppercase tracking-widest">total</span>
-
-      </div>
-
-    </div>
-
-  );
-
-}
-
-
-
-function LinhaDonut({ cor, nome, valor }) {
-
-  return (
-
-    <div className="flex items-center gap-2.5">
-
-      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: cor }} />
-
-      <span className="flex-1 min-w-0 text-sm text-foreground truncate">{nome}</span>
-
-      <span className="font-mono font-bold text-sm text-foreground shrink-0">{valor}</span>
-
-    </div>
-
-  );
-
-}
-
-
-
-export default function RelatoriosPage() {
-
-  const [loading, setLoading] = useState(true);
-
-  const [error, setError] = useState(null);
-
-  const [ordens, setOrdens] = useState([]);
-
-  const [clientes, setClientes] = useState([]);
-
-  const [faturas, setFaturas] = useState([]);
-
-  const [materiais, setMateriais] = useState([]);
-
-  const [categorias, setCategorias] = useState([]);
-
-  const [bens, setBens] = useState([]);
-
-  const [pedidos, setPedidos] = useState([]);
-
-  const [usuarios, setUsuarios] = useState([]);
-
-  const [propostas, setPropostas] = useState([]);
-
-  const [org, setOrg] = useState({});
-
-  const [periodo, setPeriodo] = useState(getUltimos6Meses()[5].labelCurto);
-
-  const [aba, setAba] = useState("comercial");
-
-  const [filtroTipo, setFiltroTipo] = useState("todos");
-
-  const [filtroFamilias, setFiltroFamilias] = useState([]);
-
-  const [filtroGrupos, setFiltroGrupos] = useState([]);
-
-  const [filtroEstadosFatura, setFiltroEstadosFatura] = useState([]);
-
-  const [filtroTiposFatura, setFiltroTiposFatura] = useState([]);
-
-  const [filtroEstadosOrdem, setFiltroEstadosOrdem] = useState([]);
-
-  const [filtroStatusMaterial, setFiltroStatusMaterial] = useState([]);
-
-  const [filtroFamiliasMateriais, setFiltroFamiliasMateriais] = useState([]);
-
-  const [busca, setBusca] = useState("");
-
-  const [tesouraria, setTesouraria] = useState(null);
-
-  const [relatorioId, setRelatorioId] = useState(null);
-
-  const [relatorioVer, setRelatorioVer] = useState(null);
-
-  const { addToast } = useToast();
-
-
-
-  const carregarDados = useCallback(async () => {
-
-    setLoading(true);
-
-    try {
-
-      const [ords, clis, fats, mats, cats, o, tes, bs, peds, usrs, props] = await Promise.all([
-
-        listarOrdens(),
-
-        listar(),
-
-        listarFaturas(),
-
-        listarMateriais(),
-
-        listarCategorias(),
-
-        buscarOrganizacao(),
-
-        resumoTesouraria().catch(() => null),
-
-        listarBens().catch(() => []),
-
-        listarPedidos().catch(() => []),
-
-        listarUsuarios().catch(() => []),
-
-        listarPropostas().catch(() => []),
-
-      ]);
-
-      setOrdens(Array.isArray(ords) ? ords : ords?.ordens || []);
-
-      setClientes(Array.isArray(clis) ? clis : clis?.data || []);
-
-      setFaturas(Array.isArray(fats) ? fats : fats?.data || []);
-
-      setMateriais(Array.isArray(mats) ? mats : []);
-
-      setCategorias(Array.isArray(cats) ? cats : []);
-
-      setBens(Array.isArray(bs) ? bs : bs?.data || []);
-
-      setPedidos(Array.isArray(peds) ? peds : peds?.data || []);
-
-      setUsuarios(Array.isArray(usrs) ? usrs : usrs?.data || []);
-
-      setPropostas(Array.isArray(props) ? props : props?.data || []);
-
-      setOrg(o || {});
-
-      setTesouraria(tes || null);
-
-    } catch (err) {
-
-      setError(err.message);
-
-      addToast(err.response?.data?.erro || "Erro ao carregar relatórios", "error");
-
-    } finally {
-
-      setLoading(false);
-
-    }
-
-  }, [addToast]);
-
-
-
-  useEffect(() => {
-
-    const t = setTimeout(() => carregarDados(), 0);
-
-    return () => clearTimeout(t);
-
-  }, [carregarDados]);
-
-
-
-  const ultimosMeses = useMemo(() => getUltimos6Meses(), []);
-
-
-
-  const contagemEstadosFatura = useMemo(() => {
-
-    const m = {};
-
-    faturas.forEach((f) => { m[f.estado] = (m[f.estado] || 0) + 1; });
-
-    return m;
-
-  }, [faturas]);
-
-
-
-  const contagemTiposFatura = useMemo(() => {
-
-    const m = {};
-
-    faturas.forEach((f) => { m[f.tipo] = (m[f.tipo] || 0) + 1; });
-
-    return m;
-
-  }, [faturas]);
-
-
-
-  const faturasFiltradas = useMemo(() => {
-
-    return faturas.filter((f) => {
-
-      const eOk = filtroEstadosFatura.length === 0 || filtroEstadosFatura.includes(f.estado);
-
-      const tOk = filtroTiposFatura.length === 0 || filtroTiposFatura.includes(f.tipo);
-
-      return eOk && tOk;
-
-    });
-
-  }, [faturas, filtroEstadosFatura, filtroTiposFatura]);
-
-
-
-  const contagemEstadosOrdem = useMemo(() => {
-
-    const m = {};
-
-    ordens.forEach((o) => { const e = o.estado || o.status; m[e] = (m[e] || 0) + 1; });
-
-    return m;
-
-  }, [ordens]);
-
-
-
-  const ordensFiltradas = useMemo(() => {
-
-    return ordens.filter((o) => filtroEstadosOrdem.length === 0 || filtroEstadosOrdem.includes(o.estado || o.status));
-
-  }, [ordens, filtroEstadosOrdem]);
-
-
-
-  const contagemStatusMaterial = useMemo(() => {
-
-    const m = {};
-
-    materiais.forEach((mat) => { m[mat.status] = (m[mat.status] || 0) + 1; });
-
-    return m;
-
-  }, [materiais]);
-
-
-
-  const opcoesFamiliasMateriais = useMemo(() => {
-
-    const map = new Map();
-
-    materiais.forEach((mat) => {
-
-      const fam = normalizarFamilia(mat.categoria?.familia);
-
-      const famCfg = familias[fam];
-
-      if (!map.has(fam)) map.set(fam, { value: fam, label: famCfg?.label || mat.categoria?.familia || fam });
-
-    });
-
-    return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, "pt"));
-
-  }, [materiais]);
-
-
-
-  const materiaisFiltrados = useMemo(() => {
-
-    return materiais.filter((mat) => {
-
-      const sOk = filtroStatusMaterial.length === 0 || filtroStatusMaterial.includes(mat.status);
-
-      const fOk = filtroFamiliasMateriais.length === 0 || filtroFamiliasMateriais.includes(normalizarFamilia(mat.categoria?.familia));
-
-      return sOk && fOk;
-
-    });
-
-  }, [materiais, filtroStatusMaterial, filtroFamiliasMateriais]);
-
-
-
-  const vendasPorMes = useMemo(() => {
-
-    const hoje = new Date();
-
-    const mesesIndices = ultimosMeses.map((m) => m.mes);
-
-    const counts = ultimosMeses.map((m) => ({ mes: m.mes, label: m.label, valor: 0, quantidade: 0 }));
-
-    faturasFiltradas.forEach((f) => {
-
-      const d = f.data_emissao ? new Date(f.data_emissao) : null;
-
-      if (d && !isNaN(d.getTime()) && d.getFullYear() === hoje.getFullYear() && mesesIndices.includes(d.getMonth())) {
-
-        const idx = ultimosMeses.findIndex((m) => m.mes === d.getMonth());
-
-        counts[idx].valor += Number(f.total || f.valor) || 0;
-
-        counts[idx].quantidade += 1;
-
-      }
-
-    });
-
-    return counts;
-
-  }, [faturasFiltradas, ultimosMeses]);
-
-
-
-  const recebidoPorMes = useMemo(() => {
-
-    const hoje = new Date();
-
-    const mesesIndices = ultimosMeses.map((m) => m.mes);
-
-    const counts = ultimosMeses.map((m) => ({ mes: m.mes, label: m.label, valor: 0, quantidade: 0 }));
-
-    faturasFiltradas.forEach((f) => {
-
-      if (f.estado !== "paga") return;
-
-      const d = f.data_pagamento || f.data_emissao;
-
-      const dt = d ? new Date(d) : null;
-
-      if (dt && !isNaN(dt.getTime()) && dt.getFullYear() === hoje.getFullYear() && mesesIndices.includes(dt.getMonth())) {
-
-        const idx = ultimosMeses.findIndex((m) => m.mes === dt.getMonth());
-
-        counts[idx].valor += Number(f.valor_pago || f.total || f.valor) || 0;
-
-        counts[idx].quantidade += 1;
-
-      }
-
-    });
-
-    return counts;
-
-  }, [faturasFiltradas, ultimosMeses]);
-
-
-
-  const recebidoHoje = useMemo(() => {
-
-    const hoje = new Date().toISOString().split("T")[0];
-
-    return faturasFiltradas
-
-      .filter((f) => f.estado === "paga" && (f.data_pagamento || f.data_emissao) === hoje)
-
-      .reduce((s, f) => s + (Number(f.valor_pago || f.total || f.valor) || 0), 0);
-
-  }, [faturasFiltradas]);
-
-
-
-  const recebidoMes = useMemo(() => {
-
-    const hoje = new Date();
-
-    return faturasFiltradas
-
-      .filter((f) => {
-
-        if (f.estado !== "paga") return false;
-
-        const d = new Date(f.data_pagamento || f.data_emissao);
-
-        return !isNaN(d.getTime()) && d.getFullYear() === hoje.getFullYear() && d.getMonth() === hoje.getMonth();
-
-      })
-
-      .reduce((s, f) => s + (Number(f.valor_pago || f.total || f.valor) || 0), 0);
-
-  }, [faturasFiltradas]);
-
-
-
-  const clientesTop = useMemo(() => {
-
-    const map = {};
-
-    faturasFiltradas.forEach((f) => {
-
-      const nome = f.cliente?.nome || f.cliente || "Cliente";
-
-      map[nome] = (map[nome] || 0) + (Number(f.total || f.valor) || 0);
-
-    });
-
-    return Object.entries(map)
-
-      .sort((a, b) => b[1] - a[1])
-
-      .slice(0, 5)
-
-      .map(([nome, total], i) => ({
-
-        nome,
-
-        total,
-
-        cor: ["bg-primary", "bg-primary/70", "bg-primary/50", "bg-primary/30", "bg-primary/15"][i],
-
-      }));
-
-  }, [faturasFiltradas]);
-
-
-
-  const clientesTotal = useMemo(() => clientesTop.reduce((s, c) => s + c.total, 0), [clientesTop]);
-
-
-
-  const producaoPorMes = useMemo(() => {
-
-    const hoje = new Date();
-
-    const mesesIndices = ultimosMeses.map((m) => m.mes);
-
-    const result = {};
-
-    mesesIndices.forEach((mesIdx) => {
-
-      const ordensMes = ordensFiltradas.filter((o) => {
-
-        const d = o.data_entrada ? new Date(o.data_entrada) : null;
-
-        return d && !isNaN(d.getTime()) && d.getFullYear() === hoje.getFullYear() && d.getMonth() === mesIdx;
-
-      });
-
-      const produzidas = ordensMes.length;
-
-      const entregues = ordensMes.filter((o) => (o.estado || o.status) === "entregue").length;
-
-      result[mesIdx] = { produzidas, entregues, pct: produzidas > 0 ? Math.round((entregues / produzidas) * 100) : 0 };
-
-    });
-
-    return result;
-
-  }, [ordensFiltradas, ultimosMeses]);
-
-
-
-  const opsPorStatus = useMemo(() => ["aguardando", "em_producao", "finalizado", "entregue"].map((s) => ({
-
-    status: s,
-
-    label: s.replace("_", " ").replace(/\b\w/g, l => l.toUpperCase()),
-
-    quantidade: ordensFiltradas.filter(o => (o.estado || o.status) === s).length,
-
-  })), [ordensFiltradas]);
-
-
-
-  const cadastrosFiltrados = useMemo(() => {
-
-    let lista = clientes;
-
-    if (filtroTipo !== "todos") lista = lista.filter((c) => c.tipo === filtroTipo);
-
-    if (busca.trim()) {
-
-      const b = busca.trim().toLowerCase();
-
-      lista = lista.filter((c) =>
-
-        [c.nome, c.empresa, c.nif, c.codigo, c.telefone, c.email].some((v) =>
-
-          String(v || "").toLowerCase().includes(b)
-
-        )
-
-      );
-
-    }
-
-    return lista;
-
-  }, [clientes, filtroTipo, busca]);
-
-
-
-  const totalClientes = useMemo(() => clientes.filter((c) => c.tipo === "cliente").length, [clientes]);
-
-  const totalFornecedores = useMemo(() => clientes.filter((c) => c.tipo === "fornecedor").length, [clientes]);
-
-
-  const baseClientes = useMemo(() => clientes.filter((c) => c.tipo === "cliente"), [clientes]);
-
-
-
-  const periodoClientes = useMemo(() => {
-
-    const hoje = new Date();
-
-    const chave = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
-
-    const rotulo = hoje.toLocaleDateString("pt-PT", { month: "long", year: "numeric" });
-
-    return { chave, rotulo: rotulo.charAt(0).toUpperCase() + rotulo.slice(1) };
-
-  }, []);
-
-
-
-  const clientesAtivos = useMemo(() => baseClientes.filter((c) => c.ativo !== false).length, [baseClientes]);
-
-
-
-  const clientesInativos = useMemo(() => baseClientes.filter((c) => c.ativo === false).length, [baseClientes]);
-
-
-
-  const novosClientesPeriodo = useMemo(
-
-    () => baseClientes.filter((c) => String(c.dataCadastro || c.data_cadastro || "").startsWith(periodoClientes.chave)).length,
-
-    [baseClientes, periodoClientes.chave]
-
-  );
-
-
-
-  const dividaPorClienteRel = useMemo(() => {
-
-    const mapa = new Map();
-
-    for (const f of faturas) {
-
-      if (!f || ["recibo", "proforma", "nota_credito"].includes(f.tipo) || ["paga", "cancelada"].includes(f.estado)) continue;
-
-      const cid = Number(f.cliente_id ?? f.cliente?.id);
-
-      if (!Number.isInteger(cid) || cid <= 0) continue;
-
-      const saldo = Number(f.total ?? f.valor ?? 0) - Number(f.valor_pago ?? 0);
-
-      mapa.set(cid, (mapa.get(cid) || 0) + saldo);
-
-    }
-
-    return mapa;
-
-  }, [faturas]);
-
-
-
-  const clientesComPendencia = useMemo(
-
-    () => baseClientes.filter((c) => (dividaPorClienteRel.get(Number(c.id)) || 0) > 0).length,
-
-    [baseClientes, dividaPorClienteRel]
-
-  );
-
-
-
-  const categoriasStock = useMemo(() => {
-
-    const map = {};
-
-    materiais.forEach((m) => {
-
-      const cat = m.categoria?.nome || "Sem categoria";
-
-      if (!map[cat]) map[cat] = { itens: 0, qtd: 0, valor: 0 };
-
-      map[cat].itens += 1;
-
-      map[cat].qtd += toNum(m.quantidade);
-
-      map[cat].valor += toNum(m.quantidade) * toNum(m.custo_unit);
-
-    });
-
-    return Object.entries(map)
-
-      .map(([nome, d]) => ({ nome, ...d }))
-
-      .sort((a, b) => b.valor - a.valor);
-
-  }, [materiais]);
-
-
-
-  const tesourariaPorMes = useMemo(() => {
-
-    const hoje = new Date();
-
-    const counts = ultimosMeses.map((m) => ({ label: m.label, mes: m.mes, entradas: 0, saidas: 0 }));
-
-    const movs = Array.isArray(tesouraria?.movimentos) ? tesouraria.movimentos : [];
-
-    movs.forEach((mov) => {
-
-      const raw = mov.data_movimento || mov.data;
-
-      const d = raw ? new Date(raw) : null;
-
-      if (!d || isNaN(d.getTime()) || d.getFullYear() !== hoje.getFullYear()) return;
-
-      const idx = ultimosMeses.findIndex((m) => m.mes === d.getMonth());
-
-      if (idx < 0) return;
-
-      const v = Number(mov.valor) || 0;
-
-      if (mov.tipo === "entrada") counts[idx].entradas += v;
-
-      else if (mov.tipo === "saida") counts[idx].saidas += v;
-
-    });
-
-    return counts;
-
-  }, [tesouraria, ultimosMeses]);
-
-
-
-  const contasTesouraria = useMemo(
-
-    () => (Array.isArray(tesouraria?.contas) ? tesouraria.contas : []),
-
-    [tesouraria]
-
-  );
-
-
-
-  const bensPorCategoria = useMemo(() => {
-
-    const m = {};
-
-    bens.forEach((b) => {
-
-      const c = String(b.categoria || "Sem categoria").trim();
-
-      if (!m[c]) m[c] = { nome: c, itens: 0, valor: 0 };
-
-      m[c].itens += 1;
-
-      m[c].valor += toNum(b.valor_aquisicao);
-
-    });
-
-    return Object.values(m).sort((a, b) => b.valor - a.valor);
-
-  }, [bens]);
-
-
-
-  const bensPorEstado = useMemo(() => {
-
-    const m = {};
-
-    bens.forEach((b) => { const e = b.estado || "ativo"; m[e] = (m[e] || 0) + 1; });
-
-    return m;
-
-  }, [bens]);
-
-
-
-  const pedidosPorEstado = useMemo(() => {
-
-    const m = {};
-
-    pedidos.forEach((p) => { const e = p.estado || p.status || "pendente"; m[e] = (m[e] || 0) + 1; });
-
-    return m;
-
-  }, [pedidos]);
-
-
-
-  const comprasPorMes = useMemo(() => {
-
-    const hoje = new Date();
-
-    const mesesIndices = ultimosMeses.map((m) => m.mes);
-
-    const counts = ultimosMeses.map((m) => ({ mes: m.mes, label: m.label, valor: 0, quantidade: 0 }));
-
-    pedidos.forEach((p) => {
-
-      const raw = p.data_pedido || p.createdAt || p.data;
-
-      const d = raw ? new Date(raw) : null;
-
-      if (d && !isNaN(d.getTime()) && d.getFullYear() === hoje.getFullYear() && mesesIndices.includes(d.getMonth())) {
-
-        const idx = ultimosMeses.findIndex((m) => m.mes === d.getMonth());
-
-        counts[idx].valor += toNum(p.total);
-
-        counts[idx].quantidade += 1;
-
-      }
-
-    });
-
-    return counts;
-
-  }, [pedidos, ultimosMeses]);
-
-
-
-  const usuariosPorPerfil = useMemo(() => {
-
-    const m = {};
-
-    usuarios.forEach((u) => { const p = u.perfil?.nome || u.perfil || u.funcao || "Sem perfil"; m[p] = (m[p] || 0) + 1; });
-
-    return Object.entries(m).map(([nome, qtd]) => ({ nome, qtd })).sort((a, b) => b.qtd - a.qtd);
-
-  }, [usuarios]);
-
-
-
-  const usuariosAtivos = useMemo(
-
-    () => usuarios.filter((u) => u.ativo !== false).length,
-
-    [usuarios]
-
-  );
-
-  const usuariosInativos = useMemo(
-
-    () => usuarios.filter((u) => u.ativo === false).length,
-
-    [usuarios]
-
-  );
-
-
-
-  const relatorios = useMemo(() => {
-
-    const texto = (r, v) => (r.formato || ((x) => String(Math.round(Number(x) || 0))))(v);
-
-    const mk = (r) => ({
-
-      id: r.id,
-
-      titulo: r.titulo,
-
-      icon: r.icon,
-
-      sub: r.sub || "Total calculado com base nos dados actuais.",
-
-      serie: r.serie || [],
-
-      total: r.total,
-
-      totalTexto: texto(r, r.total),
-
-      variacao: r.variacao ?? null,
-
-      formato: r.formato,
-
-      formatoAxis: r.formatoAxis,
-
-      cor: r.cor || COR_RELATORIO,
-
-      colunas: r.colunas || ["Item", "Valor"],
-
-      linhas: r.linhas || [],
-
-      onExportPdf: () =>
-
-        exportarRelatorioPDF({
-
-          titulo: r.titulo,
-
-          org,
-
-          cabecalhos: r.colunas || ["Item", "Valor"],
-
-          linhas: r.linhas || [],
-
-          resumo: [`Total: ${texto(r, r.total)}`],
-
-        }),
-
-      onExportExcel: () => exportarRelatorioExcel(r.titulo, r.colunas || ["Item", "Valor"], r.linhas || []),
-
-    });
-
-
-
-    const soma = (arr, campo) => arr.reduce((s, x) => s + (Number(x[campo]) || 0), 0);
-
-
-
-    const vendasSerie = vendasPorMes.map((v) => ({ label: v.label, valor: v.valor }));
-
-    const totalVendas = soma(vendasSerie, "valor");
-
-    const recebidoSerie = recebidoPorMes.map((v) => ({ label: v.label, valor: v.valor }));
-
-    const totalRecebido = soma(recebidoSerie, "valor");
-
-    const docsSerie = vendasPorMes.map((v) => ({ label: v.label, valor: v.quantidade }));
-
-    const clientesSerie = clientesTop.map((c) => ({ label: c.nome, valor: c.total }));
-
-    const totalClientesTop = soma(clientesSerie, "valor");
-
-
-
-    const prodSerie = ultimosMeses.map((m) => ({ label: m.label, valor: (producaoPorMes[m.mes] || { produzidas: 0 }).produzidas }));
-
-    const entrSerie = ultimosMeses.map((m) => ({ label: m.label, valor: (producaoPorMes[m.mes] || { entregues: 0 }).entregues }));
-
-    const pctSerie = ultimosMeses.map((m) => ({ label: m.label, valor: (producaoPorMes[m.mes] || { pct: 0 }).pct }));
-
-    const statusSerie = opsPorStatus.map((s) => ({ label: s.label, valor: s.quantidade }));
-
-
-
-    const catsValorSerie = categoriasStock.map((c) => ({ label: c.nome, valor: c.valor }));
-
-    const catsItensSerie = categoriasStock.map((c) => ({ label: c.nome, valor: c.itens }));
-
-    const catsQtdSerie = categoriasStock.map((c) => ({ label: c.nome, valor: c.qtd }));
-
-    const matStatusSerie = STATUS_MATERIAL.map((s) => ({ label: s.label, valor: contagemStatusMaterial[s.value] || 0 }));
-
-
-
-    const finEstadoSerie = ESTADOS_FATURA.map((s) => ({ label: s.label, valor: contagemEstadosFatura[s.value] || 0 }));
-
-    const despesasSerie = tesourariaPorMes.map((m) => ({ label: m.label, valor: m.saidas }));
-
-    const entradasSerie = tesourariaPorMes.map((m) => ({ label: m.label, valor: m.entradas }));
-
-    const saidasSerie = tesourariaPorMes.map((m) => ({ label: m.label, valor: m.saidas }));
-
-    const contasSerie = contasTesouraria.map((c) => ({ label: c.nome || `Conta #${c.id}`, valor: Number(c.saldo_atual) || 0 }));
-
-
-
-    const hojeRef = new Date();
-
-    const propostasLista = Array.isArray(propostas) ? propostas : [];
-
-    const propostasCriadas = propostasLista.length;
-
-    const propostasEnviadas = propostasLista.filter((p) => { const estado = p.estado || p.status; if (estado === "enviada") return true; if (p.enviado_em || p.data_envio || p.primeiro_envio_em) return true; return false; }).length;
-
-    const propostasAceites = propostasLista.filter((p) => { const estado = p.estado || p.status; return estado === "aprovada" || p.aceite_em || p.aprovado_em || p.data_aceite; }).length;
-
-    const propostasRecusadas = propostasLista.filter((p) => { const estado = p.estado || p.status; return estado === "rejeitada" || p.rejeitado_em || p.recusado_em || p.data_rejeicao; }).length;
-
-    const decididas = propostasAceites + propostasRecusadas;
-
-    const taxaAceitacao = decididas > 0 ? Math.round((propostasAceites / decididas) * 100) : 0;
-
-    const valorProposto = propostasLista.reduce((s, p) => { const v = Number(p.valor_total || p.total || p.valor_proposto || p.valor || 0); return s + (isNaN(v) ? 0 : v); }, 0);
-
-    const valorAceite = propostasLista.reduce((s, p) => { const estado = p.estado || p.status; if (!(estado === "aprovada" || p.aceite_em || p.aprovado_em || p.data_aceite)) return s; const v = Number(p.valor_total || p.total || p.valor_aceite || p.valor || 0); return s + (isNaN(v) ? 0 : v); }, 0);
-
-    const valorMedio = propostasEnviadas > 0 ? valorProposto / propostasEnviadas : 0;
-
-    const temposAberturaEnvio = [];
-
-    propostasLista.forEach((p) => { const criado = p.createdAt || p.data_criacao || p.data_criacao_proposta; const enviado = p.enviado_em || p.data_envio || p.primeiro_envio_em; if (criado && enviado) { const d1 = new Date(criado); const d2 = new Date(enviado); if (!isNaN(d1.getTime()) && !isNaN(d2.getTime()) && d2 >= d1) temposAberturaEnvio.push((d2 - d1) / (1000 * 60 * 60 * 24)); } });
-
-    const tempoMedioAberturaEnvio = temposAberturaEnvio.length ? temposAberturaEnvio.reduce((a,b)=>a+b,0)/temposAberturaEnvio.length : 0;
-
-    const temposSubmissaoDecisao = [];
-
-    propostasLista.forEach((p) => { const enviado = p.enviado_em || p.data_envio || p.primeiro_envio_em || p.data_submissao; const decisao = p.aceite_em || p.aprovado_em || p.data_aceite || p.rejeitado_em || p.recusado_em || p.data_rejeicao || p.data_decisao; if (enviado && decisao) { const d1 = new Date(enviado); const d2 = new Date(decisao); if (!isNaN(d1.getTime()) && !isNaN(d2.getTime()) && d2 >= d1) temposSubmissaoDecisao.push((d2 - d1) / (1000 * 60 * 60 * 24)); } });
-
-    const tempoMedioSubmissaoDecisao = temposSubmissaoDecisao.length ? temposSubmissaoDecisao.reduce((a,b)=>a+b,0)/temposSubmissaoDecisao.length : 0;
-
-    const propostasPendentes = propostasLista.filter((p) => { const estado = p.estado || p.status; if (["aprovada", "rejeitada", "anulada", "cancelada", "expirada"].includes(estado)) return false; if (p.aceite_em || p.aprovado_em || p.rejeitado_em || p.recusado_em || p.anulado_em) return false; return true; }).length;
-
-    const propostasForaPrazo = propostasLista.filter((p) => { const estado = p.estado || p.status; if (["aprovada", "rejeitada", "anulada", "cancelada"].includes(estado)) return false; const val = p.validade_data || p.data_validade || p.expira_em; if (!val) return false; const dv = new Date(val); if (isNaN(dv.getTime())) return false; return dv < new Date(hojeRef.getFullYear(), hojeRef.getMonth(), hojeRef.getDate()); }).length;
-
-    const propostasRevistas = propostasLista.filter((p) => { const rev = p.revisoes || p.num_revisoes || p.historico_revisoes || p.versoes; if (Array.isArray(rev)) return rev.length > 0; if (typeof rev === "number") return rev > 0; if (p.revisado || p.tem_revisao) return true; return false; }).length;
-
-    const taxaRevistasCriadas = propostasCriadas > 0 ? Math.round((propostasRevistas / propostasCriadas) * 100) : 0;
-
-    const propostasConvertidas = propostasLista.filter((p) => { if (p.orcamento_id || p.orcamento?.id || p.encomenda_id || p.encomenda?.id || p.ordem_producao_id || p.op_id || p.gerou_encomenda || p.gerou_orcamento) return true; return false; }).length;
-
-    const conversaoEncomendas = propostasCriadas > 0 ? Math.round((propostasConvertidas / propostasCriadas) * 100) : 0;
-
-
-
-    const porModulo = {
-
-      comercial: [
-
-        mk({
-
-          id: "relatorio-propostas", titulo: "Relat\u00f3rio de Propostas", icon: "description",
-
-          sub: "Indicadores com base em criação, envio, decisão e conversão",
-
-          serie: [
-
-            { label: "Criadas", valor: propostasCriadas },
-
-            { label: "Enviadas", valor: propostasEnviadas },
-
-            { label: "Aceites", valor: propostasAceites },
-
-            { label: "Recusadas", valor: propostasRecusadas },
-
-            { label: "Pendentes", valor: propostasPendentes },
-
-          ],
-
-          total: propostasCriadas,
-
-          colunas: ["Indicador", "Valor"],
-
-          linhas: [
-
-            ["01 Propostas criadas", propostasCriadas],
-
-            ["02 Propostas enviadas", propostasEnviadas],
-
-            ["03 Propostas aceites", propostasAceites],
-
-            ["04 Propostas recusadas", propostasRecusadas],
-
-            ["05 Taxa de aceitação (Aceites / decididas x 100)", taxaAceitacao + "%"],
-
-            ["06 Valor total proposto", fmtKz(valorProposto)],
-
-            ["07 Valor total aceite", fmtKz(valorAceite)],
-
-            ["08 Valor médio por proposta (Valor proposto / enviadas)", propostasEnviadas > 0 ? fmtKz(valorMedio) : "Kz 0"],
-
-            ["09 Tempo médio (Abertura até primeiro envio) (dias)", tempoMedioAberturaEnvio.toFixed(1)],
-
-            ["10 Tempo médio (Submissão até decisão) (dias)", tempoMedioSubmissaoDecisao.toFixed(1)],
-
-            ["11 Propostas pendentes", propostasPendentes],
-
-            ["12 Propostas fora de prazo", propostasForaPrazo],
-
-            ["13 Taxa de revistas / criadas x 100", taxaRevistasCriadas + "%"],
-
-            ["14 Conversão em encomendas", conversaoEncomendas + "%"],
-
-          ],
-
-        }),
-
-        mk({
-
-          id: "vendas-periodo", titulo: "Vendas por período", icon: "trending_up",
-
-          sub: "Total acumulado nos últimos 6 meses",
-
-          serie: vendasSerie, total: totalVendas, variacao: variacaoDe(vendasSerie), formato: fmtKz, formatoAxis: compactKz,
-
-          colunas: ["Período", "Valor", "Documentos"],
-
-          linhas: vendasPorMes.map((v) => [v.label, fmtKz(v.valor), v.quantidade]),
-
-        }),
-
-        mk({
-
-          id: "clientes-activos", titulo: "Clientes mais activos", icon: "workspace_premium",
-
-          sub: "Clientes com maior faturação.",
-
-          serie: clientesSerie, total: totalClientesTop, formato: fmtKz, formatoAxis: compactKz,
-
-          colunas: ["Cliente", "Faturação"],
-
-          linhas: clientesTop.map((c) => [c.nome, fmtKz(c.total)]),
-
-        }),
-
-        mk({
-
-          id: "documentos", titulo: "Documentos emitidos", icon: "receipt_long",
-
-          sub: "Documentos emitidos nos últimos 6 meses.",
-
-          serie: docsSerie, total: soma(docsSerie, "valor"), variacao: variacaoDe(docsSerie),
-
-          colunas: ["Período", "Documentos"], linhas: vendasPorMes.map((v) => [v.label, v.quantidade]),
-
-        }),
-
-        mk({
-
-          id: "recebimentos", titulo: "Recebimentos", icon: "payments",
-
-          sub: "Faturas pagas nos últimos 6 meses.",
-
-          serie: recebidoSerie, total: totalRecebido, variacao: variacaoDe(recebidoSerie), formato: fmtKz, formatoAxis: compactKz,
-
-          colunas: ["Período", "Recebido", "Documentos"],
-
-          linhas: recebidoPorMes.map((v) => [v.label, fmtKz(v.valor), v.quantidade]),
-
-        }),
-
-      ],
-
-      producao: [
-
-        mk({
-
-          id: "ordens-periodo", titulo: "Ordens por período", icon: "precision_manufacturing",
-
-          sub: "Ordens de produção registadas nos últimos 6 meses.",
-
-          serie: prodSerie, total: soma(prodSerie, "valor"), variacao: variacaoDe(prodSerie),
-
-          colunas: ["Período", "Ordens"], linhas: prodSerie.map((x) => [x.label, x.valor]),
-
-        }),
-
-        mk({
-
-          id: "entregas-periodo", titulo: "Entregas por período", icon: "local_shipping",
-
-          sub: "Ordens entregues nos últimos 6 meses.",
-
-          serie: entrSerie, total: soma(entrSerie, "valor"), variacao: variacaoDe(entrSerie),
-
-          colunas: ["Período", "Entregues"], linhas: entrSerie.map((x) => [x.label, x.valor]),
-
-        }),
-
-        mk({
-
-          id: "taxa-entrega", titulo: "Taxa de entrega", icon: "show_chart",
-
-          sub: "Percentagem de ordens entregues nos últimos 6 meses.",
-
-          serie: pctSerie, total: pctSerie.length ? pctSerie[pctSerie.length - 1].valor : 0,
-
-          formato: (v) => `${Math.round(Number(v) || 0)}%`,
-
-          colunas: ["Período", "Taxa (%)"], linhas: pctSerie.map((x) => [x.label, `${x.valor}%`]),
-
-        }),
-
-        mk({
-
-          id: "ordens-estado", titulo: "Ordens por estado", icon: "pie_chart",
-
-          sub: "Distribuição das ordens por estado.",
-
-          serie: statusSerie, total: soma(statusSerie, "valor"),
-
-          colunas: ["Estado", "Ordens"], linhas: statusSerie.map((x) => [x.label, x.valor]),
-
-        }),
-
-      ],
-
-      stocks: [
-
-        mk({
-
-          id: "valor-stock-categoria", titulo: "Valor de stock por categoria", icon: "savings",
-
-          sub: "Valor de inventário por categoria de material.",
-
-          serie: catsValorSerie, total: soma(catsValorSerie, "valor"), formato: fmtKz, formatoAxis: compactKz,
-
-          colunas: ["Categoria", "Valor"], linhas: categoriasStock.map((c) => [c.nome, fmtKz(c.valor)]),
-
-        }),
-
-        mk({
-
-          id: "itens-categoria", titulo: "Itens por categoria", icon: "category",
-
-          sub: "Número de materiais por categoria.",
-
-          serie: catsItensSerie, total: soma(catsItensSerie, "valor"),
-
-          colunas: ["Categoria", "Itens"], linhas: categoriasStock.map((c) => [c.nome, c.itens]),
-
-        }),
-
-        mk({
-
-          id: "qtd-categoria", titulo: "Quantidade em stock por categoria", icon: "inventory_2",
-
-          sub: "Quantidade total de material em stock por categoria.",
-
-          serie: catsQtdSerie, total: soma(catsQtdSerie, "valor"),
-
-          formato: (v) => Number(v || 0).toLocaleString("pt-AO"),
-
-          colunas: ["Categoria", "Quantidade"], linhas: categoriasStock.map((c) => [c.nome, c.qtd.toLocaleString("pt-AO")]),
-
-        }),
-
-        mk({
-
-          id: "materiais-estado", titulo: "Materiais por estado", icon: "warning",
-
-          sub: "Estado do inventário de materiais.",
-
-          serie: matStatusSerie, total: soma(matStatusSerie, "valor"),
-
-          colunas: ["Estado", "Materiais"], linhas: matStatusSerie.map((x) => [x.label, x.valor]),
-
-        }),
-
-      ],
-
-      compras: [
-
-        mk({
-
-          id: "pedidos-mes", titulo: "Pedidos de compra por mês", icon: "add_shopping_cart",
-
-          sub: "Pedidos de compra registados nos últimos 6 meses.",
-
-          serie: comprasPorMes.map((m) => ({ label: m.label, valor: m.quantidade })),
-
-          total: pedidos.length, variacao: variacaoDe(comprasPorMes.map((m) => ({ valor: m.quantidade }))),
-
-          colunas: ["Período", "Pedidos"], linhas: comprasPorMes.map((m) => [m.label, m.quantidade]),
-
-        }),
-
-        mk({
-
-          id: "compras-valor", titulo: "Valor de compras por mês", icon: "payments",
-
-          sub: "Valor dos pedidos de compra nos últimos 6 meses.",
-
-          serie: comprasPorMes.map((m) => ({ label: m.label, valor: m.valor })),
-
-          total: comprasPorMes.reduce((s, m) => s + m.valor, 0), variacao: variacaoDe(comprasPorMes.map((m) => ({ valor: m.valor }))), formato: fmtKz, formatoAxis: compactKz,
-
-          colunas: ["Período", "Valor"], linhas: comprasPorMes.map((m) => [m.label, fmtKz(m.valor)]),
-
-        }),
-
-        mk({
-
-          id: "pedidos-estado", titulo: "Pedidos por estado", icon: "description",
-
-          sub: "Distribuição dos pedidos de compra por estado.",
-
-          serie: ESTADOS_PEDIDO.map((s) => ({ label: s.label, valor: pedidosPorEstado[s.value] || 0 })),
-
-          total: pedidos.length,
-
-          colunas: ["Estado", "Pedidos"], linhas: ESTADOS_PEDIDO.map((s) => [s.label, pedidosPorEstado[s.value] || 0]),
-
-        }),
-
-      ],
-
-      financeiro: [
-
-        mk({
-
-          id: "faturacao", titulo: "Faturação emitida", icon: "receipt_long",
-
-          sub: "Total faturado nos últimos 6 meses.",
-
-          serie: vendasSerie, total: totalVendas, variacao: variacaoDe(vendasSerie), formato: fmtKz, formatoAxis: compactKz,
-
-          colunas: ["Período", "Faturação"], linhas: vendasPorMes.map((v) => [v.label, fmtKz(v.valor)]),
-
-        }),
-
-        mk({
-
-          id: "recebido", titulo: "Recebido", icon: "payments",
-
-          sub: "Valor efetivamente recebido nos últimos 6 meses.",
-
-          serie: recebidoSerie, total: totalRecebido, variacao: variacaoDe(recebidoSerie), formato: fmtKz, formatoAxis: compactKz,
-
-          colunas: ["Período", "Recebido"], linhas: recebidoPorMes.map((v) => [v.label, fmtKz(v.valor)]),
-
-        }),
-
-        mk({
-
-          id: "docs-estado", titulo: "Documentos por estado", icon: "description",
-
-          sub: "Distribuição dos documentos por estado.",
-
-          serie: finEstadoSerie, total: soma(finEstadoSerie, "valor"),
-
-          colunas: ["Estado", "Documentos"], linhas: finEstadoSerie.map((x) => [x.label, x.valor]),
-
-        }),
-
-        mk({
-
-          id: "despesas", titulo: "Despesas (Tesouraria)", icon: "trending_down",
-
-          sub: "Saídas registadas na tesouraria nos últimos 6 meses.",
-
-          serie: despesasSerie, total: soma(despesasSerie, "valor"), variacao: variacaoDe(despesasSerie), formato: fmtKz, formatoAxis: compactKz,
-
-          colunas: ["Período", "Saídas"], linhas: despesasSerie.map((x) => [x.label, fmtKz(x.valor)]),
-
-        }),
-
-      ],
-
-      tesouraria: [
-
-        mk({
-
-          id: "entradas-mes", titulo: "Entradas por mês", icon: "arrow_downward",
-
-          sub: "Entradas na tesouraria nos últimos 6 meses.",
-
-          serie: entradasSerie, total: soma(entradasSerie, "valor"), variacao: variacaoDe(entradasSerie), formato: fmtKz, formatoAxis: compactKz,
-
-          colunas: ["Período", "Entradas"], linhas: entradasSerie.map((x) => [x.label, fmtKz(x.valor)]),
-
-        }),
-
-        mk({
-
-          id: "saidas-mes", titulo: "Saídas por mês", icon: "arrow_upward",
-
-          sub: "Saídas na tesouraria nos últimos 6 meses.",
-
-          serie: saidasSerie, total: soma(saidasSerie, "valor"), variacao: variacaoDe(saidasSerie), formato: fmtKz, formatoAxis: compactKz,
-
-          colunas: ["Período", "Saídas"], linhas: saidasSerie.map((x) => [x.label, fmtKz(x.valor)]),
-
-        }),
-
-        mk({
-
-          id: "saldo-contas", titulo: "Saldo por conta", icon: "account_balance_wallet",
-
-          sub: "Saldo atual por conta bancária e caixa.",
-
-          serie: contasSerie, total: soma(contasSerie, "valor"), formato: fmtKz, formatoAxis: compactKz,
-
-          colunas: ["Conta", "Saldo"], linhas: contasSerie.map((x) => [x.label, fmtKz(x.valor)]),
-
-        }),
-
-      ],
-
-      patrimonio: [
-
-        mk({
-
-          id: "bens-categoria", titulo: "Bens por categoria", icon: "category",
-
-          sub: "Número de bens patrimoniais por categoria.",
-
-          serie: bensPorCategoria.map((c) => ({ label: c.nome, valor: c.itens })),
-
-          total: bens.length,
-
-          colunas: ["Categoria", "Bens", "Valor"], linhas: bensPorCategoria.map((c) => [c.nome, c.itens, fmtKz(c.valor)]),
-
-        }),
-
-        mk({
-
-          id: "valor-categoria", titulo: "Valor patrimonial por categoria", icon: "account_balance_wallet",
-
-          sub: "Valor de aquisição acumulado por categoria.",
-
-          serie: bensPorCategoria.map((c) => ({ label: c.nome, valor: c.valor })),
-
-          total: bensPorCategoria.reduce((s, c) => s + c.valor, 0), formato: fmtKz, formatoAxis: compactKz,
-
-          colunas: ["Categoria", "Valor"], linhas: bensPorCategoria.map((c) => [c.nome, fmtKz(c.valor)]),
-
-        }),
-
-        mk({
-
-          id: "bens-estado", titulo: "Bens por estado", icon: "verified",
-
-          sub: "Distribuição dos bens patrimoniais por estado.",
-
-          serie: ESTADOS_BEM.map((s) => ({ label: s.label, valor: bensPorEstado[s.value] || 0 })),
-
-          total: bens.length,
-
-          colunas: ["Estado", "Bens"], linhas: ESTADOS_BEM.map((s) => [s.label, bensPorEstado[s.value] || 0]),
-
-        }),
-
-      ],
-
-      rh: [
-
-        mk({
-
-          id: "utilizadores-perfil", titulo: "Utilizadores por perfil", icon: "groups",
-
-          sub: "Número de utilizadores por perfil de acesso.",
-
-          serie: usuariosPorPerfil.map((u) => ({ label: u.nome, valor: u.qtd })),
-
-          total: usuarios.length,
-
-          colunas: ["Perfil", "Utilizadores"], linhas: usuariosPorPerfil.map((u) => [u.nome, u.qtd]),
-
-        }),
-
-        mk({
-
-          id: "utilizadores-ativos", titulo: "Utilizadores ativos", icon: "verified",
-
-          sub: "Estado das contas dos utilizadores.",
-
-          serie: [
-
-            { label: "Ativos", valor: usuariosAtivos },
-
-            { label: "Inativos", valor: usuariosInativos },
-
-          ],
-
-          total: usuarios.length,
-
-          colunas: ["Estado", "Utilizadores"], linhas: [["Ativos", usuariosAtivos], ["Inativos", usuariosInativos]],
-
-        }),
-
-      ],
-
-    };
-
-
-
-    return porModulo[aba] || [];
-
-  }, [
-
-    aba, org, vendasPorMes, recebidoPorMes, clientesTop, producaoPorMes, opsPorStatus,
-
-    ultimosMeses, categoriasStock, contagemStatusMaterial, contagemEstadosFatura, tesourariaPorMes,
-
-    contasTesouraria, bens, bensPorCategoria, bensPorEstado, pedidos, pedidosPorEstado,
-
-    comprasPorMes, usuarios, usuariosPorPerfil, usuariosAtivos, usuariosInativos,
-
-  ]);
-
-
-
-  const relatorioAtivo = relatorios.find((r) => r.id === relatorioId) || relatorios[0] || null;
-
-
-
-  return (
-
-    <div className="space-y-5">
-
-      <div className="min-w-0">
+  "inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted/60";
 
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">Relatórios e Análises</h1>
 
-        <p className="mt-1 text-xs font-medium text-muted-foreground">Informação para melhores decisões.</p>
+
+function variacaoDe(serie) {
+
+  if (!Array.isArray(serie) || serie.length < 2) return null;
+
+  const anterior = Number(serie[serie.length - 2]?.valor) || 0;
+
+  const atual = Number(serie[serie.length - 1]?.valor) || 0;
+
+  if (!anterior) return atual ? 100 : null;
+
+  return Math.round(((atual - anterior) / anterior) * 100);
+
+}
+
+
+
+function PainelFiltros({ icon, titulo, acoes, children }) {
+
+  return (
+
+    <div className="rounded-xl border border-border bg-card p-4">
+
+      <div className="mb-3 flex items-center justify-between gap-2">
+
+        <div className="flex min-w-0 items-center gap-2">
+
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border bg-muted">
+
+            <Icon name={icon} className="text-base text-muted-foreground" />
+
+          </span>
+
+          <p className="truncate text-sm font-semibold text-foreground">{titulo}</p>
+
+        </div>
+
+        {acoes && <div className="flex shrink-0 items-center gap-2">{acoes}</div>}
 
       </div>
 
+      <div className="space-y-3">{children}</div>
+
+    </div>
+
+  );
+
+}
 
 
-      <div className="flex flex-wrap items-center gap-1">
-
-        {MODULOS_REL.map((m) => (
-
-          <button
-
-            key={m.value}
-
-            type="button"
-
-            onClick={() => { setAba(m.value); setRelatorioId(null); }}
-
-            aria-pressed={aba === m.value}
-
-            className={`${tabClsBase} ${aba === m.value ? tabClsAtiva : tabClsInativa}`}
-
-          >
-
-            <Icon name={m.icon} className="text-base" /> {m.label}
-
-          </button>
-
-        ))}
-
-      </div>
-
-
-
-      {relatorios.length > 0 && (
-
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-
-          <section className="overflow-hidden rounded-xl border border-border bg-card lg:col-span-5">
-
-            <div className="flex items-center gap-2 px-4 py-3">
 
-              <Icon name="description" className="text-base text-muted-foreground" />
-
-              <h2 className="text-sm font-semibold text-foreground">Relatórios Disponíveis</h2>
-
-            </div>
-
-            <ul className="space-y-1 p-3">
-
-              {relatorios.map((r) => {
-
-                const ativo = relatorioAtivo?.id === r.id;
-
-                return (
-
-                  <li key={r.id}>
-
-                    <button
-
-                      type="button"
-
-                      onClick={() => setRelatorioId(r.id)}
-
-                      className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left text-sm transition-all ${
-
-                        ativo ? "bg-primary/10 text-primary" : "text-foreground hover:bg-muted/60"
-
-                      }`}
-
-                    >
-
-                      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
-
-                        ativo ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-
-                      }`}>
-
-                        <Icon name={r.icon} className="text-sm" />
-
-                      </span>
-
-                      <span className={`min-w-0 flex-1 truncate ${ativo ? "font-semibold text-primary" : "font-medium"}`}>{r.titulo}</span>
-
-                    </button>
-
-                  </li>
-
-                );
-
-              })}
-
-            </ul>
-
-          </section>
-
-
-
-          <section className="overflow-hidden rounded-xl border border-border bg-card lg:col-span-7">
-
-            {relatorioAtivo && (
-
-              <>
-
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3">
+function ChartTooltip({ active, payload, label, formato }) {
 
-                  <div className="min-w-0">
+  if (!active || !payload || payload.length === 0) return null;
 
-                    <h3 className="truncate text-sm font-semibold text-foreground">{relatorioAtivo.titulo}</h3>
+  return (
 
-                    <p className="truncate text-xs text-muted-foreground">{relatorioAtivo.sub}</p>
+    <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs space-y-1">
 
+      <p className="font-semibold text-foreground">{label}</p>
+
+      {payload.map((p, i) => (
+
+        <p key={i} className="flex items-center gap-2 text-muted-foreground">
+
+          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: p.color || p.payload?.fill }} />
+
+          <span>{p.name}:</span>
+
+          <span className="font-bold text-foreground font-mono">{formato ? formato(p.value) : p.value}</span>
+
+        </p>
+
+      ))}
+
+    </div>
+
+  );
+
+}
+
+
+
+function CabecalhoGrafico({ icon, titulo, sub }) {
+
+  return (
+
+    <div className="flex items-center gap-3 px-4 py-3">
+
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-muted">
+
+        <Icon name={icon} className="text-lg text-muted-foreground" />
+
+      </span>
+
+      <div className="min-w-0">
+
+        <h3 className="truncate text-sm font-semibold text-foreground">{titulo}</h3>
+
+        {sub && <p className="truncate text-[11px] text-muted-foreground">{sub}</p>}
+
+      </div>
+
+    </div>
+
+  );
+
+}
+
+
+
+function CartaoGrafico({ icon, titulo, sub, children, className = "" }) {
+
+  return (
+
+    <section className={`overflow-hidden rounded-xl border border-border bg-card ${className}`}>
+
+      <CabecalhoGrafico icon={icon} titulo={titulo} sub={sub} />
+
+      <div className="p-4">{children}</div>
+
+    </section>
+
+  );
+
+}
+
+
+
+
+
+function AreaGrafico({ dados, serie, nome, cor, formato, xKey = "label" }) {
+
+  const gradId = `grad-${serie}`;
+
+  return (
+
+    <ResponsiveContainer width="100%" height="100%">
+
+      <AreaChart data={dados} margin={{ top: 10, right: 10, left: -14, bottom: 0 }}>
+
+        <defs>
+
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+
+            <stop offset="0%" stopColor={cor} stopOpacity={0.35} />
+
+            <stop offset="100%" stopColor={cor} stopOpacity={0.02} />
+
+          </linearGradient>
+
+        </defs>
+
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+
+        <XAxis dataKey={xKey} tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} dy={4} />
+
+        <YAxis tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} width={52} tickFormatter={formato} allowDecimals={false} />
+
+        <Tooltip content={<ChartTooltip formato={formato} />} />
+
+        <Area type="monotone" dataKey="valor" name={nome} stroke={cor} strokeWidth={2.5} fill={`url(#${gradId})`} activeDot={{ r: 4 }} />
+
+      </AreaChart>
+
+    </ResponsiveContainer>
+
+  );
+
+}
+
+
+
+function DonutGrafico({ dados, centro, tooltipFormat }) {
+
+  return (
+
+    <div className="relative h-52">
+
+      <ResponsiveContainer width="100%" height="100%">
+
+        <PieChart>
+
+          <Tooltip content={<ChartTooltip formato={tooltipFormat} />} />
+
+          <Pie data={dados} dataKey="value" nameKey="name" innerRadius={60} outerRadius={84} paddingAngle={2.5} strokeWidth={0} cornerRadius={6}>
+
+            {dados.map((d, i) => <Cell key={i} fill={d.color} />)}
+
+          </Pie>
+
+        </PieChart>
+
+      </ResponsiveContainer>
+
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+
+        <span className="text-xl font-semibold text-foreground font-mono">{centro}</span>
+
+        <span className="text-[10px] text-muted-foreground">total</span>
+
+      </div>
+
+    </div>
+
+  );
+
+}
+
+
+
+function LinhaDonut({ cor, nome, valor }) {
+
+  return (
+
+    <div className="flex items-center gap-2.5">
+
+      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: cor }} />
+
+      <span className="flex-1 min-w-0 text-sm text-foreground truncate">{nome}</span>
+
+      <span className="font-mono font-bold text-sm text-foreground shrink-0">{valor}</span>
+
+    </div>
+
+  );
+
+}
+
+
+
+export default function RelatoriosPage() {
+
+  const [loading, setLoading] = useState(true);
+
+  const [error, setError] = useState(null);
+
+  const [ordens, setOrdens] = useState([]);
+
+  const [clientes, setClientes] = useState([]);
+
+  const [faturas, setFaturas] = useState([]);
+
+  const [materiais, setMateriais] = useState([]);
+
+  const [categorias, setCategorias] = useState([]);
+
+  const [bens, setBens] = useState([]);
+
+  const [pedidos, setPedidos] = useState([]);
+
+  const [usuarios, setUsuarios] = useState([]);
+
+  const [propostas, setPropostas] = useState([]);
+
+  const [org, setOrg] = useState({});
+
+  const [intervalo, setIntervalo] = useState({ modo: "6m", inicio: "", fim: "" });
+
+  const [aba, setAba] = useState("comercial");
+
+  const [subAbas, setSubAbas] = useState({ comercial: "resumo", stocks: "materiais" });
+
+  const [filtrosAbertos, setFiltrosAbertos] = useState(false);
+
+  const [vistaAberta, setVistaAberta] = useState(false);
+
+  const [filtroFamilias, setFiltroFamilias] = useState([]);
+
+  const [filtroGrupos, setFiltroGrupos] = useState([]);
+
+  const [filtroEstadosFatura, setFiltroEstadosFatura] = useState([]);
+
+  const [filtroTiposFatura, setFiltroTiposFatura] = useState([]);
+
+  const [filtroEstadosOrdem, setFiltroEstadosOrdem] = useState([]);
+
+  const [filtroStatusMaterial, setFiltroStatusMaterial] = useState([]);
+
+  const [filtroFamiliasMateriais, setFiltroFamiliasMateriais] = useState([]);
+
+  const [busca, setBusca] = useState("");
+
+  const [tesouraria, setTesouraria] = useState(null);
+
+  const [relatorioId, setRelatorioId] = useState(null);
+
+  const [relatorioVer, setRelatorioVer] = useState(null);
+
+  const { addToast } = useToast();
+
+
+
+  const carregarDados = useCallback(async () => {
+
+    setLoading(true);
+
+    try {
+
+      const [ords, clis, fats, mats, cats, o, tes, bs, peds, usrs, props] = await Promise.all([
+
+        listarOrdens(),
+
+        listar(),
+
+        listarFaturas(),
+
+        listarMateriais(),
+
+        listarCategorias(),
+
+        buscarOrganizacao(),
+
+        resumoTesouraria().catch(() => null),
+
+        listarBens().catch(() => []),
+
+        listarPedidos().catch(() => []),
+
+        listarUsuarios().catch(() => []),
+
+        listarPropostas().catch(() => []),
+
+      ]);
+
+      setOrdens(Array.isArray(ords) ? ords : ords?.ordens || []);
+
+      setClientes(Array.isArray(clis) ? clis : clis?.data || []);
+
+      setFaturas(Array.isArray(fats) ? fats : fats?.data || []);
+
+      setMateriais(Array.isArray(mats) ? mats : []);
+
+      setCategorias(Array.isArray(cats) ? cats : []);
+
+      setBens(Array.isArray(bs) ? bs : bs?.data || []);
+
+      setPedidos(Array.isArray(peds) ? peds : peds?.data || []);
+
+      setUsuarios(Array.isArray(usrs) ? usrs : usrs?.data || []);
+
+      setPropostas(Array.isArray(props) ? props : props?.data || []);
+
+      setOrg(o || {});
+
+      setTesouraria(tes || null);
+
+    } catch (err) {
+
+      setError(err.message);
+
+      addToast(err.response?.data?.erro || "Erro ao carregar relatórios", "error");
+
+    } finally {
+
+      setLoading(false);
+
+    }
+
+  }, [addToast]);
+
+
+
+  useEffect(() => {
+
+    const t = setTimeout(() => carregarDados(), 0);
+
+    return () => clearTimeout(t);
+
+  }, [carregarDados]);
+
+
+
+  const ultimosMeses = useMemo(() => mesesDoIntervalo(intervalo), [intervalo]);
+
+  const carteiraClientes = useMemo(() => clientes.filter((c) => c.tipo !== "fornecedor"), [clientes]);
+  const clientesPeriodo = useMemo(
+    () => registosDoPeriodo(carteiraClientes, ultimosMeses, ["dataCadastro", "data_cadastro", "createdAt"]),
+    [carteiraClientes, ultimosMeses]
+  );
+  const movimentosPeriodo = useMemo(
+    () => registosDoPeriodo(
+      Array.isArray(tesouraria?.movimentos) ? tesouraria.movimentos : [],
+      ultimosMeses,
+      ["data_movimento", "data"]
+    ),
+    [tesouraria, ultimosMeses]
+  );
+
+  const contagemEstadosFatura = useMemo(() => {
+
+    const m = {};
+
+    faturas.forEach((f) => { m[f.estado] = (m[f.estado] || 0) + 1; });
+
+    return m;
+
+  }, [faturas]);
+
+
+
+  const contagemTiposFatura = useMemo(() => {
+
+    const m = {};
+
+    faturas.forEach((f) => { m[f.tipo] = (m[f.tipo] || 0) + 1; });
+
+    return m;
+
+  }, [faturas]);
+
+
+
+  const faturasPeriodo = useMemo(
+    () => registosDoPeriodo(faturas, ultimosMeses, ["data_emissao"]),
+    [faturas, ultimosMeses]
+  );
+
+  const faturasFiltradas = useMemo(() => {
+
+    return faturasPeriodo.filter((f) => {
+
+      const eOk = filtroEstadosFatura.length === 0 || filtroEstadosFatura.includes(f.estado);
+
+      const tOk = filtroTiposFatura.length === 0 || filtroTiposFatura.includes(f.tipo);
+
+      return eOk && tOk;
+
+    });
+
+  }, [faturasPeriodo, filtroEstadosFatura, filtroTiposFatura]);
+
+
+
+  const contagemEstadosOrdem = useMemo(() => {
+
+    const m = {};
+
+    ordens.forEach((o) => { const e = o.estado || o.status; m[e] = (m[e] || 0) + 1; });
+
+    return m;
+
+  }, [ordens]);
+
+
+
+  const ordensPeriodo = useMemo(
+    () => registosDoPeriodo(ordens, ultimosMeses, ["data_entrada", "createdAt"]),
+    [ordens, ultimosMeses]
+  );
+
+  const ordensFiltradas = useMemo(() => {
+
+    return ordensPeriodo.filter((o) => filtroEstadosOrdem.length === 0 || filtroEstadosOrdem.includes(o.estado || o.status));
+
+  }, [ordensPeriodo, filtroEstadosOrdem]);
+
+
+
+  const contagemStatusMaterial = useMemo(() => {
+
+    const m = {};
+
+    materiais.forEach((mat) => { m[mat.status] = (m[mat.status] || 0) + 1; });
+
+    return m;
+
+  }, [materiais]);
+
+
+
+  const opcoesFamiliasMateriais = useMemo(() => {
+
+    const map = new Map();
+
+    materiais.forEach((mat) => {
+
+      const fam = normalizarFamilia(mat.categoria?.familia);
+
+      const famCfg = familias[fam];
+
+      if (!map.has(fam)) map.set(fam, { value: fam, label: famCfg?.label || mat.categoria?.familia || fam });
+
+    });
+
+    return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, "pt"));
+
+  }, [materiais]);
+
+
+
+  const materiaisFiltrados = useMemo(() => {
+
+    return materiais.filter((mat) => {
+
+      const sOk = filtroStatusMaterial.length === 0 || filtroStatusMaterial.includes(mat.status);
+
+      const fOk = filtroFamiliasMateriais.length === 0 || filtroFamiliasMateriais.includes(normalizarFamilia(mat.categoria?.familia));
+
+      return sOk && fOk;
+
+    });
+
+  }, [materiais, filtroStatusMaterial, filtroFamiliasMateriais]);
+
+
+
+  const vendasPorMes = useMemo(() => {
+
+    const counts = ultimosMeses.map((m) => ({ chave: m.chave, mes: m.mes, label: m.label, valor: 0, quantidade: 0 }));
+
+    const indice = new Map(ultimosMeses.map((m, i) => [m.chave, i]));
+
+    faturasFiltradas.forEach((f) => {
+
+      const d = f.data_emissao ? new Date(f.data_emissao) : null;
+
+      if (!d || isNaN(d.getTime())) return;
+
+      const idx = indice.get(chaveMes(d));
+
+      if (idx === undefined) return;
+
+      counts[idx].valor += Number(f.total || f.valor) || 0;
+
+      counts[idx].quantidade += 1;
+
+    });
+
+    return counts;
+
+  }, [faturasFiltradas, ultimosMeses]);
+
+
+
+  const recebidoPorMes = useMemo(() => {
+
+    const counts = ultimosMeses.map((m) => ({ chave: m.chave, mes: m.mes, label: m.label, valor: 0, quantidade: 0 }));
+
+    const indice = new Map(ultimosMeses.map((m, i) => [m.chave, i]));
+
+    faturasFiltradas.forEach((f) => {
+
+      if (f.estado !== "paga") return;
+
+      const d = f.data_pagamento || f.data_emissao;
+
+      const dt = d ? new Date(d) : null;
+
+      if (!dt || isNaN(dt.getTime())) return;
+
+      const idx = indice.get(chaveMes(dt));
+
+      if (idx === undefined) return;
+
+      counts[idx].valor += Number(f.valor_pago || f.total || f.valor) || 0;
+
+      counts[idx].quantidade += 1;
+
+    });
+
+    return counts;
+
+  }, [faturasFiltradas, ultimosMeses]);
+
+
+
+  const recebidoHoje = useMemo(() => {
+
+    const hoje = new Date().toISOString().split("T")[0];
+
+    return faturasFiltradas
+
+      .filter((f) => f.estado === "paga" && (f.data_pagamento || f.data_emissao) === hoje)
+
+      .reduce((s, f) => s + (Number(f.valor_pago || f.total || f.valor) || 0), 0);
+
+  }, [faturasFiltradas]);
+
+
+
+  const recebidoMes = useMemo(() => {
+
+    const hoje = new Date();
+
+    return faturasFiltradas
+
+      .filter((f) => {
+
+        if (f.estado !== "paga") return false;
+
+        const d = new Date(f.data_pagamento || f.data_emissao);
+
+        return !isNaN(d.getTime()) && d.getFullYear() === hoje.getFullYear() && d.getMonth() === hoje.getMonth();
+
+      })
+
+      .reduce((s, f) => s + (Number(f.valor_pago || f.total || f.valor) || 0), 0);
+
+  }, [faturasFiltradas]);
+
+
+
+  const clientesTop = useMemo(() => {
+
+    const doPeriodo = new Set(ultimosMeses.map((m) => m.chave));
+
+    const map = {};
+
+    faturasFiltradas.forEach((f) => {
+
+      const d = f.data_emissao ? new Date(f.data_emissao) : null;
+
+      if (!d || isNaN(d.getTime()) || !doPeriodo.has(chaveMes(d))) return;
+
+      const nome = f.cliente?.nome || f.cliente || "Cliente";
+
+      map[nome] = (map[nome] || 0) + (Number(f.total || f.valor) || 0);
+
+    });
+
+    return Object.entries(map)
+
+      .sort((a, b) => b[1] - a[1])
+
+      .slice(0, 5)
+
+      .map(([nome, total], i) => ({
+
+        nome,
+
+        total,
+
+        cor: ["bg-primary", "bg-primary/70", "bg-primary/50", "bg-primary/30", "bg-primary/15"][i],
+
+      }));
+
+  }, [faturasFiltradas, ultimosMeses]);
+
+
+
+  const clientesTotal = useMemo(() => clientesTop.reduce((s, c) => s + c.total, 0), [clientesTop]);
+
+
+
+  const producaoPorMes = useMemo(() => {
+
+    const result = {};
+
+    ultimosMeses.forEach(({ chave }) => {
+
+      const ordensMes = ordensFiltradas.filter((o) => {
+
+        const d = dataDoRegisto(o, ["data_entrada", "createdAt"]);
+
+        return d && chaveMes(d) === chave;
+
+      });
+
+      const produzidas = ordensMes.length;
+
+      const entregues = ordensMes.filter((o) => (o.estado || o.status) === "entregue").length;
+
+      result[chave] = { produzidas, entregues, pct: produzidas > 0 ? Math.round((entregues / produzidas) * 100) : 0 };
+
+    });
+
+    return result;
+
+  }, [ordensFiltradas, ultimosMeses]);
+
+
+
+  const opsPorStatus = useMemo(() => ["aguardando", "em_producao", "finalizado", "entregue"].map((s) => ({
+
+    status: s,
+
+    label: s.replace("_", " ").replace(/\b\w/g, l => l.toUpperCase()),
+
+    quantidade: ordensFiltradas.filter(o => (o.estado || o.status) === s).length,
+
+  })), [ordensFiltradas]);
+
+
+
+  const cadastrosFiltrados = useMemo(() => {
+
+    let lista = carteiraClientes;
+
+    if (busca.trim()) {
+
+      const b = busca.trim().toLowerCase();
+
+      lista = lista.filter((c) =>
+
+        [c.nome, c.empresa, c.nif, c.codigo, c.telefone, c.email].some((v) =>
+
+          String(v || "").toLowerCase().includes(b)
+
+        )
+
+      );
+
+    }
+
+    return lista;
+
+  }, [carteiraClientes, busca]);
+
+
+
+  const totalClientes = useMemo(() => carteiraClientes.length, [carteiraClientes]);
+
+  const categoriasStock = useMemo(() => {
+
+    const map = {};
+
+    materiais.forEach((m) => {
+
+      const cat = m.categoria?.nome || "Sem categoria";
+
+      if (!map[cat]) map[cat] = { itens: 0, qtd: 0, valor: 0 };
+
+      map[cat].itens += 1;
+
+      map[cat].qtd += toNum(m.quantidade);
+
+      map[cat].valor += toNum(m.quantidade) * toNum(m.custo_unit);
+
+    });
+
+    return Object.entries(map)
+
+      .map(([nome, d]) => ({ nome, ...d }))
+
+      .sort((a, b) => b.valor - a.valor);
+
+  }, [materiais]);
+
+
+
+  const tesourariaPorMes = useMemo(() => {
+
+    const counts = ultimosMeses.map((m) => ({ chave: m.chave, label: m.label, mes: m.mes, entradas: 0, saidas: 0 }));
+
+    const indice = new Map(ultimosMeses.map((m, i) => [m.chave, i]));
+
+    const movs = Array.isArray(tesouraria?.movimentos) ? tesouraria.movimentos : [];
+
+    movs.forEach((mov) => {
+
+      const raw = mov.data_movimento || mov.data;
+
+      const d = raw ? new Date(raw) : null;
+
+      if (!d || isNaN(d.getTime())) return;
+
+      const idx = indice.get(chaveMes(d));
+
+      if (idx === undefined) return;
+
+      const v = Number(mov.valor) || 0;
+
+      if (mov.tipo === "entrada") counts[idx].entradas += v;
+
+      else if (mov.tipo === "saida") counts[idx].saidas += v;
+
+    });
+
+    return counts;
+
+  }, [tesouraria, ultimosMeses]);
+
+
+
+  const contasTesouraria = useMemo(
+
+    () => (Array.isArray(tesouraria?.contas) ? tesouraria.contas : []),
+
+    [tesouraria]
+
+  );
+
+
+
+  const bensPorCategoria = useMemo(() => {
+
+    const m = {};
+
+    bens.forEach((b) => {
+
+      const c = String(b.categoria || "Sem categoria").trim();
+
+      if (!m[c]) m[c] = { nome: c, itens: 0, valor: 0 };
+
+      m[c].itens += 1;
+
+      m[c].valor += toNum(b.valor_aquisicao);
+
+    });
+
+    return Object.values(m).sort((a, b) => b.valor - a.valor);
+
+  }, [bens]);
+
+
+
+  const bensPorEstado = useMemo(() => {
+
+    const m = {};
+
+    bens.forEach((b) => { const e = b.estado || "ativo"; m[e] = (m[e] || 0) + 1; });
+
+    return m;
+
+  }, [bens]);
+
+
+
+  const pedidosPeriodo = useMemo(
+    () => registosDoPeriodo(pedidos, ultimosMeses, ["data_pedido", "createdAt", "data"]),
+    [pedidos, ultimosMeses]
+  );
+
+  const pedidosPorEstado = useMemo(() => {
+
+    const m = {};
+
+    pedidosPeriodo.forEach((p) => { const e = p.estado || p.status || "pendente"; m[e] = (m[e] || 0) + 1; });
+
+    return m;
+
+  }, [pedidosPeriodo]);
+
+
+
+  const comprasPorMes = useMemo(() => {
+
+    const counts = ultimosMeses.map((m) => ({ chave: m.chave, mes: m.mes, label: m.label, valor: 0, quantidade: 0 }));
+
+    const indice = new Map(ultimosMeses.map((m, i) => [m.chave, i]));
+
+    pedidosPeriodo.forEach((p) => {
+
+      const d = dataDoRegisto(p, ["data_pedido", "createdAt", "data"]);
+
+      if (!d) return;
+
+      const idx = indice.get(chaveMes(d));
+
+      if (idx === undefined) return;
+
+      counts[idx].valor += toNum(p.total);
+
+      counts[idx].quantidade += 1;
+
+    });
+
+    return counts;
+
+  }, [pedidosPeriodo, ultimosMeses]);
+
+  const usuariosPorPerfil = useMemo(() => {
+
+    const m = {};
+
+    usuarios.forEach((u) => { const p = u.perfil?.nome || u.perfil || u.funcao || "Sem perfil"; m[p] = (m[p] || 0) + 1; });
+
+    return Object.entries(m).map(([nome, qtd]) => ({ nome, qtd })).sort((a, b) => b.qtd - a.qtd);
+
+  }, [usuarios]);
+
+
+
+  const usuariosAtivos = useMemo(
+
+    () => usuarios.filter((u) => u.ativo !== false).length,
+
+    [usuarios]
+
+  );
+
+  const usuariosInativos = useMemo(
+
+    () => usuarios.filter((u) => u.ativo === false).length,
+
+    [usuarios]
+
+  );
+
+
+
+  const relatorios = useMemo(() => {
+
+    const texto = (r, v) => (r.formato || ((x) => String(Math.round(Number(x) || 0))))(v);
+
+    const mk = (r) => ({
+
+      id: r.id,
+
+      titulo: r.titulo,
+
+      icon: r.icon,
+
+      sub: r.sub || "Total calculado com base nos dados actuais.",
+
+      serie: r.serie || [],
+
+      total: r.total,
+
+      totalTexto: texto(r, r.total),
+
+      variacao: r.variacao ?? null,
+
+      formato: r.formato,
+
+      formatoAxis: r.formatoAxis,
+
+      cor: r.cor || COR_RELATORIO,
+
+      colunas: r.colunas || ["Item", "Valor"],
+
+      linhas: r.linhas || [],
+
+      onExportPdf: () =>
+
+        exportarRelatorioPDF({
+
+          titulo: r.titulo,
+
+          org,
+
+          cabecalhos: r.colunas || ["Item", "Valor"],
+
+          linhas: r.linhas || [],
+
+          resumo: [`Total: ${texto(r, r.total)}`],
+
+        }),
+
+      onExportExcel: () => exportarRelatorioExcel(r.titulo, r.colunas || ["Item", "Valor"], r.linhas || []),
+
+    });
+
+
+
+    const soma = (arr, campo) => arr.reduce((s, x) => s + (Number(x[campo]) || 0), 0);
+
+
+
+    const vendasSerie = vendasPorMes.map((v) => ({ label: v.label, valor: v.valor }));
+
+    const totalVendas = soma(vendasSerie, "valor");
+
+    const recebidoSerie = recebidoPorMes.map((v) => ({ label: v.label, valor: v.valor }));
+
+    const totalRecebido = soma(recebidoSerie, "valor");
+
+    const docsSerie = vendasPorMes.map((v) => ({ label: v.label, valor: v.quantidade }));
+
+    const clientesSerie = clientesTop.map((c) => ({ label: c.nome, valor: c.total }));
+
+    const totalClientesTop = soma(clientesSerie, "valor");
+
+
+
+    const prodSerie = ultimosMeses.map((m) => ({ label: m.label, valor: (producaoPorMes[m.chave] || { produzidas: 0 }).produzidas }));
+
+    const entrSerie = ultimosMeses.map((m) => ({ label: m.label, valor: (producaoPorMes[m.chave] || { entregues: 0 }).entregues }));
+
+    const pctSerie = ultimosMeses.map((m) => ({ label: m.label, valor: (producaoPorMes[m.chave] || { pct: 0 }).pct }));
+
+    const statusSerie = opsPorStatus.map((s) => ({ label: s.label, valor: s.quantidade }));
+
+
+
+    const catsValorSerie = categoriasStock.map((c) => ({ label: c.nome, valor: c.valor }));
+
+    const catsItensSerie = categoriasStock.map((c) => ({ label: c.nome, valor: c.itens }));
+
+    const catsQtdSerie = categoriasStock.map((c) => ({ label: c.nome, valor: c.qtd }));
+
+    const matStatusSerie = STATUS_MATERIAL.map((s) => ({ label: s.label, valor: contagemStatusMaterial[s.value] || 0 }));
+
+
+
+    const finEstadoSerie = ESTADOS_FATURA.map((s) => ({ label: s.label, valor: contagemEstadosFatura[s.value] || 0 }));
+
+    const despesasSerie = tesourariaPorMes.map((m) => ({ label: m.label, valor: m.saidas }));
+
+    const entradasSerie = tesourariaPorMes.map((m) => ({ label: m.label, valor: m.entradas }));
+
+    const saidasSerie = tesourariaPorMes.map((m) => ({ label: m.label, valor: m.saidas }));
+
+    const contasSerie = contasTesouraria.map((c) => ({ label: c.nome || `Conta #${c.id}`, valor: Number(c.saldo_atual) || 0 }));
+
+
+
+    const hojeRef = new Date();
+
+    const propostasLista = Array.isArray(propostas) ? propostas : [];
+
+    const propostasCriadas = propostasLista.length;
+
+    const propostasEnviadas = propostasLista.filter((p) => { const estado = p.estado || p.status; if (estado === "enviada") return true; if (p.enviado_em || p.data_envio || p.primeiro_envio_em) return true; return false; }).length;
+
+    const propostasAceites = propostasLista.filter((p) => { const estado = p.estado || p.status; return estado === "aprovada" || p.aceite_em || p.aprovado_em || p.data_aceite; }).length;
+
+    const propostasRecusadas = propostasLista.filter((p) => { const estado = p.estado || p.status; return estado === "rejeitada" || p.rejeitado_em || p.recusado_em || p.data_rejeicao; }).length;
+
+    const decididas = propostasAceites + propostasRecusadas;
+
+    const taxaAceitacao = decididas > 0 ? Math.round((propostasAceites / decididas) * 100) : 0;
+
+    const valorProposto = propostasLista.reduce((s, p) => { const v = Number(p.valor_total || p.total || p.valor_proposto || p.valor || 0); return s + (isNaN(v) ? 0 : v); }, 0);
+
+    const valorAceite = propostasLista.reduce((s, p) => { const estado = p.estado || p.status; if (!(estado === "aprovada" || p.aceite_em || p.aprovado_em || p.data_aceite)) return s; const v = Number(p.valor_total || p.total || p.valor_aceite || p.valor || 0); return s + (isNaN(v) ? 0 : v); }, 0);
+
+    const valorMedio = propostasEnviadas > 0 ? valorProposto / propostasEnviadas : 0;
+
+    const temposAberturaEnvio = [];
+
+    propostasLista.forEach((p) => { const criado = p.createdAt || p.data_criacao || p.data_criacao_proposta; const enviado = p.enviado_em || p.data_envio || p.primeiro_envio_em; if (criado && enviado) { const d1 = new Date(criado); const d2 = new Date(enviado); if (!isNaN(d1.getTime()) && !isNaN(d2.getTime()) && d2 >= d1) temposAberturaEnvio.push((d2 - d1) / (1000 * 60 * 60 * 24)); } });
+
+    const tempoMedioAberturaEnvio = temposAberturaEnvio.length ? temposAberturaEnvio.reduce((a,b)=>a+b,0)/temposAberturaEnvio.length : 0;
+
+    const temposSubmissaoDecisao = [];
+
+    propostasLista.forEach((p) => { const enviado = p.enviado_em || p.data_envio || p.primeiro_envio_em || p.data_submissao; const decisao = p.aceite_em || p.aprovado_em || p.data_aceite || p.rejeitado_em || p.recusado_em || p.data_rejeicao || p.data_decisao; if (enviado && decisao) { const d1 = new Date(enviado); const d2 = new Date(decisao); if (!isNaN(d1.getTime()) && !isNaN(d2.getTime()) && d2 >= d1) temposSubmissaoDecisao.push((d2 - d1) / (1000 * 60 * 60 * 24)); } });
+
+    const tempoMedioSubmissaoDecisao = temposSubmissaoDecisao.length ? temposSubmissaoDecisao.reduce((a,b)=>a+b,0)/temposSubmissaoDecisao.length : 0;
+
+    const propostasPendentes = propostasLista.filter((p) => { const estado = p.estado || p.status; if (["aprovada", "rejeitada", "anulada", "cancelada", "expirada"].includes(estado)) return false; if (p.aceite_em || p.aprovado_em || p.rejeitado_em || p.recusado_em || p.anulado_em) return false; return true; }).length;
+
+    const propostasForaPrazo = propostasLista.filter((p) => { const estado = p.estado || p.status; if (["aprovada", "rejeitada", "anulada", "cancelada"].includes(estado)) return false; const val = p.validade_data || p.data_validade || p.expira_em; if (!val) return false; const dv = new Date(val); if (isNaN(dv.getTime())) return false; return dv < new Date(hojeRef.getFullYear(), hojeRef.getMonth(), hojeRef.getDate()); }).length;
+
+    const propostasRevistas = propostasLista.filter((p) => { const rev = p.revisoes || p.num_revisoes || p.historico_revisoes || p.versoes; if (Array.isArray(rev)) return rev.length > 0; if (typeof rev === "number") return rev > 0; if (p.revisado || p.tem_revisao) return true; return false; }).length;
+
+    const taxaRevistasCriadas = propostasCriadas > 0 ? Math.round((propostasRevistas / propostasCriadas) * 100) : 0;
+
+    const propostasConvertidas = propostasLista.filter((p) => { if (p.orcamento_id || p.orcamento?.id || p.encomenda_id || p.encomenda?.id || p.ordem_producao_id || p.op_id || p.gerou_encomenda || p.gerou_orcamento) return true; return false; }).length;
+
+    const conversaoEncomendas = propostasCriadas > 0 ? Math.round((propostasConvertidas / propostasCriadas) * 100) : 0;
+
+
+
+    const porModulo = {
+
+      comercial: [
+
+        mk({
+
+          id: "relatorio-propostas", titulo: "Relat\u00f3rio de Propostas", icon: "description",
+
+          sub: "Indicadores com base em criação, envio, decisão e conversão",
+
+          serie: [
+
+            { label: "Criadas", valor: propostasCriadas },
+
+            { label: "Enviadas", valor: propostasEnviadas },
+
+            { label: "Aceites", valor: propostasAceites },
+
+            { label: "Recusadas", valor: propostasRecusadas },
+
+            { label: "Pendentes", valor: propostasPendentes },
+
+          ],
+
+          total: propostasCriadas,
+
+          colunas: ["Indicador", "Valor"],
+
+          linhas: [
+
+            ["01 Propostas criadas", propostasCriadas],
+
+            ["02 Propostas enviadas", propostasEnviadas],
+
+            ["03 Propostas aceites", propostasAceites],
+
+            ["04 Propostas recusadas", propostasRecusadas],
+
+            ["05 Taxa de aceitação (Aceites / decididas x 100)", taxaAceitacao + "%"],
+
+            ["06 Valor total proposto", fmtKz(valorProposto)],
+
+            ["07 Valor total aceite", fmtKz(valorAceite)],
+
+            ["08 Valor médio por proposta (Valor proposto / enviadas)", propostasEnviadas > 0 ? fmtKz(valorMedio) : "Kz 0"],
+
+            ["09 Tempo médio (Abertura até primeiro envio) (dias)", tempoMedioAberturaEnvio.toFixed(1)],
+
+            ["10 Tempo médio (Submissão até decisão) (dias)", tempoMedioSubmissaoDecisao.toFixed(1)],
+
+            ["11 Propostas pendentes", propostasPendentes],
+
+            ["12 Propostas fora de prazo", propostasForaPrazo],
+
+            ["13 Taxa de revistas / criadas x 100", taxaRevistasCriadas + "%"],
+
+            ["14 Conversão em encomendas", conversaoEncomendas + "%"],
+
+          ],
+
+        }),
+
+        mk({
+
+          id: "vendas-periodo", titulo: "Vendas por período", icon: "trending_up",
+
+          sub: "Total acumulado no período",
+
+          serie: vendasSerie, total: totalVendas, variacao: variacaoDe(vendasSerie), formato: fmtKz, formatoAxis: compactKz,
+
+          colunas: ["Período", "Valor", "Documentos"],
+
+          linhas: vendasPorMes.map((v) => [v.label, fmtKz(v.valor), v.quantidade]),
+
+        }),
+
+        mk({
+
+          id: "clientes-activos", titulo: "Clientes mais activos", icon: "workspace_premium",
+
+          sub: "Clientes com maior faturação.",
+
+          serie: clientesSerie, total: totalClientesTop, formato: fmtKz, formatoAxis: compactKz,
+
+          colunas: ["Cliente", "Faturação"],
+
+          linhas: clientesTop.map((c) => [c.nome, fmtKz(c.total)]),
+
+        }),
+
+        mk({
+
+          id: "documentos", titulo: "Documentos emitidos", icon: "receipt_long",
+
+          sub: "Documentos emitidos no período.",
+
+          serie: docsSerie, total: soma(docsSerie, "valor"), variacao: variacaoDe(docsSerie),
+
+          colunas: ["Período", "Documentos"], linhas: vendasPorMes.map((v) => [v.label, v.quantidade]),
+
+        }),
+
+        mk({
+
+          id: "recebimentos", titulo: "Recebimentos", icon: "payments",
+
+          sub: "Faturas pagas no período.",
+
+          serie: recebidoSerie, total: totalRecebido, variacao: variacaoDe(recebidoSerie), formato: fmtKz, formatoAxis: compactKz,
+
+          colunas: ["Período", "Recebido", "Documentos"],
+
+          linhas: recebidoPorMes.map((v) => [v.label, fmtKz(v.valor), v.quantidade]),
+
+        }),
+
+      ],
+
+      producao: [
+
+        mk({
+
+          id: "ordens-periodo", titulo: "Ordens por período", icon: "precision_manufacturing",
+
+          sub: "Ordens de produção registadas no período.",
+
+          serie: prodSerie, total: soma(prodSerie, "valor"), variacao: variacaoDe(prodSerie),
+
+          colunas: ["Período", "Ordens"], linhas: prodSerie.map((x) => [x.label, x.valor]),
+
+        }),
+
+        mk({
+
+          id: "entregas-periodo", titulo: "Entregas por período", icon: "local_shipping",
+
+          sub: "Ordens entregues no período.",
+
+          serie: entrSerie, total: soma(entrSerie, "valor"), variacao: variacaoDe(entrSerie),
+
+          colunas: ["Período", "Entregues"], linhas: entrSerie.map((x) => [x.label, x.valor]),
+
+        }),
+
+        mk({
+
+          id: "taxa-entrega", titulo: "Taxa de entrega", icon: "show_chart",
+
+          sub: "Percentagem de ordens entregues no período.",
+
+          serie: pctSerie, total: pctSerie.length ? pctSerie[pctSerie.length - 1].valor : 0,
+
+          formato: (v) => `${Math.round(Number(v) || 0)}%`,
+
+          colunas: ["Período", "Taxa (%)"], linhas: pctSerie.map((x) => [x.label, `${x.valor}%`]),
+
+        }),
+
+        mk({
+
+          id: "ordens-estado", titulo: "Ordens por estado", icon: "pie_chart",
+
+          sub: "Distribuição das ordens por estado.",
+
+          serie: statusSerie, total: soma(statusSerie, "valor"),
+
+          colunas: ["Estado", "Ordens"], linhas: statusSerie.map((x) => [x.label, x.valor]),
+
+        }),
+
+      ],
+
+      stocks: [
+
+        mk({
+
+          id: "valor-stock-categoria", titulo: "Valor de stock por categoria", icon: "savings",
+
+          sub: "Valor de inventário por categoria de material.",
+
+          serie: catsValorSerie, total: soma(catsValorSerie, "valor"), formato: fmtKz, formatoAxis: compactKz,
+
+          colunas: ["Categoria", "Valor"], linhas: categoriasStock.map((c) => [c.nome, fmtKz(c.valor)]),
+
+        }),
+
+        mk({
+
+          id: "itens-categoria", titulo: "Itens por categoria", icon: "category",
+
+          sub: "Número de materiais por categoria.",
+
+          serie: catsItensSerie, total: soma(catsItensSerie, "valor"),
+
+          colunas: ["Categoria", "Itens"], linhas: categoriasStock.map((c) => [c.nome, c.itens]),
+
+        }),
+
+        mk({
+
+          id: "qtd-categoria", titulo: "Quantidade em stock por categoria", icon: "inventory_2",
+
+          sub: "Quantidade total de material em stock por categoria.",
+
+          serie: catsQtdSerie, total: soma(catsQtdSerie, "valor"),
+
+          formato: (v) => Number(v || 0).toLocaleString("pt-AO"),
+
+          colunas: ["Categoria", "Quantidade"], linhas: categoriasStock.map((c) => [c.nome, c.qtd.toLocaleString("pt-AO")]),
+
+        }),
+
+        mk({
+
+          id: "materiais-estado", titulo: "Materiais por estado", icon: "warning",
+
+          sub: "Estado do inventário de materiais.",
+
+          serie: matStatusSerie, total: soma(matStatusSerie, "valor"),
+
+          colunas: ["Estado", "Materiais"], linhas: matStatusSerie.map((x) => [x.label, x.valor]),
+
+        }),
+
+      ],
+
+      compras: [
+
+        mk({
+
+          id: "pedidos-mes", titulo: "Pedidos de compra por mês", icon: "add_shopping_cart",
+
+          sub: "Pedidos de compra registados no período.",
+
+          serie: comprasPorMes.map((m) => ({ label: m.label, valor: m.quantidade })),
+
+          total: pedidos.length, variacao: variacaoDe(comprasPorMes.map((m) => ({ valor: m.quantidade }))),
+
+          colunas: ["Período", "Pedidos"], linhas: comprasPorMes.map((m) => [m.label, m.quantidade]),
+
+        }),
+
+        mk({
+
+          id: "compras-valor", titulo: "Valor de compras por mês", icon: "payments",
+
+          sub: "Valor dos pedidos de compra no período.",
+
+          serie: comprasPorMes.map((m) => ({ label: m.label, valor: m.valor })),
+
+          total: comprasPorMes.reduce((s, m) => s + m.valor, 0), variacao: variacaoDe(comprasPorMes.map((m) => ({ valor: m.valor }))), formato: fmtKz, formatoAxis: compactKz,
+
+          colunas: ["Período", "Valor"], linhas: comprasPorMes.map((m) => [m.label, fmtKz(m.valor)]),
+
+        }),
+
+        mk({
+
+          id: "pedidos-estado", titulo: "Pedidos por estado", icon: "description",
+
+          sub: "Distribuição dos pedidos de compra por estado.",
+
+          serie: ESTADOS_PEDIDO.map((s) => ({ label: s.label, valor: pedidosPorEstado[s.value] || 0 })),
+
+          total: pedidos.length,
+
+          colunas: ["Estado", "Pedidos"], linhas: ESTADOS_PEDIDO.map((s) => [s.label, pedidosPorEstado[s.value] || 0]),
+
+        }),
+
+      ],
+
+      financeiro: [
+
+        mk({
+
+          id: "faturacao", titulo: "Faturação emitida", icon: "receipt_long",
+
+          sub: "Total faturado no período.",
+
+          serie: vendasSerie, total: totalVendas, variacao: variacaoDe(vendasSerie), formato: fmtKz, formatoAxis: compactKz,
+
+          colunas: ["Período", "Faturação"], linhas: vendasPorMes.map((v) => [v.label, fmtKz(v.valor)]),
+
+        }),
+
+        mk({
+
+          id: "recebido", titulo: "Recebido", icon: "payments",
+
+          sub: "Valor efetivamente recebido no período.",
+
+          serie: recebidoSerie, total: totalRecebido, variacao: variacaoDe(recebidoSerie), formato: fmtKz, formatoAxis: compactKz,
+
+          colunas: ["Período", "Recebido"], linhas: recebidoPorMes.map((v) => [v.label, fmtKz(v.valor)]),
+
+        }),
+
+        mk({
+
+          id: "docs-estado", titulo: "Documentos por estado", icon: "description",
+
+          sub: "Distribuição dos documentos por estado.",
+
+          serie: finEstadoSerie, total: soma(finEstadoSerie, "valor"),
+
+          colunas: ["Estado", "Documentos"], linhas: finEstadoSerie.map((x) => [x.label, x.valor]),
+
+        }),
+
+        mk({
+
+          id: "despesas", titulo: "Despesas (Tesouraria)", icon: "trending_down",
+
+          sub: "Saídas registadas na tesouraria no período.",
+
+          serie: despesasSerie, total: soma(despesasSerie, "valor"), variacao: variacaoDe(despesasSerie), formato: fmtKz, formatoAxis: compactKz,
+
+          colunas: ["Período", "Saídas"], linhas: despesasSerie.map((x) => [x.label, fmtKz(x.valor)]),
+
+        }),
+
+      ],
+
+      tesouraria: [
+
+        mk({
+
+          id: "entradas-mes", titulo: "Entradas por mês", icon: "arrow_downward",
+
+          sub: "Entradas na tesouraria no período.",
+
+          serie: entradasSerie, total: soma(entradasSerie, "valor"), variacao: variacaoDe(entradasSerie), formato: fmtKz, formatoAxis: compactKz,
+
+          colunas: ["Período", "Entradas"], linhas: entradasSerie.map((x) => [x.label, fmtKz(x.valor)]),
+
+        }),
+
+        mk({
+
+          id: "saidas-mes", titulo: "Saídas por mês", icon: "arrow_upward",
+
+          sub: "Saídas na tesouraria no período.",
+
+          serie: saidasSerie, total: soma(saidasSerie, "valor"), variacao: variacaoDe(saidasSerie), formato: fmtKz, formatoAxis: compactKz,
+
+          colunas: ["Período", "Saídas"], linhas: saidasSerie.map((x) => [x.label, fmtKz(x.valor)]),
+
+        }),
+
+        mk({
+
+          id: "saldo-contas", titulo: "Saldo por conta", icon: "account_balance_wallet",
+
+          sub: "Saldo atual por conta bancária e caixa.",
+
+          serie: contasSerie, total: soma(contasSerie, "valor"), formato: fmtKz, formatoAxis: compactKz,
+
+          colunas: ["Conta", "Saldo"], linhas: contasSerie.map((x) => [x.label, fmtKz(x.valor)]),
+
+        }),
+
+      ],
+
+      patrimonio: [
+
+        mk({
+
+          id: "bens-categoria", titulo: "Bens por categoria", icon: "category",
+
+          sub: "Número de bens patrimoniais por categoria.",
+
+          serie: bensPorCategoria.map((c) => ({ label: c.nome, valor: c.itens })),
+
+          total: bens.length,
+
+          colunas: ["Categoria", "Bens", "Valor"], linhas: bensPorCategoria.map((c) => [c.nome, c.itens, fmtKz(c.valor)]),
+
+        }),
+
+        mk({
+
+          id: "valor-categoria", titulo: "Valor patrimonial por categoria", icon: "account_balance_wallet",
+
+          sub: "Valor de aquisição acumulado por categoria.",
+
+          serie: bensPorCategoria.map((c) => ({ label: c.nome, valor: c.valor })),
+
+          total: bensPorCategoria.reduce((s, c) => s + c.valor, 0), formato: fmtKz, formatoAxis: compactKz,
+
+          colunas: ["Categoria", "Valor"], linhas: bensPorCategoria.map((c) => [c.nome, fmtKz(c.valor)]),
+
+        }),
+
+        mk({
+
+          id: "bens-estado", titulo: "Bens por estado", icon: "verified",
+
+          sub: "Distribuição dos bens patrimoniais por estado.",
+
+          serie: ESTADOS_BEM.map((s) => ({ label: s.label, valor: bensPorEstado[s.value] || 0 })),
+
+          total: bens.length,
+
+          colunas: ["Estado", "Bens"], linhas: ESTADOS_BEM.map((s) => [s.label, bensPorEstado[s.value] || 0]),
+
+        }),
+
+      ],
+
+      rh: [
+
+        mk({
+
+          id: "utilizadores-perfil", titulo: "Utilizadores por perfil", icon: "groups",
+
+          sub: "Número de utilizadores por perfil de acesso.",
+
+          serie: usuariosPorPerfil.map((u) => ({ label: u.nome, valor: u.qtd })),
+
+          total: usuarios.length,
+
+          colunas: ["Perfil", "Utilizadores"], linhas: usuariosPorPerfil.map((u) => [u.nome, u.qtd]),
+
+        }),
+
+        mk({
+
+          id: "utilizadores-ativos", titulo: "Utilizadores ativos", icon: "verified",
+
+          sub: "Estado das contas dos utilizadores.",
+
+          serie: [
+
+            { label: "Ativos", valor: usuariosAtivos },
+
+            { label: "Inativos", valor: usuariosInativos },
+
+          ],
+
+          total: usuarios.length,
+
+          colunas: ["Estado", "Utilizadores"], linhas: [["Ativos", usuariosAtivos], ["Inativos", usuariosInativos]],
+
+        }),
+
+      ],
+
+    };
+
+
+
+    return porModulo[aba] || [];
+
+  }, [
+
+    aba, org, vendasPorMes, recebidoPorMes, clientesTop, producaoPorMes, opsPorStatus,
+
+    ultimosMeses, categoriasStock, contagemStatusMaterial, contagemEstadosFatura, tesourariaPorMes,
+
+    contasTesouraria, bens, bensPorCategoria, bensPorEstado, pedidos, pedidosPorEstado,
+
+    comprasPorMes, usuarios, usuariosPorPerfil, usuariosAtivos, usuariosInativos, propostas,
+
+  ]);
+
+
+
+  const relatorioAtivo = relatorios.find((r) => r.id === relatorioId) || relatorios[0] || null;
+
+  const resolverGrupoCatalogo = useCallback(
+    (c) => tiposItem[normalizarTipoItem(c.tipo)]?.label || String(c.tipo || "").trim() || "Sem grupo",
+    []
+  );
+
+  const opcoesCatalogo = useMemo(() => {
+    const fams = new Map();
+    const grupos = new Map();
+    categorias.forEach((c) => {
+      const fam = normalizarFamilia(c.familia);
+      if (!fams.has(fam)) fams.set(fam, { value: fam, label: familias[fam]?.label || c.familia || fam });
+      const g = resolverGrupoCatalogo(c);
+      if (!grupos.has(g)) grupos.set(g, { value: g, label: g });
+    });
+    const ordenar = (lista) => [...lista.values()].sort((a, b) => a.label.localeCompare(b.label, "pt"));
+    return { familias: ordenar(fams), grupos: ordenar(grupos) };
+  }, [categorias, resolverGrupoCatalogo]);
+
+  const categoriasFiltradas = useMemo(
+    () =>
+      categorias.filter((c) => {
+        const famOk = filtroFamilias.length === 0 || filtroFamilias.includes(normalizarFamilia(c.familia));
+        const gruOk = filtroGrupos.length === 0 || filtroGrupos.includes(resolverGrupoCatalogo(c));
+        return famOk && gruOk;
+      }),
+    [categorias, filtroFamilias, filtroGrupos, resolverGrupoCatalogo]
+  );
+
+  const escopoVista =
+    aba === "comercial" ? `comercial:${subAbas.comercial}` : aba === "stocks" ? `stocks:${subAbas.stocks}` : aba;
+
+  const itensVista = useMemo(() => itensDe(escopoVista), [escopoVista]);
+
+  const vista = useVistaRelatorios(escopoVista, itensVista);
+
+  const chips = useMemo(() => {
+    const lista = [];
+    if ((aba === "comercial" && subAbas.comercial === "resumo") || aba === "financeiro") {
+      filtroEstadosFatura.forEach((v) =>
+        lista.push({
+          id: `ef-${v}`,
+          label: `Estado: ${rotuloDe(ESTADOS_FATURA, v)}`,
+          onRemove: () => setFiltroEstadosFatura((p) => p.filter((x) => x !== v)),
+        })
+      );
+      filtroTiposFatura.forEach((v) =>
+        lista.push({
+          id: `tf-${v}`,
+          label: `Tipo: ${rotuloDe(TIPOS_FATURA, v)}`,
+          onRemove: () => setFiltroTiposFatura((p) => p.filter((x) => x !== v)),
+        })
+      );
+    }
+    if (aba === "producao") {
+      filtroEstadosOrdem.forEach((v) =>
+        lista.push({
+          id: `eo-${v}`,
+          label: `Estado: ${rotuloDe(ESTADOS_ORDEM, v)}`,
+          onRemove: () => setFiltroEstadosOrdem((p) => p.filter((x) => x !== v)),
+        })
+      );
+    }
+    if (aba === "stocks" && subAbas.stocks === "materiais") {
+      filtroStatusMaterial.forEach((v) =>
+        lista.push({
+          id: `sm-${v}`,
+          label: `Estado: ${rotuloDe(STATUS_MATERIAL, v)}`,
+          onRemove: () => setFiltroStatusMaterial((p) => p.filter((x) => x !== v)),
+        })
+      );
+      filtroFamiliasMateriais.forEach((v) =>
+        lista.push({
+          id: `fm-${v}`,
+          label: `Família: ${familias[normalizarFamilia(v)]?.label || v}`,
+          onRemove: () => setFiltroFamiliasMateriais((p) => p.filter((x) => x !== v)),
+        })
+      );
+    }
+    if (aba === "stocks" && subAbas.stocks === "catalogo") {
+      filtroGrupos.forEach((v) =>
+        lista.push({
+          id: `cg-${v}`,
+          label: `Grupo: ${v}`,
+          onRemove: () => setFiltroGrupos((p) => p.filter((x) => x !== v)),
+        })
+      );
+      filtroFamilias.forEach((v) =>
+        lista.push({
+          id: `cf-${v}`,
+          label: `Família: ${familias[normalizarFamilia(v)]?.label || v}`,
+          onRemove: () => setFiltroFamilias((p) => p.filter((x) => x !== v)),
+        })
+      );
+    }
+    return lista;
+  }, [aba, subAbas, filtroEstadosFatura, filtroTiposFatura, filtroEstadosOrdem, filtroStatusMaterial, filtroFamiliasMateriais, filtroGrupos, filtroFamilias]);
+
+  const resumo = useMemo(() => {
+    if (aba === "comercial" && subAbas.comercial === "clientes") {
+      return {
+        mostrados: cadastrosFiltrados.length,
+        total: carteiraClientes.length,
+        rotulo: "clientes",
+        descricao: `Carteira atual · ${clientesPeriodo.length} novos no período`,
+      };
+    }
+    if (aba === "comercial" || aba === "financeiro") {
+      return {
+        mostrados: faturasFiltradas.length,
+        total: faturas.length,
+        rotulo: "faturas",
+        descricao: `${faturasPeriodo.length} no período selecionado`,
+      };
+    }
+    if (aba === "producao") {
+      return {
+        mostrados: ordensFiltradas.length,
+        total: ordens.length,
+        rotulo: "ordens",
+        descricao: `${ordensPeriodo.length} no período selecionado`,
+      };
+    }
+    if (aba === "stocks") {
+      return subAbas.stocks === "materiais"
+        ? { mostrados: materiaisFiltrados.length, total: materiais.length, rotulo: "materiais", descricao: "Posição atual do stock" }
+        : { mostrados: categoriasFiltradas.length, total: categorias.length, rotulo: "categorias", descricao: "Catálogo atual" };
+    }
+    if (aba === "compras") {
+      return {
+        mostrados: pedidosPeriodo.length,
+        total: pedidos.length,
+        rotulo: "pedidos",
+        descricao: "No período selecionado",
+      };
+    }
+    if (aba === "tesouraria") {
+      const total = Array.isArray(tesouraria?.movimentos) ? tesouraria.movimentos.length : 0;
+      return { mostrados: movimentosPeriodo.length, total, rotulo: "movimentos", descricao: "No período selecionado" };
+    }
+    if (aba === "patrimonio") return { mostrados: bens.length, total: bens.length, rotulo: "bens", descricao: "Posição atual do património" };
+    if (aba === "rh") return { mostrados: usuarios.length, total: usuarios.length, rotulo: "utilizadores", descricao: "Situação atual das contas" };
+    return null;
+  }, [aba, subAbas, carteiraClientes, clientesPeriodo, cadastrosFiltrados, faturasFiltradas, faturas, faturasPeriodo, ordensFiltradas, ordens, ordensPeriodo, materiaisFiltrados, materiais, categoriasFiltradas, categorias, pedidosPeriodo, pedidos, movimentosPeriodo, tesouraria, bens, usuarios]);
+
+  // A carteira é uma fotografia atual. O intervalo só identifica os novos clientes.
+  const resumoClientes = useMemo(() => {
+    const agrupar = (campo) => {
+      const mapa = new Map();
+      carteiraClientes.forEach((c) => {
+        const v = String(c[campo] || "").trim() || "Não informado";
+        mapa.set(v, (mapa.get(v) || 0) + 1);
+      });
+      return [...mapa.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([nome, valor], i) => ({ name: nome, value: valor, color: CORES_DONUT[i % CORES_DONUT.length] }));
+    };
+    return {
+      total: carteiraClientes.length,
+      ativos: carteiraClientes.filter((c) => c.ativo !== false).length,
+      novos: clientesPeriodo.length,
+      incompletos: carteiraClientes.filter((c) => camposEmFalta(c).length > 0),
+      porTipo: agrupar("tipo_cliente"),
+      porProvincia: agrupar("provincia"),
+    };
+  }, [carteiraClientes, clientesPeriodo]);
+
+  const subAbasAtuais =
+    aba === "comercial"
+      ? [
+          { value: "resumo", label: "Resumo" },
+          { value: "clientes", label: "Clientes" },
+        ]
+      : aba === "stocks"
+        ? [
+            { value: "materiais", label: "Materiais" },
+            { value: "catalogo", label: "Catálogo" },
+          ]
+        : [];
+
+  const subAbaAtual = aba === "comercial" ? subAbas.comercial : aba === "stocks" ? subAbas.stocks : null;
+
+  const temFiltrosAba =
+    (aba === "comercial" && subAbas.comercial === "resumo") ||
+    aba === "financeiro" ||
+    aba === "producao" ||
+    aba === "stocks";
+
+  const mudarAba = (valor) => {
+    setAba(valor);
+    setRelatorioId(null);
+    setFiltrosAbertos(false);
+    setVistaAberta(false);
+  };
+
+  const limparFiltros = () => {
+    if ((aba === "comercial" && subAbas.comercial === "resumo") || aba === "financeiro") {
+      setFiltroEstadosFatura([]);
+      setFiltroTiposFatura([]);
+    }
+    if (aba === "producao") setFiltroEstadosOrdem([]);
+    if (aba === "stocks" && subAbas.stocks === "materiais") {
+      setFiltroStatusMaterial([]);
+      setFiltroFamiliasMateriais([]);
+    }
+    if (aba === "stocks" && subAbas.stocks === "catalogo") {
+      setFiltroFamilias([]);
+      setFiltroGrupos([]);
+    }
+  };
+
+
+
+
+  const acoesExportar = (() => {
+    if (aba === "comercial" && subAbas.comercial === "resumo") {
+      return (
+        <button
+          type="button"
+          onClick={() => gerarRelatorioFaturacoesPDF(faturasFiltradas, org, { estados: filtroEstadosFatura, tipos: filtroTiposFatura })}
+          className={botaoPdfCls}
+        >
+          <Icon name="picture_as_pdf" className="text-sm" /> PDF
+        </button>
+      );
+    }
+    if (aba === "producao") {
+      return (
+        <button
+          type="button"
+          onClick={() => gerarRelatorioProducaoPDF(ordensFiltradas, org, { estados: filtroEstadosOrdem })}
+          className={botaoPdfCls}
+        >
+          <Icon name="picture_as_pdf" className="text-sm" /> PDF
+        </button>
+      );
+    }
+    if (aba === "stocks" && subAbas.stocks === "materiais") {
+      return (
+        <button
+          type="button"
+          onClick={() => gerarRelatorioStockPDF(materiaisFiltrados, categorias, org)}
+          className={botaoPdfCls}
+        >
+          <Icon name="picture_as_pdf" className="text-sm" /> PDF
+        </button>
+      );
+    }
+    if (aba === "stocks" && subAbas.stocks === "catalogo") {
+      return (
+        <button
+          type="button"
+          onClick={() =>
+            gerarRelatorioCategoriasPDF(categorias, materiais, org, {
+              familias: filtroFamilias.map((f) => familias[normalizarFamilia(f)]?.label || f),
+              grupos: filtroGrupos,
+            })
+          }
+          className={botaoPdfCls}
+        >
+          <Icon name="picture_as_pdf" className="text-sm" /> PDF
+        </button>
+      );
+    }
+    if (aba === "financeiro") {
+      return (
+        <button
+          type="button"
+          onClick={() =>
+            exportarRelatorioPDF({
+              titulo: "Relatório Financeiro",
+              org,
+              cabecalhos: ["Período", "Faturado", "Recebido", "Saídas"],
+              linhas: ultimosMeses.map((m, i) => [
+                m.label,
+                fmtKz(vendasPorMes[i]?.valor || 0),
+                fmtKz(recebidoPorMes[i]?.valor || 0),
+                fmtKz(tesourariaPorMes[i]?.saidas || 0),
+              ]),
+              resumo: [
+                `Faturado: ${fmtKz(vendasPorMes.reduce((s, v) => s + v.valor, 0))}`,
+                `Recebido: ${fmtKz(recebidoPorMes.reduce((s, v) => s + v.valor, 0))}`,
+              ],
+            })
+          }
+          className={botaoPdfCls}
+        >
+          <Icon name="picture_as_pdf" className="text-sm" /> PDF
+        </button>
+      );
+    }
+    if (aba === "tesouraria") {
+      const movs = movimentosPeriodo;
+      return (
+        <button
+          type="button"
+          disabled={movs.length === 0}
+          onClick={() =>
+            exportarRelatorioPDF({
+              titulo: "Relatório de Tesouraria",
+              org,
+              cabecalhos: ["Data", "Tipo", "Descrição", "Valor"],
+              linhas: movs.map((m) => {
+                const raw = m.data_movimento || m.data;
+                const d = raw ? new Date(raw) : null;
+                return [
+                  d && !isNaN(d.getTime()) ? d.toLocaleDateString("pt-AO") : "—",
+                  m.tipo === "entrada" ? "Entrada" : "Saída",
+                  m.descricao || m.descricao_movimento || m.observacao || "—",
+                  fmtKz(m.valor),
+                ];
+              }),
+              resumo: [`Movimentos: ${movs.length}`],
+            })
+          }
+          className={botaoPdfCls}
+        >
+          <Icon name="picture_as_pdf" className="text-sm" /> PDF
+        </button>
+      );
+    }
+    if (aba === "patrimonio") {
+      const totalValorBens = bens.reduce((s, b) => s + toNum(b.valor_aquisicao), 0);
+      return (
+        <button
+          type="button"
+          onClick={() =>
+            exportarRelatorioPDF({
+              titulo: "Relatório de Bens",
+              org,
+              cabecalhos: ["Código", "Nome", "Categoria", "Estado", "Valor de Aquisição"],
+              linhas: bens.map((b) => [
+                b.codigo || "—",
+                b.nome,
+                b.categoria || "—",
+                rotuloDe(ESTADOS_BEM, b.estado),
+                fmtKz(b.valor_aquisicao),
+              ]),
+              resumo: [`Total de bens: ${bens.length}`, `Valor patrimonial: ${fmtKz(totalValorBens)}`],
+            })
+          }
+          className={botaoPdfCls}
+        >
+          <Icon name="picture_as_pdf" className="text-sm" /> PDF
+        </button>
+      );
+    }
+    if (aba === "compras") {
+      const totalCompras = pedidosPeriodo.reduce((s, p) => s + toNum(p.total), 0);
+      return (
+        <button
+          type="button"
+          onClick={() =>
+            exportarRelatorioPDF({
+              titulo: "Relatório de Compras",
+              org,
+              cabecalhos: ["Número", "Fornecedor", "Estado", "Data", "Total"],
+              linhas: pedidosPeriodo.map((p) => [
+                p.numero || `#${p.id}`,
+                p.fornecedor_nome || "—",
+                rotuloDe(ESTADOS_PEDIDO, p.estado),
+                p.data_pedido ? new Date(p.data_pedido).toLocaleDateString("pt-AO") : "—",
+                fmtKz(p.total),
+              ]),
+              resumo: [`Total de pedidos: ${pedidosPeriodo.length}`, `Valor de compras: ${fmtKz(totalCompras)}`],
+            })
+          }
+          className={botaoPdfCls}
+        >
+          <Icon name="picture_as_pdf" className="text-sm" /> PDF
+        </button>
+      );
+    }
+    if (aba === "rh") {
+      return (
+        <button
+          type="button"
+          onClick={() =>
+            exportarRelatorioPDF({
+              titulo: "Relatório de Recursos Humanos",
+              org,
+              cabecalhos: ["Nome", "Email", "Perfil", "Função", "Estado"],
+              linhas: usuarios.map((u) => [
+                u.nome || "—",
+                u.email || "—",
+                u.perfil || "—",
+                u.funcao || "—",
+                u.ativo === false ? "Inativo" : "Ativo",
+              ]),
+              resumo: [`Total de utilizadores: ${usuarios.length}`, `Ativos: ${usuariosAtivos}`, `Inativos: ${usuariosInativos}`],
+            })
+          }
+          className={botaoPdfCls}
+        >
+          <Icon name="picture_as_pdf" className="text-sm" /> PDF
+        </button>
+      );
+    }
+    return null;
+  })();
+
+  return (
+    <div className="space-y-4">
+      <div className="min-w-0">
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">Relatórios e Análises</h1>
+        <p className="mt-1 text-xs font-medium text-muted-foreground">Informação para melhores decisões.</p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-1">
+        {MODULOS_REL.map((m) => (
+          <button
+            key={m.value}
+            type="button"
+            onClick={() => mudarAba(m.value)}
+            aria-pressed={aba === m.value}
+            className={`${tabClsBase} ${aba === m.value ? tabClsAtiva : tabClsInativa}`}
+          >
+            <Icon name={m.icon} className="text-base" /> {m.label}
+          </button>
+        ))}
+      </div>
+
+      <BarraContexto
+        subAbas={subAbasAtuais}
+        subAba={subAbaAtual}
+        onSubAba={(valor) => setSubAbas((p) => ({ ...p, [aba]: valor }))}
+        intervalo={intervalo}
+        onPeriodo={(modo) => setIntervalo((p) => ({ ...p, modo }))}
+        onDatas={(parcial) => setIntervalo((p) => ({ ...p, ...parcial }))}
+        filtrosAbertos={filtrosAbertos}
+        onToggleFiltros={() => setFiltrosAbertos((v) => !v)}
+        nFiltrosAtivos={chips.length}
+        temFiltros={temFiltrosAba}
+        chips={chips}
+        onLimpar={limparFiltros}
+        resumo={resumo}
+        nOcultos={vista.nOcultos}
+        vistaAberta={vistaAberta}
+        onToggleVista={() => setVistaAberta((v) => !v)}
+        painelVista={
+          <PainelVista
+            aberto={vistaAberta}
+            onFechar={() => setVistaAberta(false)}
+            itens={itensVista}
+            visiveis={vista.visiveis}
+            onToggle={vista.alternar}
+            onMostrarTudo={vista.mostrarTudo}
+            onRestaurar={vista.restaurar}
+          />
+        }
+        relatorios={aba === "comercial" && subAbas.comercial === "clientes" ? [] : relatorios}
+        relatorioId={relatorioAtivo?.id}
+        onRelatorio={setRelatorioId}
+        acoes={acoesExportar}
+      />
+
+      {filtrosAbertos && temFiltrosAba && (
+        <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+          {(aba === "comercial" || aba === "financeiro") && (
+            <>
+              <FiltroChips
+                icon="info"
+                titulo="Estado da fatura"
+                opcoes={ESTADOS_FATURA.map((o) => ({ ...o, count: contagemEstadosFatura[o.value] || 0 }))}
+                valor={filtroEstadosFatura}
+                onChange={setFiltroEstadosFatura}
+                limparLabel="Todos"
+              />
+              <FiltroChips
+                icon="description"
+                titulo="Tipo de documento"
+                opcoes={TIPOS_FATURA.map((o) => ({ ...o, count: contagemTiposFatura[o.value] || 0 }))}
+                valor={filtroTiposFatura}
+                onChange={setFiltroTiposFatura}
+                limparLabel="Todos"
+              />
+            </>
+          )}
+          {aba === "producao" && (
+            <FiltroChips
+              icon="info"
+              titulo="Estado da ordem"
+              opcoes={ESTADOS_ORDEM.map((o) => ({ ...o, count: contagemEstadosOrdem[o.value] || 0 }))}
+              valor={filtroEstadosOrdem}
+              onChange={setFiltroEstadosOrdem}
+              limparLabel="Todos"
+            />
+          )}
+          {aba === "stocks" && subAbas.stocks === "materiais" && (
+            <>
+              <FiltroChips
+                icon="info"
+                titulo="Estado do material"
+                opcoes={STATUS_MATERIAL.map((o) => ({ ...o, count: contagemStatusMaterial[o.value] || 0 }))}
+                valor={filtroStatusMaterial}
+                onChange={setFiltroStatusMaterial}
+                limparLabel="Todos"
+              />
+              <MultiSelect
+                icon="folder_open"
+                value={filtroFamiliasMateriais}
+                onChange={setFiltroFamiliasMateriais}
+                options={opcoesFamiliasMateriais}
+                placeholder="Todas as famílias"
+              />
+            </>
+          )}
+          {aba === "stocks" && subAbas.stocks === "catalogo" && (
+            <div className="flex flex-wrap items-center gap-3">
+              <MultiSelect
+                icon="category"
+                value={filtroGrupos}
+                onChange={setFiltroGrupos}
+                options={opcoesCatalogo.grupos}
+                placeholder="Todos os grupos"
+              />
+              <MultiSelect
+                icon="folder"
+                value={filtroFamilias}
+                onChange={setFiltroFamilias}
+                options={opcoesCatalogo.familias}
+                placeholder="Todas as famílias"
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {loading && (
+        <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+          A carregar relatórios...
+        </div>
+      )}
+
+      {!loading && error && (
+        <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-error">{error}</div>
+      )}
+
+      {!loading && !error && aba === "comercial" && subAbas.comercial === "resumo" && (
+        <>
+          <Bloco id="com.kpis" vista={vista}>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {[
+                { label: "Recebido hoje", value: fmtKz(recebidoHoje), icon: "today" },
+                { label: "Recebido este mês", value: fmtKz(recebidoMes), icon: "payments" },
+                {
+                  label: "A receber",
+                  value: fmtKz(
+                    faturasFiltradas
+                      .filter((f) => !["paga", "cancelada"].includes(f.estado))
+                      .reduce((s, f) => s + (Number(f.total || f.valor) || 0), 0)
+                  ),
+                  icon: "paid",
+                },
+                { label: "Documentos", value: faturasFiltradas.length, icon: "receipt_long" },
+              ].map((kpi) => (
+                <KpiCard key={kpi.label} icon={kpi.icon} label={kpi.label} value={kpi.value} />
+              ))}
+            </div>
+          </Bloco>
+
+          <Bloco id="com.fluxo" vista={vista}>
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <CartaoGrafico
+                icon="receipt_long"
+                titulo="Faturação emitida"
+                sub={`Total: ${fmtKz(vendasPorMes.reduce((s, v) => s + v.valor, 0))}`}
+              >
+                <div className="h-52">
+                  <AreaGrafico dados={vendasPorMes} serie="faturacao" nome="Faturação" cor="var(--data-1)" formato={compactKz} />
+                </div>
+              </CartaoGrafico>
+              <CartaoGrafico
+                icon="payments"
+                titulo="Recebido (faturas pagas)"
+                sub={`Total: ${fmtKz(recebidoPorMes.reduce((s, v) => s + v.valor, 0))}`}
+              >
+                <div className="h-52">
+                  <AreaGrafico dados={recebidoPorMes} serie="recebido" nome="Recebido" cor="var(--data-5)" formato={compactKz} />
+                </div>
+              </CartaoGrafico>
+            </div>
+          </Bloco>
+
+          <Bloco id="com.top" vista={vista}>
+            <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2">
+              <CartaoGrafico icon="pie_chart" titulo="Faturação por cliente" sub="Repartição dos 5 principais clientes">
+                {clientesTop.length === 0 ? (
+                  <p className="py-10 text-center text-sm text-muted-foreground">Sem faturação no período.</p>
+                ) : (
+                  <DonutGrafico
+                    dados={clientesTop.map((c, i) => ({ ...c, color: CORES_DONUT[i % CORES_DONUT.length] }))}
+                    centro={compactKz(clientesTotal)}
+                    tooltipFormat={(v) => fmtKz(v)}
+                  />
+                )}
+              </CartaoGrafico>
+
+              <CartaoGrafico icon="workspace_premium" titulo="Top 5 clientes" sub="Clientes com maior faturação">
+                {clientesTop.length === 0 ? (
+                  <p className="py-10 text-center text-sm text-muted-foreground">Sem clientes para apresentar.</p>
+                ) : (
+                  <div className="flex h-full flex-col justify-center space-y-4">
+                    {clientesTop.map((c, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <span className="w-5 font-mono text-sm font-bold text-muted-foreground">{i + 1}</span>
+                        <div className="flex-1">
+                          <div className="mb-1 flex justify-between gap-2 text-sm">
+                            <span className="truncate font-medium">{c.nome}</span>
+                            <span className="shrink-0 font-mono font-bold">{fmtKz(c.total)}</span>
+                          </div>
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${(c.total / (clientesTotal || 1)) * 100}%`,
+                                background: CORES_DONUT[i % CORES_DONUT.length],
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
+                )}
+              </CartaoGrafico>
+            </div>
+          </Bloco>
 
-                  <div className="flex shrink-0 flex-col sm:items-end">
+          <Bloco id="com.relatorio" vista={vista}>
+            <CardRelatorioModulo relatorio={relatorioAtivo} onVer={setRelatorioVer} />
+          </Bloco>
+        </>
+      )}
 
-                    <p className="text-xl font-semibold tracking-tight text-foreground tabular-nums">{relatorioAtivo.totalTexto}</p>
+      {!loading && !error && aba === "comercial" && subAbas.comercial === "clientes" && (
+        <>
+          <Bloco id="cli.kpis" vista={vista}>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <KpiCard icon="groups" label="Clientes" value={resumoClientes.total} />
+              <KpiCard icon="verified" label="Ativos" value={resumoClientes.ativos} iconVariant="success" />
+              <KpiCard icon="today" label="Novos no período" value={resumoClientes.novos} iconVariant="info" />
+              <KpiCard icon="error" label="Cadastros incompletos" value={resumoClientes.incompletos.length} iconVariant="warning" />
+            </div>
+          </Bloco>
 
-                    {relatorioAtivo.variacao !== null && (
+          <Bloco id="cli.distribuicoes" vista={vista}>
+            <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2">
+              <CartaoGrafico icon="person" titulo="Clientes por tipo" sub="Distribuição da carteira">
+                <div className="grid grid-cols-1 items-center gap-4 sm:grid-cols-2">
+                  <DonutGrafico
+                    dados={resumoClientes.porTipo}
+                    centro={String(resumoClientes.total)}
+                    tooltipFormat={(v) => `${v} clientes`}
+                  />
+                  <div className="space-y-2">
+                    {resumoClientes.porTipo.map((d) => (
+                      <LinhaDonut
+                        key={d.name}
+                        cor={d.color}
+                        nome={d.name}
+                        valor={`${d.value} (${Math.round((d.value / (resumoClientes.total || 1)) * 100)}%)`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </CartaoGrafico>
 
-                      <span className={`mt-0.5 inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${
+              <CartaoGrafico icon="pin_drop" titulo="Clientes por província" sub="Cobertura geográfica da carteira">
+                <div className="grid grid-cols-1 items-center gap-4 sm:grid-cols-2">
+                  <DonutGrafico
+                    dados={resumoClientes.porProvincia}
+                    centro={String(resumoClientes.total)}
+                    tooltipFormat={(v) => `${v} clientes`}
+                  />
+                  <div className="space-y-2">
+                    {resumoClientes.porProvincia.map((d) => (
+                      <LinhaDonut
+                        key={d.name}
+                        cor={d.color}
+                        nome={d.name}
+                        valor={`${d.value} (${Math.round((d.value / (resumoClientes.total || 1)) * 100)}%)`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </CartaoGrafico>
+            </div>
+          </Bloco>
 
-                        relatorioAtivo.variacao >= 0 ? "bg-success/10 text-success ring-success/20" : "bg-error/10 text-error ring-error/20"
+          <Bloco id="cli.cadastros" vista={vista}>
+            <Ledger rotulo="Cadastros ledger">
+              <LedgerHeader titulo="Cadastros" subtitulo={`${cadastrosFiltrados.length} de ${totalClientes} clientes · Carteira atual`} />
+              <div className="flex flex-col gap-2.5 px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs text-muted-foreground">Clientes da carteira atual, sem fornecedores.</p>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <div className="relative w-full sm:w-56">
+                    <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-base text-muted-foreground" />
+                    <input
+                      className="w-full rounded-lg border border-border bg-card py-1.5 pl-9 pr-4 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus-visible:ring-2 focus-visible:ring-primary/25"
+                      placeholder="Pesquisar cliente..."
+                      value={busca}
+                      onChange={(e) => setBusca(e.target.value)}
+                      aria-label="Pesquisar cliente"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    disabled={cadastrosFiltrados.length === 0}
+                    onClick={() => gerarRelatorioCadastrosPDF(cadastrosFiltrados, org, "cliente")}
+                    className={botaoPdfCls}
+                  >
+                    <Icon name="picture_as_pdf" className="text-sm" /> Exportar clientes
+                  </button>
+                </div>
+              </div>
+              <LedgerTable>
+                <thead>
+                  <tr className="border-b border-border">
+                    <LedgerTh>Nome</LedgerTh>
+                    <LedgerTh className="hidden sm:table-cell">Empresa</LedgerTh>
+                    <LedgerTh>NIF</LedgerTh>
+                    <LedgerTh className="hidden lg:table-cell">Email</LedgerTh>
+                    <LedgerTh>Telefone</LedgerTh>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cadastrosFiltrados.map((c, i) => (
+                    <LedgerTr key={c.id || c.codigo || i}>
+                      <LedgerTd className="font-medium">{c.nome}</LedgerTd>
+                      <LedgerTd className="hidden text-muted-foreground sm:table-cell">{c.empresa || "—"}</LedgerTd>
+                      <LedgerTd className="font-mono text-xs text-muted-foreground">{c.nif || "—"}</LedgerTd>
+                      <LedgerTd className="hidden text-xs text-muted-foreground lg:table-cell">{c.email || "—"}</LedgerTd>
+                      <LedgerTd className="text-muted-foreground">{c.telefone || "—"}</LedgerTd>
+                    </LedgerTr>
+                  ))}
+                </tbody>
+              </LedgerTable>
+              {cadastrosFiltrados.length === 0 && (
+                <LedgerEmpty icone="search_off">
+                  {carteiraClientes.length === 0 ? "Nenhum cadastro encontrado" : "Nenhum resultado para os filtros escolhidos"}
+                </LedgerEmpty>
+              )}
+            </Ledger>
+          </Bloco>
 
-                      }`}>
-
-                        <Icon name={relatorioAtivo.variacao >= 0 ? "trending_up" : "trending_down"} className="text-sm" />
-
-                        {relatorioAtivo.variacao >= 0 ? "+" : ""}{relatorioAtivo.variacao}%
-
-                      </span>
-
-                    )}
-
-                  </div>
-
-                </div>
-
-                <div className="px-4 pt-3">
-
-                  <div className="h-64">
-
-                    {relatorioAtivo.serie.length > 0 ? (
-
-                      <ResponsiveContainer width="100%" height="100%">
-
-                        <BarChart data={relatorioAtivo.serie} margin={{ top: 10, right: 10, left: -14, bottom: 0 }}>
-
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-
-                          <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} dy={4} interval={0} />
-
-                          <YAxis tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} width={52} tickFormatter={relatorioAtivo.formatoAxis} allowDecimals={false} />
-
-                          <Tooltip content={<ChartTooltip formato={relatorioAtivo.formato} />} cursor={{ fill: "var(--muted)" }} />
-
-                          <Bar dataKey="valor" name={relatorioAtivo.titulo} radius={[6, 6, 0, 0]} maxBarSize={54} fill={relatorioAtivo.cor} />
-
-                        </BarChart>
-
-                      </ResponsiveContainer>
-
-                    ) : (
-
-                      <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-border">
-
-                        <p className="text-sm text-muted-foreground">Sem dados suficientes para este relatório.</p>
-
-                      </div>
-
-                    )}
-
-                  </div>
-
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-3">
-
-                  <button
-
-                    type="button"
-
-                    onClick={() => setRelatorioVer(relatorioAtivo)}
-
-                    className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/60"
-
-                  >
-
-                    <Icon name="visibility" className="text-sm text-muted-foreground" /> Visualizar
-
-                  </button>
-
-                  <button type="button" onClick={relatorioAtivo.onExportPdf} className={botaoPdfCls}>
-
-                    <Icon name="picture_as_pdf" className="text-sm text-error" /> Exportar PDF
-
-                  </button>
-
-                  <button type="button" onClick={relatorioAtivo.onExportExcel} className={botaoExcelCls}>
-
-                    <Icon name="grid_on" className="text-sm text-success" /> Exportar Excel
-
-                  </button>
-
-                </div>
-
-              </>
-
-            )}
-
-          </section>
-
-        </div>
-
-      )}
-
-
-
-      {aba === "comercial" && (
-
-        <>
-
-          <PainelFiltros
-
-              icon="filter_list"
-
-              titulo="Filtros da Área Comercial"
-
-              acoes={
-
-                <button
-
-                  type="button"
-
-                  onClick={() => gerarRelatorioFaturacoesPDF(faturasFiltradas, org, { estados: filtroEstadosFatura, tipos: filtroTiposFatura })}
-
-                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-
-                >
-
-                  <Icon name="picture_as_pdf" className="text-sm" /> Exportar PDF
-
-                </button>
-
-              }
-
-            >
-
-            <FiltroChips
-
-              icon="info"
-
-              titulo="Estado da Fatura"
-
-              opcoes={ESTADOS_FATURA.map((o) => ({ ...o, count: contagemEstadosFatura[o.value] || 0 }))}
-
-              valor={filtroEstadosFatura}
-
-              onChange={setFiltroEstadosFatura}
-
-              limparLabel="Todos"
-
-            />
-
-            <FiltroChips
-
-              icon="description"
-
-              titulo="Tipo de Documento"
-
-              opcoes={TIPOS_FATURA.map((o) => ({ ...o, count: contagemTiposFatura[o.value] || 0 }))}
-
-              valor={filtroTiposFatura}
-
-              onChange={setFiltroTiposFatura}
-
-              limparLabel="Todos"
-
-            />
-
-          </PainelFiltros>
-
-
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-
-            {[
-
-              { label: "Recebido Hoje", value: `Kz ${recebidoHoje.toLocaleString("pt-AO")}`, icon: "today" },
-
-              { label: "Recebido este Mês", value: `Kz ${recebidoMes.toLocaleString("pt-AO")}`, icon: "payments" },
-
-              { label: "A Receber", value: `Kz ${faturasFiltradas.filter((f) => !["paga", "cancelada"].includes(f.estado)).reduce((s, f) => s + (Number(f.total || f.valor) || 0), 0).toLocaleString("pt-AO")}`, icon: "paid" },
-
-              { label: "Documentos", value: faturasFiltradas.length, icon: "receipt_long" },
-
-            ].map((kpi) => (
-
-              <KpiCard key={kpi.label} icon={kpi.icon} label={kpi.label} value={kpi.value} />
-
-            ))}
-
-          </div>
-
-
-
-          <TabsPills
-
-            valor={periodo}
-
-            onChange={setPeriodo}
-
-            opcoes={ultimosMeses.map((m) => ({ value: m.labelCurto, label: m.label }))}
-
-          />
-
-
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-            <CartaoGrafico icon="receipt_long" titulo="Faturação Emitida" sub={`Total: ${fmtKz(vendasPorMes.reduce((s, v) => s + v.valor, 0))}`}>
-
-              <div className="h-52">
-
-                <AreaGrafico dados={vendasPorMes} serie="faturacao" nome="Faturação" cor="#0066ff" formato={compactKz} />
-
-              </div>
-
-            </CartaoGrafico>
-
-
-
-            <CartaoGrafico icon="payments" titulo="Recebido (Faturas Pagas)" sub={`Total: ${fmtKz(recebidoPorMes.reduce((s, v) => s + v.valor, 0))}`}>
-
-              <div className="h-52">
-
-                <AreaGrafico dados={recebidoPorMes} serie="recebido" nome="Recebido" cor="#10b981" formato={compactKz} />
-
-              </div>
-
-            </CartaoGrafico>
-
-          </div>
-
-
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
-
-            <CartaoGrafico icon="pie_chart" titulo="Faturação por Cliente" sub="Repartição dos Top 5 clientes">
-
-              <DonutGrafico
-
-                dados={clientesTop.map((c, i) => ({ ...c, color: CORES_DONUT[i % CORES_DONUT.length] }))}
-
-                centro={compactKz(clientesTotal)}
-
-                tooltipFormat={(v) => fmtKz(v)}
-
-              />
-
-            </CartaoGrafico>
-
-
-
-            <CartaoGrafico icon="workspace_premium" titulo="Top 5 Clientes" sub="Clientes com maior faturação">
-
-              <div className="h-full flex flex-col justify-center space-y-4">
-
-                {clientesTop.map((c, i) => (
-
-                  <div key={i} className="flex items-center gap-3">
-
-                    <span className="text-sm font-mono font-bold text-muted-foreground w-5">{i + 1}</span>
-
-                    <div className="flex-1">
-
-                      <div className="flex justify-between text-sm mb-1 gap-2">
-
-                        <span className="font-medium truncate">{c.nome}</span>
-
-                        <span className="font-mono font-bold shrink-0">Kz {c.total.toLocaleString()}</span>
-
-                      </div>
-
-                      <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-
-                        <div className="h-full rounded-full" style={{ width: `${(c.total / clientesTotal) * 100}%`, background: CORES_DONUT[i % CORES_DONUT.length] }} />
-
-                      </div>
-
-                    </div>
-
-                  </div>
-
-                ))}
-
-              </div>
-
-            </CartaoGrafico>
-
-          </div>
-
-
-
-{filtroTipo !== "fornecedor" && (
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-4">
-
-            {[
-
-              { label: "CLIENTES ACTIVOS", valor: clientesAtivos, icone: "groups", tom: "bg-primary/10 text-primary" },
-
-              { label: "NOVOS NO PERÍODO", valor: novosClientesPeriodo, icone: "person_add", tom: "bg-info/10 text-info", legenda: periodoClientes.rotulo },
-
-              { label: "COM PENDÊNCIAS", valor: clientesComPendencia, icone: "pending_actions", tom: "bg-warning/10 text-warning" },
-
-              { label: "CLIENTES INACTIVOS", valor: clientesInativos, icone: "person_off", tom: "bg-muted text-muted-foreground" },
-
-            ].map((k) => (
-
-              <div key={k.label} className="flex items-center gap-4 rounded-xl border border-border bg-card p-4 shadow-sm">
-
-                <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${k.tom}`}>
-
-                  <Icon name={k.icone} className="text-xl" />
-
-                </span>
-
-                <div className="min-w-0">
-
-                  <p className="text-xs font-semibold text-muted-foreground">{k.label}</p>
-
-                  <p className="text-xl font-semibold leading-tight tracking-tight text-foreground tabular-nums">{k.valor}</p>
-
-                  {k.legenda && <p className="text-[10px] font-medium text-muted-foreground">{k.legenda}</p>}
-
-                </div>
-
-              </div>
-
-            ))}
-
-          </div>
-)}
-
-
-
-          <Ledger rotulo="Cadastros ledger">
-
-            <LedgerHeader
-
-              titulo="Cadastros"
-
-              subtitulo={`${cadastrosFiltrados.length} de ${clientes.length} registos`}
-
-            />
-
-            <div className="flex flex-col gap-2.5 px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-
-              <TabsPills
-
-                valor={filtroTipo}
-
-                onChange={setFiltroTipo}
-
-                opcoes={[
-
-                  { value: "todos", label: `Todos (${clientes.length})`, icon: "badge" },
-
-                  { value: "cliente", label: `Clientes (${totalClientes})`, icon: "person" },
-
-                  { value: "fornecedor", label: `Fornecedores (${totalFornecedores})`, icon: "local_shipping" },
-
-                ]}
-
-              />
-
-              <div className="flex items-center gap-1.5">
-
-                <div className="relative w-full sm:w-64">
-
-                  <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-base" />
-
-                  <input
-
-                    className="w-full rounded-lg border border-border bg-card py-1.5 pl-9 pr-4 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus-visible:ring-2 focus-visible:ring-primary/25"
-
-                    placeholder="Buscar..."
-
-                    value={busca}
-
-                    onChange={(e) => setBusca(e.target.value)}
-
-                  />
-
-                </div>
-
-                {[
-
-                  { v: "todos", label: "Todos" },
-
-                  { v: "cliente", label: "Clientes" },
-
-                  { v: "fornecedor", label: "Fornecedores" },
-
-                ].map((r) => (
-
-                  <button
-
-                    key={r.v}
-
-                    type="button"
-
-                    onClick={() => gerarRelatorioCadastrosPDF(clientes, org, r.v)}
-
-                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-
-                  >
-
-                    <Icon name="picture_as_pdf" className="text-sm" /> {r.label}
-
-                  </button>
-
-                ))}
-
-              </div>
-
-            </div>
-
-            <LedgerTable>
-
-              <thead>
-
-                <tr className="border-b border-border">
-
-                  <LedgerTh>Tipo</LedgerTh>
-
-                  <LedgerTh>Nome</LedgerTh>
-
-                  <LedgerTh className="hidden sm:table-cell">Empresa</LedgerTh>
-
-                  <LedgerTh>NIF</LedgerTh>
-
-                  <LedgerTh className="hidden lg:table-cell">Email</LedgerTh>
-
-                  <LedgerTh>Telefone</LedgerTh>
-
-                </tr>
-
-              </thead>
-
-              <tbody>
-
-                {cadastrosFiltrados.map((c, i) => (
-
-                  <LedgerTr key={c.id || c.codigo || i}>
-
-                    <LedgerTd>
-
-                      <StatusBadge tom="neutral">
-
-                        <Icon name={c.tipo === "cliente" ? "person" : "local_shipping"} className="text-xs" />
-
-                        {c.tipo === "cliente" ? "Cliente" : "Fornecedor"}
-
-                      </StatusBadge>
-
-                    </LedgerTd>
-
-                    <LedgerTd className="font-medium">{c.nome}</LedgerTd>
-
-                    <LedgerTd className="hidden text-muted-foreground sm:table-cell">{c.empresa || "—"}</LedgerTd>
-
-                    <LedgerTd className="font-mono text-xs text-muted-foreground">{c.nif || "—"}</LedgerTd>
-
-                    <LedgerTd className="hidden text-xs text-muted-foreground lg:table-cell">{c.email || "—"}</LedgerTd>
-
-                    <LedgerTd className="text-muted-foreground">{c.telefone || "—"}</LedgerTd>
-
-                  </LedgerTr>
-
-                ))}
-
-              </tbody>
-
-            </LedgerTable>
-
-            {cadastrosFiltrados.length === 0 && (
-
-              <LedgerEmpty icone="search_off">
-
-                {clientes.length === 0 ? "Nenhum cadastro encontrado" : "Nenhum resultado para os filtros escolhidos"}
-
-              </LedgerEmpty>
-
-            )}
-
-          </Ledger>
-
-
-
-          <RelatorioClientes clientes={clientes} org={org} />
-
-        </>
-
-      )}
-
-
-
-      {aba === "producao" && (() => {
-
-        const statusCores = { aguardando: "#f58220", em_producao: "#0066ff", finalizado: "#10b981", entregue: "#64748b" };
-
-        const totalOrdens = opsPorStatus.reduce((t, x) => t + x.quantidade, 0) || 1;
-
-        const donutsStatus = opsPorStatus.map((s) => ({ name: s.label, value: s.quantidade, color: statusCores[s.status] }));
-
-        const desempenhoMeses = ultimosMeses.map((m) => ({
-
-          label: m.label,
-
-          valor: (producaoPorMes[m.mes] || { produzidas: 0 }).produzidas,
-
-          entregues: (producaoPorMes[m.mes] || { entregues: 0 }).entregues,
-
-        }));
-
-        return (
-
-          <>
-
-            <PainelFiltros
-
-              icon="filter_list"
-
-              titulo="Filtros de Produção"
-
-              acoes={
-
-                <button
-
-                  type="button"
-
-                  onClick={() => gerarRelatorioProducaoPDF(ordensFiltradas, org, { estados: filtroEstadosOrdem })}
-
-                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-
-                >
-
-                  <Icon name="picture_as_pdf" className="text-sm" /> Exportar PDF
-
-                </button>
-
-              }
-
-            >
-
-              <FiltroChips
-
-                icon="info"
-
-                titulo="Estado da Ordem"
-
-                opcoes={ESTADOS_ORDEM.map((o) => ({ ...o, count: contagemEstadosOrdem[o.value] || 0 }))}
-
-                valor={filtroEstadosOrdem}
-
-                onChange={setFiltroEstadosOrdem}
-
-                limparLabel="Todos"
-
-              />
-
-            </PainelFiltros>
-
-
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-
-              {opsPorStatus.map((s) => (
-
-                <div key={s.status} className="rounded-xl border border-border bg-card p-4 text-center">
-
-                  <p className="text-2xl font-semibold tabular-nums text-foreground">{s.quantidade}</p>
-
-                  <p className="mt-0.5 text-xs text-muted-foreground">{s.label}</p>
-
-                </div>
-
-              ))}
-
-            </div>
-
-
-
-            <div className="w-full h-2 bg-muted rounded-full overflow-hidden flex">
-
-              {opsPorStatus.map((s) => {
-
-                const pct = (s.quantidade / totalOrdens) * 100;
-
-                return pct > 0 ? <div key={s.status} className="h-full" style={{ width: `${pct}%`, background: statusCores[s.status] }} /> : null;
-
-              })}
-
-            </div>
-
-
-
-            <div className="flex gap-4 flex-wrap text-xs">
-
-              {opsPorStatus.map((s) => (
-
-                <div key={s.status} className="flex items-center gap-1.5">
-
-                  <span className="w-2.5 h-2.5 rounded-full" style={{ background: statusCores[s.status] }} />
-
-                  <span className="text-muted-foreground">{s.label}</span>
-
-                  <span className="font-medium">{Math.round((s.quantidade / totalOrdens) * 100)}%</span>
-
-                </div>
-
-              ))}
-
-            </div>
-
-
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
-
-              <CartaoGrafico icon="pie_chart" titulo="Ordens por Estado" sub="Distribuição das ordens de produção">
-
-                <DonutGrafico dados={donutsStatus} centro={String(ordens.length)} tooltipFormat={(v) => `${v} ordens`} />
-
-                <div className="mt-3 space-y-2">
-
-                  {donutsStatus.map((d) => (
-
-                    <LinhaDonut key={d.name} cor={d.color} nome={d.name} valor={`${d.value} (${Math.round((d.value / totalOrdens) * 100)}%)`} />
-
-                  ))}
-
-                </div>
-
-              </CartaoGrafico>
-
-
-
-              <CartaoGrafico icon="show_chart" titulo="Desempenho por Período" sub="Ordens produzidas e entregues por mês">
-
-                <div className="h-52">
-
-                  <ResponsiveContainer width="100%" height="100%">
-
-                    <AreaChart data={desempenhoMeses} margin={{ top: 10, right: 10, left: -14, bottom: 0 }}>
-
-                      <defs>
-
-                        <linearGradient id="grad-produzidas" x1="0" y1="0" x2="0" y2="1">
-
-                          <stop offset="0%" stopColor="#0066ff" stopOpacity={0.35} />
-
-                          <stop offset="100%" stopColor="#0066ff" stopOpacity={0.02} />
-
-                        </linearGradient>
-
-                        <linearGradient id="grad-entregues" x1="0" y1="0" x2="0" y2="1">
-
-                          <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
-
-                          <stop offset="100%" stopColor="#10b981" stopOpacity={0.02} />
-
-                        </linearGradient>
-
-                      </defs>
-
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-
-                      <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} dy={4} />
-
-                      <YAxis tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} width={40} allowDecimals={false} />
-
-                      <Tooltip content={<ChartTooltip />} />
-
-                      <Area type="monotone" dataKey="valor" name="Produzidas" stroke="#0066ff" strokeWidth={2.5} fill="url(#grad-produzidas)" activeDot={{ r: 4 }} />
-
-                      <Area type="monotone" dataKey="entregues" name="Entregues" stroke="#10b981" strokeWidth={2.5} fill="url(#grad-entregues)" activeDot={{ r: 4 }} />
-
-                    </AreaChart>
-
-                  </ResponsiveContainer>
-
-                </div>
-
-              </CartaoGrafico>
-
-            </div>
-
-          </>
-
-        );
-
-      })()}
-
-
-
-      {aba === "stocks" && (() => {
-
-        const catMap = {};
-
-        materiaisFiltrados.forEach((m) => {
-
-          const cat = m.categoria?.nome || "Sem categoria";
-
-          const fam = normalizarFamilia(m.categoria?.familia);
-
-          if (!catMap[cat]) catMap[cat] = { qtd: 0, valorTotal: 0, disponivel: 0, itens: 0, familia: fam };
-
-          catMap[cat].itens += 1;
-
-          catMap[cat].qtd += toNum(m.quantidade);
-
-          catMap[cat].disponivel += toNum(m.estoque_disponivel);
-
-          catMap[cat].valorTotal += toNum(m.quantidade) * toNum(m.custo_unit);
-
-        });
-
-        const catSorted = Object.entries(catMap).sort((a, b) => b[1].valorTotal - a[1].valorTotal);
-
-        const totalItens = materiaisFiltrados.length;
-
-        const totalQtd = materiaisFiltrados.reduce((s, m) => s + toNum(m.quantidade), 0);
-
-        const totalValor = materiaisFiltrados.reduce((s, m) => s + toNum(m.quantidade) * toNum(m.custo_unit), 0);
-
-        const esgotados = materiaisFiltrados.filter((m) => m.status === "esgotado").length;
-
-        const abaixoMin = materiaisFiltrados.filter((m) => m.status === "repor").length;
-
-        const criticos = esgotados + abaixoMin;
-
-        const donutsCategorias = catSorted.slice(0, 6).map(([nome, d], i) => ({
-
-          name: nome,
-
-          value: d.valorTotal,
-
-          color: CORES_DONUT[i % CORES_DONUT.length],
-
-        }));
-
-        const donutCategoriasTotal = donutsCategorias.reduce((s, d) => s + d.value, 0);
-
-
-
-        const temFiltroMat = filtroStatusMaterial.length > 0 || filtroFamiliasMateriais.length > 0;
-
-
-
-        return (
-
-          <>
-
-            <PainelFiltros
-
-              icon="filter_list"
-
-              titulo="Filtros de Provisionamento"
-
-              acoes={
-
-                <button
-
-                  type="button"
-
-                  onClick={() => gerarRelatorioStockPDF(materiaisFiltrados, categorias, org)}
-
-                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-
-                >
-
-                  <Icon name="picture_as_pdf" className="text-sm" /> Exportar PDF
-
-                </button>
-
-              }
-
-            >
-
-              <FiltroChips
-
-                icon="info"
-
-                titulo="Estado do Material"
-
-                opcoes={STATUS_MATERIAL.map((o) => ({ ...o, count: contagemStatusMaterial[o.value] || 0 }))}
-
-                valor={filtroStatusMaterial}
-
-                onChange={setFiltroStatusMaterial}
-
-                limparLabel="Todos"
-
-              />
-
-              <MultiSelect
-
-                icon="folder_open"
-
-                value={filtroFamiliasMateriais}
-
-                onChange={setFiltroFamiliasMateriais}
-
-                options={opcoesFamiliasMateriais}
-
-                placeholder="Todas as famílias"
-
-              />
-
-              {temFiltroMat && (
-
-                <p className="text-[11px] text-muted-foreground">
-
-                  A mostrar <span className="text-foreground font-medium">{materiaisFiltrados.length}</span> de {materiais.length} materiais
-
-                  {filtroStatusMaterial.length > 0 && <> · Estados: <span className="text-foreground">{filtroStatusMaterial.join(", ")}</span></>}
-
-                  {filtroFamiliasMateriais.length > 0 && <> · Famílias: <span className="text-foreground">{filtroFamiliasMateriais.join(", ")}</span></>}
-
-                </p>
-
-              )}
-
-            </PainelFiltros>
-
-
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-
-              <KpiCard icon="inventory_2" label="Total Materiais" value={totalItens} />
-
-              <KpiCard icon="scale" label="Qtd. em Stock" value={totalQtd.toLocaleString("pt-AO")} />
-
-              <KpiCard icon="payments" label="Valor Estoque" value={`Kz ${totalValor.toLocaleString("pt-AO")}`} />
-
-              <KpiCard icon="warning" label="Críticos" value={`${criticos}`} />
-
-            </div>
-
-
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-
-              <Ledger rotulo="Resumo por categoria ledger" className="lg:col-span-2">
-
-                <div className="flex items-center justify-between gap-2 px-4 py-3">
+          <Bloco id="cli.qualidade" vista={vista}>
+            <Ledger rotulo="Qualidade cadastral ledger">
+              <LedgerHeader
+                titulo="Cadastros incompletos"
+                subtitulo={`${resumoClientes.incompletos.length} registos com campos essenciais em falta`}
+              />
+              <LedgerTable>
+                <thead>
+                  <tr className="border-b border-border">
+                    <LedgerTh>Cliente</LedgerTh>
+                    <LedgerTh>NIF</LedgerTh>
+                    <LedgerTh className="text-right">Campos em falta</LedgerTh>
+                    <LedgerTh>Contacto</LedgerTh>
+                  </tr>
+                </thead>
+                <tbody>
+                  {resumoClientes.incompletos.map((c) => {
+                    const falta = camposEmFalta(c);
+                    const semContacto = !String(c.pessoa_contacto || "").trim() && !String(c.pessoa_telefone || "").trim();
+                    return (
+                      <LedgerTr key={c.id || c.codigo}>
+                        <LedgerTd className="font-medium">{c.nome || "—"}</LedgerTd>
+                        <LedgerTd className="whitespace-nowrap font-mono text-xs text-muted-foreground">{c.nif || "—"}</LedgerTd>
+                        <LedgerTd className="text-right font-mono text-xs tabular-nums">{falta.length}</LedgerTd>
+                        <LedgerTd>
+                          {semContacto ? (
+                            <StatusBadge tom="warning">Sem pessoa de contacto</StatusBadge>
+                          ) : (
+                            <StatusBadge tom="success">OK</StatusBadge>
+                          )}
+                        </LedgerTd>
+                      </LedgerTr>
+                    );
+                  })}
+                </tbody>
+              </LedgerTable>
+              {resumoClientes.incompletos.length === 0 && (
+                <LedgerEmpty icone="task_alt">Todos os cadastros estão completos</LedgerEmpty>
+              )}
+            </Ledger>
+          </Bloco>
 
-                  <h2 className="truncate text-sm font-semibold text-foreground">Resumo por Categoria</h2>
-
-                  <button
-
-                    type="button"
-
-                    onClick={() => gerarRelatorioStockPDF(materiaisFiltrados, categorias, org)}
-
-                    className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-
-                  >
-
-                    <Icon name="picture_as_pdf" className="text-sm" />
-
-                    PDF
-
-                  </button>
-
-                </div>
-
-                <LedgerTable>
-
-                  <thead>
-
-                    <tr className="border-b border-border">
-
-                      <LedgerTh>Categoria</LedgerTh>
-
-                      <LedgerTh className="text-right">Itens</LedgerTh>
-
-                      <LedgerTh className="text-right">Qtd.</LedgerTh>
-
-                      <LedgerTh className="text-right">Disponível</LedgerTh>
-
-                      <LedgerTh className="hidden text-right sm:table-cell">Valor</LedgerTh>
-
-                    </tr>
-
-                  </thead>
-
-                  <tbody>
-
-                    {catSorted.map(([nome, d]) => {
-
-                      const famCfg = familias[d.familia];
-
-                      return (
-
-                        <LedgerTr key={nome}>
-
-                          <LedgerTd>
-
-                            <span className="flex items-center gap-2">
-
-                              {famCfg && <Icon name={famCfg.icon} className="text-sm text-muted-foreground" />}
-
-                              <span className="font-medium">{nome}</span>
-
-                            </span>
-
-                          </LedgerTd>
-
-                          <LedgerTd className="text-right font-mono text-xs tabular-nums">{d.itens}</LedgerTd>
-
-                          <LedgerTd className="text-right font-mono text-xs tabular-nums">{d.qtd.toLocaleString("pt-AO")}</LedgerTd>
-
-                          <LedgerTd className="text-right font-mono text-xs tabular-nums">{d.disponivel.toLocaleString("pt-AO")}</LedgerTd>
-
-                          <LedgerTd className="hidden text-right font-mono text-xs tabular-nums sm:table-cell">Kz {d.valorTotal.toLocaleString("pt-AO")}</LedgerTd>
-
-                        </LedgerTr>
-
-                      );
-
-                    })}
-
-                  </tbody>
-
-                  <tfoot>
-
-                    <tr className="border-t border-border font-medium">
-
-                      <LedgerTd className="text-xs">TOTAL</LedgerTd>
-
-                      <LedgerTd className="text-right font-mono text-xs tabular-nums">{totalItens}</LedgerTd>
-
-                      <LedgerTd className="text-right font-mono text-xs tabular-nums">{totalQtd.toLocaleString("pt-AO")}</LedgerTd>
-
-                      <LedgerTd className="text-right font-mono text-xs tabular-nums">{totalQtd.toLocaleString("pt-AO")}</LedgerTd>
-
-                      <LedgerTd className="hidden text-right font-mono text-xs tabular-nums sm:table-cell">Kz {totalValor.toLocaleString("pt-AO")}</LedgerTd>
-
-                    </tr>
-
-                  </tfoot>
-
-                </LedgerTable>
-
-              </Ledger>
-
-
-
-              <CartaoGrafico icon="pie_chart" titulo="Valor de Stock por Categoria" sub="Top 6 categorias por valor">
-
-                <DonutGrafico
-
-                  dados={donutsCategorias}
-
-                  centro={donutCategoriasTotal > 0 ? compactKz(donutCategoriasTotal) : "0"}
-
-                  tooltipFormat={(v) => fmtKz(v)}
-
-                />
-
-                <div className="mt-3 space-y-2">
-
-                  {donutsCategorias.map((d) => (
-
-                    <div key={d.name} className="flex items-center justify-between gap-2">
-
-                      <LinhaDonut cor={d.color} nome={d.name} valor="" />
-
-                      <span className="font-mono font-bold text-sm shrink-0">{compactKz(d.value)}</span>
-
-                    </div>
-
-                  ))}
-
-                </div>
-
-              </CartaoGrafico>
-
-            </div>
-
-
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-
-              <div className="rounded-xl border border-border bg-card p-4 text-center">
-
-                <p className="text-2xl font-semibold tabular-nums text-success">{materiaisFiltrados.filter((m) => m.status === "ok").length}</p>
-
-                <p className="mt-0.5 text-xs text-muted-foreground">Saudáveis</p>
-
-              </div>
-
-              <div className="rounded-xl border border-border bg-card p-4 text-center">
-
-                <p className="text-2xl font-semibold tabular-nums text-warning">{abaixoMin}</p>
-
-                <p className="mt-0.5 text-xs text-muted-foreground">Abaixo do Mínimo</p>
-
-              </div>
-
-              <div className="rounded-xl border border-border bg-card p-4 text-center">
-
-                <p className="text-2xl font-semibold tabular-nums text-error">{esgotados}</p>
-
-                <p className="mt-0.5 text-xs text-muted-foreground">Esgotados</p>
-
-              </div>
-
-            </div>
-
-
-
-            {criticos > 0 && (
-
-              <Ledger rotulo="Itens críticos ledger">
-
-                <LedgerHeader titulo="Itens Críticos" subtitulo={`${criticos} materiais em alerta`} />
-
-                <LedgerTable>
-
-                  <thead>
-
-                    <tr className="border-b border-border">
-
-                      <LedgerTh>Material</LedgerTh>
-
-                      <LedgerTh>Estado</LedgerTh>
-
-                      <LedgerTh className="text-right">Disponível</LedgerTh>
-
-                    </tr>
-
-                  </thead>
-
-                  <tbody>
-
-                    {materiaisFiltrados.filter((m) => m.status === "esgotado" || m.status === "repor").map((m) => {
-
-                      const esgotado = m.status === "esgotado";
-
-                      return (
-
-                        <LedgerTr key={m.id}>
-
-                          <LedgerTd>
-
-                            <span className="flex items-center gap-2">
-
-                              <Icon name={esgotado ? "error" : "warning"} className={`text-sm ${esgotado ? "text-error" : "text-warning"}`} />
-
-                              <span className="text-sm font-medium text-foreground">{m.nome}</span>
-
-                              <span className="text-xs text-muted-foreground">{m.categoria?.nome || ""}</span>
-
-                            </span>
-
-                          </LedgerTd>
-
-                          <LedgerTd>
-
-                            <StatusBadge tom={esgotado ? "error" : "warning"}>{esgotado ? "Esgotado" : "A repor"}</StatusBadge>
-
-                          </LedgerTd>
-
-                          <LedgerTd className="text-right font-mono text-xs tabular-nums text-foreground">
-
-                            {toNum(m.estoque_disponivel).toLocaleString("pt-AO")} / {toNum(m.ponto_ressuprimento || m.estoque_min).toLocaleString("pt-AO")} {m.unidade}
-
-                          </LedgerTd>
-
-                        </LedgerTr>
-
-                      );
-
-                    })}
-
-                  </tbody>
-
-                </LedgerTable>
-
-              </Ledger>
-
-            )}
-
-          </>
-
-        );
-
-      })()}
-
-
-
-      {aba === "stocks" && (() => {
-
-        const fams = new Map();
-
-        const grupos = new Map();
-
-        const resolverGrupo = (c) => tiposItem[normalizarTipoItem(c.tipo)]?.label || String(c.tipo || "").trim() || "Sem grupo";
-
-        categorias.forEach((c) => {
-
-          const fam = normalizarFamilia(c.familia);
-
-          const famCfg = familias[fam];
-
-          if (!fams.has(fam)) fams.set(fam, { value: fam, label: famCfg?.label || c.familia || fam });
-
-          const gLabel = resolverGrupo(c);
-
-          if (!grupos.has(gLabel)) grupos.set(gLabel, { value: gLabel, label: gLabel });
-
-        });
-
-        const opcoesFamilias = [...fams.values()].sort((a, b) => a.label.localeCompare(b.label, "pt"));
-
-        const opcoesGrupos = [...grupos.values()].sort((a, b) => a.label.localeCompare(b.label, "pt"));
-
-
-
-        const categoriasFiltradas = categorias.filter((c) => {
-
-          const famOk = filtroFamilias.length === 0 || filtroFamilias.includes(normalizarFamilia(c.familia));
-
-          const gruOk = filtroGrupos.length === 0 || filtroGrupos.includes(resolverGrupo(c));
-
-          return famOk && gruOk;
-
-        });
-
-
-
-        const catMap = {};
-
-        categoriasFiltradas.forEach((c) => {
-
-          const fam = normalizarFamilia(c.familia);
-
-          if (!catMap[fam]) catMap[fam] = [];
-
-          catMap[fam].push(c);
-
-        });
-
-
-
-        const idsCatsFiltradas = new Set(categoriasFiltradas.map((c) => String(c.id)));
-
-        const temFiltro = filtroFamilias.length > 0 || filtroGrupos.length > 0;
-
-        const itensRecursos = temFiltro
-
-          ? materiais.filter((m) => idsCatsFiltradas.has(String(m.categoria_id))).length
-
-          : materiais.length;
-
-
-
-        // ── Distribuições (Grupo / Família / Subfamília) ──
-
-        const porGrupo = {};
-
-        const porFamilia = {};
-
-        const porSubfamilia = {};
-
-
-
-        categoriasFiltradas.forEach((c) => {
-
-          const grupoLabel = resolverGrupo(c);
-
-          porGrupo[grupoLabel] = (porGrupo[grupoLabel] || 0) + 1;
-
-
-
-          const famCfg = familias[normalizarFamilia(c.familia)];
-
-          const famLabel = famCfg?.label || c.familia || "Sem família";
-
-          porFamilia[famLabel] = (porFamilia[famLabel] || 0) + 1;
-
-
-
-          const sub = String(c.subfamilia || "").trim() || "Sem subfamília";
-
-          porSubfamilia[sub] = (porSubfamilia[sub] || 0) + 1;
-
-        });
-
-
-
-        const ordenar = (obj) =>
-
-          Object.entries(obj)
-
-            .sort((a, b) => b[1] - a[1])
-
-            .map(([name, value], i) => ({
-
-              name,
-
-              value,
-
-              color: CORES_DONUT[i % CORES_DONUT.length],
-
-            }));
-
-
-
-        const listaGrupos = ordenar(porGrupo);
-
-        const listaFamilias = ordenar(porFamilia);
-
-        const listaSubfamilias = ordenar(porSubfamilia);
-
-
-
-        const totalGrupos = listaGrupos.reduce((s, d) => s + d.value, 0);
-
-        const totalFamilias = listaFamilias.reduce((s, d) => s + d.value, 0);
-
-        const totalSubfamilias = listaSubfamilias.reduce((s, d) => s + d.value, 0);
-
-
-
-        const labelDeFam = (k) => opcoesFamilias.find((o) => o.value === k)?.label || k;
-
-
-
-        return (
-
-          <>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-
-              <KpiCard icon="category" label="Categorias" value={categoriasFiltradas.length} />
-
-              <KpiCard icon="folder_open" label="Famílias" value={Object.keys(catMap).length} />
-
-              <KpiCard icon="sell" label="Subfamílias" value={listaSubfamilias.length} />
-
-              <KpiCard icon="inventory_2" label="Itens" value={itensRecursos} />
-
-            </div>
-
-
-
-            {/* ─────────── FILTROS (Grupo / Família — multi-seleção) ─────────── */}
-
-            <div className="rounded-xl border border-border bg-card p-4">
-
-              <div className="flex flex-wrap items-center gap-3">
-
-                <MultiSelect icon="category" value={filtroGrupos} onChange={setFiltroGrupos} options={opcoesGrupos} placeholder="Todos os grupos" />
-
-                <MultiSelect icon="folder" value={filtroFamilias} onChange={setFiltroFamilias} options={opcoesFamilias} placeholder="Todas as famílias" />
-
-                {temFiltro && (
-
-                  <button
-
-                    type="button"
-
-                    onClick={() => { setFiltroFamilias([]); setFiltroGrupos([]); }}
-
-                    className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-
-                  >
-
-                    <Icon name="close" className="text-sm text-primary" /> Limpar filtros
-
-                  </button>
-
-                )}
-
-              </div>
-
-              {temFiltro && (
-
-                <p className="mt-2.5 text-[11px] text-muted-foreground">
-
-                  A mostrar {categoriasFiltradas.length} de {categorias.length} categorias
-
-                  {filtroGrupos.length > 0 && <> · Grupos: <span className="text-foreground">{filtroGrupos.join(", ")}</span></>}
-
-                  {filtroFamilias.length > 0 && <> · Famílias: <span className="text-foreground">{filtroFamilias.map(labelDeFam).join(", ")}</span></>}
-
-                </p>
-
-              )}
-
-            </div>
-
-
-
-            {/* ─────────── 3 GRÁFICOS DISTINTOS (Grupo / Família / Subfamília) ─────────── */}
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
-
-              <CartaoGrafico icon="bar_chart" titulo="Grupo" sub="Categorias por grupo">
-
-                <div className="h-52">
-
-                  <ResponsiveContainer width="100%" height="100%">
-
-                    <BarChart data={listaGrupos} margin={{ top: 10, right: 10, left: -14, bottom: 0 }}>
-
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-
-                      <XAxis dataKey="name" tick={false} axisLine={false} height={8} />
-
-                      <YAxis tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} width={40} allowDecimals={false} />
-
-                      <Tooltip content={<ChartTooltip formato={(v) => `${v} categoria${v === 1 ? "" : "s"}`} />} cursor={{ fill: "var(--muted)" }} />
-
-                      <Bar dataKey="value" name="Categorias" radius={[6, 6, 0, 0]} maxBarSize={34}>
-
-                        {listaGrupos.map((d, i) => <Cell key={i} fill={d.color} />)}
-
-                      </Bar>
-
-                    </BarChart>
-
-                  </ResponsiveContainer>
-
-                </div>
-
-                <div className="mt-3 space-y-2 max-h-56 overflow-y-auto pr-1">
-
-                  {listaGrupos.map((d) => (
-
-                    <LinhaDonut key={d.name} cor={d.color} nome={d.name} valor={`${d.value} (${Math.round((d.value / (totalGrupos || 1)) * 100)}%)`} />
-
-                  ))}
-
-                </div>
-
-              </CartaoGrafico>
-
-
-
-              <CartaoGrafico icon="folder" titulo="Família" sub="Categorias por família">
-
-                <DonutGrafico dados={listaFamilias} centro={String(totalFamilias)} tooltipFormat={(v) => `${v} categoria${v === 1 ? "" : "s"}`} />
-
-                <div className="mt-3 space-y-2 max-h-56 overflow-y-auto pr-1">
-
-                  {listaFamilias.map((d) => (
-
-                    <LinhaDonut key={d.name} cor={d.color} nome={d.name} valor={`${d.value} (${Math.round((d.value / (totalFamilias || 1)) * 100)}%)`} />
-
-                  ))}
-
-                </div>
-
-              </CartaoGrafico>
-
-
-
-              <CartaoGrafico icon="sell" titulo="Subfamília" sub="Categorias por subfamília">
-
-                <div className="mt-3 space-y-3 pr-1 max-h-56 overflow-y-auto">
-
-                  {listaSubfamilias.map((d) => {
-
-                    const pct = Math.round((d.value / (totalSubfamilias || 1)) * 100);
-
-                    return (
-
-                      <div key={d.name}>
-
-                        <div className="flex items-center justify-between gap-2 mb-1">
-
-                          <span className="flex-1 min-w-0 text-sm text-foreground truncate">{d.name}</span>
-
-                          <span className="font-mono font-bold text-sm text-foreground shrink-0">{d.value} · {pct}%</span>
-
-                        </div>
-
-                        <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-
-                          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: d.color }} />
-
-                        </div>
-
-                      </div>
-
-                    );
-
-                  })}
-
-                </div>
-
-              </CartaoGrafico>
-
-            </div>
-
-
-
-            {/* Botão de exportação PDF do relatório de categorias */}
-
-            <div className="flex justify-end">
-
-              <button
-
-                type="button"
-
-                onClick={() => gerarRelatorioCategoriasPDF(categorias, materiais, org, { familias: filtroFamilias.map(labelDeFam), grupos: filtroGrupos })}
-
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-
-              >
-
-                <Icon name="picture_as_pdf" className="text-sm" /> Exportar
-
-              </button>
-
-            </div>
-
-          </>
-
-        );
-
-      })()}
-
-
-
-      {aba === "patrimonio" && (() => {
-
-        const totalValorBens = bens.reduce((s, b) => s + toNum(b.valor_aquisicao), 0);
-
-        const labelEstado = (e) => ESTADOS_BEM.find((s) => s.value === e)?.label || e || "—";
-
-        return (
-
-          <>
-
-            <PainelFiltros
-
-              icon="filter_list"
-
-              titulo="Filtros de Património"
-
-              acoes={
-
-                <button
-
-                  type="button"
-
-                  onClick={() => exportarRelatorioPDF({
-
-                    titulo: "Relatório de Bens",
-
-                    org,
-
-                    cabecalhos: ["Código", "Nome", "Categoria", "Estado", "Valor de Aquisição"],
-
-                    linhas: bens.map((b) => [b.codigo || "—", b.nome, b.categoria || "—", labelEstado(b.estado), fmtKz(b.valor_aquisicao)]),
-
-                    resumo: [`Total de bens: ${bens.length}`, `Valor patrimonial: ${fmtKz(totalValorBens)}`],
-
-                  })}
-
-                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-
-                >
-
-                  <Icon name="picture_as_pdf" className="text-sm" /> Exportar PDF
-
-                </button>
-
-              }
-
-            >
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-
-                <KpiCard icon="category" label="Total de bens" value={bens.length} />
-
-                <KpiCard icon="account_balance_wallet" label="Valor patrimonial" value={fmtKz(totalValorBens)} />
-
-                <KpiCard icon="verified" label="Em uso" value={bensPorEstado.ativo || 0} />
-
-                <KpiCard icon="build" label="Manutenção/avariados" value={(bensPorEstado.manutencao || 0) + (bensPorEstado.avariado || 0)} />
-
-              </div>
-
-            </PainelFiltros>
-
-
-
-            <Ledger rotulo="Bens ledger">
-
-              <LedgerHeader titulo="Bens patrimoniais" subtitulo={`${bens.length} bens registados`} />
-
-              <LedgerTable>
-
-                <thead>
-
-                  <tr className="border-b border-border">
-
-                    <LedgerTh>Código</LedgerTh>
-
-                    <LedgerTh>Nome</LedgerTh>
-
-                    <LedgerTh>Categoria</LedgerTh>
-
-                    <LedgerTh>Estado</LedgerTh>
-
-                    <LedgerTh>Valor de Aquisição</LedgerTh>
-
-                  </tr>
-
-                </thead>
-
-                <tbody>
-
-                  {bens.map((b) => (
-
-                    <LedgerTr key={b.id}>
-
-                      <LedgerTd className="font-mono text-xs whitespace-nowrap">{b.codigo || "—"}</LedgerTd>
-
-                      <LedgerTd>{b.nome}</LedgerTd>
-
-                      <LedgerTd className="whitespace-nowrap text-muted-foreground">{b.categoria || "—"}</LedgerTd>
-
-                      <LedgerTd>
-
-                        <StatusBadge>{labelEstado(b.estado)}</StatusBadge>
-
-                      </LedgerTd>
-
-                      <LedgerTd className="tabular-nums">{fmtKz(b.valor_aquisicao)}</LedgerTd>
-
-                    </LedgerTr>
-
-                  ))}
-
-                </tbody>
-
-              </LedgerTable>
-
-              {bens.length === 0 && <LedgerEmpty icone="category">Nenhum bem patrimonial registado</LedgerEmpty>}
-
-            </Ledger>
-
-          </>
-
-        );
-
-      })()}
-
-
-
-      {aba === "compras" && (() => {
-
-        const totalCompras = pedidos.reduce((s, p) => s + toNum(p.total), 0);
-
-        const labelEstado = (e) => ESTADOS_PEDIDO.find((s) => s.value === e)?.label || e || "—";
-
-        return (
-
-          <>
-
-            <PainelFiltros
-
-              icon="filter_list"
-
-              titulo="Filtros de Compras"
-
-              acoes={
-
-                <button
-
-                  type="button"
-
-                  onClick={() => exportarRelatorioPDF({
-
-                    titulo: "Relatório de Compras",
-
-                    org,
-
-                    cabecalhos: ["Número", "Fornecedor", "Estado", "Data", "Total"],
-
-                    linhas: pedidos.map((p) => [p.numero || `#${p.id}`, p.fornecedor_nome || "—", labelEstado(p.estado), p.data_pedido ? new Date(p.data_pedido).toLocaleDateString("pt-AO") : "—", fmtKz(p.total)]),
-
-                    resumo: [`Total de pedidos: ${pedidos.length}`, `Valor de compras: ${fmtKz(totalCompras)}`],
-
-                  })}
-
-                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-
-                >
-
-                  <Icon name="picture_as_pdf" className="text-sm" /> Exportar PDF
-
-                </button>
-
-              }
-
-            >
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-
-                <KpiCard icon="add_shopping_cart" label="Pedidos" value={pedidos.length} />
-
-                <KpiCard icon="payments" label="Valor de compras" value={fmtKz(totalCompras)} />
-
-                <KpiCard icon="schedule" label="Pendentes" value={pedidosPorEstado.pendente || 0} />
-
-                <KpiCard icon="inventory_2" label="Recebidos" value={pedidosPorEstado.recebido || 0} />
-
-              </div>
-
-            </PainelFiltros>
-
-
-
-            <Ledger rotulo="Pedidos ledger">
-
-              <LedgerHeader titulo="Pedidos de compra" subtitulo={`${pedidos.length} pedidos registados`} />
-
-              <LedgerTable>
-
-                <thead>
-
-                  <tr className="border-b border-border">
-
-                    <LedgerTh>Número</LedgerTh>
-
-                    <LedgerTh>Fornecedor</LedgerTh>
-
-                    <LedgerTh>Estado</LedgerTh>
-
-                    <LedgerTh>Data</LedgerTh>
-
-                    <LedgerTh>Total</LedgerTh>
-
-                  </tr>
-
-                </thead>
-
-                <tbody>
-
-                  {pedidos.map((p) => (
-
-                    <LedgerTr key={p.id}>
-
-                      <LedgerTd className="font-mono text-xs whitespace-nowrap">{p.numero || `#${p.id}`}</LedgerTd>
-
-                      <LedgerTd>{p.fornecedor_nome || "—"}</LedgerTd>
-
-                      <LedgerTd>
-
-                        <StatusBadge>{labelEstado(p.estado)}</StatusBadge>
-
-                      </LedgerTd>
-
-                      <LedgerTd className="whitespace-nowrap text-muted-foreground">{p.data_pedido ? new Date(p.data_pedido).toLocaleDateString("pt-AO") : "—"}</LedgerTd>
-
-                      <LedgerTd className="tabular-nums">{fmtKz(p.total)}</LedgerTd>
-
-                    </LedgerTr>
-
-                  ))}
-
-                </tbody>
-
-              </LedgerTable>
-
-              {pedidos.length === 0 && <LedgerEmpty icone="add_shopping_cart">Nenhum pedido de compra registado</LedgerEmpty>}
-
-            </Ledger>
-
-          </>
-
-        );
-
-      })()}
-
-
-
-      {aba === "rh" && (() => {
-
-        return (
-
-          <>
-
-            <PainelFiltros
-
-              icon="filter_list"
-
-              titulo="Filtros de Recursos Humanos"
-
-              acoes={
-
-                <button
-
-                  type="button"
-
-                  onClick={() => exportarRelatorioPDF({
-
-                    titulo: "Relatório de Recursos Humanos",
-
-                    org,
-
-                    cabecalhos: ["Nome", "Email", "Perfil", "Função", "Estado"],
-
-                    linhas: usuarios.map((u) => [u.nome || "—", u.email || "—", u.perfil || "—", u.funcao || "—", u.ativo === false ? "Inativo" : "Ativo"]),
-
-                    resumo: [`Total de utilizadores: ${usuarios.length}`, `Ativos: ${usuariosAtivos}`, `Inativos: ${usuariosInativos}`],
-
-                  })}
-
-                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-
-                >
-
-                  <Icon name="picture_as_pdf" className="text-sm" /> Exportar PDF
-
-                </button>
-
-              }
-
-            >
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-
-                <KpiCard icon="groups" label="Utilizadores" value={usuarios.length} />
-
-                <KpiCard icon="verified" label="Ativos" value={usuariosAtivos} />
-
-                <KpiCard icon="block" label="Inativos" value={usuariosInativos} />
-
-                <KpiCard icon="badge" label="Perfis" value={usuariosPorPerfil.length} />
-
-              </div>
-
-            </PainelFiltros>
-
-
-
-            <Ledger rotulo="Utilizadores ledger">
-
-              <LedgerHeader titulo="Utilizadores" subtitulo={`${usuarios.length} utilizadores registados`} />
-
-              <LedgerTable>
-
-                <thead>
-
-                  <tr className="border-b border-border">
-
-                    <LedgerTh>Nome</LedgerTh>
-
-                    <LedgerTh>Email</LedgerTh>
-
-                    <LedgerTh>Perfil</LedgerTh>
-
-                    <LedgerTh>Função</LedgerTh>
-
-                    <LedgerTh>Estado</LedgerTh>
-
-                  </tr>
-
-                </thead>
-
-                <tbody>
-
-                  {usuarios.map((u) => (
-
-                    <LedgerTr key={u.id}>
-
-                      <LedgerTd>{u.nome || "—"}</LedgerTd>
-
-                      <LedgerTd className="text-muted-foreground">{u.email || "—"}</LedgerTd>
-
-                      <LedgerTd>{u.perfil || "—"}</LedgerTd>
-
-                      <LedgerTd className="text-muted-foreground">{u.funcao || "—"}</LedgerTd>
-
-                      <LedgerTd>
-
-                        <StatusBadge tom={u.ativo === false ? "neutral" : "success"}>{u.ativo === false ? "Inativo" : "Ativo"}</StatusBadge>
-
-                      </LedgerTd>
-
-                    </LedgerTr>
-
-                  ))}
-
-                </tbody>
-
-              </LedgerTable>
-
-              {usuarios.length === 0 && <LedgerEmpty icone="groups">Nenhum utilizador registado</LedgerEmpty>}
-
-            </Ledger>
-
-          </>
-
-        );
-
-      })()}
-
-
-
-      <Modal
-
-        open={!!relatorioVer}
-
-        onClose={() => setRelatorioVer(null)}
-
-        title={relatorioVer?.titulo || "Relatório"}
-
-        icon={relatorioVer?.icon || "description"}
-
-        size="lg"
-
-      >
-
-        {relatorioVer && (
-
-          <div className="space-y-3">
-
-            <p className="text-xs text-muted-foreground">{relatorioVer.sub}</p>
-
-            <p className="text-lg font-semibold tracking-tight text-foreground tabular-nums">{relatorioVer.totalTexto}</p>
-
-            <LedgerTable>
-
-              <thead>
-
-                <tr className="border-b border-border">
-
-                  {relatorioVer.colunas.map((c, i) => (
-
-                    <LedgerTh key={c} className={i > 0 ? "text-right" : ""}>{c}</LedgerTh>
-
-                  ))}
-
-                </tr>
-
-              </thead>
-
-              <tbody>
-
-                {relatorioVer.linhas.map((linha, i) => (
-
-                  <LedgerTr key={i}>
-
-                    {linha.map((celula, j) => (
-
-                      <LedgerTd key={j} className={j > 0 ? "text-right tabular-nums" : ""}>{celula}</LedgerTd>
-
-                    ))}
-
-                  </LedgerTr>
-
-                ))}
-
-              </tbody>
-
-            </LedgerTable>
-
-            {relatorioVer.linhas.length === 0 && (
-
-              <LedgerEmpty icone="bar_chart">Sem dados para apresentar</LedgerEmpty>
-
-            )}
-
-          </div>
-
-        )}
-
-      </Modal>
-
-    </div>
-
-  );
-
+          <Bloco id="cli.detalhado" vista={vista}>
+            <RelatorioClientes clientes={clientes} org={org} />
+          </Bloco>
+        </>
+      )}
+
+      {!loading && !error && aba === "producao" && (() => {
+        const statusCores = { aguardando: "var(--data-3)", em_producao: "var(--data-1)", finalizado: "var(--data-5)", entregue: "var(--data-6)" };
+        const totalOrdens = opsPorStatus.reduce((t, x) => t + x.quantidade, 0) || 1;
+        const donutsStatus = opsPorStatus.map((s) => ({ name: s.label, value: s.quantidade, color: statusCores[s.status] }));
+        const desempenho = ultimosMeses.map((m) => ({
+          label: m.label,
+          valor: producaoPorMes[m.chave]?.produzidas || 0,
+          entregues: producaoPorMes[m.chave]?.entregues || 0,
+        }));
+
+        return (
+          <>
+            <Bloco id="prod.kpis" vista={vista}>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {opsPorStatus.map((s) => (
+                  <div key={s.status} className="rounded-xl border border-border bg-card p-4 text-center">
+                    <p className="text-2xl font-semibold tabular-nums text-foreground">{s.quantidade}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+            </Bloco>
+
+            <Bloco id="prod.distribuicao" vista={vista}>
+              <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2">
+                <CartaoGrafico icon="pie_chart" titulo="Ordens por estado" sub="Distribuição das ordens de produção">
+                  <DonutGrafico dados={donutsStatus} centro={String(ordens.length)} tooltipFormat={(v) => `${v} ordens`} />
+                  <div className="mt-3 space-y-2">
+                    {donutsStatus.map((d) => (
+                      <LinhaDonut
+                        key={d.name}
+                        cor={d.color}
+                        nome={d.name}
+                        valor={`${d.value} (${Math.round((d.value / totalOrdens) * 100)}%)`}
+                      />
+                    ))}
+                  </div>
+                </CartaoGrafico>
+
+                <CartaoGrafico icon="stacked_bar_chart" titulo="Progresso por estado" sub="Percentagem do total de ordens">
+                  <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
+                    {opsPorStatus.map((s) => {
+                      const pct = (s.quantidade / totalOrdens) * 100;
+                      return pct > 0 ? (
+                        <div key={s.status} className="h-full" style={{ width: `${pct}%`, background: statusCores[s.status] }} />
+                      ) : null;
+                    })}
+                  </div>
+                  <div className="mt-4 space-y-2.5">
+                    {opsPorStatus.map((s) => (
+                      <div key={s.status} className="flex items-center gap-2 text-xs">
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ background: statusCores[s.status] }} />
+                        <span className="flex-1 text-muted-foreground">{s.label}</span>
+                        <span className="font-medium tabular-nums text-foreground">
+                          {Math.round((s.quantidade / totalOrdens) * 100)}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </CartaoGrafico>
+              </div>
+            </Bloco>
+
+            <Bloco id="prod.desempenho" vista={vista}>
+              <CartaoGrafico icon="show_chart" titulo="Desempenho por período" sub="Ordens produzidas e entregues">
+                <div className="h-52">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={desempenho} margin={{ top: 10, right: 10, left: -14, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="grad-produzidas" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="var(--data-1)" stopOpacity={0.35} />
+                          <stop offset="100%" stopColor="var(--data-1)" stopOpacity={0.02} />
+                        </linearGradient>
+                        <linearGradient id="grad-entregues" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="var(--data-5)" stopOpacity={0.3} />
+                          <stop offset="100%" stopColor="var(--data-5)" stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                      <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} dy={4} />
+                      <YAxis tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} width={40} allowDecimals={false} />
+                      <Tooltip content={<ChartTooltip />} />
+                      <Area type="monotone" dataKey="valor" name="Produzidas" stroke="var(--data-1)" strokeWidth={2.5} fill="url(#grad-produzidas)" activeDot={{ r: 4 }} />
+                      <Area type="monotone" dataKey="entregues" name="Entregues" stroke="var(--data-5)" strokeWidth={2.5} fill="url(#grad-entregues)" activeDot={{ r: 4 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </CartaoGrafico>
+            </Bloco>
+
+            <Bloco id="prod.relatorio" vista={vista}>
+              <CardRelatorioModulo relatorio={relatorioAtivo} onVer={setRelatorioVer} />
+            </Bloco>
+          </>
+        );
+      })()}
+
+      {!loading && !error && aba === "stocks" && subAbas.stocks === "materiais" && (() => {
+        const catMap = {};
+        materiaisFiltrados.forEach((m) => {
+          const cat = m.categoria?.nome || "Sem categoria";
+          const fam = normalizarFamilia(m.categoria?.familia);
+          if (!catMap[cat]) catMap[cat] = { qtd: 0, valorTotal: 0, disponivel: 0, itens: 0, familia: fam };
+          catMap[cat].itens += 1;
+          catMap[cat].qtd += toNum(m.quantidade);
+          catMap[cat].disponivel += toNum(m.estoque_disponivel);
+          catMap[cat].valorTotal += toNum(m.quantidade) * toNum(m.custo_unit);
+        });
+        const catSorted = Object.entries(catMap).sort((a, b) => b[1].valorTotal - a[1].valorTotal);
+        const totalItens = materiaisFiltrados.length;
+        const totalQtd = materiaisFiltrados.reduce((s, m) => s + toNum(m.quantidade), 0);
+        const totalValor = materiaisFiltrados.reduce((s, m) => s + toNum(m.quantidade) * toNum(m.custo_unit), 0);
+        const esgotados = materiaisFiltrados.filter((m) => m.status === "esgotado").length;
+        const abaixoMin = materiaisFiltrados.filter((m) => m.status === "repor").length;
+        const criticos = esgotados + abaixoMin;
+        const donutsCategorias = catSorted.slice(0, 6).map(([nome, d], i) => ({
+          name: nome,
+          value: d.valorTotal,
+          color: CORES_DONUT[i % CORES_DONUT.length],
+        }));
+        const totalCategorias = donutsCategorias.reduce((s, d) => s + d.value, 0);
+
+        return (
+          <>
+            <Bloco id="mat.kpis" vista={vista}>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <KpiCard icon="inventory_2" label="Total de materiais" value={totalItens} />
+                <KpiCard icon="scale" label="Quantidade em stock" value={totalQtd.toLocaleString("pt-AO")} />
+                <KpiCard icon="payments" label="Valor do stock" value={fmtKz(totalValor)} />
+                <KpiCard icon="warning" label="Críticos" value={criticos} />
+              </div>
+            </Bloco>
+
+            <Bloco id="mat.valor" vista={vista}>
+              <CartaoGrafico icon="pie_chart" titulo="Valor por categoria" sub="As 6 categorias com maior valor em stock">
+                {donutsCategorias.length === 0 ? (
+                  <p className="py-10 text-center text-sm text-muted-foreground">Sem materiais para apresentar.</p>
+                ) : (
+                  <div className="grid grid-cols-1 items-center gap-4 lg:grid-cols-2">
+                    <DonutGrafico dados={donutsCategorias} centro={compactKz(totalCategorias)} tooltipFormat={(v) => fmtKz(v)} />
+                    <div className="space-y-2">
+                      {donutsCategorias.map((d) => (
+                        <LinhaDonut key={d.name} cor={d.color} nome={d.name} valor={fmtKz(d.value)} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CartaoGrafico>
+            </Bloco>
+
+            <Bloco id="mat.criticos" vista={vista}>
+              <Ledger rotulo="Itens críticos ledger">
+                <LedgerHeader titulo="Itens críticos" subtitulo={`${criticos} materiais em alerta`} />
+                <LedgerTable>
+                  <thead>
+                    <tr className="border-b border-border">
+                      <LedgerTh>Material</LedgerTh>
+                      <LedgerTh>Estado</LedgerTh>
+                      <LedgerTh className="text-right">Disponível</LedgerTh>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {materiaisFiltrados
+                      .filter((m) => m.status === "esgotado" || m.status === "repor")
+                      .map((m) => {
+                        const esgotado = m.status === "esgotado";
+                        return (
+                          <LedgerTr key={m.id}>
+                            <LedgerTd>
+                              <span className="flex items-center gap-2">
+                                <Icon name={esgotado ? "error" : "warning"} className={`text-sm ${esgotado ? "text-error" : "text-warning"}`} />
+                                <span className="text-sm font-medium text-foreground">{m.nome}</span>
+                                <span className="text-xs text-muted-foreground">{m.categoria?.nome || ""}</span>
+                              </span>
+                            </LedgerTd>
+                            <LedgerTd>
+                              <StatusBadge tom={esgotado ? "error" : "warning"}>{esgotado ? "Esgotado" : "A repor"}</StatusBadge>
+                            </LedgerTd>
+                            <LedgerTd className="text-right font-mono text-xs tabular-nums text-foreground">
+                              {toNum(m.estoque_disponivel).toLocaleString("pt-AO")} /{" "}
+                              {toNum(m.ponto_ressuprimento || m.estoque_min).toLocaleString("pt-AO")} {m.unidade}
+                            </LedgerTd>
+                          </LedgerTr>
+                        );
+                      })}
+                  </tbody>
+                </LedgerTable>
+                {criticos === 0 && <LedgerEmpty icone="check_circle">Nenhum material crítico</LedgerEmpty>}
+              </Ledger>
+            </Bloco>
+
+            <Bloco id="mat.relatorio" vista={vista}>
+              <CardRelatorioModulo relatorio={relatorioAtivo} onVer={setRelatorioVer} />
+            </Bloco>
+          </>
+        );
+      })()}
+
+      {!loading && !error && aba === "stocks" && subAbas.stocks === "catalogo" && (() => {
+        const catMap = {};
+        categoriasFiltradas.forEach((c) => {
+          const fam = normalizarFamilia(c.familia);
+          if (!catMap[fam]) catMap[fam] = [];
+          catMap[fam].push(c);
+        });
+
+        const idsCats = new Set(categoriasFiltradas.map((c) => String(c.id)));
+        const temFiltro = filtroFamilias.length > 0 || filtroGrupos.length > 0;
+        const itensRecursos = temFiltro ? materiais.filter((m) => idsCats.has(String(m.categoria_id))).length : materiais.length;
+
+        const porGrupo = {};
+        const porFamilia = {};
+        const porSubfamilia = {};
+        categoriasFiltradas.forEach((c) => {
+          const grupoLabel = resolverGrupoCatalogo(c);
+          porGrupo[grupoLabel] = (porGrupo[grupoLabel] || 0) + 1;
+          const famLabel = familias[normalizarFamilia(c.familia)]?.label || c.familia || "Sem família";
+          porFamilia[famLabel] = (porFamilia[famLabel] || 0) + 1;
+          const sub = String(c.subfamilia || "").trim() || "Sem subfamília";
+          porSubfamilia[sub] = (porSubfamilia[sub] || 0) + 1;
+        });
+
+        const ordenar = (obj) =>
+          Object.entries(obj)
+            .sort((a, b) => b[1] - a[1])
+            .map(([name, value], i) => ({ name, value, color: CORES_DONUT[i % CORES_DONUT.length] }));
+
+        const listaGrupos = ordenar(porGrupo);
+        const listaFamilias = ordenar(porFamilia);
+        const listaSubfamilias = ordenar(porSubfamilia);
+        const totalGrupos = listaGrupos.reduce((s, d) => s + d.value, 0);
+        const totalFamilias = listaFamilias.reduce((s, d) => s + d.value, 0);
+        const totalSubfamilias = listaSubfamilias.reduce((s, d) => s + d.value, 0);
+
+        return (
+          <>
+            <Bloco id="cat.kpis" vista={vista}>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <KpiCard icon="category" label="Categorias" value={categoriasFiltradas.length} />
+                <KpiCard icon="folder_open" label="Famílias" value={Object.keys(catMap).length} />
+                <KpiCard icon="sell" label="Subfamílias" value={listaSubfamilias.length} />
+                <KpiCard icon="inventory_2" label="Itens" value={itensRecursos} />
+              </div>
+            </Bloco>
+
+            <Bloco id="cat.distribuicoes" vista={vista}>
+              <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
+                <CartaoGrafico icon="bar_chart" titulo="Grupo" sub="Categorias por grupo">
+                  <div className="h-52">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={listaGrupos} margin={{ top: 10, right: 10, left: -14, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                        <XAxis dataKey="name" tick={false} axisLine={false} height={8} />
+                        <YAxis tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} width={40} allowDecimals={false} />
+                        <Tooltip content={<ChartTooltip formato={(v) => `${v} categoria${v === 1 ? "" : "s"}`} />} cursor={{ fill: "var(--muted)" }} />
+                        <Bar dataKey="value" name="Categorias" radius={[6, 6, 0, 0]} maxBarSize={34}>
+                          {listaGrupos.map((d, i) => (
+                            <Cell key={i} fill={d.color} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="custom-scrollbar mt-3 max-h-56 space-y-2 overflow-y-auto pr-1">
+                    {listaGrupos.map((d) => (
+                      <LinhaDonut
+                        key={d.name}
+                        cor={d.color}
+                        nome={d.name}
+                        valor={`${d.value} (${Math.round((d.value / (totalGrupos || 1)) * 100)}%)`}
+                      />
+                    ))}
+                  </div>
+                </CartaoGrafico>
+
+                <CartaoGrafico icon="folder" titulo="Família" sub="Categorias por família">
+                  <DonutGrafico dados={listaFamilias} centro={String(totalFamilias)} tooltipFormat={(v) => `${v} categoria${v === 1 ? "" : "s"}`} />
+                  <div className="custom-scrollbar mt-3 max-h-56 space-y-2 overflow-y-auto pr-1">
+                    {listaFamilias.map((d) => (
+                      <LinhaDonut
+                        key={d.name}
+                        cor={d.color}
+                        nome={d.name}
+                        valor={`${d.value} (${Math.round((d.value / (totalFamilias || 1)) * 100)}%)`}
+                      />
+                    ))}
+                  </div>
+                </CartaoGrafico>
+
+                <CartaoGrafico icon="sell" titulo="Subfamília" sub="Categorias por subfamília">
+                  <div className="custom-scrollbar mt-1 max-h-56 space-y-3 overflow-y-auto pr-1">
+                    {listaSubfamilias.map((d) => {
+                      const pct = Math.round((d.value / (totalSubfamilias || 1)) * 100);
+                      return (
+                        <div key={d.name}>
+                          <div className="mb-1 flex items-center justify-between gap-2">
+                            <span className="min-w-0 flex-1 truncate text-sm text-foreground">{d.name}</span>
+                            <span className="shrink-0 font-mono text-sm font-bold text-foreground">
+                              {d.value} · {pct}%
+                            </span>
+                          </div>
+                          <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                            <div className="h-full rounded-full" style={{ width: `${pct}%`, background: d.color }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CartaoGrafico>
+              </div>
+            </Bloco>
+
+            <Bloco id="cat.relatorio" vista={vista}>
+              <CardRelatorioModulo relatorio={relatorioAtivo} onVer={setRelatorioVer} />
+            </Bloco>
+          </>
+        );
+      })()}
+
+      {!loading && !error && aba === "compras" && (() => {
+        const totalCompras = pedidosPeriodo.reduce((s, p) => s + toNum(p.total), 0);
+        const labelEstado = (e) => rotuloDe(ESTADOS_PEDIDO, e);
+        const donutEstados = ESTADOS_PEDIDO.map((e) => ({ name: e.label, value: pedidosPorEstado[e.value] || 0, color: e.cor }));
+        const totalPedidos = donutEstados.reduce((s, d) => s + d.value, 0);
+
+        return (
+          <>
+            <Bloco id="comp.kpis" vista={vista}>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <KpiCard icon="add_shopping_cart" label="Pedidos" value={pedidosPeriodo.length} />
+                <KpiCard icon="payments" label="Valor de compras" value={fmtKz(totalCompras)} />
+                <KpiCard icon="schedule" label="Pendentes" value={pedidosPorEstado.pendente || 0} />
+                <KpiCard icon="inventory_2" label="Recebidos" value={pedidosPorEstado.recebido || 0} />
+              </div>
+            </Bloco>
+
+            <Bloco id="comp.meses" vista={vista}>
+              <CartaoGrafico icon="show_chart" titulo="Compras por mês" sub="Valor total de pedidos no período">
+                <div className="h-52">
+                  <AreaGrafico dados={comprasPorMes} serie="compras" nome="Compras" cor="var(--data-3)" formato={compactKz} />
+                </div>
+              </CartaoGrafico>
+            </Bloco>
+
+            <Bloco id="comp.estado" vista={vista}>
+              <CartaoGrafico icon="pie_chart" titulo="Pedidos por estado" sub="Distribuição dos pedidos de compra">
+                <div className="grid grid-cols-1 items-center gap-4 lg:grid-cols-2">
+                  <DonutGrafico dados={donutEstados} centro={String(totalPedidos)} tooltipFormat={(v) => `${v} pedidos`} />
+                  <div className="space-y-2">
+                    {donutEstados.map((d) => (
+                      <LinhaDonut key={d.name} cor={d.color} nome={d.name} valor={String(d.value)} />
+                    ))}
+                  </div>
+                </div>
+              </CartaoGrafico>
+            </Bloco>
+
+            <Bloco id="comp.tabela" vista={vista}>
+              <Ledger rotulo="Pedidos ledger">
+                <LedgerHeader titulo="Pedidos de compra" subtitulo={`${pedidosPeriodo.length} pedidos no período selecionado`} />
+                <LedgerTable>
+                  <thead>
+                    <tr className="border-b border-border">
+                      <LedgerTh>Número</LedgerTh>
+                      <LedgerTh>Fornecedor</LedgerTh>
+                      <LedgerTh>Estado</LedgerTh>
+                      <LedgerTh>Data</LedgerTh>
+                      <LedgerTh>Total</LedgerTh>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pedidosPeriodo.map((p) => (
+                      <LedgerTr key={p.id}>
+                        <LedgerTd className="whitespace-nowrap font-mono text-xs">{p.numero || `#${p.id}`}</LedgerTd>
+                        <LedgerTd>{p.fornecedor_nome || "—"}</LedgerTd>
+                        <LedgerTd>
+                          <StatusBadge>{labelEstado(p.estado)}</StatusBadge>
+                        </LedgerTd>
+                        <LedgerTd className="whitespace-nowrap text-muted-foreground">
+                          {p.data_pedido ? new Date(p.data_pedido).toLocaleDateString("pt-AO") : "—"}
+                        </LedgerTd>
+                        <LedgerTd className="tabular-nums">{fmtKz(p.total)}</LedgerTd>
+                      </LedgerTr>
+                    ))}
+                  </tbody>
+                </LedgerTable>
+                {pedidosPeriodo.length === 0 && <LedgerEmpty icone="add_shopping_cart">Nenhum pedido de compra no período selecionado</LedgerEmpty>}
+              </Ledger>
+            </Bloco>
+
+            <Bloco id="comp.relatorio" vista={vista}>
+              <CardRelatorioModulo relatorio={relatorioAtivo} onVer={setRelatorioVer} />
+            </Bloco>
+          </>
+        );
+      })()}
+
+      {!loading && !error && aba === "financeiro" && (() => {
+        const totalFaturado = vendasPorMes.reduce((s, v) => s + v.valor, 0);
+        const totalRecebido = recebidoPorMes.reduce((s, v) => s + v.valor, 0);
+        const aReceber = faturasFiltradas
+          .filter((f) => !["paga", "cancelada"].includes(f.estado))
+          .reduce((s, f) => s + (Number(f.total || f.valor) || 0), 0);
+        const fluxo = ultimosMeses.map((m, i) => ({
+          label: m.label,
+          faturado: vendasPorMes[i]?.valor || 0,
+          recebido: recebidoPorMes[i]?.valor || 0,
+        }));
+        const estados = ESTADOS_FATURA.map((e) => ({
+          name: e.label,
+          value: faturasFiltradas.filter((f) => f.estado === e.value).length,
+          color: e.cor,
+        }));
+        const despesas = tesourariaPorMes.map((m) => ({ label: m.label, valor: m.saidas }));
+
+        return (
+          <>
+            <Bloco id="fin.kpis" vista={vista}>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <KpiCard icon="receipt_long" label="Faturado" value={fmtKz(totalFaturado)} />
+                <KpiCard icon="payments" label="Recebido" value={fmtKz(totalRecebido)} />
+                <KpiCard icon="paid" label="A receber" value={fmtKz(aReceber)} />
+                <KpiCard icon="description" label="Documentos" value={faturasFiltradas.length} />
+              </div>
+            </Bloco>
+
+            <Bloco id="fin.fluxo" vista={vista}>
+              <CartaoGrafico icon="account_balance" titulo="Faturação e recebimentos" sub="Valores por período">
+                <div className="h-52">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={fluxo} margin={{ top: 10, right: 10, left: -14, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="grad-fin-fat" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="var(--data-1)" stopOpacity={0.3} />
+                          <stop offset="100%" stopColor="var(--data-1)" stopOpacity={0.02} />
+                        </linearGradient>
+                        <linearGradient id="grad-fin-rec" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="var(--data-5)" stopOpacity={0.3} />
+                          <stop offset="100%" stopColor="var(--data-5)" stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                      <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} dy={4} />
+                      <YAxis tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} width={48} tickFormatter={compactKz} allowDecimals={false} />
+                      <Tooltip content={<ChartTooltip formato={fmtKz} />} />
+                      <Area type="monotone" dataKey="faturado" name="Faturado" stroke="var(--data-1)" strokeWidth={2.5} fill="url(#grad-fin-fat)" activeDot={{ r: 4 }} />
+                      <Area type="monotone" dataKey="recebido" name="Recebido" stroke="var(--data-5)" strokeWidth={2.5} fill="url(#grad-fin-rec)" activeDot={{ r: 4 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </CartaoGrafico>
+            </Bloco>
+
+            <Bloco id="fin.estado" vista={vista}>
+              <CartaoGrafico icon="pie_chart" titulo="Documentos por estado" sub="Situação dos documentos emitidos">
+                <div className="grid grid-cols-1 items-center gap-4 lg:grid-cols-2">
+                  <DonutGrafico dados={estados} centro={String(faturasFiltradas.length)} tooltipFormat={(v) => `${v} documentos`} />
+                  <div className="space-y-2">
+                    {estados.map((d) => (
+                      <LinhaDonut key={d.name} cor={d.color} nome={d.name} valor={String(d.value)} />
+                    ))}
+                  </div>
+                </div>
+              </CartaoGrafico>
+            </Bloco>
+
+            <Bloco id="fin.despesas" vista={vista}>
+              <CartaoGrafico icon="trending_down" titulo="Despesas da tesouraria" sub="Saídas registadas por período">
+                <div className="h-52">
+                  <AreaGrafico dados={despesas} serie="despesas" nome="Saídas" cor="var(--data-2)" formato={compactKz} />
+                </div>
+              </CartaoGrafico>
+            </Bloco>
+
+            <Bloco id="fin.tabela" vista={vista}>
+              <Ledger rotulo="Resumo mensal ledger">
+                <LedgerHeader titulo="Resumo mensal" subtitulo="Faturado, recebido e saídas por período" />
+                <LedgerTable>
+                  <thead>
+                    <tr className="border-b border-border">
+                      <LedgerTh>Período</LedgerTh>
+                      <LedgerTh className="text-right">Faturado</LedgerTh>
+                      <LedgerTh className="text-right">Recebido</LedgerTh>
+                      <LedgerTh className="text-right">Saídas</LedgerTh>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ultimosMeses.map((m, i) => (
+                      <LedgerTr key={m.chave}>
+                        <LedgerTd className="font-medium">{m.label}</LedgerTd>
+                        <LedgerTd className="text-right tabular-nums">{fmtKz(vendasPorMes[i]?.valor || 0)}</LedgerTd>
+                        <LedgerTd className="text-right tabular-nums">{fmtKz(recebidoPorMes[i]?.valor || 0)}</LedgerTd>
+                        <LedgerTd className="text-right tabular-nums">{fmtKz(tesourariaPorMes[i]?.saidas || 0)}</LedgerTd>
+                      </LedgerTr>
+                    ))}
+                  </tbody>
+                </LedgerTable>
+              </Ledger>
+            </Bloco>
+
+            <Bloco id="fin.relatorio" vista={vista}>
+              <CardRelatorioModulo relatorio={relatorioAtivo} onVer={setRelatorioVer} />
+            </Bloco>
+          </>
+        );
+      })()}
+
+      {!loading && !error && aba === "tesouraria" && (() => {
+        const movs = movimentosPeriodo;
+        const totalEntradas = tesourariaPorMes.reduce((s, m) => s + m.entradas, 0);
+        const totalSaidas = tesourariaPorMes.reduce((s, m) => s + m.saidas, 0);
+        const saldoTotal = contasTesouraria.reduce((s, c) => s + (Number(c.saldo_atual) || 0), 0);
+        const fluxo = ultimosMeses.map((m, i) => ({
+          label: m.label,
+          entradas: tesourariaPorMes[i]?.entradas || 0,
+          saidas: tesourariaPorMes[i]?.saidas || 0,
+        }));
+        const contas = contasTesouraria
+          .map((c) => ({ nome: c.nome || `Conta #${c.id}`, saldo: Number(c.saldo_atual) || 0 }))
+          .sort((a, b) => b.saldo - a.saldo);
+        const maxSaldo = Math.max(...contas.map((c) => Math.abs(c.saldo)), 1);
+
+        return (
+          <>
+            {!tesouraria ? (
+              <div className="rounded-xl border border-border bg-card p-8 text-center">
+                <p className="text-sm text-muted-foreground">Sem dados de tesouraria para apresentar.</p>
+              </div>
+            ) : (
+              <>
+                <Bloco id="tes.kpis" vista={vista}>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <KpiCard icon="arrow_downward" label="Entradas" value={fmtKz(totalEntradas)} />
+                    <KpiCard icon="arrow_upward" label="Saídas" value={fmtKz(totalSaidas)} />
+                    <KpiCard icon="savings" label="Saldo das contas" value={fmtKz(saldoTotal)} />
+                    <KpiCard icon="account_balance" label="Contas" value={contas.length} />
+                  </div>
+                </Bloco>
+
+                <Bloco id="tes.fluxo" vista={vista}>
+                  <CartaoGrafico icon="swap_vert" titulo="Entradas e saídas" sub="Movimento da tesouraria por período">
+                    <div className="h-52">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={fluxo} margin={{ top: 10, right: 10, left: -14, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="grad-tes-ent" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="var(--data-5)" stopOpacity={0.3} />
+                              <stop offset="100%" stopColor="var(--data-5)" stopOpacity={0.02} />
+                            </linearGradient>
+                            <linearGradient id="grad-tes-sai" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="var(--data-2)" stopOpacity={0.25} />
+                              <stop offset="100%" stopColor="var(--data-2)" stopOpacity={0.02} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                          <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} dy={4} />
+                          <YAxis tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} width={48} tickFormatter={compactKz} allowDecimals={false} />
+                          <Tooltip content={<ChartTooltip formato={fmtKz} />} />
+                          <Area type="monotone" dataKey="entradas" name="Entradas" stroke="var(--data-5)" strokeWidth={2.5} fill="url(#grad-tes-ent)" activeDot={{ r: 4 }} />
+                          <Area type="monotone" dataKey="saidas" name="Saídas" stroke="var(--data-2)" strokeWidth={2.5} fill="url(#grad-tes-sai)" activeDot={{ r: 4 }} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CartaoGrafico>
+                </Bloco>
+
+                <Bloco id="tes.contas" vista={vista}>
+                  <CartaoGrafico icon="account_balance_wallet" titulo="Saldo por conta" sub="Bancos e caixa">
+                    {contas.length === 0 ? (
+                      <p className="py-8 text-center text-sm text-muted-foreground">Sem contas registadas.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {contas.map((c) => (
+                          <div key={c.nome}>
+                            <div className="mb-1 flex items-center justify-between gap-2 text-sm">
+                              <span className="min-w-0 flex-1 truncate text-foreground">{c.nome}</span>
+                              <span className="shrink-0 font-mono font-bold text-foreground">{fmtKz(c.saldo)}</span>
+                            </div>
+                            <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                              <div
+                                className={`h-full rounded-full ${c.saldo >= 0 ? "bg-primary" : "bg-error"}`}
+                                style={{ width: `${Math.min(100, (Math.abs(c.saldo) / maxSaldo) * 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CartaoGrafico>
+                </Bloco>
+
+                <Bloco id="tes.tabela" vista={vista}>
+                  <Ledger rotulo="Movimentos ledger">
+                    <LedgerHeader titulo="Movimentos" subtitulo={`${movs.length} movimentos no período selecionado`} />
+                    <LedgerTable>
+                      <thead>
+                        <tr className="border-b border-border">
+                          <LedgerTh>Data</LedgerTh>
+                          <LedgerTh>Tipo</LedgerTh>
+                          <LedgerTh>Descrição</LedgerTh>
+                          <LedgerTh className="text-right">Valor</LedgerTh>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {movs.map((m, i) => {
+                          const raw = m.data_movimento || m.data;
+                          const d = raw ? new Date(raw) : null;
+                          const entrada = m.tipo === "entrada";
+                          return (
+                            <LedgerTr key={m.id || i}>
+                              <LedgerTd className="whitespace-nowrap text-muted-foreground">
+                                {d && !isNaN(d.getTime()) ? d.toLocaleDateString("pt-AO") : "—"}
+                              </LedgerTd>
+                              <LedgerTd>
+                                <StatusBadge tom={entrada ? "success" : "error"}>{entrada ? "Entrada" : "Saída"}</StatusBadge>
+                              </LedgerTd>
+                              <LedgerTd className="text-muted-foreground">
+                                {m.descricao || m.descricao_movimento || m.observacao || "—"}
+                              </LedgerTd>
+                              <LedgerTd className="text-right tabular-nums">{fmtKz(m.valor)}</LedgerTd>
+                            </LedgerTr>
+                          );
+                        })}
+                      </tbody>
+                    </LedgerTable>
+                    {movs.length === 0 && <LedgerEmpty icone="swap_vert">Nenhum movimento no período selecionado</LedgerEmpty>}
+                  </Ledger>
+                </Bloco>
+
+                <Bloco id="tes.relatorio" vista={vista}>
+                  <CardRelatorioModulo relatorio={relatorioAtivo} onVer={setRelatorioVer} />
+                </Bloco>
+              </>
+            )}
+          </>
+        );
+      })()}
+
+      {!loading && !error && aba === "patrimonio" && (() => {
+        const totalValorBens = bens.reduce((s, b) => s + toNum(b.valor_aquisicao), 0);
+        const labelEstado = (e) => rotuloDe(ESTADOS_BEM, e);
+        const categorias = bensPorCategoria.map((c) => ({ name: c.nome, value: c.itens }));
+        const estados = ESTADOS_BEM.map((e) => ({ name: e.label, value: bensPorEstado[e.value] || 0, color: e.cor }));
+
+        return (
+          <>
+            <Bloco id="pat.kpis" vista={vista}>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <KpiCard icon="category" label="Total de bens" value={bens.length} />
+                <KpiCard icon="account_balance_wallet" label="Valor patrimonial" value={fmtKz(totalValorBens)} />
+                <KpiCard icon="verified" label="Em uso" value={bensPorEstado.ativo || 0} />
+                <KpiCard icon="build" label="Manutenção/avariados" value={(bensPorEstado.manutencao || 0) + (bensPorEstado.avariado || 0)} />
+              </div>
+            </Bloco>
+
+            <Bloco id="pat.categoria" vista={vista}>
+              <CartaoGrafico icon="bar_chart" titulo="Bens por categoria" sub="Número de bens por categoria">
+                {categorias.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-muted-foreground">Sem bens registados.</p>
+                ) : (
+                  <div className="grid grid-cols-1 items-center gap-4 lg:grid-cols-2">
+                    <div className="h-52">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={categorias} margin={{ top: 10, right: 10, left: -14, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                          <XAxis dataKey="name" tick={false} axisLine={false} height={8} />
+                          <YAxis tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} width={40} allowDecimals={false} />
+                          <Tooltip content={<ChartTooltip formato={(v) => `${v} bens`} />} cursor={{ fill: "var(--muted)" }} />
+                          <Bar dataKey="value" name="Bens" radius={[6, 6, 0, 0]} maxBarSize={34} fill="var(--data-1)" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="custom-scrollbar max-h-56 space-y-2 overflow-y-auto pr-1">
+                      {bensPorCategoria.map((c, i) => (
+                        <LinhaDonut key={c.nome} cor={CORES_DONUT[i % CORES_DONUT.length]} nome={c.nome} valor={`${c.itens} · ${fmtKz(c.valor)}`} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CartaoGrafico>
+            </Bloco>
+
+            <Bloco id="pat.estado" vista={vista}>
+              <CartaoGrafico icon="pie_chart" titulo="Bens por estado" sub="Situação dos bens patrimoniais">
+                <div className="grid grid-cols-1 items-center gap-4 lg:grid-cols-2">
+                  <DonutGrafico dados={estados} centro={String(bens.length)} tooltipFormat={(v) => `${v} bens`} />
+                  <div className="space-y-2">
+                    {estados.map((d) => (
+                      <LinhaDonut key={d.name} cor={d.color} nome={d.name} valor={String(d.value)} />
+                    ))}
+                  </div>
+                </div>
+              </CartaoGrafico>
+            </Bloco>
+
+            <Bloco id="pat.tabela" vista={vista}>
+              <Ledger rotulo="Bens ledger">
+                <LedgerHeader titulo="Bens patrimoniais" subtitulo={`${bens.length} bens registados`} />
+                <LedgerTable>
+                  <thead>
+                    <tr className="border-b border-border">
+                      <LedgerTh>Código</LedgerTh>
+                      <LedgerTh>Nome</LedgerTh>
+                      <LedgerTh>Categoria</LedgerTh>
+                      <LedgerTh>Estado</LedgerTh>
+                      <LedgerTh className="text-right">Valor</LedgerTh>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bens.map((b) => (
+                      <LedgerTr key={b.id}>
+                        <LedgerTd className="whitespace-nowrap font-mono text-xs">{b.codigo || "—"}</LedgerTd>
+                        <LedgerTd>{b.nome}</LedgerTd>
+                        <LedgerTd className="whitespace-nowrap text-muted-foreground">{b.categoria || "—"}</LedgerTd>
+                        <LedgerTd>
+                          <StatusBadge>{labelEstado(b.estado)}</StatusBadge>
+                        </LedgerTd>
+                        <LedgerTd className="text-right tabular-nums">{fmtKz(b.valor_aquisicao)}</LedgerTd>
+                      </LedgerTr>
+                    ))}
+                  </tbody>
+                </LedgerTable>
+                {bens.length === 0 && <LedgerEmpty icone="category">Nenhum bem patrimonial registado</LedgerEmpty>}
+              </Ledger>
+            </Bloco>
+
+            <Bloco id="pat.relatorio" vista={vista}>
+              <CardRelatorioModulo relatorio={relatorioAtivo} onVer={setRelatorioVer} />
+            </Bloco>
+          </>
+        );
+      })()}
+
+      {!loading && !error && aba === "rh" && (() => {
+        const perfis = usuariosPorPerfil.map((u) => ({ name: u.nome, value: u.qtd }));
+        const estados = [
+          { name: "Ativos", value: usuariosAtivos, color: "var(--data-5)" },
+          { name: "Inativos", value: usuariosInativos, color: "var(--data-6)" },
+        ];
+
+        return (
+          <>
+            <Bloco id="rh.kpis" vista={vista}>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <KpiCard icon="groups" label="Utilizadores" value={usuarios.length} />
+                <KpiCard icon="verified" label="Ativos" value={usuariosAtivos} />
+                <KpiCard icon="block" label="Inativos" value={usuariosInativos} />
+                <KpiCard icon="badge" label="Perfis" value={usuariosPorPerfil.length} />
+              </div>
+            </Bloco>
+
+            <Bloco id="rh.perfis" vista={vista}>
+              <CartaoGrafico icon="bar_chart" titulo="Utilizadores por perfil" sub="Distribuição por perfil de acesso">
+                {perfis.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-muted-foreground">Sem utilizadores registados.</p>
+                ) : (
+                  <div className="grid grid-cols-1 items-center gap-4 lg:grid-cols-2">
+                    <div className="h-52">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={perfis} margin={{ top: 10, right: 10, left: -14, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                          <XAxis dataKey="name" tick={false} axisLine={false} height={8} />
+                          <YAxis tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} width={40} allowDecimals={false} />
+                          <Tooltip content={<ChartTooltip formato={(v) => `${v} utilizadores`} />} cursor={{ fill: "var(--muted)" }} />
+                          <Bar dataKey="value" name="Utilizadores" radius={[6, 6, 0, 0]} maxBarSize={34}>
+                            {perfis.map((d, i) => (
+                              <Cell key={i} fill={CORES_DONUT[i % CORES_DONUT.length]} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="space-y-2">
+                      {perfis.map((d, i) => (
+                        <LinhaDonut key={d.name} cor={CORES_DONUT[i % CORES_DONUT.length]} nome={d.name} valor={String(d.value)} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CartaoGrafico>
+            </Bloco>
+
+            <Bloco id="rh.estado" vista={vista}>
+              <CartaoGrafico icon="pie_chart" titulo="Ativos e inativos" sub="Estado das contas dos utilizadores">
+                <div className="grid grid-cols-1 items-center gap-4 lg:grid-cols-2">
+                  <DonutGrafico dados={estados} centro={String(usuarios.length)} tooltipFormat={(v) => `${v} utilizadores`} />
+                  <div className="space-y-2">
+                    {estados.map((d) => (
+                      <LinhaDonut key={d.name} cor={d.color} nome={d.name} valor={String(d.value)} />
+                    ))}
+                  </div>
+                </div>
+              </CartaoGrafico>
+            </Bloco>
+
+            <Bloco id="rh.tabela" vista={vista}>
+              <Ledger rotulo="Utilizadores ledger">
+                <LedgerHeader titulo="Utilizadores" subtitulo={`${usuarios.length} utilizadores registados`} />
+                <LedgerTable>
+                  <thead>
+                    <tr className="border-b border-border">
+                      <LedgerTh>Nome</LedgerTh>
+                      <LedgerTh>Email</LedgerTh>
+                      <LedgerTh>Perfil</LedgerTh>
+                      <LedgerTh>Função</LedgerTh>
+                      <LedgerTh>Estado</LedgerTh>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {usuarios.map((u) => (
+                      <LedgerTr key={u.id}>
+                        <LedgerTd>{u.nome || "—"}</LedgerTd>
+                        <LedgerTd className="text-muted-foreground">{u.email || "—"}</LedgerTd>
+                        <LedgerTd>{u.perfil || "—"}</LedgerTd>
+                        <LedgerTd className="text-muted-foreground">{u.funcao || "—"}</LedgerTd>
+                        <LedgerTd>
+                          <StatusBadge tom={u.ativo === false ? "neutral" : "success"}>
+                            {u.ativo === false ? "Inativo" : "Ativo"}
+                          </StatusBadge>
+                        </LedgerTd>
+                      </LedgerTr>
+                    ))}
+                  </tbody>
+                </LedgerTable>
+                {usuarios.length === 0 && <LedgerEmpty icone="groups">Nenhum utilizador registado</LedgerEmpty>}
+              </Ledger>
+            </Bloco>
+
+            <Bloco id="rh.relatorio" vista={vista}>
+              <CardRelatorioModulo relatorio={relatorioAtivo} onVer={setRelatorioVer} />
+            </Bloco>
+          </>
+        );
+      })()}
+
+      <Modal open={!!relatorioVer} onClose={() => setRelatorioVer(null)} title={relatorioVer?.titulo || "Relatório"} icon={relatorioVer?.icon || "description"} size="lg">
+        {relatorioVer && (
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">{relatorioVer.sub}</p>
+            <p className="text-lg font-semibold tracking-tight text-foreground tabular-nums">{relatorioVer.totalTexto}</p>
+            <LedgerTable>
+              <thead>
+                <tr className="border-b border-border">
+                  {relatorioVer.colunas.map((c, i) => (
+                    <LedgerTh key={c} className={i > 0 ? "text-right" : ""}>
+                      {c}
+                    </LedgerTh>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {relatorioVer.linhas.map((linha, i) => (
+                  <LedgerTr key={i}>
+                    {linha.map((celula, j) => (
+                      <LedgerTd key={j} className={j > 0 ? "text-right tabular-nums" : ""}>
+                        {celula}
+                      </LedgerTd>
+                    ))}
+                  </LedgerTr>
+                ))}
+              </tbody>
+            </LedgerTable>
+            {relatorioVer.linhas.length === 0 && <LedgerEmpty icone="bar_chart">Sem dados para apresentar</LedgerEmpty>}
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
 }

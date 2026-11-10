@@ -89,7 +89,7 @@ export default function Paginacao({ pagina, setPagina, totalPaginas, total, de, 
               onClick={() => setPagina((p) => Math.max(1, p - 1))}
               disabled={pagina === 1}
               aria-label="Página anterior"
-              className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground hover:border-outline-variant disabled:opacity-30 disabled:cursor-not-allowed transition-colors active:scale-95"
+              className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground hover:border-outline-variant disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <Icon name="chevron_left" className="text-sm" />
             </button>
@@ -98,7 +98,7 @@ export default function Paginacao({ pagina, setPagina, totalPaginas, total, de, 
               onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
               disabled={pagina === totalPaginas}
               aria-label="Página seguinte"
-              className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground hover:border-outline-variant disabled:opacity-30 disabled:cursor-not-allowed transition-colors active:scale-95"
+              className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground hover:border-outline-variant disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <Icon name="chevron_right" className="text-sm" />
             </button>

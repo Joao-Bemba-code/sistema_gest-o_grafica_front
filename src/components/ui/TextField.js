@@ -180,25 +180,25 @@ const TextField = forwardRef(function TextField(
 
       <div className="flex min-h-[18px] items-start gap-1.5 px-1 pt-1 text-[11px] leading-tight">
         {isError && message && (
-          <p id={messageId} role="alert" className="animate-msg-in flex items-start gap-1 text-error">
+          <p id={messageId} role="alert" className="flex items-start gap-1 text-error">
             <Icon name="error" className="mt-px shrink-0 text-[13px]" />
             <span>{message}</span>
           </p>
         )}
         {state === "warning" && !isError && message && (
-          <p id={messageId} className="animate-msg-in flex items-start gap-1 text-warning">
+          <p id={messageId} className="flex items-start gap-1 text-warning">
             <Icon name="warning" className="mt-px shrink-0 text-[13px]" />
             <span>{message}</span>
           </p>
         )}
         {state === "success" && hasValue && !isError && (
-          <p id={messageId} className="animate-msg-in flex items-start gap-1 text-success">
+          <p id={messageId} className="flex items-start gap-1 text-success">
             <Icon name="check_circle" className="mt-px shrink-0 text-[13px]" />
             <span>{message || "Tudo certo"}</span>
           </p>
         )}
         {focused && !isError && helper && !(state === "success" && hasValue) && (
-          <p id={helperId} className="animate-msg-in flex items-start gap-1 text-muted-foreground">
+          <p id={helperId} className="flex items-start gap-1 text-muted-foreground">
             <Icon name="info" className="mt-px shrink-0 text-[13px]" />
             <span>{helper}</span>
           </p>

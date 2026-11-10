@@ -36,9 +36,9 @@ export const ITENS_NAVEGACAO = [
   },
   { icone: LuCog, nome: "Produção", para: "/producao", perm: ["producao", "ver"] },
   { icone: LuBox, nome: "Stocks", para: "/estoque", perm: ["estoque", "ver"] },
-  { icone: LuShoppingBag, nome: "Compras", para: "/compras", perm: ["estoque", "ver"] },
-  { icone: LuChartColumn, nome: "Financeiro", para: "/faturacao", perm: ["faturacao", "ver"] },
-  { icone: LuLandmark, nome: "Tesouraria", para: "/tesouraria", perm: ["tesouraria", "ver"] },
+  { icone: LuShoppingBag, nome: "Compras", para: "/compras", perm: ["estoque", "ver"], permOu: [["compras", "ver"]] },
+  { icone: LuChartColumn, nome: "Financeiro", para: "/faturacao", perm: ["faturacao", "ver"], permOu: [["financeiro", "ver"]] },
+  { icone: LuLandmark, nome: "Tesouraria", para: "/tesouraria", perm: ["tesouraria", "ver"], permOu: [["financeiro", "ver"]] },
   { icone: LuBuilding, nome: "Património", para: "/patrimonio", perm: ["patrimonio", "ver"] },
   { icone: LuUsers, nome: "Recursos Humanos", para: "/utilizadores", perm: ["utilizadores", "ver"] },
   { icone: LuFileText, nome: "Relatórios", para: "/relatorios", perm: ["relatorios", "ver"] },
@@ -49,7 +49,7 @@ export const ITENS_NAVEGACAO = [
 export const PAGINAS_BUSCA = [
   ...ITENS_NAVEGACAO.map((i) => ({ icone: i.icone, nome: i.nome, para: i.para, perm: i.perm })),
   { icone: LuClipboardList, nome: "Orçamentos", para: "/orcamentos", perm: ["comercial", "ver"] },
-  { icone: LuUser, nome: "Clientes", para: "/clientes", perm: ["comercial", "ver"] },
+  { icone: LuUser, nome: "Clientes", para: "/clientes", perm: ["comercial", "ver"], permOu: [["compras", "ver"]] },
   { icone: LuBox, nome: "Ordens de Produção", para: "/producao/ordens", perm: ["producao", "ver"] },
   { icone: LuFileText, nome: "Design System", para: "/design-system", perm: ["configuracao", "ver"] },
 ];

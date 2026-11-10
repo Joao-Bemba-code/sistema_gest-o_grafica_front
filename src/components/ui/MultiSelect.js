@@ -62,7 +62,7 @@ export default function MultiSelect({ value = [], options = [], onChange, placeh
       </button>
 
       {aberto && (
-        <div className="absolute z-50 mt-2 w-72 max-w-[calc(100vw-2rem)] left-0 bg-card border border-border rounded-2xl shadow-lg overflow-hidden animate-scale-in">
+        <div className="absolute z-50 mt-2 w-72 max-w-[calc(100vw-2rem)] left-0 bg-card border border-border rounded-xl shadow-md overflow-hidden">
           <div className="p-2 border-b border-border/60">
             <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2">
               <Icon name="search" className="text-sm text-muted-foreground shrink-0" />
@@ -111,14 +111,14 @@ export default function MultiSelect({ value = [], options = [], onChange, placeh
             <button
               type="button"
               onClick={() => onChange([])}
-              className="text-[10px] font-semibold uppercase tracking-wider px-3 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="text-[11px] font-medium px-3 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             >
               Todas
             </button>
             <button
               type="button"
               onClick={() => onChange(options.map((o) => o.value))}
-              className="text-[10px] font-semibold uppercase tracking-wider px-3 py-1.5 rounded-lg text-primary hover:bg-primary/10 transition-colors"
+              className="text-[11px] font-medium px-3 py-1.5 rounded-lg text-primary hover:bg-primary/10 transition-colors"
             >
               Seleccionar tudo
             </button>

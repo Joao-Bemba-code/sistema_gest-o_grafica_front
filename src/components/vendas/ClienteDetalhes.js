@@ -90,7 +90,7 @@ export default function ClienteDetalhes({
         ))}
       </div>
 
-      <div role="tabpanel" id={`${id("painel")}-${tab}`} aria-labelledby={id(`tab-${tab}`)} className="animate-fade-up h-[400px] overflow-y-auto pr-1 custom-scrollbar">
+      <div role="tabpanel" id={`${id("painel")}-${tab}`} aria-labelledby={id(`tab-${tab}`)} className="h-[400px] overflow-y-auto pr-1 custom-scrollbar">
         {tab === "identidade" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <Info label="Código do cliente" value={cliente.codigo} />

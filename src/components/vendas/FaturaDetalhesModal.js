@@ -165,7 +165,7 @@ export default function FaturaDetalhesModal({ fatura, empresa, onClose, onChange
         </div>
 
         {/* Altura fixa: o modal nunca muda de tamanho ao trocar de secção */}
-        <div role="tabpanel" id={`${id("painel")}-${tab}`} aria-labelledby={id(`tab-${tab}`)} className="animate-fade-up h-[400px] overflow-y-auto pr-1 custom-scrollbar">
+        <div role="tabpanel" id={`${id("painel")}-${tab}`} aria-labelledby={id(`tab-${tab}`)} className="h-[400px] overflow-y-auto pr-1 custom-scrollbar">
           {tab === "documento" && (
             <div className="space-y-4">
               <div className="rounded-xl border bg-muted/30 p-4">

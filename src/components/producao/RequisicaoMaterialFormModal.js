@@ -246,7 +246,7 @@ export default function RequisicaoMaterialFormModal({
         </p>
 
         {erro && (
-          <p role="alert" className="flex items-center gap-2 text-xs font-semibold text-destructive bg-destructive/10 rounded-xl px-3 py-2.5 animate-msg-in">
+          <p role="alert" className="flex items-center gap-2 text-xs font-semibold text-destructive bg-destructive/10 rounded-xl px-3 py-2.5">
             <Icon name="error" className="text-base" /> {erro}
           </p>
         )}
