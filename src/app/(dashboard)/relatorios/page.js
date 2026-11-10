@@ -38,7 +38,7 @@ import { listar as listarUsuarios } from "@/services/usuarios";
 
 import { listar as listarPropostas } from "@/services/propostas";
 
-import { resumoTesouraria } from "@/services/tesouraria";
+import { resumoTesouraria, listarMovimentos } from "@/services/tesouraria";
 
 import { gerarRelatorioStockPDF, gerarRelatorioCadastrosPDF, gerarRelatorioCategoriasPDF, gerarRelatorioFaturacoesPDF, gerarRelatorioProducaoPDF } from "@/lib/estoquePdf";
 
@@ -548,6 +548,10 @@ export default function RelatoriosPage() {
 
   const [propostas, setPropostas] = useState([]);
 
+  // Movimentos da tesouraria: o /tesouraria/resumo não devolve a lista, por
+  // isso os gráficos de despesas precisam dela carregada à parte.
+  const [movimentos, setMovimentos] = useState([]);
+
   const [org, setOrg] = useState({});
 
   const [intervalo, setIntervalo] = useState({ modo: "6m", inicio: "", fim: "" });
@@ -592,7 +596,7 @@ export default function RelatoriosPage() {
 
     try {
 
-      const [ords, clis, fats, mats, cats, o, tes, bs, peds, usrs, props] = await Promise.all([
+      const [ords, clis, fats, mats, cats, o, tes, bs, peds, usrs, props, movts] = await Promise.all([
 
         listarOrdens(),
 
@@ -615,6 +619,8 @@ export default function RelatoriosPage() {
         listarUsuarios().catch(() => []),
 
         listarPropostas().catch(() => []),
+
+        listarMovimentos().catch(() => []),
 
       ]);
 
@@ -639,6 +645,8 @@ export default function RelatoriosPage() {
       setOrg(o || {});
 
       setTesouraria(tes || null);
+
+      setMovimentos(Array.isArray(movts) ? movts : movts?.data || []);
 
     } catch (err) {
 
@@ -673,13 +681,16 @@ export default function RelatoriosPage() {
     () => registosDoPeriodo(carteiraClientes, ultimosMeses, ["dataCadastro", "data_cadastro", "createdAt"]),
     [carteiraClientes, ultimosMeses]
   );
+  // O resumo da tesouraria só devolve totais do mês; os gráficos mensais
+  // precisam da lista de movimentos, carregada à parte. Movimentos anulados
+  // ou cancelados ficam de fora para não contarem como despesa/receita.
+  const movimentosValidos = useMemo(
+    () => movimentos.filter((m) => !["anulado", "cancelado"].includes(m.estado)),
+    [movimentos]
+  );
   const movimentosPeriodo = useMemo(
-    () => registosDoPeriodo(
-      Array.isArray(tesouraria?.movimentos) ? tesouraria.movimentos : [],
-      ultimosMeses,
-      ["data_movimento", "data"]
-    ),
-    [tesouraria, ultimosMeses]
+    () => registosDoPeriodo(movimentosValidos, ultimosMeses, ["data_movimento", "data"]),
+    [movimentosValidos, ultimosMeses]
   );
 
   const contagemEstadosFatura = useMemo(() => {
@@ -1040,7 +1051,7 @@ export default function RelatoriosPage() {
 
     const indice = new Map(ultimosMeses.map((m, i) => [m.chave, i]));
 
-    const movs = Array.isArray(tesouraria?.movimentos) ? tesouraria.movimentos : [];
+    const movs = movimentosValidos;
 
     movs.forEach((mov) => {
 
@@ -1064,7 +1075,7 @@ export default function RelatoriosPage() {
 
     return counts;
 
-  }, [tesouraria, ultimosMeses]);
+  }, [movimentosValidos, ultimosMeses]);
 
 
 
@@ -1945,13 +1956,13 @@ export default function RelatoriosPage() {
       };
     }
     if (aba === "tesouraria") {
-      const total = Array.isArray(tesouraria?.movimentos) ? tesouraria.movimentos.length : 0;
+      const total = movimentosValidos.length;
       return { mostrados: movimentosPeriodo.length, total, rotulo: "movimentos", descricao: "No período selecionado" };
     }
     if (aba === "patrimonio") return { mostrados: bens.length, total: bens.length, rotulo: "bens", descricao: "Posição atual do património" };
     if (aba === "rh") return { mostrados: usuarios.length, total: usuarios.length, rotulo: "utilizadores", descricao: "Situação atual das contas" };
     return null;
-  }, [aba, subAbas, carteiraClientes, clientesPeriodo, cadastrosFiltrados, faturasFiltradas, faturas, faturasPeriodo, ordensFiltradas, ordens, ordensPeriodo, materiaisFiltrados, materiais, categoriasFiltradas, categorias, pedidosPeriodo, pedidos, movimentosPeriodo, tesouraria, bens, usuarios]);
+  }, [aba, subAbas, carteiraClientes, clientesPeriodo, cadastrosFiltrados, faturasFiltradas, faturas, faturasPeriodo, ordensFiltradas, ordens, ordensPeriodo, materiaisFiltrados, materiais, categoriasFiltradas, categorias, pedidosPeriodo, pedidos, movimentosPeriodo, movimentosValidos, bens, usuarios]);
 
   // A carteira é uma fotografia atual. O intervalo só identifica os novos clientes.
   const resumoClientes = useMemo(() => {

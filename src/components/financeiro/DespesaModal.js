@@ -14,6 +14,7 @@ import { criarMovimento, anexarFicheiros } from "@/services/tesouraria";
 const CATEGORIAS_BASE = [
   "Despesa",
   "Compra",
+  "Consumo interno",
   "Salário",
   "Imposto",
   "Aluguel",
@@ -38,6 +39,7 @@ const METODOS = [
 const CATEGORIAS_CANONICAS = {
   despesa: "despesa",
   compra: "compra",
+  "consumo interno": "consumo_interno",
   salario: "salario",
   imposto: "imposto",
   aluguel: "aluguel",

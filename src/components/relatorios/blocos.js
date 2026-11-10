@@ -49,7 +49,7 @@ export const BLOCOS = {
     { id: "fin.kpis", titulo: "Indicadores financeiros", grupo: "indicadores", padrao: true },
     { id: "fin.fluxo", titulo: "Faturação e recebimentos", grupo: "graficos", padrao: true },
     { id: "fin.estado", titulo: "Documentos por estado", grupo: "graficos", padrao: true },
-    { id: "fin.despesas", titulo: "Despesas da tesouraria", grupo: "graficos", padrao: false },
+    { id: "fin.despesas", titulo: "Despesas da tesouraria", grupo: "graficos", padrao: true },
     { id: "fin.tabela", titulo: "Resumo mensal", grupo: "tabelas", padrao: false },
     { id: "fin.relatorio", titulo: "Relatório do módulo", grupo: "graficos", padrao: true },
   ],

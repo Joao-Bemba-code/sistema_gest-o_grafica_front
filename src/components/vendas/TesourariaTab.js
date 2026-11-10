@@ -68,6 +68,7 @@ const categoriasEntrada = [
 
 const categoriasSaida = [
   { value: "compra", label: "Compra" },
+  { value: "consumo_interno", label: "Consumo interno" },
   { value: "despesa", label: "Despesa" },
   { value: "salario", label: "Salário" },
   { value: "imposto", label: "Imposto" },

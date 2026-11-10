@@ -37,6 +37,7 @@ import {
   LuCheck,
   LuTrendingUp,
   LuBanknote,
+  LuPercent,
 } from "react-icons/lu";
 
 const DIA_MS = 86400000;
@@ -330,15 +331,16 @@ export default function DashboardPage() {
       const dd = dataPedido(p);
       return dd && dd >= ini && dd < fim ? s + Number(p.total || 0) : s;
     }, 0);
+  // Movimentos anulados/cancelados não contam nem como receita nem como despesa.
   const somarSaidas = (ini, fim) =>
     movimentos.reduce((s, mv) => {
-      if (mv.tipo !== "saida") return s;
+      if (mv.tipo !== "saida" || ["anulado", "cancelado"].includes(mv.estado)) return s;
       const dd = parseDataISO(mv.data_movimento);
       return dd && dd >= ini && dd < fim ? s + Number(mv.valor || 0) : s;
     }, 0);
   const somarEntradas = (ini, fim) =>
     movimentos.reduce((s, mv) => {
-      if (mv.tipo !== "entrada") return s;
+      if (mv.tipo !== "entrada" || ["anulado", "cancelado"].includes(mv.estado)) return s;
       const dd = parseDataISO(mv.data_movimento);
       return dd && dd >= ini && dd < fim ? s + Number(mv.valor || 0) : s;
     }, 0);
@@ -349,12 +351,15 @@ export default function DashboardPage() {
   const opsAnt = contarOrdens(intervalo.iniAnt, intervalo.fimAnt);
   const comprasAtual = somarPedidos(intervalo.ini, intervalo.fim);
   const comprasAnt = somarPedidos(intervalo.iniAnt, intervalo.fimAnt);
-  const despesasAtual = somarSaidas(intervalo.ini, intervalo.fim);
-  const despesasAnt = somarSaidas(intervalo.iniAnt, intervalo.fimAnt);
+  // As despesas incluem as compras de materiais (pedidos) e as saídas da
+  // tesouraria (despesas gerais, salários, consumo interno, etc.).
+  const despesasAtual = somarSaidas(intervalo.ini, intervalo.fim) + comprasAtual;
+  const despesasAnt = somarSaidas(intervalo.iniAnt, intervalo.fimAnt) + comprasAnt;
   const receitasAtual = somarEntradas(intervalo.ini, intervalo.fim);
   const receitasAnt = somarEntradas(intervalo.iniAnt, intervalo.fimAnt);
   const resultadoAtual = receitasAtual - despesasAtual;
   const resultadoAnt = receitasAnt - despesasAnt;
+  const margemAtual = receitasAtual > 0 ? ((receitasAtual - despesasAtual) / receitasAtual) * 100 : 0;
   const deltaVendas = variacao(vendasAtual, vendasAnt);
   const deltaOps = variacao(opsAtual, opsAnt);
   const deltaCompras = variacao(comprasAtual, comprasAnt);
@@ -447,6 +452,22 @@ export default function DashboardPage() {
     return arr;
   })();
 
+  /* ─── Gráfico meses: receitas vs despesas ─── */
+  const dadosFinanceiros = (() => {
+    const ref = mesRef || hoje;
+    const arr = [];
+    for (let i = nMeses - 1; i >= 0; i--) {
+      const ini = new Date(ref.getFullYear(), ref.getMonth() - i, 1);
+      const fim = new Date(ref.getFullYear(), ref.getMonth() - i + 1, 1);
+      arr.push({
+        label: ini.toLocaleDateString("pt-PT", { month: "short" }).replace(".", ""),
+        receitas: somarEntradas(ini, fim),
+        despesas: somarSaidas(ini, fim) + somarPedidos(ini, fim),
+      });
+    }
+    return arr;
+  })();
+
   /* ─── Alertas ─── */
   const alertas = [
     faturasPorPagar.length > 0 && {
@@ -485,8 +506,9 @@ export default function DashboardPage() {
     { icon: LuCog, chipCls: "bg-error/10", iconCls: "text-error", label: "Produção (OP)", value: formatNum(opsAtual), delta: deltaOps, sub: "ordens concluídas" },
     { icon: LuShoppingCart, chipCls: "bg-warning/10", iconCls: "text-warning", label: "Compras", value: `${formatNum(comprasAtual)} Kz`, delta: deltaCompras, sub: "em materiais" },
     { icon: LuBox, chipCls: "bg-success/10", iconCls: "text-success", label: "Stocks", value: formatNum(materiais.length), delta: null, sub: "artigos activos" },
-    { icon: LuCreditCard, chipCls: "bg-error/10", iconCls: "text-error", label: "Despesas", value: `${formatNum(despesasAtual)} Kz`, delta: deltaDespesas, deltaCls: "text-error", sub: "vs. mês anterior" },
+    { icon: LuCreditCard, chipCls: "bg-error/10", iconCls: "text-error", label: "Despesas", value: `${formatNum(despesasAtual)} Kz`, delta: deltaDespesas, deltaCls: "text-error", sub: "incl. compras" },
     { icon: LuBanknote, chipCls: "bg-success/10", iconCls: "text-success", label: "Resultado", value: `${formatNum(resultadoAtual)} Kz`, delta: deltaResultado, deltaCls: resultadoAtual < 0 ? "text-error" : "text-success", sub: "receitas − despesas", valueCls: resultadoAtual < 0 ? "text-error" : "text-success" },
+    { icon: LuPercent, chipCls: "bg-info/10", iconCls: "text-info", label: "Margem", value: `${margemAtual.toFixed(1)}%`, delta: null, sub: "resultado ÷ receitas", valueCls: margemAtual < 0 ? "text-error" : "text-success" },
   ];
 
   const acoesRapidas = [
@@ -793,6 +815,46 @@ export default function DashboardPage() {
                 centroValor={compactKz(totalValorPropostas)}
                 centroLabel="Kz"
               />
+            </div>
+          </div>
+        </div>
+
+        {/* ══════════ Receitas vs Despesas ══════════ */}
+        <div className="min-w-0 lg:col-span-9">
+          <div className="flex flex-col justify-between rounded-xl border border-border bg-card p-4 shadow-sm">
+            <h3 className="mb-2 text-xs font-semibold text-foreground">
+              Receitas vs Despesas (últimos {nMeses} meses)
+            </h3>
+            <div className="relative mt-2 h-44 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={dadosFinanceiros} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                  <XAxis dataKey="label" tick={{ fontSize: 8.5 }} axisLine={false} tickLine={false} />
+                  <YAxis
+                    tick={{ fontSize: 8 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={40}
+                    tickFormatter={(v) => (v >= 1000000 ? `${v / 1000000}M` : v >= 1000 ? `${Math.round(v / 1000)}k` : v)}
+                  />
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    formatter={(v, name) => [`Kz ${formatNum(v)}`, name === "receitas" ? "Receitas" : "Despesas"]}
+                  />
+                  <Bar dataKey="receitas" fill="var(--data-5)" radius={[1.5, 1.5, 0, 0]} barSize={12} />
+                  <Bar dataKey="despesas" fill="var(--data-2)" radius={[1.5, 1.5, 0, 0]} barSize={12} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex items-center justify-center space-x-6 pt-1 text-[10px]">
+              <div className="flex items-center space-x-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "var(--data-5)" }} />
+                <span className="text-muted-foreground">Receitas (Kz)</span>
+              </div>
+              <div className="flex items-center space-x-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "var(--data-2)" }} />
+                <span className="text-muted-foreground">Despesas incl. compras (Kz)</span>
+              </div>
             </div>
           </div>
         </div>
