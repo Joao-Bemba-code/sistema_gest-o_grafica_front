@@ -19,6 +19,7 @@ import { listar as listarClientes } from "@/services/clientes";
 import { buscarOrganizacao } from "@/services/configuracoes";
 import { getUsuario } from "@/services/auth";
 import { useToast } from "@/components/Toast";
+import { dadosBaixaStock } from "@/lib/requisicaoStock";
 import { statusDe, toNum, especificacoesObjeto, ehEquipamento, moverEstoqueDe, tipoChaveDe, familiaChaveDe, tipoRecursoOptions } from "@/lib/estoque";
 
 function chaveCategoria(texto) {
@@ -194,8 +195,16 @@ export default function useEstoque() {
       material_id: item.id,
       tipo,
       quantidade: qtd,
-      motivo: motivos[tipo] || tipo,
-      ...(isEntrada ? { fornecedor_nome: dados.fornecedor } : tipo === "saida" ? { cliente_nome: dados.cliente } : {}),
+      motivo: tipo === "saida" && dados.tipo_requisicao === "interna" ? dados.motivo : motivos[tipo] || tipo,
+      ...(isEntrada ? { fornecedor_nome: dados.fornecedor } : tipo === "saida" ? {
+        cliente_nome: dados.tipo_requisicao === "interna" ? null : dados.cliente,
+        tipo_requisicao: dados.tipo_requisicao,
+        destino: dados.tipo_requisicao === "interna" ? dados.destino : null,
+      } : {}),
+      solicitado_por: dados.solicitado_por || undefined,
+      permitido_por: dados.permitido_por || undefined,
+      lote: dados.lote || undefined,
+      validade: dados.validade || undefined,
       observacoes: dados.detalhes || dados.observacoes || undefined,
     };
     const antes = materiais;

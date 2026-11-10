@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { identificarRequisicaoStock } from "./requisicaoStock";
 import { formatKz, familias, normalizarFamilia, tiposItem, normalizarTipoItem, entradasEspecificacao, especificacoesObjeto } from "./estoque";
 import { TEMA_TABELA, TEMA_TABELA_MARCA, formatNumero, formatarData, carregarLogo, desenharCabecalhoMarca, desenharMarcaDeAgua, tituloSecaoMarca, colunasProporcionaisMarca, desenharKpisMarca, finalizarComRodapeMarca, LARGURA_UTIL_MARCA, COR_MARCA_PRINCIPAL, COR_MARCA_SECUNDARIO, COR_MARCA_CINZA, COR_MARCA_FUNDO, MARGEM_MARCA } from "./pdfEstilo";
 
@@ -190,7 +191,8 @@ export async function gerarRequisicaoPDF(mov, org = {}, requisicao = null) {
   const dt = new Date(mov.createdAt);
   const dataStr = isNaN(dt.getTime()) ? "—" : dt.toLocaleDateString("pt-PT");
   const horaStr = isNaN(dt.getTime()) ? "—" : dt.toLocaleTimeString("pt-PT");
-  const parteNome = ehEntrada ? (mov.fornecedor_nome || "—") : (mov.cliente_nome || "—");
+  const interna = mov.tipo === "saida" && mov.tipo_requisicao === "interna";
+  const parteNome = ehEntrada ? (mov.fornecedor_nome || "—") : interna ? (mov.destino || "Consumo interno") : (mov.cliente_nome || "—");
 
   autoTable(doc, {
     startY: linhaY + 6,
@@ -234,24 +236,21 @@ export async function gerarRequisicaoPDF(mov, org = {}, requisicao = null) {
     yFim = doc.lastAutoTable.finalY + 8;
   }
 
-  const yObs = yFim;
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...PRETO);
-  doc.text("Observações:", MARGEM, yObs);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...CINZA_ESCURO);
-  // Quando a requisição já deu a linha de preparação, não repetimos a mesma
-  // informação escrita no movimento.
   const obsBruta = (mov.observacoes || "").trim();
-  const obsText =
-    (requisicao && obsBruta.startsWith("Preparado por")) || !obsBruta ? "—" : obsBruta;
-  const obsLines = doc.splitTextToSize(obsText, LARGURA_UTIL);
-  doc.text(obsLines, MARGEM, yObs + 5);
-
-  doc.setFontSize(8);
-  doc.setTextColor(...CINZA_ESCURO);
-  doc.text(`${ehEntrada ? "Fornecedor" : "Cliente"}: ${parteNome}`, MARGEM, yObs + 12);
+  const obsText = (requisicao && obsBruta.startsWith("Preparado por")) || !obsBruta ? "—" : obsBruta;
+  autoTable(doc, {
+    startY: yFim,
+    body: [
+      ...(mov.tipo === "saida" && mov.tipo_requisicao ? [["Tipo de requisição", interna ? "Interna" : "Para cliente"]] : []),
+      [ehEntrada ? "Fornecedor" : interna ? "Destino / sector" : "Cliente", parteNome],
+      ...(interna ? [["Motivo", mov.motivo || "—"]] : []),
+      ...(mov.lote ? [["Lote", mov.lote]] : []),
+      ...(mov.validade ? [["Validade", mov.validade]] : []),
+      ["Observações", obsText],
+    ],
+    ...TEMA_RELATORIO,
+    columnStyles: colunasProporcionais([1, 3]),
+  });
 
   finalizarComRodape(doc);
   doc.save(`Requisicao_Material_${mov.id || "doc"}.pdf`);

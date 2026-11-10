@@ -66,7 +66,7 @@ export default function useMovimentacoes({ org }) {
       .filter((m) => filtro === "todos" || m.tipo === filtro)
       .filter((m) => {
         if (!q) return true;
-        const alvo = `${m.material?.nome || ""} ${m.fornecedor_nome || ""} ${m.cliente_nome || ""} ${m.lote || ""} ${m.solicitado_por || ""}`.toLowerCase();
+        const alvo = `${m.material?.nome || ""} ${m.fornecedor_nome || ""} ${m.cliente_nome || ""} ${m.tipo_requisicao || ""} ${m.destino || ""} ${m.motivo || ""} ${m.lote || ""} ${m.solicitado_por || ""}`.toLowerCase();
         return alvo.includes(q);
       })
       .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
