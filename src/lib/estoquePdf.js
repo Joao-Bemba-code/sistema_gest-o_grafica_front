@@ -191,8 +191,12 @@ export async function gerarRequisicaoPDF(mov, org = {}, requisicao = null) {
   const dt = new Date(mov.createdAt);
   const dataStr = isNaN(dt.getTime()) ? "—" : dt.toLocaleDateString("pt-PT");
   const horaStr = isNaN(dt.getTime()) ? "—" : dt.toLocaleTimeString("pt-PT");
-  const interna = mov.tipo === "saida" && mov.tipo_requisicao === "interna";
-  const parteNome = ehEntrada ? (mov.fornecedor_nome || "—") : interna ? (mov.destino || "Consumo interno") : (mov.cliente_nome || "—");
+  // A base guarda o destino da requisição interna dentro do motivo, por isso a
+  // leitura passa pelo helper em vez de esperar colunas próprias.
+  const req = identificarRequisicaoStock(mov);
+  const interna = req.interna;
+  const motivoLimpo = String(mov.motivo || "").replace(/^Requisição interna:\s*/, "");
+  const parteNome = ehEntrada ? (mov.fornecedor_nome || "—") : interna ? (req.destino || "—") : (mov.cliente_nome || "—");
 
   autoTable(doc, {
     startY: linhaY + 6,
@@ -241,9 +245,9 @@ export async function gerarRequisicaoPDF(mov, org = {}, requisicao = null) {
   autoTable(doc, {
     startY: yFim,
     body: [
-      ...(mov.tipo === "saida" && mov.tipo_requisicao ? [["Tipo de requisição", interna ? "Interna" : "Para cliente"]] : []),
+      ...(mov.tipo === "saida" && req.identificada ? [["Tipo de requisição", interna ? "Interna" : "Para cliente"]] : []),
       [ehEntrada ? "Fornecedor" : interna ? "Destino / sector" : "Cliente", parteNome],
-      ...(interna ? [["Motivo", mov.motivo || "—"]] : []),
+      ...(interna && motivoLimpo && motivoLimpo !== req.destino ? [["Motivo", motivoLimpo]] : []),
       ...(mov.lote ? [["Lote", mov.lote]] : []),
       ...(mov.validade ? [["Validade", mov.validade]] : []),
       ["Observações", obsText],

@@ -69,6 +69,7 @@ export default function MovimentacoesModal({ open, onClose, movimentos, filtrado
           <div className="space-y-1.5 max-h-[50vh] overflow-y-auto pr-1 custom-scrollbar">
             {visiveis.map((m) => {
               const cfg = tipoCfg[m.tipo] || tipoCfg.saida;
+              const req = identificarRequisicaoStock(m);
               return (
                 <div key={m.id} className="flex items-center justify-between gap-3 obsidian-glass rounded-lg px-3 py-2.5 border border-outline-variant/30">
                   <div className="min-w-0">
@@ -77,7 +78,7 @@ export default function MovimentacoesModal({ open, onClose, movimentos, filtrado
                       <span className="text-xs font-bold text-foreground truncate">{m.material?.nome || "—"}</span>
                     </div>
                     <p className="text-[10px] font-mono text-muted-foreground mt-0.5">
-                      {formatHora(m.createdAt)} • {m.tipo === "entrada" ? `Fornecedor: ${m.fornecedor_nome || "—"}` : m.tipo === "transferencia" ? `Destino: ${m.material_destino_id || "—"}` : m.tipo === "saida" ? (m.tipo_requisicao === "interna" ? `Interna · ${m.destino || "Consumo interno"}` : `Cliente: ${m.cliente_nome || "—"}`) : `Motivo: ${m.motivo || "—"}${m.material_destino_id ? ` → Material #${m.material_destino_id}` : ""}`}
+                      {formatHora(m.createdAt)} • {m.tipo === "entrada" ? `Fornecedor: ${m.fornecedor_nome || "—"}` : m.tipo === "transferencia" ? `Destino: ${m.material_destino_id || "—"}` : m.tipo === "saida" ? (req.interna ? `Interna · ${req.destino || "Consumo interno"}` : `Cliente: ${m.cliente_nome || "—"}`) : `Motivo: ${m.motivo || "—"}${m.material_destino_id ? ` → Material #${m.material_destino_id}` : ""}`}
                       {m.lote ? ` • Lote ${m.lote}` : ""}
                     </p>
                     <p className="text-[10px] text-muted-foreground">

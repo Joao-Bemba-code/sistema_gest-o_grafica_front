@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo } from "react";
 import { extrato } from "@/services/materiais";
 import { listar as listarRequisicoes } from "@/services/requisicoesMaterial";
 import { gerarRequisicaoPDF } from "@/lib/estoquePdf";
+import { identificarRequisicaoStock } from "@/lib/requisicaoStock";
 import { useToast } from "@/components/Toast";
 
 export default function useMovimentacoes({ org }) {
@@ -66,7 +67,8 @@ export default function useMovimentacoes({ org }) {
       .filter((m) => filtro === "todos" || m.tipo === filtro)
       .filter((m) => {
         if (!q) return true;
-        const alvo = `${m.material?.nome || ""} ${m.fornecedor_nome || ""} ${m.cliente_nome || ""} ${m.tipo_requisicao || ""} ${m.destino || ""} ${m.motivo || ""} ${m.lote || ""} ${m.solicitado_por || ""}`.toLowerCase();
+        const req = identificarRequisicaoStock(m);
+        const alvo = `${m.material?.nome || ""} ${m.fornecedor_nome || ""} ${m.cliente_nome || ""} ${req.interna ? `interna ${req.destino}` : ""} ${m.motivo || ""} ${m.lote || ""} ${m.solicitado_por || ""}`.toLowerCase();
         return alvo.includes(q);
       })
       .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));

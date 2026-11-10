@@ -191,21 +191,22 @@ export default function useEstoque() {
     const qtd = Number(dados.quantidade);
     const isEntrada = tipo === "entrada";
     const motivos = { entrada: "Entrada manual", saida: "Saída manual", perda: `Perda — ${dados.motivo || ""}`, desperdicio: `Desperdício — ${dados.motivo || ""}` };
+    // A API em produção não aceita saída sem contraparte: a requisição interna
+    // usa "Consumo interno" e leva o destino no motivo, porque a base ainda não
+    // tem colunas próprias para tipo_requisicao/destino.
+    const interna = tipo === "saida" && dados.tipo_requisicao === "interna";
+    const baixa = tipo === "saida" ? dadosBaixaStock(dados) : null;
     const payload = {
       material_id: item.id,
       tipo,
       quantidade: qtd,
-      motivo: tipo === "saida" && dados.tipo_requisicao === "interna" ? dados.motivo : motivos[tipo] || tipo,
-      ...(isEntrada ? { fornecedor_nome: dados.fornecedor } : tipo === "saida" ? {
-        cliente_nome: dados.tipo_requisicao === "interna" ? null : dados.cliente,
-        tipo_requisicao: dados.tipo_requisicao,
-        destino: dados.tipo_requisicao === "interna" ? dados.destino : null,
-      } : {}),
+      motivo: baixa ? baixa.motivo : motivos[tipo] || tipo,
+      ...(isEntrada ? { fornecedor_nome: dados.fornecedor } : baixa ? { cliente_nome: baixa.cliente_nome } : {}),
       solicitado_por: dados.solicitado_por || undefined,
       permitido_por: dados.permitido_por || undefined,
       lote: dados.lote || undefined,
       validade: dados.validade || undefined,
-      observacoes: dados.detalhes || dados.observacoes || undefined,
+      observacoes: (interna ? baixa.observacoes : dados.detalhes || dados.observacoes) || undefined,
     };
     const antes = materiais;
     setMateriais((prev) =>
