@@ -24,6 +24,7 @@ import {
 import { podeAtual } from "@/lib/permissoes";
 import { getUsuario } from "@/services/auth";
 import { listar, auxiliares, criar, cancelar as cancelarRequisicao } from "@/services/requisicoesMaterial";
+import { avisarNotificacoes } from "@/hooks/useNotificacoes";
 import RequisicaoMaterialFormModal from "./RequisicaoMaterialFormModal";
 
 const ESTADO_META = {
@@ -36,6 +37,18 @@ const ESTADO_META = {
 
 // O backend etiqueta consumo interno assim; não é um cliente.
 const CONSUMO_INTERNO = "Consumo interno / produção";
+
+// O nome guardado é a fonte de verdade. O cliente_id pode faltar em registos
+// antigos (ou quando a OP só trazia o cliente pelo orçamento) e isso não
+// significa que a requisição seja de consumo interno.
+function nomeDoCliente(r) {
+  const nome = String(r?.cliente_nome || "").trim();
+  return nome || CONSUMO_INTERNO;
+}
+
+function temCliente(r) {
+  return Boolean(r?.cliente_id) || nomeDoCliente(r) !== CONSUMO_INTERNO;
+}
 
 const CAMPOS = [
   { value: "numero", label: "Número", obter: (r) => r.numero || "" },
@@ -124,6 +137,7 @@ export default function RequisicoesTab() {
     try {
       await criar(dados);
       await carregar();
+      avisarNotificacoes();
       addToast("Requisição enviada — aguarda aprovação do Estoque", "success");
       return true;
     } catch (err) {
@@ -143,6 +157,7 @@ export default function RequisicoesTab() {
     try {
       await cancelarRequisicao(cancelando.id);
       await carregar();
+      avisarNotificacoes();
       addToast(`Requisição ${cancelando.numero} cancelada`, "success");
       setCancelando(null);
     } catch (err) {
@@ -233,8 +248,8 @@ export default function RequisicoesTab() {
                     )}
                   </LedgerTd>
                   <LedgerTd className="max-w-52">
-                    <span className="block truncate text-sm">{r.cliente_nome || CONSUMO_INTERNO}</span>
-                    {!r.cliente_id && <span className="block text-xs text-muted-foreground">Consumo interno</span>}
+                    <span className="block truncate text-sm">{nomeDoCliente(r)}</span>
+                    {!temCliente(r) && <span className="block text-xs text-muted-foreground">Sem cliente associado</span>}
                   </LedgerTd>
                   <LedgerTd className="text-muted-foreground">{r.solicitado_por || "—"}</LedgerTd>
                   <LedgerTd className="text-right tabular-nums">{(r.itens || []).length}</LedgerTd>
@@ -277,7 +292,7 @@ export default function RequisicoesTab() {
               <StatusBadge tom={(ESTADO_META[reqDetalhe.estado] || ESTADO_META.pendente).tom}>
                 {(ESTADO_META[reqDetalhe.estado] || ESTADO_META.pendente).label}
               </StatusBadge>
-              {!reqDetalhe.cliente_id && <StatusBadge tom="neutral">Consumo interno</StatusBadge>}
+              {!temCliente(reqDetalhe) && <StatusBadge tom="neutral">Consumo interno</StatusBadge>}
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
               {[

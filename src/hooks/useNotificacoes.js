@@ -17,6 +17,13 @@ function chaveLidas() {
 
 const prioridade = { error: 0, warning: 1, info: 2, success: 3 };
 
+// Pede à campainha para recarregar já (criar/aprovar/rejeitar não espera 30s).
+export function avisarNotificacoes() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("sigraf:notificacoes"));
+  }
+}
+
 function formatHora(v) {
   if (!v) return "—";
   const d = new Date(v);
@@ -149,14 +156,20 @@ export default function useNotificacoes() {
             });
         }
 
+        // Não lidas primeiro; dentro de cada grupo, o nível mais grave e depois
+        // o mais recente. A lista fica completa no estado: cortar aqui escondia
+        // notificações do backend e fazia o contador da campainha mentir.
         nova.sort((a, b) => {
+          const la = a.lida ? 1 : 0;
+          const lb = b.lida ? 1 : 0;
+          if (la !== lb) return la - lb;
           const pa = prioridade[a.nivel] ?? 9;
           const pb = prioridade[b.nivel] ?? 9;
           if (pa !== pb) return pa - pb;
           return new Date(b.tempo) - new Date(a.tempo);
         });
 
-        setItens(nova.slice(0, 12));
+        setItens(nova);
         setCarregando(false);
       });
   }, []);
@@ -167,11 +180,16 @@ export default function useNotificacoes() {
     const aoVoltar = () => {
       if (document.visibilityState === "visible") carregar();
     };
+    // Quem cria/aprova uma requisição avisa a campainha de imediato, sem
+    // esperar os 30 segundos do ciclo.
+    const aoAtualizar = () => carregar();
     window.addEventListener("focus", aoVoltar);
+    window.addEventListener("sigraf:notificacoes", aoAtualizar);
     document.addEventListener("visibilitychange", aoVoltar);
     return () => {
       clearInterval(intervalo);
       window.removeEventListener("focus", aoVoltar);
+      window.removeEventListener("sigraf:notificacoes", aoAtualizar);
       document.removeEventListener("visibilitychange", aoVoltar);
     };
   }, [carregar]);

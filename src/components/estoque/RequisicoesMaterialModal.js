@@ -26,6 +26,13 @@ const FILTROS = [
 
 const ORDEM_ESTADOS = { pendente: 0, aprovada: 1, rejeitada: 2, cancelada: 3, consumida: 4 };
 
+const SEM_CLIENTE = "Consumo interno / produção";
+
+// O nome guardado manda: o cliente_id pode faltar em registos antigos sem que
+// a requisição seja de consumo interno.
+const nomeCliente = (r) => String(r?.cliente_nome || "").trim() || SEM_CLIENTE;
+const temCliente = (r) => Boolean(r?.cliente_id) || nomeCliente(r) !== SEM_CLIENTE;
+
 // "04/11/2026 às 14:30" — a data e a hora da entrega do material.
 const dataHora = (v) => {
   if (!v) return "";
@@ -226,13 +233,13 @@ export default function RequisicoesMaterialModal({
                               <Icon name="precision_manufacturing" className="text-[11px]" /> OP {r.ordem_producao_numero}
                             </span>
                           )}
-                          {!r.cliente_id && (
+                          {!temCliente(r) && (
                             <span className="pill pill-muted text-[9px]">
                               <Icon name="factory" className="text-[11px]" /> Consumo interno
                             </span>
                           )}
                         </div>
-                        <p className="text-sm font-semibold text-foreground mt-1">{r.cliente_nome}</p>
+                        <p className="text-sm font-semibold text-foreground mt-1">{nomeCliente(r)}</p>
                         <p className="text-[11px] text-muted-foreground">
                           Pedido por {r.solicitado_por || "—"}
                           {r.data_requisicao

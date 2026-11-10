@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/Ledger";
 import useEstoque from "@/hooks/useEstoque";
 import useMovimentacoes from "@/hooks/useMovimentacoes";
+import { avisarNotificacoes } from "@/hooks/useNotificacoes";
 import KpiGrid from "@/components/estoque/KpiGrid";
 import MovimentacaoModal from "@/components/estoque/MovimentacaoModal";
 import MovimentacoesModal from "@/components/estoque/MovimentacoesModal";
@@ -339,11 +340,27 @@ export default function EstoquePage() {
     }
   }, [addToast]);
 
+  // O link da notificação chega como /estoque?requisicoes=1: abre o painel,
+  // senão o utilizador não encontra o pedido que a campainha anunciou.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const p = new URLSearchParams(window.location.search);
+    if (p.get("requisicoes") !== "1") return;
+    const timer = setTimeout(() => {
+      abrirRequisicoes();
+      p.delete("requisicoes");
+      const q = p.toString();
+      router.replace(`/estoque${q ? `?${q}` : ""}`, { scroll: false });
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [abrirRequisicoes, router]);
+
   const confirmarAprovacaoRequisicao = useCallback(
     async (requisicao, dados) => {
       try {
         await aprovarRequisicao(requisicao.id, dados);
         await Promise.all([recarregarRequisicoes(), carregar()]);
+        avisarNotificacoes();
         addToast(
           `Requisição ${requisicao.numero} aprovada — saída registada: preparou ${dados?.preparado_por || "?"}, entregou ${dados?.entregue_por || "?"}, recebeu ${dados?.recebido_por || "?"}`,
           "success"
@@ -368,6 +385,7 @@ export default function EstoquePage() {
       try {
         await rejeitarRequisicao(requisicao.id, motivo);
         await recarregarRequisicoes();
+        avisarNotificacoes();
         addToast(`Requisição ${requisicao.numero} rejeitada`, "success");
         return true;
       } catch (err) {

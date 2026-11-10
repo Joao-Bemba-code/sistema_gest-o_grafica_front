@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Icon from "@/components/Icon";
 import { cn } from "@/lib/utils";
 import OrdensTab from "@/components/producao/OrdensTab";
@@ -23,6 +23,14 @@ const abas = [
 
 export default function ProducaoPage() {
   const [tab, setTab] = useState("encomendas");
+  // Link da campainha: /producao?tab=requisicoes abre logo a aba certa.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (!t || !abas.some((a) => a.id === t)) return;
+    const timer = setTimeout(() => setTab(t), 0);
+    return () => clearTimeout(timer);
+  }, []);
   const [novaOpOpen, setNovaOpOpen] = useState(false);
   const [novaOpPrefill, setNovaOpPrefill] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
