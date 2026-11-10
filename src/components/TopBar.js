@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { logout } from "@/services/auth";
@@ -41,6 +41,37 @@ const COR_NIVEL = {
   info: "text-primary",
 };
 
+// Faixa à esquerda e chip do ícone: dão cor e peso a cada notificação para
+// que se distinga o nível à primeira vista, mesmo com a lista fechada.
+const CHIP_NIVEL = {
+  error: "bg-error/15",
+  warning: "bg-warning/15",
+  success: "bg-success/15",
+  info: "bg-primary/15",
+};
+
+const BARRA_NIVEL = {
+  error: "border-l-error",
+  warning: "border-l-warning",
+  success: "border-l-success",
+  info: "border-l-primary",
+};
+
+function tempoRelativo(v) {
+  if (!v) return "";
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return "";
+  const min = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (min < 1) return "agora";
+  if (min < 60) return `há ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `há ${h} h`;
+  const dias = Math.floor(h / 24);
+  if (dias === 1) return "ontem";
+  if (dias < 7) return `há ${dias} dias`;
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" });
+}
+
 const iconBtn =
   "relative inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
 
@@ -62,7 +93,17 @@ export default function TopBar({ onOpenMenu = () => {}, onToggleColapso = () => 
   const [notifAberto, setNotifAberto] = useState(false);
   const [perfilAberto, setPerfilAberto] = useState(false);
   const { notificacoes, carregando, naoLidas, marcarLida, marcarTodasLidas } = useNotificacoes();
-  const naoLidasIds = new Set(naoLidas.map((n) => n.id));
+  const naoLidasIds = useMemo(() => new Set(naoLidas.map((n) => n.id)), [naoLidas]);
+  // Não lidas primeiro: assim o que ainda não foi visto aparece no topo da lista.
+  const listaNotif = useMemo(
+    () =>
+      [...notificacoes].sort(
+        (a, b) => (naoLidasIds.has(a.id) ? 0 : 1) - (naoLidasIds.has(b.id) ? 0 : 1)
+      ),
+    [notificacoes, naoLidasIds]
+  );
+  const temErro = naoLidas.some((n) => n.nivel === "error");
+  const temAviso = naoLidas.some((n) => n.nivel === "warning");
   const sinoRef = useRef(null);
   const perfilRef = useRef(null);
 
@@ -154,26 +195,44 @@ export default function TopBar({ onOpenMenu = () => {}, onToggleColapso = () => 
             onClick={() => setNotifAberto((v) => !v)}
             aria-label={naoLidas.length > 0 ? `Notificações (${naoLidas.length} por ler)` : "Notificações"}
             aria-expanded={notifAberto}
-            title="Notificações"
-            className={iconBtn}
+            title={naoLidas.length > 0 ? `${naoLidas.length} notificação(ões) por ler` : "Notificações"}
+            className={cn(
+              iconBtn,
+              naoLidas.length > 0 && "bg-error/10 text-foreground ring-1 ring-error/25"
+            )}
           >
             <LuBell className="h-[18px] w-[18px]" />
             {naoLidas.length > 0 && (
-              <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-card bg-error text-[9px] font-bold text-white">
+              <span
+                className={cn(
+                  "absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-card px-1 text-[10px] font-bold leading-none text-white",
+                  temErro ? "bg-error" : temAviso ? "bg-warning" : "bg-primary"
+                )}
+              >
                 {naoLidas.length > 9 ? "9+" : naoLidas.length}
               </span>
             )}
           </button>
           {notifAberto && (
-            <div className="absolute right-0 top-full z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border bg-popover shadow-dropdown">
+            <div className="absolute right-0 top-full z-50 mt-2 w-[24rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border bg-popover shadow-dropdown">
               <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
-                <p className="text-sm font-semibold text-foreground">Notificações</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-foreground">Notificações</p>
+                  {naoLidas.length > 0 && (
+                    <span className={cn(
+                      "rounded-full px-2 py-0.5 text-[10px] font-bold",
+                      temErro ? "bg-error/10 text-error" : "bg-primary/10 text-primary"
+                    )}>
+                      {naoLidas.length} por ler
+                    </span>
+                  )}
+                </div>
                 {naoLidas.length > 0 && (
                   <button
                     onClick={marcarTodasLidas}
                     className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80"
                   >
-                    <LuCheckCheck className="h-3.5 w-3.5" /> Marcar como lidas
+                    <LuCheckCheck className="h-3.5 w-3.5" /> Marcar lidas
                   </button>
                 )}
               </div>
@@ -186,8 +245,8 @@ export default function TopBar({ onOpenMenu = () => {}, onToggleColapso = () => 
                     <p className="text-xs text-muted-foreground">Sem notificações</p>
                   </div>
                 ) : (
-                  <div className="space-y-0.5">
-                    {notificacoes.map((n) => {
+                  <div className="space-y-1">
+                    {listaNotif.map((n) => {
                       const unread = naoLidasIds.has(n.id);
                       const Icone = ICONE_NIVEL[n.nivel] || LuInfo;
                       return (
@@ -199,21 +258,31 @@ export default function TopBar({ onOpenMenu = () => {}, onToggleColapso = () => 
                             setNotifAberto(false);
                           }}
                           className={cn(
-                            "flex w-full items-start gap-3 rounded-lg p-3 text-left hover:bg-muted",
-                            !unread && "opacity-55"
+                            "flex w-full items-start gap-3 rounded-r-lg border-l-[3px] p-3 text-left transition-colors hover:bg-muted",
+                            BARRA_NIVEL[n.nivel] || "border-l-primary",
+                            unread ? "bg-muted/70" : "bg-transparent opacity-60"
                           )}
                         >
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                          <span className={cn(
+                            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                            CHIP_NIVEL[n.nivel] || "bg-primary/15"
+                          )}>
                             <Icone className={cn("h-4 w-4", COR_NIVEL[n.nivel] || "text-primary")} />
                           </span>
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className={cn("truncate text-sm font-medium", unread ? "text-foreground" : "text-muted-foreground")}>
+                            <div className="flex items-start justify-between gap-2">
+                              <p className={cn(
+                                "text-[13px] leading-snug",
+                                unread ? "font-semibold text-foreground" : "font-medium text-muted-foreground"
+                              )}>
                                 {n.titulo}
                               </p>
-                              {unread && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-label="Não lida" />}
+                              {unread && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-error" aria-label="Não lida" />}
                             </div>
-                            <p className="mt-0.5 truncate text-xs text-muted-foreground">{n.desc}</p>
+                            {n.desc && (
+                              <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-muted-foreground">{n.desc}</p>
+                            )}
+                            <p className="mt-1 text-[10px] font-medium text-muted-foreground/90">{tempoRelativo(n.tempo)}</p>
                           </div>
                         </Link>
                       );
