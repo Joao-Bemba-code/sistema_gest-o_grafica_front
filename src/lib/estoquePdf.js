@@ -177,6 +177,25 @@ function finalizarComRodape(doc) {
 // ============================================================
 // REQUISIÇÃO DE MATERIAL
 // ============================================================
+// A requisição guarda quem preparou/entregou/recebeu. Movimentos antigos têm
+// essa informação apenas na observação ("Preparado por X · entregue por Y ·
+// recebido por Z"), por isso há uma segunda leitura como rede de segurança.
+function preparacaoDoMovimento(mov, requisicao) {
+  const partes = String(mov?.observacoes || "")
+    .split("·")
+    .map((s) => s.trim());
+  const ler = (prefixo) => {
+    const parte = partes.find((s) => s.toLowerCase().startsWith(prefixo));
+    return parte ? parte.slice(prefixo.length).trim() : "";
+  };
+  return {
+    preparado_por: requisicao?.preparado_por || ler("preparado por") || "—",
+    entregue_por: requisicao?.entregue_por || ler("entregue por") || "—",
+    recebido_por: requisicao?.recebido_por || ler("recebido por") || "—",
+    entregue_em: requisicao?.entregue_em || null,
+  };
+}
+
 export async function gerarRequisicaoPDF(mov, org = {}, requisicao = null) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
@@ -185,6 +204,8 @@ export async function gerarRequisicaoPDF(mov, org = {}, requisicao = null) {
   const mat = mov.material || {};
   const cat = mat.categoria?.nome || especificacoesObjeto(mat.especificacoes).categoria || "—";
   const ehEntrada = mov.tipo === "entrada";
+  // O custo unitário interessa à entrada (compra); nas saídas a ficha mostra
+  // apenas o que saiu, sem valores.
   const custoUnit = mat.custo_unitario != null ? mat.custo_unitario : mat.custo_unit;
   const custoStr = custoUnit != null && Number(custoUnit) > 0 ? formatKz(custoUnit) : "—";
 
@@ -196,7 +217,14 @@ export async function gerarRequisicaoPDF(mov, org = {}, requisicao = null) {
   const req = identificarRequisicaoStock(mov);
   const interna = req.interna;
   const motivoLimpo = String(mov.motivo || "").replace(/^Requisição interna:\s*/, "");
-  const parteNome = ehEntrada ? (mov.fornecedor_nome || "—") : interna ? (req.destino || "—") : (mov.cliente_nome || "—");
+  // O movimento guarda o cliente da altura da saída; a requisição já traz o
+  // cliente actual (resolvido pela OP), por isso tem prioridade.
+  const clienteAtual = String(requisicao?.cliente_nome || "").trim();
+  const parteNome = ehEntrada
+    ? (mov.fornecedor_nome || "—")
+    : interna
+      ? (req.destino || "—")
+      : (clienteAtual && clienteAtual !== "Consumo interno / produção" ? clienteAtual : (mov.cliente_nome || "—"));
 
   autoTable(doc, {
     startY: linhaY + 6,
@@ -211,20 +239,31 @@ export async function gerarRequisicaoPDF(mov, org = {}, requisicao = null) {
 
   autoTable(doc, {
     startY: y,
-    head: [["ID", "Nome", "Quantidade", "Custo Unitário"]],
-    body: [[mat.id ?? "—", mat.nome || "—", `${Number(mov.quantidade)} ${mat.unidade || "un"}`, custoStr]],
+    head: [ehEntrada ? ["ID", "Nome", "Quantidade", "Custo Unitário"] : ["ID", "Nome", "Quantidade"]],
+    body: [
+      ehEntrada
+        ? [mat.id ?? "—", mat.nome || "—", `${Number(mov.quantidade)} ${mat.unidade || "un"}`, custoStr]
+        : [mat.id ?? "—", mat.nome || "—", `${Number(mov.quantidade)} ${mat.unidade || "un"}`],
+    ],
     ...TEMA_RELATORIO,
-    columnStyles: colunasProporcionais(
-      [1, 4, 1.6, 1.4],
-      { 0: { halign: "center" }, 2: { halign: "right" }, 3: { halign: "right" } }
-    ),
+    columnStyles: ehEntrada
+      ? colunasProporcionais(
+          [1, 4, 1.6, 1.4],
+          { 0: { halign: "center" }, 2: { halign: "right" }, 3: { halign: "right" } }
+        )
+      : colunasProporcionais(
+          [1, 5, 1.6],
+          { 0: { halign: "center" }, 2: { halign: "right" } }
+        ),
   });
 
   // Preparação e entrega: os três nomes e a data/hora ficam na requisição, não
-  // no movimento, por isso só aparecem quando a requisição foi encontrada.
+  // no movimento. Quando a requisição já não está acessível, recuperam-se da
+  // observação gravada na aprovação, para a ficha nunca sair sem esse rasto.
   let yFim = doc.lastAutoTable.finalY + 8;
-  if (requisicao) {
-    const quando = requisicao.entregue_em ? new Date(requisicao.entregue_em) : null;
+  if (!ehEntrada) {
+    const prep = preparacaoDoMovimento(mov, requisicao);
+    const quando = prep.entregue_em ? new Date(prep.entregue_em) : null;
     const dataHora =
       quando && !isNaN(quando.getTime())
         ? `${quando.toLocaleDateString("pt-PT")} às ${quando.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}`
@@ -233,7 +272,7 @@ export async function gerarRequisicaoPDF(mov, org = {}, requisicao = null) {
     autoTable(doc, {
       startY: yFim,
       head: [["Preparou", "Entregou", "Recebeu", "Data e hora da saída"]],
-      body: [[requisicao.preparado_por || "—", requisicao.entregue_por || "—", requisicao.recebido_por || "—", dataHora]],
+      body: [[prep.preparado_por, prep.entregue_por, prep.recebido_por, dataHora]],
       ...TEMA_RELATORIO,
       columnStyles: colunasProporcionais([1.4, 1.4, 1.4, 1.8]),
     });
@@ -241,7 +280,9 @@ export async function gerarRequisicaoPDF(mov, org = {}, requisicao = null) {
   }
 
   const obsBruta = (mov.observacoes || "").trim();
-  const obsText = (requisicao && obsBruta.startsWith("Preparado por")) || !obsBruta ? "—" : obsBruta;
+  const obsEBaixa =
+    obsBruta.toLowerCase().startsWith("preparado por") || !obsBruta;
+  const obsText = obsEBaixa ? "—" : obsBruta;
   autoTable(doc, {
     startY: yFim,
     body: [

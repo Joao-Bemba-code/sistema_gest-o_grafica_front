@@ -23,7 +23,9 @@ import {
 } from "@/components/ui/Ledger";
 import { podeAtual } from "@/lib/permissoes";
 import { getUsuario } from "@/services/auth";
+import { buscarOrganizacao } from "@/services/configuracoes";
 import { listar, auxiliares, criar, cancelar as cancelarRequisicao } from "@/services/requisicoesMaterial";
+import { gerarRequisicaoMaterialPdf, gerarRelatorioRequisicoesPdf } from "@/lib/requisicoesMaterialPdf";
 import { avisarNotificacoes } from "@/hooks/useNotificacoes";
 import RequisicaoMaterialFormModal from "./RequisicaoMaterialFormModal";
 
@@ -37,6 +39,9 @@ const ESTADO_META = {
 
 // O backend etiqueta consumo interno assim; não é um cliente.
 const CONSUMO_INTERNO = "Consumo interno / produção";
+
+const pillBase = "inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium whitespace-nowrap transition-colors";
+const pillInativa = "text-muted-foreground hover:bg-muted hover:text-foreground";
 
 // O nome guardado é a fonte de verdade. O cliente_id pode faltar em registos
 // antigos (ou quando a OP só trazia o cliente pelo orçamento) e isso não
@@ -78,6 +83,8 @@ export default function RequisicoesTab() {
   const [requisicoes, setRequisicoes] = useState([]);
   const [ordens, setOrdens] = useState([]);
   const [materiais, setMateriais] = useState([]);
+  const [empresa, setEmpresa] = useState({});
+  const [pdfId, setPdfId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [aberto, setAberto] = useState(false);
   const [sessao, setSessao] = useState(0);
@@ -90,7 +97,7 @@ export default function RequisicoesTab() {
   const podeCriar = podeAtual("producao", "criar");
 
   const carregar = useCallback(async () => {
-    const [reqs, aux] = await Promise.allSettled([listar(), auxiliares()]);
+    const [reqs, aux, orgRes] = await Promise.allSettled([listar(), auxiliares(), buscarOrganizacao()]);
     if (reqs.status === "fulfilled") {
       setRequisicoes(Array.isArray(reqs.value) ? reqs.value : []);
     } else {
@@ -116,6 +123,11 @@ export default function RequisicoesTab() {
           : aux.reason?.response?.data?.erro || "Erro ao carregar ordens de produção e materiais",
         "error"
       );
+    }
+    // O cabeçalho dos PDFs usa os dados da organização; se falhar, o PDF sai
+    // com o nome por omissão e a lista continua a funcionar.
+    if (orgRes.status === "fulfilled" && orgRes.value) {
+      setEmpresa(orgRes.value?.organizacao || orgRes.value || {});
     }
   }, [addToast]);
 
@@ -193,6 +205,26 @@ export default function RequisicoesTab() {
 
   const reqDetalhe = detalhe ? requisicoes.find((r) => r.id === detalhe) || null : null;
 
+  const gerarPdfRequisicao = async (r) => {
+    if (!r) return;
+    setPdfId(r.id);
+    try {
+      await gerarRequisicaoMaterialPdf(r, empresa);
+    } catch {
+      addToast("Erro ao gerar o PDF da requisição", "error");
+    } finally {
+      setPdfId(null);
+    }
+  };
+
+  const gerarPdfListagem = async () => {
+    try {
+      await gerarRelatorioRequisicoesPdf(resultado, empresa, { termo: filtro.termo });
+    } catch {
+      addToast("Erro ao gerar o relatório de requisições", "error");
+    }
+  };
+
   if (loading) return <CardSkeleton lines={6} />;
 
   return (
@@ -219,6 +251,16 @@ export default function RequisicoesTab() {
             placeholder="Pesquisar por nº, cliente, solicitante ou material..."
           />
         )}
+        <div className="flex flex-wrap items-center justify-end gap-1.5 px-4 py-2">
+          <button
+            type="button"
+            onClick={gerarPdfListagem}
+            disabled={resultado.length === 0}
+            className={`${pillBase} ${pillInativa} disabled:pointer-events-none disabled:opacity-50`}
+          >
+            <Icon name="picture_as_pdf" className="text-sm" /> Relatório em PDF
+          </button>
+        </div>
         <LedgerTable>
           <thead>
             <tr className="border-b border-border">
@@ -262,6 +304,7 @@ export default function RequisicoesTab() {
                       ariaLabel="Ações da requisição"
                       itens={[
                         { icone: "visibility", rotulo: "Ver detalhes", onClick: () => setDetalhe(r.id) },
+                        { icone: "picture_as_pdf", rotulo: "Gerar PDF", onClick: () => gerarPdfRequisicao(r) },
                         ...(r.estado === "pendente" && podeAtual("producao", "editar") ? [{ icone: "close", rotulo: "Cancelar requisição", danger: true, onClick: () => setCancelando(r) }] : []),
                       ]}
                     />
@@ -348,13 +391,21 @@ export default function RequisicoesTab() {
               <p className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-xs text-error">Rejeitada — {reqDetalhe.motivo_rejeicao}</p>
             )}
 
-            {reqDetalhe.estado === "pendente" && podeAtual("producao", "editar") && (
-              <div className="flex justify-end">
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                loading={pdfId === reqDetalhe.id}
+                onClick={() => gerarPdfRequisicao(reqDetalhe)}
+              >
+                <Icon name="picture_as_pdf" className="text-[16px]" /> Gerar PDF
+              </Button>
+              {reqDetalhe.estado === "pendente" && podeAtual("producao", "editar") && (
                 <Button variant="destructive" size="sm" onClick={() => { setDetalhe(null); setCancelando(reqDetalhe); }}>
                   <Icon name="close" className="text-[16px]" /> Cancelar requisição
                 </Button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         )}
       </Modal>

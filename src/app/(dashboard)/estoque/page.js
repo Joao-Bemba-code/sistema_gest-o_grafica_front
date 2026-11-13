@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Icon from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
 import FloatButton from "@/components/ui/FloatButton";
@@ -101,7 +101,16 @@ const tabAtiva = "bg-primary font-semibold text-primary-foreground shadow-sm";
 const tabInativa = "text-muted-foreground hover:bg-muted hover:text-foreground";
 
 export default function EstoquePage() {
+  return (
+    <Suspense fallback={<CardSkeleton lines={8} />}>
+      <ConteudoEstoque />
+    </Suspense>
+  );
+}
+
+function ConteudoEstoque() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { addToast } = useToast();
   const {
     materiais, categorias, fornecedores, clientes, org, formatos,
@@ -341,19 +350,21 @@ export default function EstoquePage() {
   }, [addToast]);
 
   // O link da notificação chega como /estoque?requisicoes=1: abre o painel,
-  // senão o utilizador não encontra o pedido que a campainha anunciou.
+  // senão o utilizador não encontra o pedido que a campainha anunciou. Lê-se
+  // pelo useSearchParams (e não do window.location) para funcionar também
+  // quando o clique acontece já com a página de estoque aberta.
+  const querRequisicoes = searchParams.get("requisicoes") === "1";
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const p = new URLSearchParams(window.location.search);
-    if (p.get("requisicoes") !== "1") return;
+    if (!querRequisicoes) return;
     const timer = setTimeout(() => {
       abrirRequisicoes();
+      const p = new URLSearchParams(window.location.search);
       p.delete("requisicoes");
       const q = p.toString();
       router.replace(`/estoque${q ? `?${q}` : ""}`, { scroll: false });
     }, 0);
     return () => clearTimeout(timer);
-  }, [abrirRequisicoes, router]);
+  }, [querRequisicoes, abrirRequisicoes, router]);
 
   const confirmarAprovacaoRequisicao = useCallback(
     async (requisicao, dados) => {
