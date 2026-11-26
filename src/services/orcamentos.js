@@ -10,6 +10,12 @@ export async function buscarPorId(id) {
   return data;
 }
 
+// Saldo em aberto do cliente face ao limite global de dívida.
+export async function saldoCliente(clienteId) {
+  const { data } = await api.get(`/orcamentos/saldo-cliente/${clienteId}`);
+  return data;
+}
+
 export async function criar(dados) {
   const { data } = await api.post("/orcamentos", dados);
   return data;

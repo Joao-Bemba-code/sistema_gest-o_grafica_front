@@ -22,6 +22,7 @@ import useEstoque from "@/hooks/useEstoque";
 import { useToast } from "@/components/Toast";
 import PedidoFormModal from "@/components/estoque/PedidoFormModal";
 import PedidoReceberModal from "@/components/estoque/PedidoReceberModal";
+import PedidoPagarModal from "@/components/estoque/PedidoPagarModal";
 import CadastrosTab from "@/components/vendas/CadastrosTab";
 import {
   listar as listarPedidos,
@@ -31,6 +32,7 @@ import {
   aprovar as aprovarPedido,
   rejeitar as rejeitarPedido,
   enviar as enviarPedido,
+  pagar as pagarPedido,
 } from "@/services/pedidos";
 import { gerarPedidoPDF } from "@/lib/estoquePdf";
 import { formatHora, formatKz, toNum } from "@/lib/estoque";
@@ -78,6 +80,7 @@ export default function ComprasPage() {
 
   const [novoPedido, setNovoPedido] = useState({ open: false, sessao: 0 });
   const [receber, setReceber] = useState({ open: false, pedido: null, sessao: 0 });
+  const [pagar, setPagar] = useState({ open: false, pedido: null, sessao: 0 });
   const [cancelar, setCancelar] = useState({ open: false, pedido: null });
   const [cancelando, setCancelando] = useState(false);
 
@@ -126,6 +129,7 @@ export default function ComprasPage() {
 
   const abrirNovoPedido = useCallback(() => setNovoPedido((s) => ({ open: true, sessao: s.sessao + 1 })), []);
   const abrirReceber = useCallback((pedido) => setReceber((s) => ({ open: true, pedido, sessao: s.sessao + 1 })), []);
+  const abrirPagar = useCallback((pedido) => setPagar((s) => ({ open: true, pedido, sessao: s.sessao + 1 })), []);
 
   const pedidoPdf = useCallback((pedido) => gerarPedidoPDF(pedido, org), [org]);
 
@@ -159,6 +163,23 @@ export default function ComprasPage() {
       }
     },
     [receber.pedido, recarregar, addToast]
+  );
+
+  const confirmarPagamento = useCallback(
+    async (dados) => {
+      const pedido = pagar.pedido;
+      if (!pedido) return false;
+      try {
+        await pagarPedido(pedido.id, dados);
+        await recarregar();
+        addToast(`Pagamento da encomenda ${pedido.numero} registado`, "success");
+        return true;
+      } catch (err) {
+        addToast(err.response?.data?.erro || "Erro ao registar o pagamento", "error");
+        return false;
+      }
+    },
+    [pagar.pedido, recarregar, addToast]
   );
 
   const aprovarEncomenda = useCallback(
@@ -336,6 +357,7 @@ export default function ComprasPage() {
                       <LedgerTh>Fornecedor</LedgerTh>
                       <LedgerTh>Valor (Kz)</LedgerTh>
                       <LedgerTh className="text-center">Estado</LedgerTh>
+                      <LedgerTh className="text-center">Pagamento</LedgerTh>
                       <LedgerTh className="w-10" />
                     </tr>
                   </thead>
@@ -354,6 +376,9 @@ export default function ComprasPage() {
                       if (p.estado === "enviado" && podeEditar) {
                         itens.push({ icone: "download", rotulo: "Registar entrada", onClick: () => abrirReceber(p) });
                       }
+                      if (!p.pago && p.estado !== "cancelado" && podeEditar) {
+                        itens.push({ icone: "payments", rotulo: "Registar pagamento", onClick: () => abrirPagar(p) });
+                      }
                       if (["pendente", "aprovado", "enviado"].includes(p.estado) && podeEditar) {
                         itens.push({ icone: "delete", rotulo: "Cancelar", danger: true, onClick: () => setCancelar({ open: true, pedido: p }) });
                       }
@@ -366,6 +391,11 @@ export default function ComprasPage() {
                           <LedgerTd className="max-w-40"><span className="block truncate">{p.fornecedor_nome}</span></LedgerTd>
                           <LedgerTd className="tabular-nums whitespace-nowrap">{toNum(p.total).toLocaleString("pt-AO")}</LedgerTd>
                           <LedgerTd className="text-center"><StatusBadge tom="neutral" className={st.badge}>{st.label}</StatusBadge></LedgerTd>
+                          <LedgerTd className="text-center">
+                            <StatusBadge tom={p.pago ? "success" : "warning"}>
+                              {p.pago ? "Pago" : `${toNum(p.saldo).toLocaleString("pt-AO")} Kz por pagar`}
+                            </StatusBadge>
+                          </LedgerTd>
                           <LedgerTd><RowMenu ariaLabel="Ações da encomenda" itens={itens} /></LedgerTd>
                         </LedgerTr>
                       );
@@ -383,11 +413,17 @@ export default function ComprasPage() {
                       <LedgerTh>Fornecedor</LedgerTh>
                       <LedgerTh>Valor (Kz)</LedgerTh>
                       <LedgerTh className="text-center">Estado</LedgerTh>
+                      <LedgerTh className="text-center">Pagamento</LedgerTh>
                       <LedgerTh className="w-10" />
                     </tr>
                   </thead>
                   <tbody>
-                    {visiveis.map((p) => (
+                    {visiveis.map((p) => {
+                      const acoes = [{ icone: "print", rotulo: "Imprimir (PDF)", onClick: () => pedidoPdf(p) }];
+                      if (!p.pago && podeEditar) {
+                        acoes.push({ icone: "payments", rotulo: "Registar pagamento", onClick: () => abrirPagar(p) });
+                      }
+                      return (
                       <LedgerTr key={p.id}>
                         <LedgerTd>
                           <IdCell id={p.numero} meta={formatHora(p.data_recebimento)} />
@@ -396,11 +432,17 @@ export default function ComprasPage() {
                         <LedgerTd className="max-w-40"><span className="block truncate">{p.fornecedor_nome}</span></LedgerTd>
                         <LedgerTd className="tabular-nums whitespace-nowrap">{toNum(p.total).toLocaleString("pt-AO")}</LedgerTd>
                         <LedgerTd className="text-center"><StatusBadge tom="success">Recebida</StatusBadge></LedgerTd>
+                        <LedgerTd className="text-center">
+                          <StatusBadge tom={p.pago ? "success" : "warning"}>
+                            {p.pago ? "Pago" : `${toNum(p.saldo).toLocaleString("pt-AO")} Kz por pagar`}
+                          </StatusBadge>
+                        </LedgerTd>
                         <LedgerTd>
-                          <RowMenu ariaLabel="Ações da recepção" itens={[{ icone: "print", rotulo: "Imprimir (PDF)", onClick: () => pedidoPdf(p) }]} />
+                          <RowMenu ariaLabel="Ações da recepção" itens={acoes} />
                         </LedgerTd>
                       </LedgerTr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </>
               )}
@@ -440,6 +482,14 @@ export default function ComprasPage() {
         pedido={receber.pedido}
         onClose={() => setReceber((s) => ({ ...s, open: false }))}
         onConfirm={confirmarRecebimento}
+      />
+
+      <PedidoPagarModal
+        key={`pagar-${pagar.sessao}`}
+        open={pagar.open}
+        pedido={pagar.pedido}
+        onClose={() => setPagar((s) => ({ ...s, open: false }))}
+        onConfirm={confirmarPagamento}
       />
 
       <ConfirmDialog

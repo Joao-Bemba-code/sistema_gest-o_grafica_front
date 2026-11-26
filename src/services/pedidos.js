@@ -34,3 +34,9 @@ export async function receber(id, itens) {
   const { data } = await api.post(`/pedidos/${id}/receber`, { itens });
   return data;
 }
+
+// Pagamento de fornecedor (à vista ou liquidação de crédito).
+export async function pagar(id, dados) {
+  const { data } = await api.post(`/pedidos/${id}/pagar`, dados);
+  return data;
+}

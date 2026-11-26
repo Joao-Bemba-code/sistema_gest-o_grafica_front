@@ -19,7 +19,9 @@ import {
   buscarPorId,
   criar,
   atualizar,
+  saldoCliente as consultarSaldoCliente,
 } from "@/services/orcamentos";
+import { getUsuario } from "@/services/auth";
 import { listar as listarClientes } from "@/services/clientes";
 import { listar as listarMateriais } from "@/services/materiais";
 import { listar as listarServicos } from "@/services/servicos";
@@ -49,6 +51,7 @@ function NovoOrcamentoInner() {
   const [materiais, setMateriais] = useState([]);
   const [servicosCatalogo, setServicosCatalogo] = useState([]);
   const [valorHoraServicos, setValorHoraServicos] = useState(0);
+  const [limiteInfo, setLimiteInfo] = useState(null);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [form, setForm] = useState({ ...blankForm, itens: [{ ...blankItem, materiais: [{ ...blankMaterial }] }], servicos: [{ ...blankServico }] });
@@ -70,9 +73,11 @@ function NovoOrcamentoInner() {
         setServicosCatalogo(Array.isArray(srvData) ? srvData : srvData?.data ?? []);
         setValorHoraServicos(Number(orgData?.valor_hora_servicos) || 0);
         if (editandoId) {
+          let clienteEdicao = null;
           try {
             const o = await buscarPorId(editandoId);
             if (!ativo || !o) return;
+            clienteEdicao = o.cliente_id;
             setForm({
               cliente_id: o.cliente_id ? String(o.cliente_id) : "",
               cliente: o.cliente?.nome || "", empresa: o.cliente?.empresa || "", nif: o.cliente?.nif || "",
@@ -130,6 +135,11 @@ function NovoOrcamentoInner() {
           } catch {
             if (ativo) addToast("Orçamento não encontrado", "error");
           }
+          if (clienteEdicao) {
+            consultarSaldoCliente(clienteEdicao)
+              .then((info) => { if (ativo) setLimiteInfo(info); })
+              .catch(() => {});
+          }
         }
       } catch (err) {
         if (ativo) addToast(err.response?.data?.erro || "Erro ao carregar dados", "error");
@@ -145,8 +155,9 @@ function NovoOrcamentoInner() {
 
   const setField = (name, val) => setForm((p) => ({ ...p, [name]: val }));
 
-  const handleClienteSelect = (e) => {
+  const handleClienteSelect = async (e) => {
     const id = e.target.value;
+    setLimiteInfo(null);
     if (!id) {
       setForm((p) => ({ ...p, cliente_id: "", cliente: "", empresa: "", nif: "", telefone: "", email: "" }));
       return;
@@ -163,6 +174,11 @@ function NovoOrcamentoInner() {
         email: cli.email || "",
       }));
     }
+    try {
+      setLimiteInfo(await consultarSaldoCliente(id));
+    } catch {
+      setLimiteInfo(null);
+    }
   };
 
   const subtotalCalc = form.itens.reduce((s, it) => s + (Number(it.total) || 0), 0) + (form.servicos || []).reduce((s, sv) => s + (Number(sv.total) || 0), 0);
@@ -172,6 +188,10 @@ function NovoOrcamentoInner() {
 
   const aoSubmeter = async (e) => {
     e.preventDefault();
+    if (!editandoId && limiteInfo?.bloqueado && getUsuario()?.perfil !== "admin") {
+      addToast(limiteInfo.mensagem || "Cliente atingiu o limite de dívida", "error");
+      return;
+    }
     setSalvando(true);
     const dados = {
       cliente_id: form.cliente_id,
@@ -309,6 +329,7 @@ function NovoOrcamentoInner() {
 materiais={materiais}
                       servicosCatalogo={servicosCatalogo}
                       valorHoraServicos={valorHoraServicos}
+                      limiteInfo={limiteInfo}
                     />
               )}
             </div>

@@ -238,7 +238,7 @@ function Campo({ label, children, obrigatorio, full }) {
   );
 }
 
-export default function OrcamentoForm({ formId = "form-orcamento", form, setField, setForm, onSubmit, onClienteSelect, clientes = [], materiais = [], servicosCatalogo = [], valorHoraServicos = 0 }) {
+export default function OrcamentoForm({ formId = "form-orcamento", form, setField, setForm, onSubmit, onClienteSelect, clientes = [], materiais = [], servicosCatalogo = [], valorHoraServicos = 0, limiteInfo = null }) {
   const [tab, setTab] = useState("cliente");
   const id = (sufixo) => `${formId}-${sufixo}`;
   const produtosComposicao = materiais.filter((m) => temComposicao(m));
@@ -488,6 +488,25 @@ return (
                 ))}
               </select>
             </Campo>
+            {limiteInfo && (
+              <div className={`sm:col-span-2 rounded-xl border px-4 py-3 text-xs ${
+                limiteInfo.bloqueado
+                  ? "border-error/30 bg-error/10 text-error"
+                  : "border-border bg-muted/40 text-muted-foreground"
+              }`} role={limiteInfo.bloqueado ? "alert" : undefined}>
+                <p className="flex items-center gap-2 font-semibold">
+                  <Icon name={limiteInfo.bloqueado ? "error" : "info"} className="text-base" />
+                  {limiteInfo.bloqueado ? "Orçamento bloqueado" : "Situação de crédito"}
+                </p>
+                <p className="mt-1 font-medium">
+                  Dívida em aberto: Kz {Number(limiteInfo.saldo || 0).toLocaleString("pt-AO")}
+                  {Number(limiteInfo.limite) > 0 && ` · Limite: Kz ${Number(limiteInfo.limite).toLocaleString("pt-AO")}`}
+                </p>
+                {limiteInfo.bloqueado && (
+                  <p className="mt-1">{limiteInfo.mensagem}</p>
+                )}
+              </div>
+            )}
             <Campo label="Empresa">
               <SugestaoSelect
                 id={id("empresa")}

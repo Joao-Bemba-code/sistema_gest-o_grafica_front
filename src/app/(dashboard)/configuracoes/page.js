@@ -28,6 +28,7 @@ const SIS_PADRAO = {
   fuso_horario: "Africa/Luanda (GMT+1)",
   dias_aviso_ferias: 30,
   limite_ficheiros: 10,
+  limite_divida_cliente: 0,
 };
 
 const SEG_PADRAO = { tfa_ativo: true, forcar_senha: true, bloqueio_bruta: true, sessao_inativa: false };
@@ -448,6 +449,20 @@ export default function ConfiguracoesPage() {
                   <FormField label="Limite de Ficheiros (MB)">
                     <Input type="number" value={sis.limite_ficheiros} onChange={(e) => setSis((p) => ({ ...p, limite_ficheiros: Number(e.target.value) }))} />
                   </FormField>
+                  <div className="sm:col-span-2 rounded-xl border border-border bg-muted/40 p-4">
+                    <FormField label="Limite de Dívida por Cliente (Kz)">
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={sis.limite_divida_cliente ?? 0}
+                        onChange={(e) => setSis((p) => ({ ...p, limite_divida_cliente: Number(e.target.value) }))}
+                      />
+                    </FormField>
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      Valor único para todos os clientes. Ao atingi-lo, só a Administração pode criar orçamentos. 0 desactiva o bloqueio.
+                    </p>
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-muted/40 p-4">

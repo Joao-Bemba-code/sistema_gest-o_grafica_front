@@ -17,7 +17,8 @@ import OrcamentoForm, {
   recalcularServico,
   totalQuantidadeItem,
 } from "@/components/orcamentos/OrcamentoForm";
-import { buscarPorId, criar, atualizar } from "@/services/orcamentos";
+import { buscarPorId, criar, atualizar, saldoCliente as consultarSaldoCliente } from "@/services/orcamentos";
+import { getUsuario } from "@/services/auth";
 import { listar as listarClientes } from "@/services/clientes";
 import { listar as listarMateriais } from "@/services/materiais";
 import { listar as listarServicos } from "@/services/servicos";
@@ -53,6 +54,7 @@ export default function OrcamentoModal({ open, editingId, prefill, onClose, onSa
   const [materiais, setMateriais] = useState([]);
   const [servicosCatalogo, setServicosCatalogo] = useState([]);
   const [valorHoraServicos, setValorHoraServicos] = useState(0);
+  const [limiteInfo, setLimiteInfo] = useState(null);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [form, setForm] = useState({ ...blankForm, itens: [{ ...blankItem, materiais: [{ ...blankMaterial }] }], servicos: [{ ...blankServico }] });
@@ -229,6 +231,18 @@ export default function OrcamentoModal({ open, editingId, prefill, onClose, onSa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editingId, prefill]);
 
+  // Aviso de crédito acompanha o cliente selecionado (manual, edição ou proposta).
+  useEffect(() => {
+    if (!open) return undefined;
+    let ativo = true;
+    setLimiteInfo(null);
+    if (!form.cliente_id) return () => { ativo = false; };
+    consultarSaldoCliente(form.cliente_id)
+      .then((info) => { if (ativo) setLimiteInfo(info); })
+      .catch(() => { if (ativo) setLimiteInfo(null); });
+    return () => { ativo = false; };
+  }, [open, form.cliente_id]);
+
   const setField = (name, val) => setForm((p) => ({ ...p, [name]: val }));
 
   const handleClienteSelect = (e) => {
@@ -258,6 +272,10 @@ export default function OrcamentoModal({ open, editingId, prefill, onClose, onSa
 
   const aoSubmeter = async (e) => {
     e.preventDefault();
+    if (!editingId && limiteInfo?.bloqueado && getUsuario()?.perfil !== "admin") {
+      addToast(limiteInfo.mensagem || "Cliente atingiu o limite de dívida", "error");
+      return;
+    }
     setSalvando(true);
     try {
       const dados = {
@@ -381,6 +399,7 @@ export default function OrcamentoModal({ open, editingId, prefill, onClose, onSa
               materiais={materiais}
               servicosCatalogo={servicosCatalogo}
               valorHoraServicos={valorHoraServicos}
+              limiteInfo={limiteInfo}
             />
           </div>
 
