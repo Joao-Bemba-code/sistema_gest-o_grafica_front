@@ -72,6 +72,7 @@ export default function RequisicoesMaterialModal({
       return (
         String(r.numero || "").toLowerCase().includes(termo) ||
         String(r.ordem_producao_numero || "").toLowerCase().includes(termo) ||
+        String(r.ordem_producao_id ? "com ordem produção" : "sem ordem produção").includes(termo) ||
         String(r.cliente_nome || "").toLowerCase().includes(termo) ||
         String(r.solicitado_por || "").toLowerCase().includes(termo)
       );
@@ -228,9 +229,13 @@ export default function RequisicoesMaterialModal({
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-mono text-sm font-bold text-primary">{r.numero}</span>
                           <Badge variant={meta.variant}>{meta.label}</Badge>
-                          {r.ordem_producao_numero && (
+                          {r.ordem_producao_numero ? (
                             <span className="pill pill-muted text-[9px]">
                               <Icon name="precision_manufacturing" className="text-[11px]" /> OP {r.ordem_producao_numero}
+                            </span>
+                          ) : (
+                            <span className="pill pill-muted text-[9px]">
+                              <Icon name="inventory_2" className="text-[11px]" /> Sem OP
                             </span>
                           )}
                           {!temCliente(r) && (

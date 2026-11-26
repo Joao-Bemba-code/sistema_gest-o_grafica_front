@@ -31,6 +31,12 @@ const ESTADO_LABEL = {
 
 const SEM_CLIENTE = "Consumo interno / produção";
 
+function tipoLabel(r) {
+  return r?.ordem_producao_id || r?.ordem_producao_numero
+    ? "Com ordem de produção"
+    : "Sem ordem de produção";
+}
+
 function texto(v) {
   const t = String(v ?? "").trim();
   return t || "—";
@@ -81,14 +87,14 @@ export async function gerarRequisicaoMaterialPdf(requisicao, org = {}) {
   doc.setFontSize(10);
   doc.setTextColor(...COR_MARCA_TEXTO);
   doc.text(
-    doc.splitTextToSize(`Cliente: ${cliente}`, LARGURA_UTIL_MARCA).slice(0, 2),
+    doc.splitTextToSize(`Cliente: ${cliente} · ${tipoLabel(r)}`, LARGURA_UTIL_MARCA).slice(0, 2),
     x,
     y + 4
   );
   y += 14;
 
   y = desenharKpisMarca(doc, y, [
-    { label: "Ordem de produção", value: r.ordem_producao_numero || "—" },
+    { label: "Ordem de produção", value: r.ordem_producao_numero || "Sem OP" },
     { label: "Itens pedidos", value: String(itens.length) },
     { label: "Solicitada por", value: texto(r.solicitado_por) },
     { label: "Data", value: formatarData(r.data_requisicao) },
@@ -194,9 +200,10 @@ export async function gerarRelatorioRequisicoesPdf(requisicoes = [], org = {}, f
   y = tituloSecaoMarca(doc, "Requisições", x, y + 1) + 2;
   doc.autoTable({
     startY: y,
-    head: [["Requisição", "OP", "Cliente", "Solicitada por", "Itens", "Data", "Estado"]],
+    head: [["Requisição", "Tipo", "OP", "Cliente", "Solicitada por", "Itens", "Data", "Estado"]],
     body: lista.map((r) => [
       r.numero || (r.id ? `#${r.id}` : "—"),
+      tipoLabel(r),
       r.ordem_producao_numero || "—",
       nomeCliente(r),
       texto(r.solicitado_por),
@@ -205,7 +212,7 @@ export async function gerarRelatorioRequisicoesPdf(requisicoes = [], org = {}, f
       ESTADO_LABEL[r.estado] || texto(r.estado),
     ]),
     foot: [[
-      { content: "TOTAL", colSpan: 4, styles: { fontStyle: "bold" } },
+      { content: "TOTAL", colSpan: 5, styles: { fontStyle: "bold" } },
       { content: String(lista.reduce((s, r) => s + ((r.itens || []).length || Number(r.total_itens) || 0), 0)), styles: { fontStyle: "bold", halign: "right" } },
       { content: "", styles: { fontStyle: "bold" } },
       { content: `${lista.length}`, styles: { fontStyle: "bold", halign: "right" } },
@@ -218,11 +225,11 @@ export async function gerarRelatorioRequisicoesPdf(requisicoes = [], org = {}, f
       fontSize: 7.8,
     },
     columnStyles: colunasProporcionaisMarca(
-      [1.3, 1.6, 2.8, 1.8, 0.7, 1.3, 1.3],
-      { 4: { halign: "right" }, 6: { halign: "center" } }
+      [1.2, 1.7, 1.2, 2.3, 1.6, 0.7, 1.2, 1.2],
+      { 5: { halign: "right" }, 7: { halign: "center" } }
     ),
     didParseCell(data) {
-      if (data.section === "body" && data.column.index === 6) {
+      if (data.section === "body" && data.column.index === 7) {
         const v = String(data.cell.raw);
         if (v === "Rejeitada" || v === "Cancelada") {
           data.cell.styles.textColor = COR_MARCA_SECUNDARIO;

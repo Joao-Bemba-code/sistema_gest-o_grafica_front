@@ -7,23 +7,45 @@ import Icon from "@/components/Icon";
 import NumeroInput from "@/components/ui/NumeroInput";
 import { FormField } from "@/components/ui/FormField";
 import { inputCls, toNum } from "@/lib/estoque";
+import { cn } from "@/lib/utils";
 
 const linhaVazia = { material_id: "", quantidade: "", observacoes: "" };
+
+// Dois tipos de requisição: uma ligada a uma ordem de produção (actualiza o
+// estado da OP) e outra avulsa, que não fica ligada a nenhuma ordem.
+const TIPOS = [
+  {
+    value: "ordem_producao",
+    titulo: "Com ordem de produção",
+    descricao: "Ligada a uma OP aberta — o cliente vem da ordem.",
+    icone: "precision_manufacturing",
+  },
+  {
+    value: "sem_ordem",
+    titulo: "Sem ordem de produção",
+    descricao: "Saída avulsa para consumo interno ou cliente — não mexe em OPs.",
+    icone: "inventory_2",
+  },
+];
 
 export default function RequisicaoMaterialFormModal({
   open,
   onClose,
   ordens = [],
+  clientes = [],
   materiais,
   nomeUsuario,
-  // Quando a requisição é aberta a partir de uma OP (lista de Ordens ou aba
-  // Requisições), essa ordem já vem escolhida: o chão de fábrica não tem de a
-  // procurar outra vez no menu.
+  // Quando a requisição é aberta a partir de uma OP (lista de Ordens), essa
+  // ordem já vem escolhida e o tipo fica fixo em "com ordem de produção".
   ordemInicial = null,
+  fixarTipo = null,
   onConfirm,
 }) {
   const [form, setForm] = useState(() => ({
+    tipo: fixarTipo || "ordem_producao",
     ordem_producao_id: ordemInicial != null ? String(ordemInicial) : "",
+    cliente_id: "",
+    cliente_nome: "",
     solicitado_por: nomeUsuario || "",
     observacoes: "",
     itens: [{ ...linhaVazia }],
@@ -31,7 +53,10 @@ export default function RequisicaoMaterialFormModal({
   const [erro, setErro] = useState("");
   const [submetendo, setSubmetendo] = useState(false);
 
-  const ordem = ordens.find((o) => String(o.id) === String(form.ordem_producao_id)) || null;
+  const comOp = form.tipo === "ordem_producao";
+  const ordem = comOp
+    ? ordens.find((o) => String(o.id) === String(form.ordem_producao_id)) || null
+    : null;
 
   const setItem = (idx, campo, valor) =>
     setForm((f) => ({
@@ -46,7 +71,7 @@ export default function RequisicaoMaterialFormModal({
     setForm((f) => ({ ...f, itens: f.itens.filter((_, i) => i !== idx) }));
 
   const valida = () => {
-    if (!form.ordem_producao_id) {
+    if (comOp && !form.ordem_producao_id) {
       setErro("Selecione a ordem de produção a que se destina a requisição");
       return false;
     }
@@ -68,13 +93,20 @@ export default function RequisicaoMaterialFormModal({
         quantidade: String(i.quantidade),
         observacoes: i.observacoes || null,
       }));
-    setSubmetendo(true);
-    const ok = await onConfirm({
-      ordem_producao_id: Number(form.ordem_producao_id),
+    const dados = {
+      tipo: form.tipo,
       solicitado_por: form.solicitado_por,
       observacoes: form.observacoes,
       itens,
-    });
+    };
+    if (comOp) {
+      dados.ordem_producao_id = Number(form.ordem_producao_id);
+    } else {
+      if (form.cliente_id) dados.cliente_id = Number(form.cliente_id);
+      else if (form.cliente_nome.trim()) dados.cliente_nome = form.cliente_nome.trim();
+    }
+    setSubmetendo(true);
+    const ok = await onConfirm(dados);
     setSubmetendo(false);
     if (ok) onClose();
   };
@@ -96,25 +128,78 @@ export default function RequisicaoMaterialFormModal({
       }
     >
       <div className="space-y-4">
+        <div>
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+            Tipo de requisição
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {TIPOS.map((op) => {
+              const ativo = form.tipo === op.value;
+              return (
+                <button
+                  key={op.value}
+                  type="button"
+                  disabled={Boolean(fixarTipo)}
+                  aria-pressed={ativo}
+                  onClick={() => setForm((f) => ({ ...f, tipo: op.value }))}
+                  className={cn(
+                    "flex items-start gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-colors",
+                    ativo
+                      ? "border-primary bg-primary/10 text-foreground"
+                      : "border-border bg-muted/20 text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                    fixarTipo && "cursor-not-allowed opacity-80"
+                  )}
+                >
+                  <Icon name={op.icone} className="text-lg shrink-0 mt-px" />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold">{op.titulo}</span>
+                    <span className="block text-[11px] text-muted-foreground">{op.descricao}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <FormField
-            label="Ordem de produção *"
-            hint="A requisição é sempre feita com base numa OP aberta."
-          >
-            <select
-              value={form.ordem_producao_id}
-              onChange={(e) => setForm((f) => ({ ...f, ordem_producao_id: e.target.value }))}
-              className={inputCls}
+          {comOp ? (
+            <FormField
+              label="Ordem de produção *"
+              hint="A requisição é feita com base numa OP aberta."
             >
-              <option value="">Selecionar ordem de produção...</option>
-              {(ordens || []).map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.numero || `OP #${o.id}`} — {o.cliente_nome || "Consumo interno"}
-                  {o.produto ? ` · ${o.produto}` : ""}
-                </option>
-              ))}
-            </select>
-          </FormField>
+              <select
+                value={form.ordem_producao_id}
+                onChange={(e) => setForm((f) => ({ ...f, ordem_producao_id: e.target.value }))}
+                className={inputCls}
+              >
+                <option value="">Selecionar ordem de produção...</option>
+                {(ordens || []).map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.numero || `OP #${o.id}`} — {o.cliente_nome || "Consumo interno"}
+                    {o.produto ? ` · ${o.produto}` : ""}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+          ) : (
+            <FormField
+              label="Cliente (opcional)"
+              hint="Sem cliente, a requisição fica como consumo interno."
+            >
+              <select
+                value={form.cliente_id}
+                onChange={(e) => setForm((f) => ({ ...f, cliente_id: e.target.value }))}
+                className={inputCls}
+              >
+                <option value="">Consumo interno / produção</option>
+                {(clientes || []).map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nome}{c.empresa ? ` · ${c.empresa}` : ""}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+          )}
           <FormField label="Solicitado por">
             <input
               value={form.solicitado_por}
@@ -125,13 +210,28 @@ export default function RequisicaoMaterialFormModal({
           </FormField>
         </div>
 
-        {!ordens.length && (
+        {!comOp && !form.cliente_id && (
+          <FormField
+            label="Destino / cliente avulso"
+            hint="Opcional — por exemplo uma obra, departamento ou nome de cliente."
+          >
+            <input
+              value={form.cliente_nome}
+              onChange={(e) => setForm((f) => ({ ...f, cliente_nome: e.target.value }))}
+              className={inputCls}
+              placeholder="Consumo interno / produção"
+            />
+          </FormField>
+        )}
+
+        {comOp && !ordens.length && (
           <p className="rounded-xl border border-warning/30 bg-warning/10 px-3 py-2.5 text-xs text-foreground">
-            Não há ordens de produção abertas. Crie primeiro a OP na aba Encomendas ou em “Nova OP”.
+            Não há ordens de produção abertas. Crie primeiro a OP na aba Encomendas ou em “Nova OP” —
+            ou escolha “Sem ordem de produção”.
           </p>
         )}
 
-        {ordem && (
+        {comOp && ordem && (
           <div className="grid grid-cols-1 gap-3 rounded-lg border border-border bg-muted/30 p-3 sm:grid-cols-3">
             <div>
               <p className="text-[11px] font-semibold text-muted-foreground">Cliente / destino</p>
@@ -145,6 +245,14 @@ export default function RequisicaoMaterialFormModal({
               <p className="text-[11px] font-semibold text-muted-foreground">Tiragem</p>
               <p className="text-sm text-foreground">{ordem.quantidade ?? "—"}</p>
             </div>
+          </div>
+        )}
+
+        {!comOp && (
+          <div className="flex items-start gap-2 rounded-lg border border-info/30 bg-info/10 px-3 py-2.5 text-xs text-foreground">
+            <Icon name="info" className="text-base shrink-0 mt-px" />
+            Requisição avulsa: não fica ligada a nenhuma ordem de produção e não altera o estado das OPs.
+            O Estoque aprova a saída da mesma forma.
           </div>
         )}
 

@@ -97,7 +97,9 @@ export default function AprovarRequisicaoModal({
     >
       <div className="space-y-4">
         <p className="text-xs text-muted-foreground">
-          {requisicao?.ordem_producao_numero ? `OP ${requisicao.ordem_producao_numero} · ` : ""}
+          {requisicao?.ordem_producao_numero
+            ? `Com ordem de produção · OP ${requisicao.ordem_producao_numero} · `
+            : "Sem ordem de produção · "}
           {requisicao?.cliente_nome || "Consumo interno"} · {requisicao?.total_itens ?? (requisicao?.itens || []).length} material(is).
           Ao aprovar, o stock baixa imediatamente.
         </p>

@@ -40,6 +40,24 @@ const ESTADO_META = {
 // O backend etiqueta consumo interno assim; não é um cliente.
 const CONSUMO_INTERNO = "Consumo interno / produção";
 
+// Os dois tipos de requisição. Registos antigos não têm o campo `tipo`:
+// deduz-se pela presença da ordem de produção.
+function tipoDaRequisicao(r) {
+  return r?.ordem_producao_id || r?.ordem_producao_numero ? "ordem_producao" : "sem_ordem";
+}
+
+function tipoLabel(r) {
+  return tipoDaRequisicao(r) === "sem_ordem"
+    ? "Sem ordem de produção"
+    : "Com ordem de produção";
+}
+
+const TIPOS_FILTRO = [
+  { value: "todas", label: "Todas" },
+  { value: "ordem_producao", label: "Com OP" },
+  { value: "sem_ordem", label: "Sem OP" },
+];
+
 const pillBase = "inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium whitespace-nowrap transition-colors";
 const pillInativa = "text-muted-foreground hover:bg-muted hover:text-foreground";
 
@@ -58,6 +76,7 @@ function temCliente(r) {
 const CAMPOS = [
   { value: "numero", label: "Número", obter: (r) => r.numero || "" },
   { value: "op", label: "Ordem de produção", obter: (r) => r.ordem_producao_numero || "" },
+  { value: "tipo", label: "Tipo", obter: (r) => tipoLabel(r) },
   { value: "cliente", label: "Cliente", obter: (r) => r.cliente_nome || "" },
   { value: "solicitante", label: "Solicitante", obter: (r) => r.solicitado_por || "" },
   { value: "material", label: "Material", obter: (r) => (r.itens || []).map((i) => i.nome || "").join(" ") },
@@ -82,6 +101,7 @@ export default function RequisicoesTab() {
   const { addToast } = useToast();
   const [requisicoes, setRequisicoes] = useState([]);
   const [ordens, setOrdens] = useState([]);
+  const [clientes, setClientes] = useState([]);
   const [materiais, setMateriais] = useState([]);
   const [empresa, setEmpresa] = useState({});
   const [pdfId, setPdfId] = useState(null);
@@ -91,6 +111,7 @@ export default function RequisicoesTab() {
   const [cancelando, setCancelando] = useState(null);
   const [detalhe, setDetalhe] = useState(null);
   const [filtro, setFiltro] = useState({ campo: "numero", operador: "contem", termo: "" });
+  const [filtroTipo, setFiltroTipo] = useState("todas");
   const [ordem, setOrdem] = useState({ chave: "", dir: 1 });
   const [filtrosAbertos, setFiltrosAbertos] = useState(true);
 
@@ -112,9 +133,11 @@ export default function RequisicoesTab() {
     }
     if (aux.status === "fulfilled") {
       setOrdens(Array.isArray(aux.value?.ordens) ? aux.value.ordens : []);
+      setClientes(Array.isArray(aux.value?.clientes) ? aux.value.clientes : []);
       setMateriais(Array.isArray(aux.value?.materiais) ? aux.value.materiais : []);
     } else {
       setOrdens([]);
+      setClientes([]);
       setMateriais([]);
       const proibido = aux.reason?.response?.status === 403;
       addToast(
@@ -186,6 +209,7 @@ export default function RequisicoesTab() {
   const resultado = useMemo(() => {
     const termo = filtro.termo.trim().toLowerCase();
     let res = [...requisicoes];
+    if (filtroTipo !== "todas") res = res.filter((r) => tipoDaRequisicao(r) === filtroTipo);
     if (termo) {
       const cfg = CAMPOS.find((c) => c.value === filtro.campo) || CAMPOS[0];
       res = res.filter((r) => {
@@ -198,10 +222,12 @@ export default function RequisicoesTab() {
     if (ordem.chave === "numero") res.sort((a, b) => String(a.numero || "").localeCompare(String(b.numero || ""), "pt", { numeric: true }) * ordem.dir);
     if (ordem.chave === "data") res.sort((a, b) => (new Date(a.data_requisicao || 0) - new Date(b.data_requisicao || 0)) * ordem.dir);
     return res;
-  }, [requisicoes, filtro, ordem]);
+  }, [requisicoes, filtro, filtroTipo, ordem]);
 
   const { visiveis, ...pag } = usePaginacao({ items: resultado });
   const pendentes = requisicoes.filter((r) => r.estado === "pendente").length;
+  const comOp = requisicoes.filter((r) => tipoDaRequisicao(r) === "ordem_producao").length;
+  const semOp = requisicoes.length - comOp;
 
   const reqDetalhe = detalhe ? requisicoes.find((r) => r.id === detalhe) || null : null;
 
@@ -232,7 +258,7 @@ export default function RequisicoesTab() {
       <Ledger rotulo="Requisições de material ledger">
         <LedgerHeader
           titulo="Requisições de material"
-          subtitulo={`${requisicoes.length} requisições${pendentes > 0 ? ` · ${pendentes} pendentes` : ""} · aprovação e saída de stock feitas no módulo de Estoque`}
+          subtitulo={`${requisicoes.length} requisições${pendentes > 0 ? ` · ${pendentes} pendentes` : ""} · ${comOp} com OP · ${semOp} sem OP · aprovação e saída de stock feitas no módulo de Estoque`}
           novo={podeCriar ? "Nova requisição" : undefined}
           aoNovo={abrirFormulario}
           onToggleFiltros={() => setFiltrosAbertos((v) => !v)}
@@ -251,7 +277,24 @@ export default function RequisicoesTab() {
             placeholder="Pesquisar por nº, cliente, solicitante ou material..."
           />
         )}
-        <div className="flex flex-wrap items-center justify-end gap-1.5 px-4 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-1.5 px-4 py-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {TIPOS_FILTRO.map((t) => {
+              const ativo = filtroTipo === t.value;
+              const total = t.value === "todas" ? requisicoes.length : t.value === "ordem_producao" ? comOp : semOp;
+              return (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => setFiltroTipo(t.value)}
+                  aria-pressed={ativo}
+                  className={`${pillBase} ${ativo ? "bg-primary/10 text-primary" : pillInativa}`}
+                >
+                  {t.label} <span className="text-[11px] tabular-nums opacity-70">{total}</span>
+                </button>
+              );
+            })}
+          </div>
           <button
             type="button"
             onClick={gerarPdfListagem}
@@ -286,7 +329,7 @@ export default function RequisicoesTab() {
                     {r.ordem_producao_numero ? (
                       <IdCell id={r.ordem_producao_numero} meta="OP" aoAbrir={() => setDetalhe(r.id)} />
                     ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
+                      <StatusBadge tom="neutral">Sem OP</StatusBadge>
                     )}
                   </LedgerTd>
                   <LedgerTd className="max-w-52">
@@ -335,10 +378,14 @@ export default function RequisicoesTab() {
               <StatusBadge tom={(ESTADO_META[reqDetalhe.estado] || ESTADO_META.pendente).tom}>
                 {(ESTADO_META[reqDetalhe.estado] || ESTADO_META.pendente).label}
               </StatusBadge>
+              <StatusBadge tom={tipoDaRequisicao(reqDetalhe) === "sem_ordem" ? "info" : "primary"}>
+                {tipoLabel(reqDetalhe)}
+              </StatusBadge>
               {!temCliente(reqDetalhe) && <StatusBadge tom="neutral">Consumo interno</StatusBadge>}
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
               {[
+                { label: "Tipo de requisição", value: tipoLabel(reqDetalhe) },
                 { label: "Ordem de produção", value: reqDetalhe.ordem_producao_numero || "—" },
                 { label: "Cliente", value: reqDetalhe.cliente_nome || CONSUMO_INTERNO },
                 { label: "Solicitada por", value: reqDetalhe.solicitado_por || "—" },
@@ -415,6 +462,7 @@ export default function RequisicoesTab() {
         open={aberto}
         onClose={() => setAberto(false)}
         ordens={ordens}
+        clientes={clientes}
         materiais={materiais}
         nomeUsuario={getUsuario()?.nome || ""}
         onConfirm={confirmarCriacao}

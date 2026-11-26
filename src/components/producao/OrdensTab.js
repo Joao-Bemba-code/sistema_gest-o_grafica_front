@@ -150,7 +150,7 @@ export default function OrdensTab() {
     if (auxRequisicao) return;
     try {
       const dados = await auxiliaresRequisicao();
-      setAuxRequisicao({ ordens: dados?.ordens || [], materiais: dados?.materiais || [] });
+      setAuxRequisicao({ ordens: dados?.ordens || [], clientes: dados?.clientes || [], materiais: dados?.materiais || [] });
     } catch (err) {
       addToast(err.response?.data?.erro || "Erro ao carregar os dados da requisição", "error");
     }
@@ -637,9 +637,11 @@ export default function OrdensTab() {
         open={Boolean(requisitarOp)}
         onClose={() => setRequisitarOp(null)}
         ordens={ordensRequisicao}
+        clientes={auxRequisicao?.clientes || []}
         materiais={auxRequisicao?.materiais?.length ? auxRequisicao.materiais : materiais}
         nomeUsuario={getUsuario()?.nome || ""}
         ordemInicial={requisitarOp?.id ?? null}
+        fixarTipo="ordem_producao"
         onConfirm={confirmarRequisicao}
       />
 
