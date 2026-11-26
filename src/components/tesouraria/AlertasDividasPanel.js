@@ -5,6 +5,7 @@ import { alertasDividas } from "@/services/tesouraria";
 import { guardarSistema } from "@/services/configuracoes";
 import { podeAtual } from "@/lib/permissoes";
 import Icon from "@/components/Icon";
+import Modal from "@/components/Modal";
 import { Button, Card, CardContent, CardHeader, CardTitle, FormField, Input } from "@/components/ui";
 import KpiCard from "@/components/ui/KpiCard";
 import { useToast } from "@/components/Toast";
@@ -31,7 +32,7 @@ function kz(v) {
 function parametrosParaForm(p = {}) {
   return {
     limite_divida_cliente: Number(p.limite) || 0,
-    prazo_divida_dias: Number(p.prazoDias) || 0,
+    prazo_divida_dias: Number(p.prazoDias) || 30,
     juro_divida_percentual: Number(p.juroPercentual) || 0,
     desconto_divida_percentual: Number(p.descontoPercentual) || 0,
     desconto_prazo_dias: Number(p.descontoPrazoDias) || 0,
@@ -45,6 +46,7 @@ export default function AlertasDividasPanel() {
   const [form, setForm] = useState(parametrosParaForm());
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
+  const [modalAberto, setModalAberto] = useState(false);
 
   async function carregar() {
     try {
@@ -79,47 +81,42 @@ export default function AlertasDividasPanel() {
     }
   }
 
+  function abrirConfiguracao() {
+    setForm(parametrosParaForm(dados.parametros));
+    setModalAberto(true);
+  }
+
   const { resumo = {}, clientes = [] } = dados;
 
   return (
-    <Card>
+    <>
+      <Card>
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2">
           <Icon name="warning" className="text-warning" />
           Alertas de dívidas e limites
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Limite global, prazo, juro por atraso e desconto por pagamento antecipado. Os valores são guardados em Configurações → Sistema e também podem ser alterados aqui.
+          Limite global, prazo, juro por atraso e desconto por pagamento antecipado.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground">
+            Prazo de {Number(dados.parametros?.prazoDias) || 30} dias · juro de {Number(dados.parametros?.juroPercentual) || 0}% por 30 dias de atraso · desconto de {Number(dados.parametros?.descontoPercentual) || 0}% até {Number(dados.parametros?.descontoPrazoDias) || 0} dias.
+          </p>
+          {podeEditar && (
+            <Button variant="outline" onClick={abrirConfiguracao}>
+              <Icon name="settings" className="text-sm" /> Configurar limites e prazos
+            </Button>
+          )}
+        </div>
+
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <KpiCard icon="payments" iconVariant="primary" label="Limite global" value={kz(resumo.limite)} />
           <KpiCard icon="account_balance_wallet" iconVariant="warning" label="Dívida em aberto" value={kz(resumo.saldoTotal)} />
           <KpiCard icon="schedule" iconVariant="error" label="Clientes vencidos" value={String(resumo.vencidos || 0)} />
           <KpiCard icon="error" iconVariant="error" label="No limite" value={String(resumo.bloqueados || 0)} />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 rounded-xl border border-border bg-muted/30 p-3 sm:grid-cols-3 lg:grid-cols-5">
-          {CAMPOS.map((campo) => (
-            <FormField key={campo.chave} label={campo.label} hint={campo.hint}>
-              <Input
-                type="number"
-                min="0"
-                step={campo.passo}
-                value={form[campo.chave] ?? 0}
-                disabled={!podeEditar || carregando}
-                onChange={(e) => setForm((p) => ({ ...p, [campo.chave]: e.target.value }))}
-              />
-            </FormField>
-          ))}
-          {podeEditar && (
-            <div className="col-span-2 flex items-end sm:col-span-3 lg:col-span-5">
-              <Button onClick={guardar} disabled={salvando}>
-                <Icon name="save" className="text-sm" /> {salvando ? "A guardar..." : "Guardar parâmetros"}
-              </Button>
-            </div>
-          )}
         </div>
 
         {clientes.length === 0 ? (
@@ -163,6 +160,41 @@ export default function AlertasDividasPanel() {
           </div>
         )}
       </CardContent>
-    </Card>
+      </Card>
+
+      <Modal
+        open={modalAberto}
+        onClose={() => setModalAberto(false)}
+        title="Configurar limites e prazos"
+        icon="settings"
+        size="lg"
+        footer={
+          <div className="flex w-full justify-end gap-2">
+            <Button variant="outline" onClick={() => setModalAberto(false)}>Cancelar</Button>
+            <Button onClick={guardar} disabled={salvando}>
+              <Icon name="save" className="text-sm" /> {salvando ? "A guardar..." : "Guardar parâmetros"}
+            </Button>
+          </div>
+        }
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {CAMPOS.map((campo) => (
+            <FormField key={campo.chave} label={campo.label} hint={campo.hint}>
+              <Input
+                type="number"
+                min="0"
+                step={campo.passo}
+                value={form[campo.chave] ?? 0}
+                disabled={carregando}
+                onChange={(e) => setForm((p) => ({ ...p, [campo.chave]: e.target.value }))}
+              />
+            </FormField>
+          ))}
+        </div>
+        <p className="mt-3 text-[11px] text-muted-foreground">
+          Estes valores são globais para a empresa e ficam guardados em Configurações → Sistema.
+        </p>
+      </Modal>
+    </>
   );
 }

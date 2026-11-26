@@ -37,8 +37,8 @@ export const ITENS_NAVEGACAO = [
   { icone: LuCog, nome: "Produção", para: "/producao", perm: ["producao", "ver"] },
   { icone: LuBox, nome: "Stocks", para: "/estoque", perm: ["estoque", "ver"] },
   { icone: LuShoppingBag, nome: "Compras", para: "/compras", perm: ["estoque", "ver"], permOu: [["compras", "ver"]] },
-  { icone: LuChartColumn, nome: "Financeiro", para: "/faturacao", perm: ["faturacao", "ver"], permOu: [["financeiro", "ver"]] },
-  { icone: LuLandmark, nome: "Tesouraria", para: "/tesouraria", perm: ["tesouraria", "ver"], permOu: [["financeiro", "ver"]] },
+  // O financeiro passou a fazer parte da tesouraria (aba "Financeiro").
+  { icone: LuLandmark, nome: "Tesouraria", para: "/tesouraria", perm: ["tesouraria", "ver"], permOu: [["financeiro", "ver"], ["faturacao", "ver"]] },
   { icone: LuBuilding, nome: "Património", para: "/patrimonio", perm: ["patrimonio", "ver"] },
   { icone: LuUsers, nome: "Recursos Humanos", para: "/utilizadores", perm: ["utilizadores", "ver"] },
   { icone: LuFileText, nome: "Relatórios", para: "/relatorios", perm: ["relatorios", "ver"] },
@@ -48,6 +48,7 @@ export const ITENS_NAVEGACAO = [
 // Rotas extra para a busca global (páginas fora do menu principal)
 export const PAGINAS_BUSCA = [
   ...ITENS_NAVEGACAO.map((i) => ({ icone: i.icone, nome: i.nome, para: i.para, perm: i.perm })),
+  { icone: LuChartColumn, nome: "Financeiro", para: "/tesouraria?tab=financeiro", perm: ["faturacao", "ver"], permOu: [["financeiro", "ver"]] },
   { icone: LuClipboardList, nome: "Orçamentos", para: "/orcamentos", perm: ["comercial", "ver"] },
   { icone: LuUser, nome: "Clientes", para: "/clientes", perm: ["comercial", "ver"], permOu: [["compras", "ver"]] },
   { icone: LuBox, nome: "Ordens de Produção", para: "/producao/ordens", perm: ["producao", "ver"] },
