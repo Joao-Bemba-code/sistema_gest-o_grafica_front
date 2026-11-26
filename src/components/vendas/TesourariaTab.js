@@ -137,7 +137,7 @@ function rotuloConta(conta) {
   return `${conta.banco_nome}${conta.numero_conta ? ` — Conta ${conta.numero_conta}` : ""}`;
 }
 
-export default function TesourariaTab({ aba = "movimentos", setAba, abas = [], children }) {
+export default function TesourariaTab({ aba = "movimentos", setAba, abas = [], children, painel }) {
   const [movimentos, setMovimentos] = useState([]);
   const [contas, setContas] = useState([]);
   const [resumo, setResumo] = useState({ saldoTotal: 0, entradasMes: 0, saidasMes: 0, movimentosHoje: 0 });
@@ -508,6 +508,8 @@ export default function TesourariaTab({ aba = "movimentos", setAba, abas = [], c
           </button>
         ))}
       </div>
+
+      {painel && <div className="mt-1">{painel}</div>}
 
       {aba === "movimentos" ? (
         <>

@@ -42,9 +42,7 @@ export default function TesourariaPage() {
         <p className="mt-1 text-xs font-medium text-muted-foreground">Caixa, bancos e pagamentos.</p>
       </div>
 
-      <AlertasDividasPanel />
-
-      <TesourariaTab aba={abaVisivel} setAba={setTab} abas={abas}>
+      <TesourariaTab aba={abaVisivel} setAba={setTab} abas={abas} painel={<AlertasDividasPanel />}>
         {abaVisivel === "financeiro" && <FinanceiroTab />}
         {abaVisivel === "contas" && <ContasBancariasTab />}
         {abaVisivel === "conciliacao" && <ConciliacaoTab />}
