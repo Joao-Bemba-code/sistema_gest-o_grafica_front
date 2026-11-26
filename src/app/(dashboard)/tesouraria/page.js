@@ -7,6 +7,7 @@ import ComprovativosTab from "@/components/tesouraria/ComprovativosTab";
 import DividasTab from "@/components/tesouraria/DividasTab";
 import ConciliacaoTab from "@/components/tesouraria/ConciliacaoTab";
 import CaixaTab from "@/components/tesouraria/CaixaTab";
+import AlertasDividasPanel from "@/components/tesouraria/AlertasDividasPanel";
 import { podeAtual } from "@/lib/permissoes";
 
 export default function TesourariaPage() {
@@ -31,6 +32,8 @@ export default function TesourariaPage() {
         <h1 className="text-xl font-semibold tracking-tight text-foreground">Gestão de Tesouraria</h1>
         <p className="mt-1 text-xs font-medium text-muted-foreground">Caixa, bancos e pagamentos.</p>
       </div>
+
+      <AlertasDividasPanel />
 
       <TesourariaTab aba={abaVisivel} setAba={setTab} abas={abas}>
         {abaVisivel === "contas" && <ContasBancariasTab />}

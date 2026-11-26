@@ -42,6 +42,12 @@ export async function resumoTesouraria(params = {}) {
   return data;
 }
 
+// Alertas de crédito: limites, prazo, juro por atraso e desconto disponível.
+export async function alertasDividas() {
+  const { data } = await api.get("/tesouraria/alertas-dividas");
+  return data;
+}
+
 export async function exportarTesouraria(params = {}) {
   const { data } = await api.get("/tesouraria/exportar", { params, responseType: "blob" });
   return data;

@@ -44,9 +44,11 @@ export default function FaturaDetalhesModal({ fatura, empresa, onClose, onChange
   const [registrando, setRegistrando] = useState(false);
   const [contas, setContas] = useState([]);
   const [contaPagamento, setContaPagamento] = useState("");
+  const [aplicarDesconto, setAplicarDesconto] = useState(false);
 
   useEffect(() => {
     if (!fatura) return;
+    setAplicarDesconto(false);
     let ativo = true;
     listarContas()
       .then((c) => {
@@ -70,7 +72,7 @@ export default function FaturaDetalhesModal({ fatura, empresa, onClose, onChange
 
   const handleMarcarPaga = async (valorPago) => {
     try {
-      const atual = await marcarPaga(f.id, { valor_pago: Number(valorPago) || undefined, metodo: f.metodo_pagamento || "transferencia", conta_bancaria_id: contaIdSelecionada });
+      const atual = await marcarPaga(f.id, { valor_pago: Number(valorPago) || undefined, metodo: f.metodo_pagamento || "transferencia", conta_bancaria_id: contaIdSelecionada, aplicar_desconto: aplicarDesconto });
       onChanged?.(atual);
       addToast(valorPago && Number(valorPago) < Number(f.total || f.valor) ? "Pagamento parcial registado" : "Fatura marcada como paga", "success");
     } catch (err) {
@@ -89,7 +91,7 @@ export default function FaturaDetalhesModal({ fatura, empresa, onClose, onChange
     const novoTotal = atual + extra;
     setRegistrando(true);
     try {
-      const atualizada = await marcarPaga(f.id, { valor_pago: novoTotal, metodo: f.metodo_pagamento || "transferencia", conta_bancaria_id: contaIdSelecionada });
+      const atualizada = await marcarPaga(f.id, { valor_pago: novoTotal, metodo: f.metodo_pagamento || "transferencia", conta_bancaria_id: contaIdSelecionada, aplicar_desconto: aplicarDesconto });
       onChanged?.(atualizada);
       setPagamentoExtra("");
       addToast(novoTotal >= total ? "Fatura paga integralmente" : "Pagamento parcial registado", "success");
@@ -132,6 +134,15 @@ export default function FaturaDetalhesModal({ fatura, empresa, onClose, onChange
                 ))}
               </select>
             </div>
+            <label className="flex h-11 items-center gap-2 rounded-xl border border-border px-3 text-xs text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={aplicarDesconto}
+                onChange={(e) => setAplicarDesconto(e.target.checked)}
+                className="h-4 w-4 accent-primary"
+              />
+              Aplicar desconto por pagamento antecipado
+            </label>
             <Button onClick={handleRegistarPagamento} disabled={registrando || !pagamentoExtra || Number(pagamentoExtra) <= 0}>
               <Icon name="payments" className="text-sm" /> {registrando ? "A registar..." : "Registar Pagamento"}
             </Button>

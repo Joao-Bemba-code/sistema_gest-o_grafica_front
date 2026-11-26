@@ -29,6 +29,10 @@ const SIS_PADRAO = {
   dias_aviso_ferias: 30,
   limite_ficheiros: 10,
   limite_divida_cliente: 0,
+  prazo_divida_dias: 30,
+  juro_divida_percentual: 0,
+  desconto_divida_percentual: 0,
+  desconto_prazo_dias: 0,
 };
 
 const SEG_PADRAO = { tfa_ativo: true, forcar_senha: true, bloqueio_bruta: true, sessao_inativa: false };
@@ -462,6 +466,20 @@ export default function ConfiguracoesPage() {
                     <p className="mt-1.5 text-xs text-muted-foreground">
                       Valor único para todos os clientes. Ao atingi-lo, só a Administração pode criar orçamentos. 0 desactiva o bloqueio.
                     </p>
+                  </div>
+                  <div className="sm:col-span-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <FormField label="Prazo Global de Dívida (dias)">
+                      <Input type="number" min="0" value={sis.prazo_divida_dias ?? 30} onChange={(e) => setSis((p) => ({ ...p, prazo_divida_dias: Number(e.target.value) }))} />
+                    </FormField>
+                    <FormField label="Juro por 30 dias de atraso (%)">
+                      <Input type="number" min="0" step="0.01" value={sis.juro_divida_percentual ?? 0} onChange={(e) => setSis((p) => ({ ...p, juro_divida_percentual: Number(e.target.value) }))} />
+                    </FormField>
+                    <FormField label="Desconto por pagamento antecipado (%)">
+                      <Input type="number" min="0" step="0.01" value={sis.desconto_divida_percentual ?? 0} onChange={(e) => setSis((p) => ({ ...p, desconto_divida_percentual: Number(e.target.value) }))} />
+                    </FormField>
+                    <FormField label="Prazo para desconto (dias desde emissão)">
+                      <Input type="number" min="0" value={sis.desconto_prazo_dias ?? 0} onChange={(e) => setSis((p) => ({ ...p, desconto_prazo_dias: Number(e.target.value) }))} />
+                    </FormField>
                   </div>
                 </div>
 

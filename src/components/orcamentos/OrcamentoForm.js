@@ -502,6 +502,9 @@ return (
                   Dívida em aberto: Kz {Number(limiteInfo.saldo || 0).toLocaleString("pt-AO")}
                   {Number(limiteInfo.limite) > 0 && ` · Limite: Kz ${Number(limiteInfo.limite).toLocaleString("pt-AO")}`}
                 </p>
+                {Number(limiteInfo.juro) > 0 && (
+                  <p className="mt-0.5">Inclui Kz {Number(limiteInfo.juro).toLocaleString("pt-AO")} de juro por dívida vencida (prazo de {Number(limiteInfo.prazoDias) || 0} dias).</p>
+                )}
                 {limiteInfo.bloqueado && (
                   <p className="mt-1">{limiteInfo.mensagem}</p>
                 )}
