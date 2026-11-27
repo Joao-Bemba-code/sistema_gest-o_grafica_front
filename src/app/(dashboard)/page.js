@@ -50,6 +50,16 @@ function formatNum(v) {
   return Number(v || 0).toLocaleString("pt-AO");
 }
 
+// Várias APIs (propostas, ordens) devolvem o cliente como objeto
+// ({ id, nome, empresa, nif, telefone, email, endereco }). React não aceita
+// objetos como filho de JSX (erro #31): converter para texto antes de mostrar.
+function textoResumo(valor, fallback) {
+  if (valor && typeof valor === "object") {
+    return String(valor.empresa || valor.nome || valor.razao_social || fallback);
+  }
+  return valor === null || valor === undefined || valor === "" ? String(fallback) : String(valor);
+}
+
 function dataFatura(f) {
   const d = new Date(f.data_emissao || f.data || f.createdAt);
   return isNaN(d.getTime()) ? null : d;
@@ -505,12 +515,12 @@ export default function DashboardPage() {
     ...propostas.filter((p) => ["enviada", "recebida", "avaliada"].includes(p.estado)).map((p) => ({
       tipo: "Proposta",
       ref: p.numero || p.id || "—",
-      detalhe: p.cliente || p.cliente_nome || "Cliente",
+      detalhe: textoResumo(p.cliente || p.cliente_nome, "Cliente"),
     })),
     ...ordens.filter((o) => o.estado === "pendente").map((o) => ({
       tipo: "Ordem de Produção",
       ref: o.numero || o.id || "—",
-      detalhe: o.cliente || o.descricao || "OP",
+      detalhe: textoResumo(o.cliente || o.descricao, "OP"),
     })),
   ].slice(0, 6);
 
@@ -899,7 +909,7 @@ export default function DashboardPage() {
                     <div key={idx} className="flex items-start justify-between rounded-lg border border-border bg-muted/20 px-2.5 py-2">
                       <div>
                         <p className="text-[10px] font-semibold text-foreground">{a.tipo}</p>
-                        <p className="text-[9.5px] text-muted-foreground">{a.detalhe}</p>
+                        <p className="text-[9.5px] text-muted-foreground">{textoResumo(a.detalhe, "")}</p>
                       </div>
                       <span className="text-[10px] font-medium text-primary">#{String(a.ref).slice(0, 8)}</span>
                     </div>
