@@ -7,7 +7,7 @@ import NumeroInput from "@/components/ui/NumeroInput";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/Toast";
-import { marcarPaga } from "@/services/faturacao";
+import { marcarPaga, buscarFatura, anexarFicheirosFatura, abrirAnexoFatura, removerAnexoFatura } from "@/services/faturacao";
 import { listarContas } from "@/services/contasBancarias";
 import gerarPDF from "@/lib/faturacaoPdf";
 
@@ -22,6 +22,7 @@ const metodos = {
 };
 
 const faturaEstados = {
+  em_analise: { label: "Em análise", variant: "info" },
   emitida: { label: "Emitida", variant: "warning" },
   paga: { label: "Paga", variant: "success" },
   parcial: { label: "Parcial", variant: "info" },
@@ -33,6 +34,7 @@ const TABS = [
   { key: "documento", label: "01 Documento", icon: "description" },
   { key: "itens", label: "02 Itens", icon: "list" },
   { key: "pagamento", label: "03 Pagamento", icon: "payments" },
+  { key: "anexos", label: "04 Anexos", icon: "attach_file" },
 ];
 
 function formatKz(v) { return `Kz ${Number(v || 0).toLocaleString("pt-AO")}`; }
@@ -45,6 +47,13 @@ export default function FaturaDetalhesModal({ fatura, empresa, onClose, onChange
   const [contas, setContas] = useState([]);
   const [contaPagamento, setContaPagamento] = useState("");
   const [aplicarDesconto, setAplicarDesconto] = useState(false);
+  const [anexos, setAnexos] = useState([]);
+  const [enviandoAnexo, setEnviandoAnexo] = useState(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAnexos(Array.isArray(fatura?.anexos) ? fatura.anexos : []);
+  }, [fatura]);
 
   useEffect(() => {
     if (!fatura) return;
@@ -102,12 +111,50 @@ export default function FaturaDetalhesModal({ fatura, empresa, onClose, onChange
     }
   };
 
+  const atualizarAnexos = async () => {
+    try {
+      const fresca = await buscarFatura(f.id);
+      if (fresca?.id) {
+        setAnexos(Array.isArray(fresca.anexos) ? fresca.anexos : []);
+        onChanged?.(fresca);
+      }
+    } catch {
+      // silencioso: mantém o que já tinha
+    }
+  };
+
+  const handleAnexar = async (e) => {
+    const ficheiros = Array.from(e.target.files || []);
+    if (!ficheiros.length) return;
+    setEnviandoAnexo(true);
+    try {
+      await anexarFicheirosFatura(f.id, ficheiros);
+      addToast?.("Documento(s) anexado(s) para aprovação", "success");
+      await atualizarAnexos();
+    } catch (err) {
+      addToast?.(err?.response?.data?.erro || "Erro ao anexar documento", "error");
+    } finally {
+      setEnviandoAnexo(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleRemoverAnexo = async (anexoId) => {
+    try {
+      await removerAnexoFatura(anexoId);
+      setAnexos((prev) => prev.filter((a) => a.id !== anexoId));
+      addToast?.("Anexo removido", "success");
+    } catch (err) {
+      addToast?.(err?.response?.data?.erro || "Erro ao remover anexo", "error");
+    }
+  };
+
   const id = (sufixo) => `form-fatura-ficha-${sufixo}`;
 
   return (
     <Modal open={Boolean(f)} onClose={onClose} title={`Fatura ${f.numero}`} icon="receipt_long" size="xl"
       footer={<>
-        {!["paga", "cancelada"].includes(f.estado) && f.tipo !== "recibo" && (
+        {!["paga", "cancelada", "em_analise"].includes(f.estado) && f.tipo !== "recibo" && (
           <div className="w-full flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1 flex-1 min-w-[180px] max-w-[240px]">
               <label className="text-[11px] font-medium text-muted-foreground">Valor a pagar agora</label>
@@ -283,6 +330,53 @@ export default function FaturaDetalhesModal({ fatura, empresa, onClose, onChange
                 <div className="bg-muted/50 rounded-xl p-3">
                   <p className="text-[11px] font-medium text-muted-foreground mb-1">Observações</p>
                   <p className="text-foreground text-sm">{f.observacoes}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {tab === "anexos" && (
+            <div className="space-y-4">
+              {f.estado === "em_analise" && (
+                <div className="rounded-xl border border-info/30 bg-info/10 p-3 text-xs text-info">
+                  <p className="font-semibold">Fatura em análise</p>
+                  <p className="mt-0.5 text-muted-foreground">Anexe os documentos de suporte. A fatura só é emitida depois de validada na Tesouraria.</p>
+                </div>
+              )}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-medium text-muted-foreground">Anexar documento (PDF ou imagem, até 10 MB)</label>
+                <input
+                  type="file"
+                  multiple
+                  accept=".pdf,.jpg,.jpeg,.png,.webp"
+                  onChange={handleAnexar}
+                  disabled={enviandoAnexo}
+                  className="text-xs"
+                />
+                {enviandoAnexo && <p className="text-[10px] text-muted-foreground">A enviar...</p>}
+              </div>
+              {anexos.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-input px-3 py-4 text-center text-[11px] text-muted-foreground bg-muted/30">
+                  Sem documentos anexados.
+                </p>
+              ) : (
+                <div className="space-y-1.5">
+                  {anexos.map((a) => (
+                    <div key={a.id} className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-card px-3 py-2">
+                      <button
+                        type="button"
+                        onClick={() => abrirAnexoFatura(a.id).catch(() => addToast?.("Erro ao abrir anexo", "error"))}
+                        className="flex min-w-0 items-center gap-2 text-xs font-medium text-foreground hover:text-primary"
+                        title={a.nome_original}
+                      >
+                        <Icon name="attach_file" className="text-sm text-primary" />
+                        <span className="truncate">{a.nome_original}</span>
+                      </button>
+                      <Button type="button" variant="ghost" size="sm" className="text-error" onClick={() => handleRemoverAnexo(a.id)}>
+                        <Icon name="close" className="text-sm" />
+                      </Button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

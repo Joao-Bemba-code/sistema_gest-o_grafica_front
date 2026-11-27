@@ -52,7 +52,7 @@ const corEstado = {
   cancelada: COR_MARCA_CINZA,
 };
 
-export default async function gerarPDF(fatura, empresa = {}) {
+export default async function gerarPDF(fatura, empresa = {}, agtSoftware = {}) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
   const ph = doc.internal.pageSize.getHeight();
@@ -162,21 +162,37 @@ export default async function gerarPDF(fatura, empresa = {}) {
   const hBanco = caixaBancariaMarca(doc, 14, y, pw - 28, empresa);
   y += hBanco + 8;
 
-  // ===== QR Code AGT =====
-  if (fatura.agt_document_no && empresa.nif) {
-    try {
-      const urlQR = `https://quiosqueagt.minfin.gov.ao/facturacao-eletronica/consultar-fe?emissor=${String(empresa.nif).trim()}&document=${String(fatura.agt_document_no).replace(/ /g, "%20")}`;
-      const dataUrlQR = await QRCode.toDataURL(urlQR, { errorCorrectionLevel: "M", margin: 1, width: 350, color: { dark: "#1a1a1a", light: "#ffffff" } });
-      const qrSize = 24;
-      const qx = pw - 14 - qrSize;
-      doc.addImage(dataUrlQR, "PNG", qx, y, qrSize, qrSize, undefined, "FAST");
-      doc.setFontSize(6.5);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(...COR_MARCA_CINZA);
-      doc.text("Valide esta fatura na AGT", qx + qrSize / 2, y + qrSize + 4, { align: "center" });
-      y += 30;
-    } catch (e) {
+  // ===== Bloco AGT: certificação do software + validação na AGT =====
+  const versao = agtSoftware?.productVersion || "";
+  const cert = agtSoftware?.softwareValidationNumber || "";
+  if (versao || cert || fatura.agt_document_no) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6.6);
+    doc.setTextColor(...COR_MARCA_SECUNDARIO);
+    doc.text("FATURAÇÃO ELETRÓNICA — SOFTWARE CERTIFICADO PELA AGT", 14, y);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...COR_MARCA_TEXTO);
+    doc.text(`Kamgest${versao ? ` · Versão ${versao}` : ""}${cert ? ` · Certificação nº ${cert}` : ""}`, 14, y + 4.5);
+    let qrLivre = true;
+    if (fatura.agt_document_no) {
+      doc.text(`Nº do documento na AGT: ${fatura.agt_document_no}`, 14, y + 9);
     }
+    if (fatura.agt_document_no && empresa.nif) {
+      try {
+        const urlQR = `https://quiosqueagt.minfin.gov.ao/facturacao-eletronica/consultar-fe?emissor=${String(empresa.nif).trim()}&document=${String(fatura.agt_document_no).replace(/ /g, "%20")}`;
+        const dataUrlQR = await QRCode.toDataURL(urlQR, { errorCorrectionLevel: "M", margin: 1, width: 350, color: { dark: "#1a1a1a", light: "#ffffff" } });
+        const qrSize = 22;
+        const qx = pw - 14 - qrSize;
+        doc.addImage(dataUrlQR, "PNG", qx, y - 2, qrSize, qrSize, undefined, "FAST");
+        doc.setFontSize(6.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...COR_MARCA_CINZA);
+        doc.text("Valide esta fatura na AGT", qx + qrSize / 2, y - 2 + qrSize + 4, { align: "center" });
+        qrLivre = false;
+      } catch (e) {
+      }
+    }
+    y += qrLivre ? 14 : 28;
   }
 
   // ===== Assinaturas =====

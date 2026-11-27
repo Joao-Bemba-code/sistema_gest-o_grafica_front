@@ -7,15 +7,16 @@ import ComprovativosTab from "@/components/tesouraria/ComprovativosTab";
 import DividasTab from "@/components/tesouraria/DividasTab";
 import ConciliacaoTab from "@/components/tesouraria/ConciliacaoTab";
 import CaixaTab from "@/components/tesouraria/CaixaTab";
-import AlertasDividasPanel from "@/components/tesouraria/AlertasDividasPanel";
-import FinanceiroTab from "@/components/tesouraria/FinanceiroTab";
+import AnaliseFaturasTab from "@/components/tesouraria/AnaliseFaturasTab";
+import FacturasAReceberTab from "@/components/tesouraria/FacturasAReceberTab";
+import GestaoFacturacao from "@/app/(dashboard)/faturacao/page";
 import { podeAtual } from "@/lib/permissoes";
 
 export default function TesourariaPage() {
   const [tab, setTab] = useState("movimentos");
 
   // O menu "Financeiro" aponta para /tesouraria?tab=financeiro: o financeiro
-  // passou a fazer parte da tesouraria.
+  // passou a fazer parte da tesouraria e mostra a gestão completa da facturação.
   useEffect(() => {
     const pretendida = new URLSearchParams(window.location.search).get("tab");
     if (pretendida) setTab(pretendida);
@@ -24,6 +25,8 @@ export default function TesourariaPage() {
   const abas = [
     { id: "movimentos", label: "Movimentos", icon: "swap_horiz" },
     { id: "financeiro", label: "Financeiro", icon: "bar_chart" },
+    { id: "analise", label: "Faturas em análise", icon: "fact_check" },
+    { id: "receber", label: "Facturas a Receber", icon: "request_quote" },
     { id: "contas", label: "Contas e Caixa", icon: "account_balance" },
     { id: "conciliacao", label: "Reconciliação", icon: "fact_check" },
     { id: "caixa", label: "Abertura e fecho", icon: "lock_open" },
@@ -42,8 +45,10 @@ export default function TesourariaPage() {
         <p className="mt-1 text-xs font-medium text-muted-foreground">Caixa, bancos e pagamentos.</p>
       </div>
 
-      <TesourariaTab aba={abaVisivel} setAba={setTab} abas={abas} painel={<AlertasDividasPanel />}>
-        {abaVisivel === "financeiro" && <FinanceiroTab />}
+      <TesourariaTab aba={abaVisivel} setAba={setTab} abas={abas}>
+        {abaVisivel === "financeiro" && <GestaoFacturacao />}
+        {abaVisivel === "analise" && <AnaliseFaturasTab />}
+        {abaVisivel === "receber" && <FacturasAReceberTab />}
         {abaVisivel === "contas" && <ContasBancariasTab />}
         {abaVisivel === "conciliacao" && <ConciliacaoTab />}
         {abaVisivel === "caixa" && <CaixaTab />}

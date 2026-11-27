@@ -1,6 +1,7 @@
 import { getUsuario } from "@/services/auth";
 
 export const MODULOS = [
+  { valor: "visao_geral", label: "Visão Geral" },
   { valor: "comercial", label: "Área Comercial" },
   { valor: "faturacao", label: "Facturação" },
   { valor: "tesouraria", label: "Tesouraria" },
@@ -41,6 +42,7 @@ function perfilAdminPerm() {
 const PERMISSOES_PADRAO = {
   admin: perfilAdminPerm(),
   gestao: {
+    visao_geral: { ver: true, criar: true, editar: true, eliminar: true, aprovar: true },
     comercial: { ver: true, criar: true, editar: true, eliminar: true, aprovar: true },
     faturacao: { ver: true, criar: true, editar: true, eliminar: true, aprovar: true },
     tesouraria: { ver: true, criar: true, editar: true, eliminar: true, aprovar: true },
@@ -57,6 +59,7 @@ const PERMISSOES_PADRAO = {
     utilizadores: { ver: false, criar: false, editar: false, eliminar: false, aprovar: false },
   },
   producao: {
+    visao_geral: { ver: true, criar: true, editar: true, eliminar: false, aprovar: false },
     producao: { ver: true, criar: true, editar: true, eliminar: false, aprovar: false },
     comercial: { ver: true, criar: false, editar: false, eliminar: false, aprovar: false },
     maquinas: { ver: false, criar: false, editar: true, eliminar: false, aprovar: false },
@@ -73,6 +76,7 @@ const PERMISSOES_PADRAO = {
     utilizadores: { ver: false, criar: false, editar: false, eliminar: false, aprovar: false },
   },
   leitura: {
+    visao_geral: { ver: true, criar: false, editar: false, eliminar: false, aprovar: false },
     comercial: { ver: true, criar: false, editar: false, eliminar: false, aprovar: false },
     faturacao: { ver: true, criar: false, editar: false, eliminar: false, aprovar: false },
     tesouraria: { ver: true, criar: false, editar: false, eliminar: false, aprovar: false },

@@ -28,7 +28,7 @@ import { listar as listarOrcamentos } from "@/services/orcamentos";
 import { listarOrdens } from "@/services/producao";
 import { listar as listarClientes } from "@/services/clientes";
 import { listarContas } from "@/services/contasBancarias";
-import { buscarOrganizacao } from "@/services/configuracoes";
+import { buscarOrganizacao, buscarAgt } from "@/services/configuracoes";
 import { resumoTesouraria, listarMovimentos } from "@/services/tesouraria";
 import { podeAtual } from "@/lib/permissoes";
 import gerarPDF from "@/lib/faturacaoPdf";
@@ -52,6 +52,7 @@ const tiposDoc = {
 };
 
 const faturaEstados = {
+  em_analise: { label: "Em análise", tom: "info" },
   emitida: { label: "Emitida", tom: "warning" },
   paga: { label: "Paga", tom: "success" },
   parcial: { label: "Parcial", tom: "info" },
@@ -98,6 +99,7 @@ export default function FaturacaoPage() {
   const [selectedFatura, setSelectedFatura] = useState(null);
   const [faturaForm, setFaturaForm] = useState(blankFaturaForm);
   const [empresa, setEmpresa] = useState({ nome: "", nif: "", endereco: "", telefone: "", email: "" });
+  const [agtSoftware, setAgtSoftware] = useState({});
   const [anularItem, setAnularItem] = useState(null);
   const [motivoAnulacao, setMotivoAnulacao] = useState("");
   const [deletando, setDeletando] = useState(false);
@@ -129,6 +131,12 @@ export default function FaturacaoPage() {
 
   useEffect(() => {
     carregarDados();
+  }, []);
+
+  useEffect(() => {
+    buscarAgt()
+      .then((r) => setAgtSoftware(r?.software || {}))
+      .catch(() => {});
   }, []);
 
 
@@ -557,7 +565,7 @@ export default function FaturacaoPage() {
                       ariaLabel="Ações da fatura"
                       itens={[
                         { icone: "visibility", rotulo: "Ver detalhes", onClick: () => abrirFatura(f) },
-                        { icone: "download", rotulo: "Baixar PDF", onClick: () => gerarPDF(f, empresa) },
+                        { icone: "download", rotulo: "Baixar PDF", onClick: () => gerarPDF(f, empresa, agtSoftware) },
                         ...(f.estado !== "cancelada"
                           ? [{ icone: "block", rotulo: "Anular", danger: true, onClick: () => { setAnularItem(f); setMotivoAnulacao(""); } }]
                           : []),
@@ -777,7 +785,7 @@ export default function FaturacaoPage() {
         <Modal open={!!selectedFatura} onClose={() => setSelectedFatura(null)} title={`Fatura ${selectedFatura.numero}`} icon="receipt_long" size="lg"
           footer={<>
             <div className="w-full space-y-3">
-              {!["paga", "cancelada"].includes(selectedFatura.estado) && selectedFatura.tipo !== "recibo" && (
+              {!["paga", "cancelada", "em_analise"].includes(selectedFatura.estado) && selectedFatura.tipo !== "recibo" && (
                 <div className="flex flex-wrap items-end gap-3">
                   <div className="flex flex-col gap-1 flex-1 min-w-[180px] max-w-[240px]">
                     <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Valor a pagar agora</label>
@@ -823,7 +831,7 @@ export default function FaturacaoPage() {
                     </Button>
                   </>
                 )}
-                <Button type="button" variant="outline" onClick={() => gerarPDF(selectedFatura, empresa)}><Icon name="download" className="text-sm" /> Baixar PDF</Button>
+                <Button type="button" variant="outline" onClick={() => gerarPDF(selectedFatura, empresa, agtSoftware)}><Icon name="download" className="text-sm" /> Baixar PDF</Button>
                 {selectedFatura.estado !== "cancelada" && (
                   <Button
                     type="button"
@@ -957,6 +965,13 @@ export default function FaturacaoPage() {
                     </StatusBadge>
                   )}
                 </div>
+                {(agtSoftware.productVersion || agtSoftware.softwareValidationNumber) && (
+                  <p className="text-xs text-muted-foreground">
+                    Software certificado pela AGT: <span className="font-semibold text-foreground">
+                      Kamgest{agtSoftware.productVersion ? ` v${agtSoftware.productVersion}` : ""}{agtSoftware.softwareValidationNumber ? ` · Certificação nº ${agtSoftware.softwareValidationNumber}` : ""}
+                    </span>
+                  </p>
+                )}
                 {selectedFatura.agt_document_no && (
                   <p className="text-xs text-muted-foreground">
                     Nº documento AGT: <span className="font-semibold text-foreground">{selectedFatura.agt_document_no}</span>

@@ -24,7 +24,7 @@ export const blankForm = {
   cliente: "", empresa: "", nif: "", telefone: "", email: "",
   itens: [{ ...blankItem, materiais: [{ ...blankMaterial }] }],
   servicos: [{ ...blankServico }],
-  iva: "", desconto: "", prazoExecucao: "", condicoesPagamento: "100% antecipado", observacoes: "",
+  iva: "", desconto: "", descontoPercentual: "", aumentoPercentual: "", prazoExecucao: "", condicoesPagamento: "100% antecipado", observacoes: "",
 };
 
 export function precoUnitMaterial(m) {
@@ -451,9 +451,13 @@ export default function OrcamentoForm({ formId = "form-orcamento", form, setFiel
   };
 
   const subtotalCalc = form.itens.reduce((s, it) => s + (Number(it.total) || 0), 0) + (form.servicos || []).reduce((s, sv) => s + (Number(sv.total) || 0), 0);
-  const descontoCalc = Number(form.desconto) || 0;
+  const descontoPct = Number(form.descontoPercentual) || 0;
+  const aumentoPct = Number(form.aumentoPercentual) || 0;
+  // Desconto em percentagem tem prioridade; se 0, usa o valor absoluto (antigo).
+  const descontoCalc = descontoPct > 0 ? subtotalCalc * (descontoPct / 100) : (Number(form.desconto) || 0);
+  const aumentoCalc = aumentoPct > 0 ? subtotalCalc * (aumentoPct / 100) : 0;
   const ivaCalc = Number(form.iva) || 0;
-  const totalCalc = subtotalCalc - descontoCalc + ivaCalc;
+  const totalCalc = subtotalCalc - descontoCalc + aumentoCalc + ivaCalc;
 
 return (
     <form id={formId} onSubmit={onSubmit} className="space-y-5">
@@ -822,6 +826,12 @@ return (
             <Campo label="Desconto (Kz) — Opcional">
               <NumeroInput name="desconto" value={form.desconto} onChange={(e) => setField("desconto", e.target.value)} className={inputCls} placeholder="0" />
             </Campo>
+            <Campo label="Desconto (%) — sobre o subtotal">
+              <NumeroInput name="descontoPercentual" value={form.descontoPercentual} onChange={(e) => setField("descontoPercentual", e.target.value)} className={inputCls} placeholder="0" />
+            </Campo>
+            <Campo label="Aumento / Juro (%) — sobre o subtotal">
+              <NumeroInput name="aumentoPercentual" value={form.aumentoPercentual} onChange={(e) => setField("aumentoPercentual", e.target.value)} className={inputCls} placeholder="0" />
+            </Campo>
             <Campo label="Prazo de Execução" obrigatorio>
               <input required aria-required="true" name="prazoExecucao" value={form.prazoExecucao} onChange={(e) => setField("prazoExecucao", e.target.value)} className={inputCls} placeholder="Ex: 5 dias úteis" />
             </Campo>
@@ -853,7 +863,8 @@ return (
             <div className="bg-muted/50 rounded-xl p-4 flex items-center justify-between sm:col-span-2">
               <div className="text-xs font-mono text-muted-foreground space-y-0.5">
                 <p>Subtotal: <strong className="text-foreground">{`Kz ${subtotalCalc.toLocaleString("pt-AO")}`}</strong></p>
-                {descontoCalc > 0 && <p>Desconto: <strong className="text-green-600">{`-Kz ${descontoCalc.toLocaleString("pt-AO")}`}</strong></p>}
+                {descontoCalc > 0 && <p>Desconto{descontoPct > 0 ? ` (${descontoPct}%)` : ""}: <strong className="text-green-600">{`-Kz ${descontoCalc.toLocaleString("pt-AO")}`}</strong></p>}
+                {aumentoCalc > 0 && <p>Aumento{aumentoPct > 0 ? ` (${aumentoPct}%)` : ""}: <strong className="text-amber-600">{`+Kz ${aumentoCalc.toLocaleString("pt-AO")}`}</strong></p>}
                 {ivaCalc > 0 && <p>IVA: <strong className="text-foreground">{`Kz ${ivaCalc.toLocaleString("pt-AO")}`}</strong></p>}
               </div>
               <div className="text-right">

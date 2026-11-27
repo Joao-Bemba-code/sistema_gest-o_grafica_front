@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { listar as listarDividas, criar, atualizar, remover, pagar, resumo as resumoDividas } from "@/services/dividas";
 import { listar as listarClientes } from "@/services/clientes";
 import { listarContas } from "@/services/contasBancarias";
+import { alertasDividas } from "@/services/tesouraria";
+import { guardarSistema } from "@/services/configuracoes";
 import Icon from "@/components/Icon";
 import { Card, CardContent } from "@/components/ui/Card";
 import KpiCard from "@/components/ui/KpiCard";
@@ -160,6 +162,11 @@ export default function DividasTab() {
 
   const [confirmarApagar, setConfirmarApagar] = useState(null);
   const [verFicha, setVerFicha] = useState(null);
+
+  // Limite global de dívida (para todos os clientes) e prazo.
+  const [configAberta, setConfigAberta] = useState(false);
+  const [configSalvando, setConfigSalvando] = useState(false);
+  const [configForm, setConfigForm] = useState({ limite_divida_cliente: 0, prazo_divida_dias: 30 });
 
   const carregar = () => Promise.all([listarDividas(), resumoDividas()])
     .then(([lista, res]) => {
@@ -372,6 +379,36 @@ export default function DividasTab() {
     }
   };
 
+  const abrirConfig = async () => {
+    setConfigAberta(true);
+    try {
+      const info = await alertasDividas();
+      const p = info?.parametros || {};
+      setConfigForm({
+        limite_divida_cliente: Number(p.limite) || 0,
+        prazo_divida_dias: Number(p.prazoDias) || 30,
+      });
+    } catch {
+      // mantém os valores actuais
+    }
+  };
+
+  const guardarConfig = async () => {
+    setConfigSalvando(true);
+    try {
+      await guardarSistema({
+        limite_divida_cliente: Math.max(0, Number(configForm.limite_divida_cliente) || 0),
+        prazo_divida_dias: Math.max(0, Math.floor(Number(configForm.prazo_divida_dias) || 0)),
+      });
+      addToast?.("Limite global de dívida guardado", "success");
+      setConfigAberta(false);
+    } catch (e) {
+      addToast?.(e?.response?.data?.erro || "Erro ao guardar limite", "error");
+    } finally {
+      setConfigSalvando(false);
+    }
+  };
+
   if (carregando) return <ListSkeleton count={5} />;
 
   const parcelas = Array.isArray(verFicha?.parcelas) ? verFicha.parcelas : [];
@@ -379,6 +416,13 @@ export default function DividasTab() {
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground">Limite global de dívida aplicado a todos os clientes.</p>
+        <Button variant="outline" size="sm" onClick={abrirConfig}>
+          <Icon name="settings" className="text-sm" /> Configurar limite global
+        </Button>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         <KpiCard icon="account_balance_wallet" label="Total a Receber" value={formatKz(resumo.total)} iconVariant="primary"
           badge={`${resumo.qtdDividas || 0} dívida(s) em aberto`} />
@@ -783,6 +827,34 @@ export default function DividasTab() {
             )}
           </div>
         )}
+      </Modal>
+
+      <Modal
+        open={configAberta}
+        onClose={() => setConfigAberta(false)}
+        title="Limite global de dívida"
+        icon="settings"
+        size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setConfigAberta(false)}>Cancelar</Button>
+            <Button onClick={guardarConfig} loading={configSalvando}>
+              <Icon name="save" className="text-sm" /> Guardar
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-muted-foreground rounded-lg bg-muted/50 border border-border/60 px-3 py-2">
+            Limite único para todos os clientes. Ao atingi-lo, novos orçamentos ficam bloqueados (exceto para a Administração). 0 desactiva o bloqueio.
+          </p>
+          <FormField label="Limite global (Kz)" hint="0 desactiva o bloqueio de orçamentos.">
+            <NumeroInput value={configForm.limite_divida_cliente} onChange={(e) => setConfigForm((p) => ({ ...p, limite_divida_cliente: e.target.value }))} className={inputCls} placeholder="0,00" />
+          </FormField>
+          <FormField label="Prazo global (dias)" hint="Contado a partir da emissão da fatura.">
+            <NumeroInput value={configForm.prazo_divida_dias} onChange={(e) => setConfigForm((p) => ({ ...p, prazo_divida_dias: e.target.value }))} className={inputCls} placeholder="30" />
+          </FormField>
+        </div>
       </Modal>
 
       <ConfirmDialog

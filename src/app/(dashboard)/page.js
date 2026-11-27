@@ -38,6 +38,10 @@ import {
   LuTrendingUp,
   LuBanknote,
   LuPercent,
+  LuShieldCheck,
+  LuLock,
+  LuClipboardList,
+  LuUsers,
 } from "react-icons/lu";
 
 const DIA_MS = 86400000;
@@ -468,7 +472,7 @@ export default function DashboardPage() {
     return arr;
   })();
 
-  /* ─── Alertas ─── */
+  /* ─── Alertas e Travancas ─── */
   const alertas = [
     faturasPorPagar.length > 0 && {
       icon: faturasVencidas > 0 ? LuOctagonAlert : LuTriangleAlert,
@@ -480,6 +484,54 @@ export default function DashboardPage() {
     materiaisAlerta.length > 0 && { icon: LuTriangleAlert, tone: "bg-warning/10 text-warning", titulo: `${materiaisAlerta.length} ${materiaisAlerta.length === 1 ? "Artigo" : "Artigos"} com stock mínimo`, desc: "Necessitam reposição" },
     maquinasManutencao.length > 0 && { icon: LuCog, tone: "bg-primary/10 text-primary", titulo: `${maquinasManutencao.length} ${maquinasManutencao.length === 1 ? "Equipamento" : "Equipamentos"} em manutenção`, desc: maquinasManutencao[0]?.nome_comum || maquinasManutencao[0]?.nome || "Verificar estado" },
   ].filter(Boolean);
+
+  const travasAtivas = [
+    materiais.filter((m) => m.status === "esgotado").length > 0 && {
+      titulo: "Stock esgotado bloqueia produção",
+      desc: `${materiais.filter((m) => m.status === "esgotado").length} artigo(s) esgotado(s).`,
+    },
+    maquinas.filter((m) => m.estado === "avariada").length > 0 && {
+      titulo: "Equipamento avariado",
+      desc: `${maquinas.filter((m) => m.estado === "avariada").length} máquina(s) avariada(s).`,
+    },
+    faturasVencidas > 0 && {
+      titulo: "Facturas vencidas (risco de bloqueio comercial)",
+      desc: `${faturasVencidas} factura(s) vencida(s) pendentes.`,
+    },
+  ].filter(Boolean);
+
+  // Centro de aprovação (itens pendentes)
+  const aprovacoesPendentes = [
+    ...propostas.filter((p) => ["enviada", "recebida", "avaliada"].includes(p.estado)).map((p) => ({
+      tipo: "Proposta",
+      ref: p.numero || p.id || "—",
+      detalhe: p.cliente || p.cliente_nome || "Cliente",
+    })),
+    ...ordens.filter((o) => o.estado === "pendente").map((o) => ({
+      tipo: "Ordem de Produção",
+      ref: o.numero || o.id || "—",
+      detalhe: o.cliente || o.descricao || "OP",
+    })),
+  ].slice(0, 6);
+
+  // Painel executivo por unidades de negócio (resumo)
+  const unidadesNegocio = [
+    { nome: "Pré-impressão", valor: formatNum(ordens.filter((o) => o.estado === "pendente").length), sub: "OP pendentes", href: "/pre-impressao" },
+    { nome: "Impressão", valor: formatNum(emProducao), sub: "em produção", href: "/impressao" },
+    { nome: "Acabamento", valor: formatNum(concluidas), sub: "concluídas", href: "/acabamento" },
+    { nome: "Vendas/Propostas", valor: formatNum(propostas.length), sub: `${formatNum(propostas.filter((p) => p.estado === "aprovada").length)} aprovadas`, href: "/vendas" },
+    { nome: "Estoque", valor: formatNum(materiais.length), sub: `${formatNum(materiaisAlerta.length)} em alerta`, href: "/estoque" },
+    { nome: "Tesouraria", valor: `${formatNum(resultadoAtual)} Kz`, sub: "resultado do período", href: "/tesouraria" },
+  ];
+
+  // Ritual semanal (abas por área/dev)
+  const [abaRitual, setAbaRitual] = useState("producao");
+  const ritualSemanal = {
+    producao: ["Rever OPs atrasadas", "Confirmar cargas de máquinas", "Fechar O.P.s finalizadas da semana"],
+    comercial: ["Follow-up de propostas enviadas", "Rever orçamentos pendentes", "Atualizar pipeline de clientes"],
+    estoque: ["Contagem rápida de itens críticos", "Validar pedidos em atraso", "Atualizar níveis mínimos"],
+    financeiro: ["Conferir recebimentos da semana", "Rever faturas a vencer", "Fechar caixa/tesouraria"],
+  };
 
   const mesLabel = hoje.toLocaleDateString("pt-PT", { month: "long", year: "numeric" });
   const mesAtual = mesLabel.charAt(0).toUpperCase() + mesLabel.slice(1);
@@ -816,6 +868,120 @@ export default function DashboardPage() {
                 centroLabel="Kz"
               />
             </div>
+          </div>
+        </div>
+
+        {/* ══════════ Painel Executivo + Centro de Aprovação ══════════ */}
+        <div className="min-w-0 lg:col-span-9">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
+            <div className="rounded-xl border border-border bg-card p-4 shadow-sm md:col-span-7">
+              <h3 className="mb-3 text-xs font-semibold text-foreground">Painel Executivo — Unidades de Negócio</h3>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {unidadesNegocio.map((u) => (
+                  <Link key={u.nome} href={u.href} className="rounded-lg border border-border bg-muted/30 p-2.5 hover:bg-muted/60 transition-colors">
+                    <p className="text-[10px] font-medium text-muted-foreground">{u.nome}</p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">{u.valor}</p>
+                    <p className="text-[9.5px] text-muted-foreground">{u.sub}</p>
+                  </Link>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-xl border border-border bg-card p-4 shadow-sm md:col-span-5">
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="text-xs font-semibold text-foreground flex items-center gap-1.5"><LuShieldCheck className="h-4 w-4 text-primary" /> Centro de Aprovação</h3>
+                <span className="text-[10px] text-muted-foreground">{aprovacoesPendentes.length} pendente(s)</span>
+              </div>
+              <div className="space-y-2">
+                {aprovacoesPendentes.length === 0 ? (
+                  <p className="py-6 text-center text-xs text-muted-foreground">Sem itens pendentes.</p>
+                ) : (
+                  aprovacoesPendentes.map((a, idx) => (
+                    <div key={idx} className="flex items-start justify-between rounded-lg border border-border bg-muted/20 px-2.5 py-2">
+                      <div>
+                        <p className="text-[10px] font-semibold text-foreground">{a.tipo}</p>
+                        <p className="text-[9.5px] text-muted-foreground">{a.detalhe}</p>
+                      </div>
+                      <span className="text-[10px] font-medium text-primary">#{String(a.ref).slice(0, 8)}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ══════════ Alertas e Travancas Ativas ══════════ */}
+        <div className="min-w-0 lg:col-span-9">
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+            <h3 className="mb-3 text-xs font-semibold text-foreground flex items-center gap-1.5"><LuLock className="h-4 w-4 text-warning" /> Alertas e Travancas Ativas</h3>
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+              {alertas.map((a) => {
+                const Icone = a.icon;
+                return (
+                  <div key={a.titulo} className="flex items-start space-x-2.5 rounded-lg border border-border bg-muted/20 p-2.5">
+                    <div className={cn("mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full", a.tone)}>
+                      <Icone className="h-3 w-3" />
+                    </div>
+                    <div>
+                      <h4 className="text-[11px] font-semibold leading-tight text-foreground">{a.titulo}</h4>
+                      <p className="text-[9.5px] leading-tight text-muted-foreground">{a.desc}</p>
+                    </div>
+                  </div>
+                );
+              })}
+              {travasAtivas.map((t, idx) => (
+                <div key={`trava-${idx}`} className="flex items-start space-x-2.5 rounded-lg border border-warning/30 bg-warning/5 p-2.5">
+                  <div className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-warning/20 text-warning">
+                    <LuLock className="h-3 w-3" />
+                  </div>
+                  <div>
+                    <h4 className="text-[11px] font-semibold leading-tight text-foreground">{t.titulo}</h4>
+                    <p className="text-[9.5px] leading-tight text-muted-foreground">{t.desc}</p>
+                  </div>
+                </div>
+              ))}
+              {alertas.length === 0 && travasAtivas.length === 0 && (
+                <p className="py-4 text-center text-xs text-muted-foreground md:col-span-2">Sem alertas ou travancas ativas.</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ══════════ Ritual Semanal (abas por área/dev) ══════════ */}
+        <div className="min-w-0 lg:col-span-9">
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-xs font-semibold text-foreground flex items-center gap-1.5"><LuClipboardList className="h-4 w-4 text-primary" /> Ritual Semanal</h3>
+              <span className="text-[10px] text-muted-foreground">Checklist por área</span>
+            </div>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {[
+                { id: "producao", label: "Produção" },
+                { id: "comercial", label: "Comercial" },
+                { id: "estoque", label: "Estoque" },
+                { id: "financeiro", label: "Financeiro" },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setAbaRitual(tab.id)}
+                  className={cn(
+                    "rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-colors",
+                    abaRitual === tab.id ? "border-primary bg-primary/10 text-primary" : "border-border bg-muted/30 text-foreground hover:bg-muted/60"
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            <ul className="space-y-2">
+              {(ritualSemanal[abaRitual] || []).map((item, idx) => (
+                <li key={idx} className="flex items-center gap-2 rounded-lg border border-border bg-muted/10 px-3 py-2 text-[11px] text-foreground">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                  {item}
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
 

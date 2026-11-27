@@ -212,7 +212,9 @@ export default function OrcamentoModal({ open, editingId, prefill, onClose, onSa
                 duracaoHoras: Number(sv.duracaoHoras || sv.duracao_horas) || 8,
                 total: Number(sv.total) || 0,
               })),
-              iva: String(o.iva ?? ""), desconto: String(o.desconto ?? ""), prazoExecucao: o.prazoExecucao || "",
+              iva: String(o.iva ?? ""), desconto: String(o.desconto ?? ""),
+              descontoPercentual: String(o.descontoPercentual ?? ""), aumentoPercentual: String(o.aumentoPercentual ?? ""),
+              prazoExecucao: o.prazoExecucao || "",
               condicoesPagamento: o.condicoesPagamento || "", observacoes: o.observacoes || "",
             });
           } catch {
@@ -266,9 +268,12 @@ export default function OrcamentoModal({ open, editingId, prefill, onClose, onSa
   };
 
   const subtotalCalc = form.itens.reduce((s, it) => s + (Number(it.total) || 0), 0) + (form.servicos || []).reduce((s, sv) => s + (Number(sv.total) || 0), 0);
-  const descontoCalc = Number(form.desconto) || 0;
+  const descontoPct = Number(form.descontoPercentual) || 0;
+  const aumentoPct = Number(form.aumentoPercentual) || 0;
+  const descontoCalc = descontoPct > 0 ? subtotalCalc * (descontoPct / 100) : (Number(form.desconto) || 0);
+  const aumentoCalc = aumentoPct > 0 ? subtotalCalc * (aumentoPct / 100) : 0;
   const ivaCalc = Number(form.iva) || 0;
-  const totalCalc = subtotalCalc - descontoCalc + ivaCalc;
+  const totalCalc = subtotalCalc - descontoCalc + aumentoCalc + ivaCalc;
 
   const aoSubmeter = async (e) => {
     e.preventDefault();
@@ -346,6 +351,8 @@ export default function OrcamentoModal({ open, editingId, prefill, onClose, onSa
         }).filter((sv) => sv.descricao),
         subtotal: subtotalCalc,
         desconto: descontoCalc,
+        desconto_percentual: descontoPct,
+        aumento_percentual: aumentoPct,
         iva: ivaCalc,
         prazoExecucao: form.prazoExecucao,
         condicoesPagamento: form.condicoesPagamento,
@@ -434,7 +441,8 @@ export default function OrcamentoModal({ open, editingId, prefill, onClose, onSa
                 <PreviewLinha key={`sv-${i}`} label={`Serviço ${i + 1}`} valor={`${sv.descricao} · ${sv.mob || 1}×${sv.duracaoHoras || 8}h · ${formatKz(sv.total || 0)}`} />
               ))}
               <PreviewLinha label="Subtotal" valor={formatKz(subtotalCalc)} />
-              {descontoCalc > 0 && <PreviewLinha label="Desconto" valor={`-${formatKz(descontoCalc)}`} />}
+              {descontoCalc > 0 && <PreviewLinha label={`Desconto${descontoPct > 0 ? ` (${descontoPct}%)` : ""}`} valor={`-${formatKz(descontoCalc)}`} />}
+              {aumentoCalc > 0 && <PreviewLinha label={`Aumento${aumentoPct > 0 ? ` (${aumentoPct}%)` : ""}`} valor={`+${formatKz(aumentoCalc)}`} />}
               {ivaCalc > 0 && <PreviewLinha label="IVA" valor={formatKz(ivaCalc)} />}
               <PreviewLinha label="Total" valor={formatKz(totalCalc)} acento="text-primary" />
             </div>
